@@ -1,5 +1,5 @@
 #!/bin/sh
-
+#set -x
 if test $# = 0; then
     echo "usage: $0 <file prefix>"
     exit 1
@@ -10,7 +10,8 @@ ERROR=0
 
 RUN="${TEST}"
 ARGS=""
-CHECKS="${TEST}.log"
+CHECKS=${TEST%.native}".log"
+CHECKS=${CHECKS##*/}
 
 for i in ${RUN}; do
     if [ ! -x ${i} ]; then
@@ -27,14 +28,16 @@ OLDPATH=${PATH}
 PATH=.:${PATH}
 
 for i in ${RUN}; do
-    log=`basename ${i}`
+    log=${i%.native}
+    log=${log##*/}
     ${i} ${ARGS} > ${log}.log
 done
 
 PATH=${OLDPATH}
 
 for i in ${CHECKS}; do
-    if ! diff -u orig/${i} ${i} > ${i}.diff; then
+    ORIG_LOG=orig/${i%.native}
+    if ! diff -u $ORIG_LOG ${i} > ${i}.diff; then
 	echo "${TEST}: FAILED (see ${i}.diff)"
 	ERROR=$((${ERROR} + 1))
     else
