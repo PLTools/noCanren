@@ -23,6 +23,16 @@ clean:
 	rm -fr _build *.log  *.native *.byte
 
 #TESTS=
+REGRES_CASES=000 001 002 003 004
+define TESTRULES
+.PHONY: test_$(1)
+tests: test_$(1)
+native_tests: regression/test$(1).native
+test_$(1): native_tests regression/test$(1).native
+	@cd regression  && $(TESTS_ENVIRONMENT) ../test$(1).native; \
+	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
+endef
+$(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
 
 check-TESTS: check
 	@failed=0; all=0; xfail=0; xpass=0; skip=0; \
