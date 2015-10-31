@@ -1,3 +1,5 @@
 *.byte
 *.native
 /test*.log
+/_build
+
