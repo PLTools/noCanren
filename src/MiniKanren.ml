@@ -1,4 +1,40 @@
-module Stream = MKStream 
+module Stream =
+  struct
+
+    type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
+
+    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.lazy_from_fun f)
+
+    let nil = Nil
+
+    let cons h t = Cons (h, t)
+
+    let rec take ?(n=(-1)) s =
+      if n = 0
+      then []
+      else match s with
+           | Nil          -> []
+           | Cons (x, xs) -> x :: take ~n:(n-1) xs
+	   | Lazy  z      -> take ~n:n (Lazy.force z)            
+
+    let rec mplus fs gs =
+      LOG[trace1] (logn "mplus");
+      from_fun (fun () ->
+         match fs with
+         | Nil           -> gs
+         | Cons (hd, tl) -> cons hd (mplus gs tl) 
+	 | Lazy z        -> mplus gs (Lazy.force z)
+      )
+
+    let rec bind xs f =
+      from_fun (fun () ->
+        match xs with
+        | Cons (x, xs) -> mplus (f x) (bind xs f)
+	| Nil          -> nil
+        | Lazy z       -> bind (Lazy.force z) f
+     )
+
+  end
 
 let (!!) = Obj.magic
 
@@ -201,7 +237,7 @@ module State =
     let show (env, subst) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
   end
 
-type goal = State.t -> State.t MKStream.t
+type goal = State.t -> State.t Stream.t
 
 let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _) x k ->
   match Env.var e x with
@@ -271,7 +307,7 @@ class ['a] mkshow_option_t =
   object
     inherit ['a, State.t, string, State.t, string] @GT.option
     method c_None e s   = show_var e s.GT.x (fun _ -> "None")
-    method c_Some e s x = show_var e s.GT.x (fun _ -> "Some (" ^ x.fx e ^ ")")
+    method c_Some e s x = show_var e s.GT.x (fun _ -> "Some (" ^ x.GT.fx e ^ ")")
   end
 
 let mkshow t = t.GT.plugins#mkshow
@@ -421,32 +457,16 @@ let call_fresh f (env, subst) =
   f x (env', subst)
 
 let (===) x y (env, subst) =
-  LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (show_st (env, subst)));
+  LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst)));
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
-  | Some s -> LOG[trace1] (logn "'%s'" (show_st (env, s))); Stream.cons (env, s) Stream.nil
+  | Some s -> LOG[trace1] (logn "'%s'" (State.show (env, s))); Stream.cons (env, s) Stream.nil
 
-let conj f g st =
-  LOG[trace1] (logn "conj %s" (show_st st));
-  Stream.from_fun (fun () -> Stream.concat_map g (f st))
+let conj f g st = Stream.bind (f st) g 
 
 let (&&&) = conj
 
-let disj f g st =
-  LOG[trace1] (logn "disj %s" (show_st st));
-  let rec interleave fs gs =
-    LOG[trace1] (logn "interleave");
-    Stream.from_fun (
-      fun () ->
-	match Stream.destruct fs with
-	| `Nil -> gs
-	| `Cons (hd, tl) ->
-           Stream.cons hd (interleave gs tl)
-    )
-  in
-  interleave
-    (f st)
-    (Stream.from_fun (fun () -> g st))
+let disj f g st = Stream.mplus (f st) (g st)
 
 let (|||) = disj 
 

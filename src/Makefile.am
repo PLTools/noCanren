@@ -2,8 +2,8 @@ PACKAGE := MiniKanren
 SUBDIRS = 
 
 # type in sources here
-SOURCES = MKStream.ml MiniKanren.ml
-MLI = MKStream.mli MiniKanren.mli
+SOURCES = MiniKanren.ml
+MLI = MiniKanren.mli
 
 include $(top_srcdir)/m4/Makefile.am.vars
 
@@ -13,7 +13,7 @@ include $(top_srcdir)/m4/Makefile.am.vars
 CMO := $(SORTED:.ml=.cmo)
 
 # OCaml parser call with flags
-AM_P5FLAGS := -pp "$(CAMLP5O) $(PARSER_INCLUDES) pa_log.cmo pa_gt.cmo -L `camlp5o -where`  $(LOG) $(DOC)"
+AM_P5FLAGS := -pp "$(CAMLP5O) $(PARSER_INCLUDES) pa_log.cmo pa_gt.cmo -L `camlp5o -where` $(LOG) $(DOC)"
 AM_BFLAGS += -rectypes -annot
 AM_OFLAGS += -rectypes -annot
 
