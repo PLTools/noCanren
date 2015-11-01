@@ -2,15 +2,15 @@
  * MiniKanren: miniKanren primitives implementation.
  * Copyright (C) 2015
  * Dmitri Boulytchev, Dmitry Kosarev, St.Petersburg State University
- * 
+ *
  * This software is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License version 2, as published by the Free Software Foundation.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * See the GNU Library General Public License version 2 for more details
  * (enclosed in the file COPYING).
  *)
@@ -19,15 +19,11 @@
 
 (** {2 Basic modules and types} *)
 
-(** State (needed to perform calculations) *)
-module State :
-  sig
-    (** State type *)
-    type t
-
-    (** Printing helper *)
-    val show : t -> string
-  end
+module type LOGGER = sig
+  type t
+  val log: string -> t list -> t
+end
+module UnitLogger: LOGGER
 
 (** Lazy streams *)
 module Stream :
@@ -39,6 +35,19 @@ module Stream :
     (** Lazy constructor *)
     val from_fun : (unit -> 'a t) -> 'a t
   end
+
+module Make : functor (Logger: LOGGER) -> sig
+(** State (needed to perform calculations) *)
+module State :
+  sig
+    (** State type *)
+    type t
+
+    (** Printing helper *)
+    val show : t -> string
+  end
+
+module Logger: LOGGER
 
 (** Goal converts a state into a lazy stream of states *)
 type goal = State.t -> State.t Stream.t
@@ -228,3 +237,5 @@ val refine : State.t -> 'a -> 'a
 (** [take ?(n=k) s] takes at most [k] first answers from the lazy
     stream [s] (reexported from MKStream for convenience) *)
 val take : ?n:int -> State.t Stream.t -> State.t list
+
+end

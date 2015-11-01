@@ -15,14 +15,14 @@ module Stream =
       else match s with
            | Nil          -> []
            | Cons (x, xs) -> x :: take ~n:(n-1) xs
-	   | Lazy  z      -> take ~n:n (Lazy.force z)            
+	   | Lazy  z      -> take ~n:n (Lazy.force z)
 
     let rec mplus fs gs =
       LOG[trace1] (logn "mplus");
       from_fun (fun () ->
          match fs with
          | Nil           -> gs
-         | Cons (hd, tl) -> cons hd (mplus gs tl) 
+         | Cons (hd, tl) -> cons hd (mplus gs tl)
 	 | Lazy z        -> mplus gs (Lazy.force z)
       )
 
@@ -118,7 +118,7 @@ module Env :
     val var    : t -> 'a -> int option
     val vars   : t -> var list
     val show   : t -> string
-  end = 
+  end =
   struct
     module H = Hashtbl.Make (
       struct
@@ -229,8 +229,19 @@ module Subst :
 	    )
   end
 
+module type LOGGER = sig
+  type t
+  val log: string -> t list -> t
+end
+module UnitLogger : LOGGER = struct
+  type t = unit
+  let log _ _ = ()
+end
+
+module Make (Logger: LOGGER) = struct
+module Logger = Logger
 module State =
-  struct  
+  struct
     type t = Env.t * Subst.t
     let empty () = (Env.empty (), Subst.empty)
     let env = fst
@@ -313,7 +324,7 @@ class ['a] mkshow_option_t =
 let mkshow t = t.GT.plugins#mkshow
 
 let int = {GT.gcata = GT.int.GT.gcata;
-           GT.plugins = 
+           GT.plugins =
              object
                method show    = GT.int.GT.plugins#show
                method html    = GT.int.GT.plugins#html
@@ -327,7 +338,7 @@ let int = {GT.gcata = GT.int.GT.gcata;
           }
 
 let string = {GT.gcata = GT.string.GT.gcata;
-              GT.plugins = 
+              GT.plugins =
                 object
                   method show    = GT.string.GT.plugins#show
                   method html    = GT.string.GT.plugins#html
@@ -341,7 +352,7 @@ let string = {GT.gcata = GT.string.GT.gcata;
              }
 
 let bool = {GT.gcata = GT.string.GT.gcata;
-            GT.plugins = 
+            GT.plugins =
               object
                 method show    = GT.bool.GT.plugins#show
                 method html    = GT.bool.GT.plugins#html
@@ -355,7 +366,7 @@ let bool = {GT.gcata = GT.string.GT.gcata;
            }
 
 let char = {GT.gcata = GT.char.GT.gcata;
-            GT.plugins = 
+            GT.plugins =
               object
                 method show    = GT.char.GT.plugins#show
                 method html    = GT.char.GT.plugins#html
@@ -369,7 +380,7 @@ let char = {GT.gcata = GT.char.GT.gcata;
            }
 
 let unit = {GT.gcata = GT.unit.GT.gcata;
-            GT.plugins = 
+            GT.plugins =
               object
                 method show    = GT.unit.GT.plugins#show
                 method html    = GT.unit.GT.plugins#html
@@ -383,7 +394,7 @@ let unit = {GT.gcata = GT.unit.GT.gcata;
            }
 
 let int32 = {GT.gcata = GT.int32.GT.gcata;
-             GT.plugins = 
+             GT.plugins =
                object
                  method show    = GT.int32.GT.plugins#show
                  method html    = GT.int32.GT.plugins#html
@@ -397,7 +408,7 @@ let int32 = {GT.gcata = GT.int32.GT.gcata;
             }
 
 let int64 = {GT.gcata = GT.int64.GT.gcata;
-             GT.plugins = 
+             GT.plugins =
                object
                  method show    = GT.int64.GT.plugins#show
                  method html    = GT.int64.GT.plugins#html
@@ -411,7 +422,7 @@ let int64 = {GT.gcata = GT.int64.GT.gcata;
             }
 
 let nativeint = {GT.gcata = GT.nativeint.GT.gcata;
-                 GT.plugins = 
+                 GT.plugins =
                    object
                      method show    = GT.nativeint.GT.plugins#show
                      method html    = GT.nativeint.GT.plugins#html
@@ -425,7 +436,7 @@ let nativeint = {GT.gcata = GT.nativeint.GT.gcata;
                 }
 
 let list = {GT.gcata = GT.list.GT.gcata;
-            GT.plugins = 
+            GT.plugins =
               object
                 method show    = GT.list.GT.plugins#show
                 method html    = GT.list.GT.plugins#html
@@ -439,7 +450,7 @@ let list = {GT.gcata = GT.list.GT.gcata;
            }
 
 let option = {GT.gcata = GT.option.GT.gcata;
-              GT.plugins = 
+              GT.plugins =
                 object
                   method show    = GT.option.GT.plugins#show
                   method html    = GT.option.GT.plugins#html
@@ -462,13 +473,13 @@ let (===) x y (env, subst) =
   | None   -> Stream.nil
   | Some s -> LOG[trace1] (logn "'%s'" (State.show (env, s))); Stream.cons (env, s) Stream.nil
 
-let conj f g st = Stream.bind (f st) g 
+let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj
 
 let disj f g st = Stream.mplus (f st) (g st)
 
-let (|||) = disj 
+let (|||) = disj
 
 let rec (?|) = function
 | [h]  -> h
@@ -479,9 +490,11 @@ let rec (?&) = function
 | h::t -> h &&& ?& t
 
 let conde = (?|)
- 
+
 let run f = f (State.empty ())
 
 let refine (e, s) x = Subst.walk' e x s
 
 let take = Stream.take
+
+end
