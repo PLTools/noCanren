@@ -8,5 +8,8 @@ true: package(GT.syntax), package(logger.syntax)
 <camlp5/pa_minikanren.ml>: syntax(camlp5o)
 
 <regression/test*>: syntax(camlp5o), package(settings)
-<regression/test*.ml>: package(GT.syntax.show)
+<regression/test004.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test000.ml>: package(ostap)
+<regression/test000.native>: package(ostap)
+
 <regression/orig/*>: traverse

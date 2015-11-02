@@ -1,9 +1,14 @@
 open GT
-open MiniKanren.Make(MiniKanren.UnitLogger)
 
-@type nat = O | S of nat with mkshow
+module M=MiniKanren.Make(MiniKanren.UnitLogger)
+open M
+
+
+@type nat = O | S of nat with show
 
 let rec copy = function O -> O | S n -> S (copy n)
+
+
 
 let run3 memo printer n goal =
   run (

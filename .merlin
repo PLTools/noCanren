@@ -1,0 +1,11 @@
+PKG GT
+PKG ostap
+SRC src
+SRC regression
+SRC plugin
+SRC camlp5
+B _build
+B _build/src
+B _build/plugin
+B _build/regression
+rectypes
