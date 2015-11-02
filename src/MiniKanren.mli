@@ -21,7 +21,9 @@
 
 module type LOGGER = sig
   type t
+  val empty: t
   val log: string -> t list -> t
+  val to_string: t -> string
 end
 module UnitLogger: LOGGER
 
@@ -37,17 +39,19 @@ module Stream :
   end
 
 module Make : functor (Logger: LOGGER) -> sig
+module Logger: LOGGER
+
 (** State (needed to perform calculations) *)
 module State :
   sig
     (** State type *)
     type t
 
+    val extract_log : t -> Logger.t
     (** Printing helper *)
     val show : t -> string
   end
 
-module Logger: LOGGER
 
 (** Goal converts a state into a lazy stream of states *)
 type goal = State.t -> State.t Stream.t

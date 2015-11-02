@@ -11,7 +11,7 @@ let () = dispatch (function
      (S [A"-ppopt";A"-I";A"-ppopt";A"plugin"; A"-ppopt";A"mkshow.cmo"
 	]);
 
-   flag ["compile"; "use_mkshow"]
+   flag ["compile"; "use_pa_minikanren"]
         (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo"
            ; A"-ppopt";A"-L";A"-ppopt";A"plugin"
 	   ]

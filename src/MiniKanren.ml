@@ -1,3 +1,5 @@
+open Printf
+
 module Stream =
   struct
 
@@ -231,26 +233,31 @@ module Subst :
 
 module type LOGGER = sig
   type t
+  val empty: t
   val log: string -> t list -> t
+  val to_string: t -> string
 end
 module UnitLogger : LOGGER = struct
   type t = unit
-  let log _ _ = ()
+  let empty = ()
+  let log _ _ = empty
+  let to_string _ = "<unit>"
 end
 
 module Make (Logger: LOGGER) = struct
 module Logger = Logger
 module State =
   struct
-    type t = Env.t * Subst.t
-    let empty () = (Env.empty (), Subst.empty)
+    type t = Env.t * Subst.t * Logger.t
+    let extract_log (_,_,log) = log
+    let empty () = (Env.empty (), Subst.empty, Logger.empty)
     let env = fst
-    let show (env, subst) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
+    let show (env, subst, _) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
   end
 
 type goal = State.t -> State.t Stream.t
 
-let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _) x k ->
+let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _, _) x k ->
   match Env.var e x with
   | Some i -> Printf.sprintf "_.%d" i
   | None   -> k ()
@@ -463,15 +470,21 @@ let option = {GT.gcata = GT.option.GT.gcata;
                 end
              }
 
-let call_fresh f (env, subst) =
+let call_fresh f (env, subs, l) =
   let x, env' = Env.fresh env in
-  f x (env', subst)
+  f x (env', subs, l)
 
-let (===) x y (env, subst) =
+let (===) x y ((env, subst, log) as state) =
   LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst)));
+  let log = Logger.log (sprintf "unify '%s' and '%s' in '%s' = "
+                                (generic_show !!x) (generic_show !!y)
+                                (State.show state)
+                       ) [] in
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
-  | Some s -> LOG[trace1] (logn "'%s'" (State.show (env, s))); Stream.cons (env, s) Stream.nil
+  | Some s ->
+     LOG[trace1] (logn "'%s'" (State.show (env, s, log)));
+     Stream.cons (env, s, log) Stream.nil
 
 let conj f g st = Stream.bind (f st) g
 
@@ -493,7 +506,7 @@ let conde = (?|)
 
 let run f = f (State.empty ())
 
-let refine (e, s) x = Subst.walk' e x s
+let refine (e, s, _) x = Subst.walk' e x s
 
 let take = Stream.take
 

@@ -6,10 +6,12 @@ module MiniKanren = struct
 end
 open MiniKanren
 
-@type nat = O | S of nat with mkshow
+@type nat = O | S of nat with show
 
 
 let rec copy = function O -> O | S n -> S (copy n)
+
+
 
 let run3 memo printer n goal =
   run (
