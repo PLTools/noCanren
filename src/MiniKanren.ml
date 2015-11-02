@@ -1,4 +1,4 @@
-
+open Printf
 
 module Stream =
   struct
@@ -474,8 +474,12 @@ let call_fresh f (env, subs, l) =
   let x, env' = Env.fresh env in
   f x (env', subs, l)
 
-let (===) x y (env, subst, log) =
+let (===) x y ((env, subst, log) as state) =
   LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst)));
+  let log = Logger.log (sprintf "unify '%s' and '%s' in '%s' = "
+                                (generic_show !!x) (generic_show !!y)
+                                (State.show state)
+                       ) [] in
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
   | Some s ->
