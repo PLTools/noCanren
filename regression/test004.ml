@@ -1,7 +1,13 @@
 open GT
-open MiniKanren.Make(MiniKanren.UnitLogger)
+
+module MiniKanren = struct
+  include MiniKanren
+  include MiniKanren.Make(MiniKanren.UnitLogger)
+end
+open MiniKanren
 
 @type nat = O | S of nat with mkshow
+
 
 let rec copy = function O -> O | S n -> S (copy n)
 

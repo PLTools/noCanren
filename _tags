@@ -9,4 +9,5 @@ true: package(GT.syntax), package(logger.syntax)
 
 <regression/test*>: syntax(camlp5o), package(settings)
 <regression/test*.ml>: package(GT.syntax.show)
+<regression/test004.ml>: use_mkshow
 <regression/orig/*>: traverse

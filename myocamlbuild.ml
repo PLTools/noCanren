@@ -8,7 +8,7 @@ let () = dispatch (function
  | After_rules ->
 
    flag ["ocamldep"; "use_mkshow"]
-     (S [A"-ppopt";A"-L";A"-ppopt";A"plugin";(* A"-syntax";A"camlp5o -L plugin" *)
+     (S [A"-ppopt";A"-I";A"-ppopt";A"plugin"; A"-ppopt";A"mkshow.cmo"
 	]);
 
    flag ["compile"; "use_mkshow"]
