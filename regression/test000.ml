@@ -2,6 +2,7 @@ open GT
 
 external (|!): 'a -> ('a -> 'b) -> 'b = "%revapply"
 
+(*
 module OstapLogger: MiniKanren.LOGGER = struct
   open Ostap.Pretty
   type t = Ostap.Pretty.printer
@@ -10,8 +11,12 @@ module OstapLogger: MiniKanren.LOGGER = struct
     [string name; vboxed (listByBreak xs)] |! seq |! hboxed
   let to_string = toString
 end
+ *)
 
-module M = MiniKanren.Make(OstapLogger)
+module GraphLogger: MiniKanren.LOGGER = struct
+
+end
+module M = MiniKanren.Make(GraphLogger)
 open MiniKanren
 open M
 
