@@ -71,6 +71,9 @@ type goal = State.t*Logger.t -> (State.t*Logger.t) Stream.t
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
 val call_fresh : ('a -> State.t*Logger.t -> 'b) -> State.t*Logger.t -> 'b
+val call_fresh_named : string -> ('a -> State.t*Logger.t -> 'b) -> State.t*Logger.t -> 'b
+
+val (<=>) : string -> (State.t * Logger.t -> 'b) -> State.t * Logger.t -> 'b
 
 (** [x === y] creates a goal, which performs a unifications of
     [x] and [y] *)
@@ -107,11 +110,12 @@ val run : (State.t*Logger.t -> 'a) -> 'a
 
 (** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
     state [s] *)
-val refine : State.t*Logger.t -> 'a -> 'a
+val refine : State.t -> 'a -> 'a
 
 (** [take ?(n=k) s] takes at most [k] first answers from the lazy
     stream [s] (reexported from MKStream for convenience) *)
-val take : ?n:int -> State.t Stream.t -> State.t list
+val take  : ?n:int -> (State.t * Logger.t) Stream.t -> (State.t*Logger.t) list
+val take' : ?n:int -> (State.t * Logger.t) Stream.t -> State.t list
 
 (** {2 GT-based printing functions} *)
 

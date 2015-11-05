@@ -490,11 +490,26 @@ module Make (Logger: LOGGER) = struct
   type logger = Logger.t
   type goal = State.t*Logger.t -> (State.t*Logger.t) Stream.t
 
-  let call_fresh f ((env, subs), l) =
+  let call_fresh f ((env, subs), root) =
     let x, env' = Env.fresh env in
-    f x ((env', subs), l)
+    let dest = Logger.create () in
+    Logger.connect root dest (sprintf "fresh variable '%s'" (generic_show !!x));
+    f x ((env', subs), root)
+
+  let call_fresh_named name f ((env, subs), root) =
+    let x, env' = Env.fresh env in
+    let dest = Logger.create () in
+    Logger.connect root dest (sprintf "fresh variable '%s' as '%s'" (generic_show !!x) name);
+    f x ((env', subs), dest)
 
   let ok = Result.return
+
+  let adjust_state msg (st,root) =
+    let dest = Logger.create () in
+    Logger.connect root dest msg;
+    (st,dest)
+
+  let (<=>) msg f = fun st -> f (adjust_state msg st)
 
   let (===) x y ((env, subst), root) =
     (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst))); *)
@@ -505,53 +520,16 @@ module Make (Logger: LOGGER) = struct
     | Some new_s ->
         let dest = Logger.create () in
         Logger.connect root dest (sprintf "unify '%s' and '%s' in '%s' = '%s'" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) (State.show (env, new_s)) );
-        Stream.cons ((env, new_s), dest) Stream.nil
+        Stream.cons ((env, new_s), root) Stream.nil
 
-  (* let (===) x y: goal = fun (top_logger,((env, subst) as state)) -> *)
-  (* (\* *)
-  (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst)));  *\) *)
-  (*   (\* let log = Logger.log ( *\) *)
-  (*   (\*                      ) [] in *\) *)
-  (*   match Subst.unify env x y (Some subst) with *)
-  (*   | None   -> *)
-  (*       Result.error (fun _ ->  (\* ??? *\) *)
-  (*         Logger.string (sprintf "unify '%s' and '%s' in state '%s' failed" *)
-  (*                          (generic_show !!x) (generic_show !!y) *)
-  (*                          (State.show state))) *)
-  (*   | Some new_subst -> *)
-  (*     let l = Logger.string (sprintf "unify '%s' and '%s' in state '%s' = subst '%s'" *)
-  (*                              (generic_show !!x) (generic_show !!y) *)
-  (*                              (State.show state) (Subst.show new_subst)) *)
-  (*     in *)
-  (*     (\* LOG[trace1] (logn "'%s'" (State.show (env, s, log))); *\) *)
-  (*     let new_logger l' = top_logger (Logger.join l l') in *)
-  (*     ok (Stream.cons (new_logger, (env, new_subst)) Stream.nil) *)
-
-  (* let rec mymap (g: goal) (xs: ((logger->logger) * State.t) Stream.t)  = *)
-  (*   Stream.from_fun (fun () -> *)
-  (*     match xs with *)
-  (*     | Stream.Nil -> Stream.Nil *)
-  (*     | Stream.Lazy z -> mymap g (Lazy.force z) *)
-  (*     | Stream.Cons ((yl,ys), tl) -> begin *)
-  (*         match g (yl,ys) with *)
-  (*         | `Error f   -> `Error (fun x -> yl (f x)) *)
-  (*         | `Ok ss -> *)
-  (*            (\* Stream.map (fun (l,s) -> (ls) ) *\) *)
-  (*            Stream.concat ss (from_fun (fun () -> mymap g tl)) *)
-  (*       end *)
-  (*   ) *)
-
-  let conj f g st = Stream.bind (f st) g
-
-  (* let conj : goal -> goal -> goal = fun f g (top_logger,st) -> *)
-  (*   match f st with *)
-  (*   | `Error e -> `Error (fun x -> top_logger (Logger.join e x)) *)
-  (*   | `Ok stream -> ok (my_map g stream) *)
-
+  let conj f g =
+    "conj" <=> (fun st -> Stream.bind (f st) g)
 
   let (&&&) = conj
 
-  let disj f g st = Stream.mplus (f st) (g st)
+  let disj f g =
+    "disj" <=> (fun st ->     Stream.mplus (g st) (f st) )
+
 
   let (|||) = disj
 
@@ -567,7 +545,8 @@ module Make (Logger: LOGGER) = struct
 
   let run f = f (State.empty (), Logger.create ())
 
-  let refine ((e, s),_) x = Subst.walk' e x s
+  let refine (e, s) x = Subst.walk' e x s
 
   let take = Stream.take
+  let take' ?(n=(-1)) stream = List.map fst (Stream.take ~n stream)
 end
