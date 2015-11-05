@@ -21,17 +21,14 @@
 
 module type LOGGER = sig
   type t
+  type node
   val create: unit -> t
-  val connect: t -> t -> string-> unit
+  val make_node: t -> node
+  val connect: t -> node -> node -> string -> unit
+  val output_plain: filename:string -> t -> unit
+  val output_html : filename:string -> t -> unit
 end
-(* module type LOGGER = sig *)
-(*   type t *)
-(*   val empty: t *)
-(*   val string: string -> t *)
-(*   val plock: string -> t -> t *)
-(*   val join: t -> t -> t *)
-(*   val to_string: t -> string *)
-(* end *)
+
 module UnitLogger: LOGGER
 
 (** Lazy streams *)
@@ -46,10 +43,10 @@ module Stream :
   end
 
 module Make : functor (Logger: LOGGER) -> sig
-module Logger: LOGGER
+  module Logger: LOGGER
 
-(** State (needed to perform calculations) *)
-module State :
+  (** State (needed to perform calculations) *)
+  module State :
   sig
     (** State type *)
     type t
@@ -59,21 +56,27 @@ module State :
     val show : t -> string
   end
 
+  type state = State.t * Logger.t * Logger.node
 
-(** Goal converts a state into a lazy stream of states *)
-type goal = State.t*Logger.t -> (State.t*Logger.t) Stream.t
-(* type goal = State.t -> (State.t Stream.t, Logger.t) Result.t *)
-(* type goal = State.t -> State.t Stream.t *)
+
+  (** Goal converts a state into a lazy stream of states *)
+  type goal = state -> state Stream.t
+  (* type goal = State.t -> (State.t Stream.t, Logger.t) Result.t *)
+  (* type goal = State.t -> State.t Stream.t *)
 
 
 (** {2 miniKanren basic primitives} *)
 
+(** Utility function for logging *)
+val (<=>) : string -> (state -> 'b) -> (state -> 'b)
+
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
-val call_fresh : ('a -> State.t*Logger.t -> 'b) -> State.t*Logger.t -> 'b
-val call_fresh_named : string -> ('a -> State.t*Logger.t -> 'b) -> State.t*Logger.t -> 'b
+val call_fresh : ('a -> state -> 'b) -> (state -> 'b)
 
-val (<=>) : string -> (State.t * Logger.t -> 'b) -> State.t * Logger.t -> 'b
+(** [call_fresh_name name f] works the same as [call_fresh f] but adds to
+    the log [name] of created logical variable *)
+val call_fresh_named : string -> ('a -> state -> 'b) -> state -> 'b
 
 (** [x === y] creates a goal, which performs a unifications of
     [x] and [y] *)
@@ -106,7 +109,7 @@ val (?&) : goal list -> goal
 
 (** [run s] runs a state transformer [s] (not necessarily a goal) in
     initial state *)
-val run : (State.t*Logger.t -> 'a) -> 'a
+val run : Logger.t -> (state -> 'a) -> 'a
 
 (** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
     state [s] *)
@@ -114,8 +117,8 @@ val refine : State.t -> 'a -> 'a
 
 (** [take ?(n=k) s] takes at most [k] first answers from the lazy
     stream [s] (reexported from MKStream for convenience) *)
-val take  : ?n:int -> (State.t * Logger.t) Stream.t -> (State.t*Logger.t) list
-val take' : ?n:int -> (State.t * Logger.t) Stream.t -> State.t list
+val take  : ?n:int -> state Stream.t -> state list
+val take' : ?n:int -> state Stream.t -> State.t list
 
 (** {2 GT-based printing functions} *)
 

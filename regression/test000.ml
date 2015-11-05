@@ -1,17 +1,6 @@
 external (|!): 'a -> ('a -> 'b) -> 'b = "%revapply"
 
-(*
-module OstapLogger: MiniKanren.LOGGER = struct
-  open Ostap.Pretty
-  type t = Ostap.Pretty.printer
-  let empty = Ostap.Pretty.empty
-  let log name xs =
-    [string name; vboxed (listByBreak xs)] |! seq |! hboxed
-  let to_string = toString
-end
- *)
-
-module GraphLogger(* : MiniKanren.LOGGER *) = struct
+module GraphLogger = struct
   module Int = struct
     type t = int
     let compare: t->t->int  = compare
@@ -19,29 +8,32 @@ module GraphLogger(* : MiniKanren.LOGGER *) = struct
     let equal  : t->t->bool = (=)
   end
   module G = Hashtbl.Make(Int)
-  let graph: (int*string) list G.t = G.create 17
-  let clear () = G.clear graph
+  type t =
+    { l_graph: (int*string) list G.t
+    ; mutable l_counter: int
+    }
 
-  type t = int
+  type node = int
 
-  let string_of_node : t->string = string_of_int
+  let string_of_node n = string_of_int n
 
-  let node_counter = ref 0
-  let create () =
-    let rez = !node_counter in
-    G.add graph rez [] ;
-    incr node_counter;
+  let create () = { l_graph=G.create 17; l_counter=0 }
+
+  let make_node g =
+    let rez = g.l_counter in
+    G.add g.l_graph g.l_counter [] ;
+    g.l_counter <- rez+1;
     rez
 
-  let connect from dest msg =
-    try let ans = G.find graph from in
-        G.replace graph from ((dest,msg) :: ans)
-    with Not_found -> G.add graph from [(dest,msg)]
+  let connect: t -> node -> node -> string -> unit = fun g from dest msg ->
+    try let ans = G.find g.l_graph from in
+        G.replace g.l_graph from ((dest,msg) :: ans)
+    with Not_found -> G.add g.l_graph from [(dest,msg)]
 
 
   open Printf
 
-  let dump_graph ch =
+  let dump_graph g ch =
     let f k v =
       fprintf ch "%d: [" k;
       List.iteri (fun n (dest,name) ->
@@ -49,15 +41,15 @@ module GraphLogger(* : MiniKanren.LOGGER *) = struct
                   fprintf ch "(%d,'%s')" dest name) v;
       fprintf ch " ]\n"
     in
-    G.iter f graph;
+    G.iter f g.l_graph;
     flush ch
 
-  let find node =
+  let find g node =
     printf "called find of node '%s'\n%!" (string_of_node node);
-    G.find graph node
+    G.find g.l_graph node
 
   open Ostap.Pretty
-  let to_channel filename =
+  let output_plain ~filename g =
     let make_plock idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
       match xs with
@@ -65,7 +57,7 @@ module GraphLogger(* : MiniKanren.LOGGER *) = struct
       | xs -> plock (string name) (boxed (listByBreak xs))
     in
     let rec helper node : printer list =
-      try let xs = find node in
+      try let xs = find g node in
           let xs = List.rev xs in
           List.map (fun (dest,name) -> make_plock dest name (helper dest)) xs
       with Not_found -> (* failwith "bad graph" *)
@@ -76,6 +68,41 @@ module GraphLogger(* : MiniKanren.LOGGER *) = struct
     output_string ch (toString p);
     fprintf ch "\n%!" ;
     close_out ch
+
+  let output_html ~filename g =
+    let listBy sep xs =
+      List.fold_right HTMLView.(fun x acc -> seq [x;sep;acc]) xs HTMLView.br
+    in
+    let div = HTMLView.(tag ~attrs:"class='collapsable'" "div") in
+    let make_plock idx name xs =
+      let name = sprintf "%s: %s" (string_of_node idx) name in
+      match xs with
+      | [] -> HTMLView.string name
+      | xs -> div HTMLView.(named name (listBy br xs))
+    in
+    let rec helper node : HTMLView.er list =
+      try let xs = find g node in
+          let xs = List.rev xs in
+          List.map (fun (dest,name) -> make_plock dest name (helper dest)) xs
+      with Not_found -> (* failwith "bad graph" *)
+        [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
+    in
+    let p = make_plock 0 "root" (helper 0) in
+    let css = "
+               .collapsable {
+
+               }
+               " in
+    let head =
+      HTMLView.(tag "head" (tag ~attrs:"type='text/css'" "style" (raw css)))
+    in
+    let p = HTMLView.(html (seq [head;body p])) in
+    let ch = open_out filename in
+    output_string ch (HTMLView.toHTML p);
+    fprintf ch "\n%!" ;
+    close_out ch
+
+
 end
 
 
@@ -86,37 +113,37 @@ open M
 open Printf
 
 let run2 memo printer n (goal: _ -> _ -> M.goal) =
-  run (
+  let graph = Logger.create () in
+  run graph (
     call_fresh_named "q" (fun q ->
       call_fresh_named "r" (fun r st ->
         let result = take' ~n:n (goal q r st) in
         Printf.printf "%s {\n" memo;
-        List.iteri
-          (fun i st ->
-             let (_: M.State.t) = st in
-             GraphLogger.dump_graph stdout;
-             GraphLogger.to_channel (sprintf "out%d" i);
+        List.iteri (fun i st ->
+             GraphLogger.dump_graph (Obj.magic graph) stdout;
+             Logger.output_plain graph ~filename:(sprintf "out%d" i);
+             Logger.output_html  graph ~filename:(sprintf "out%d.html" i);
 
              Printf.printf "q=%s, r=%s\n" (printer st(refine st q)) (printer st(refine st r))
           )
           result;
-          GraphLogger.clear ();
         Printf.printf "}\n%!"
   )))
 
 let run1 memo printer n (goal: _ -> M.goal) =
-  run (
+  let graph = Logger.create () in
+  run graph (
     call_fresh_named "q" (fun q st ->
       let result = take' ~n:n (goal q st) in
       Printf.printf "%s {\n" memo;
       List.iteri (fun i st ->
-        GraphLogger.dump_graph stdout;
-        GraphLogger.to_channel (sprintf "out%d" i);
+        GraphLogger.dump_graph (Obj.magic graph) stdout;
+        Logger.output_plain graph ~filename:(sprintf "out%d" i);
+        Logger.output_html  graph ~filename:(sprintf "out%d.html" i);
 
         Printf.printf "q=%s\n" (printer st (refine st q))
       )
       result;
-      GraphLogger.clear ();
       Printf.printf "}\n%!"
   ))
 
@@ -177,6 +204,7 @@ let _ =
   (* run1 "reverso q q max 1 result"            int_list       1 (fun q   -> reverso q q); *)
   (* run1 "just_a"                              (mkshow(int))  1 (fun q   -> just_a q); *)
   run1 "a_and_b'"                            (mkshow(int))  2 (fun q   -> a_and_b' q);
+  (* run1 "just_a"            (mkshow(int))  1 (fun q   -> just_a q); *)
 
 
    (* run1 "appendo q [3; 4] [1; 2; 3; 4] max 1 result" int_list       1 (fun q   -> appendo q [3; 4] [1; 2; 3; 4]); *)

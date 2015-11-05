@@ -248,27 +248,36 @@ end
 
 module type LOGGER = sig
   type t
+  type node
   val create: unit -> t
-  val connect: t -> t -> string -> unit
+  val make_node: t -> node
+  val connect: t -> node -> node -> string -> unit
+  val output_plain: filename:string -> t -> unit
+  val output_html : filename:string -> t -> unit
 end
 
 module UnitLogger : LOGGER = struct
   type t = unit
+  type node = unit
   let create () = ()
-  let connect _ _ _ = ()
+  let make_node () = ()
+  let connect _ _ _ _ = ()
+  let output_plain ~filename () = ()
+  let output_html  ~filename () = ()
 end
 
 open Result
 
 module Make (Logger: LOGGER) = struct
   module Logger = Logger
-  module State =
-  struct
+  module State = struct
     type t = Env.t * Subst.t
     let empty () = (Env.empty (), Subst.empty)
     let env = fst
     let show (env, subst) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
   end
+
+  type state = State.t * Logger.t * Logger.node
 
   let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _) x k ->
     match Env.var e x with
@@ -487,40 +496,41 @@ module Make (Logger: LOGGER) = struct
   (* type goal = State.t -> ((State.t Stream.t * Logger.t), Logger.t) Result.t *)
   (* type goal = State.t -> (State.t Stream.t, Logger.t) Result.t *)
 
-  type logger = Logger.t
-  type goal = State.t*Logger.t -> (State.t*Logger.t) Stream.t
+  type goal = state -> state Stream.t
 
-  let call_fresh f ((env, subs), root) =
+  let adjust_state msg (st,l, root) =
+    let dest = Logger.make_node l in
+    Logger.connect l root dest msg;
+    (st,l,dest)
+
+  let (<=>)  : string -> (state -> 'b) -> (state -> 'b)
+    = fun msg f st -> f (adjust_state msg st)
+
+  let call_fresh = fun f (((env, subs), _, _) as state) ->
     let x, env' = Env.fresh env in
-    let dest = Logger.create () in
-    Logger.connect root dest (sprintf "fresh variable '%s'" (generic_show !!x));
-    f x ((env', subs), root)
+    ((sprintf "fresh variable '%s'" (generic_show !!x)) <=>
+      (fun (_,l,dest) -> f x ((env', subs), l, dest) ))
+      state
 
-  let call_fresh_named name f ((env, subs), root) =
+  let call_fresh_named name f (((env, subs), _, _) as state) =
     let x, env' = Env.fresh env in
-    let dest = Logger.create () in
-    Logger.connect root dest (sprintf "fresh variable '%s' as '%s'" (generic_show !!x) name);
-    f x ((env', subs), dest)
+    ((sprintf "fresh variable '%s' as '%s'" (generic_show !!x) name) <=>
+      (fun (_,l,dest) -> f x ((env', subs), l, dest) ))
+      state
 
-  let ok = Result.return
-
-  let adjust_state msg (st,root) =
-    let dest = Logger.create () in
-    Logger.connect root dest msg;
-    (st,dest)
-
-  let (<=>) msg f = fun st -> f (adjust_state msg st)
-
-  let (===) x y ((env, subst), root) =
-    (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (State.show (env, subst))); *)
+  let (===) x y ((env, subst), l, root) =
+    (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = "
+                       (generic_show !!x)
+                       (generic_show !!y) (State.show (env, subst))); *)
     match Subst.unify env x y (Some subst) with
     | None   ->
-        Logger.connect root (Logger.create()) (sprintf "unify '%s' and '%s' in '%s' failed" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) );
+        let dest = Logger.make_node l in
+        Logger.connect l root dest (sprintf "unify '%s' and '%s' in '%s' failed" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) );
         Stream.nil
     | Some new_s ->
-        let dest = Logger.create () in
-        Logger.connect root dest (sprintf "unify '%s' and '%s' in '%s' = '%s'" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) (State.show (env, new_s)) );
-        Stream.cons ((env, new_s), root) Stream.nil
+        let dest = Logger.make_node l in
+        Logger.connect l root dest (sprintf "unify '%s' and '%s' in '%s' = '%s'" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) (State.show (env, new_s)) );
+        Stream.cons ((env, new_s), l, root) Stream.nil
 
   let conj f g =
     "conj" <=> (fun st -> Stream.bind (f st) g)
@@ -528,7 +538,7 @@ module Make (Logger: LOGGER) = struct
   let (&&&) = conj
 
   let disj f g =
-    "disj" <=> (fun st ->     Stream.mplus (g st) (f st) )
+    "disj" <=> (fun st -> Stream.mplus (g st) (f st) )
 
 
   let (|||) = disj
@@ -543,10 +553,12 @@ module Make (Logger: LOGGER) = struct
 
   let conde = (?|)
 
-  let run f = f (State.empty (), Logger.create ())
+  let run l f =
+    let root_node = Logger.make_node l in
+    f (State.empty (), l, root_node)
 
   let refine (e, s) x = Subst.walk' e x s
 
   let take = Stream.take
-  let take' ?(n=(-1)) stream = List.map fst (Stream.take ~n stream)
+  let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 end
