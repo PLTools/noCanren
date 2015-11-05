@@ -45,7 +45,6 @@ module GraphLogger = struct
     flush ch
 
   let find g node =
-    printf "called find of node '%s'\n%!" (string_of_node node);
     G.find g.l_graph node
 
   open Ostap.Pretty
@@ -70,31 +69,30 @@ module GraphLogger = struct
     close_out ch
 
   let output_html ~filename g =
-    let listBy sep xs =
-      List.fold_right HTMLView.(fun x acc -> seq [x;sep;acc]) xs HTMLView.br
-    in
-    let div = HTMLView.(tag ~attrs:"class='collapsable'" "div") in
+    let label ~name for_ = HTMLView.(tag ~attrs:"for='subfolder'" "label" (string name)) in
     let make_plock idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
       match xs with
-      | [] -> HTMLView.string name
-      | xs -> div HTMLView.(named name (listBy br xs))
+      | [] -> HTMLView.(li ~attrs:"class='file'" (anchor "" (string name)))
+      | xs ->
+         let for_ = "subfolderfor1" in
+         HTMLView.(li (seq [ label ~name for_
+                           ; input ~attrs:(sprintf "type='checkbox' id='%s'" for_) (raw"")
+                           ; ol (seq xs)
+                           ]) )
     in
     let rec helper node : HTMLView.er list =
       try let xs = find g node in
           let xs = List.rev xs in
           List.map (fun (dest,name) -> make_plock dest name (helper dest)) xs
-      with Not_found -> (* failwith "bad graph" *)
+      with Not_found ->
         [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
     in
-    let p = make_plock 0 "root" (helper 0) in
-    let css = "
-               .collapsable {
-
-               }
-               " in
+    let p = (* make_plock 0 "root" *) HTMLView.seq (helper 0) in
+    let p = HTMLView.ol ~attrs:"class='tree'" p in
     let head =
-      HTMLView.(tag "head" (tag ~attrs:"type='text/css'" "style" (raw css)))
+      HTMLView.(tag "head" (
+        tag ~attrs:"rel='stylesheet' type='text/css' href='web/_styles.css' media='screen'" "link" HTMLView.br))
     in
     let p = HTMLView.(html (seq [head;body p])) in
     let ch = open_out filename in
@@ -106,7 +104,6 @@ module GraphLogger = struct
 end
 
 
-(* open GT *)
 module M = MiniKanren.Make(GraphLogger)
 open MiniKanren
 open M
