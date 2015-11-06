@@ -5,12 +5,14 @@ module MiniKanren = struct
   include MiniKanren.Make(MiniKanren.UnitLogger)
 end
 open MiniKanren
+open Tester
 
 @type nat = O | S of nat with show
 
 
 let rec copy = function O -> O | S n -> S (copy n)
 
+<<<<<<< HEAD
 
 
 let run3 memo printer n goal =
@@ -57,6 +59,8 @@ let run1 memo printer n goal =
         Printf.printf "}\n%!"
   ))
 
+=======
+>>>>>>> 13103fd0374474dfe82b6f969f7b4790cfbbb5d6
 let rec add x y =
   match x with O -> y | S n -> S (add n y)
 
@@ -81,6 +85,7 @@ let rec mulo x y z =
       (defer (mulo x' y z'))
   ]
 
+<<<<<<< HEAD
 let _ =
    run1 "1 answer, addo O (S O) q"                  (mkshow nat)   1  (fun q   -> addo O (S O) q);
    run1 "1 answer, addo (S O) (S O) q"              (mkshow nat)   1  (fun q   -> addo (S O) (S O) q);
@@ -121,3 +126,45 @@ let _ =
 
    run3 "1 answer, mulo q r t"                      (mkshow nat)   1  (fun q r t -> mulo q r t);
    run3 "10 answers, mulo q r t"                    (mkshow nat)   10 (fun q r t -> mulo q r t)
+=======
+let _ = 
+  run (mkshow nat)   1    q  (fun q     st -> REPR (addo O (S O) q st)                , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (addo (S O) (S O) q st)            , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (addo O (S O) q st)                , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (addo (S O) (S O) q st)            , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (addo q (S O) (S O) st)            , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (addo (S O) q (S O) st)            , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (addo q (S O) (S O) st)            , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (addo (S O) q (S O) st)            , ["q", q]);
+  run (mkshow nat) (-1)  qp  (fun q p   st -> REPR (addo q p (S (S (S (S O)))) st)    , ["q", q; "p", p]);
+
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo O (S O) q st)                , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo (S (S O)) (S (S O)) q st)    , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (mulo O (S O) q st)                , ["q", q]);
+
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo q (S (S O)) (S (S O)) st)    , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo q (S (S O)) (S (S (S O))) st), ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (mulo q (S (S O)) (S (S O)) st)    , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (mulo q (S (S O)) (S (S (S O))) st), ["q", q]);
+
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo (S (S O)) q (S (S O)) st)    , ["q", q]);
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo (S (S O)) q (S (S (S O))) st), ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (mulo (S (S O)) q (S (S O)) st)    , ["q", q]);
+  run (mkshow nat)   2    q  (fun q     st -> REPR (mulo (S (S O)) q (S (S (S O))) st), ["q", q]);
+  
+  run (mkshow nat)   1   qp  (fun q p   st -> REPR (mulo q (S O) p st)                , ["q", q; "p", p]);
+  run (mkshow nat)  10   qp  (fun q p   st -> REPR (mulo q (S O) p st)                , ["q", q; "p", p]);
+
+  run (mkshow nat)   1   qp  (fun q p   st -> REPR (mulo (S O) q p st)                , ["q", q; "p", p]);
+  run (mkshow nat)  10   qp  (fun q p   st -> REPR (mulo (S O) q p st)                , ["q", q; "p", p]);
+
+  run (mkshow nat)   1   qp  (fun q p   st -> REPR (mulo q p O st)                    , ["q", q; "p", p]);
+  run (mkshow nat)   1   qp  (fun q p   st -> REPR (mulo q p (S O) st)                , ["q", q; "p", p]);
+  
+  run (mkshow nat)   1    q  (fun q     st -> REPR (mulo (S O) (S O) q st)            , ["q", q]);
+  run (mkshow nat)   1   qp  (fun q p   st -> REPR (mulo q p (S (S (S (S O)))) st)    , ["q", q; "p", p]);
+  run (mkshow nat)   3   qp  (fun q p   st -> REPR (mulo q p (S (S (S (S O)))) st)    , ["q", q; "p", p]);
+
+  run (mkshow nat)   3  qpr  (fun q p r st -> REPR (mulo q p r st)                    , ["q", q; "p", p; "r", r]);
+  run (mkshow nat)  10  qpr  (fun q p r st -> REPR (mulo q p r st)                    , ["q", q; "p", p; "r", r])
+>>>>>>> 13103fd0374474dfe82b6f969f7b4790cfbbb5d6

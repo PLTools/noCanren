@@ -266,8 +266,6 @@ module UnitLogger : LOGGER = struct
   let output_html  ~filename () = ()
 end
 
-open Result
-
 module Make (Logger: LOGGER) = struct
   module Logger = Logger
   module State = struct
@@ -284,15 +282,17 @@ module Make (Logger: LOGGER) = struct
     | Some i -> Printf.sprintf "_.%d" i
     | None   -> k ()
 
-  type    int       = GT.int
-  type    string    = GT.string
-  type 'a list      = 'a GT.list
-  type    bool      = GT.bool
-  type    char      = GT.char
-  type    unit      = GT.unit
-  type    int32     = GT.int32
-  type    int64     = GT.int64
-  type    nativeint = GT.nativeint
+  type          int       = GT.int
+  type          string    = GT.string
+  type 'a       list      = 'a GT.list
+  type 'a       option    = 'a GT.option
+  type ('a, 'b) pair      = ('a, 'b) GT.pair
+  type          bool      = GT.bool
+  type          char      = GT.char
+  type          unit      = GT.unit
+  type          int32     = GT.int32
+  type          int64     = GT.int64
+  type          nativeint = GT.nativeint
 
   class mkshow_string_t =
     object
@@ -350,9 +350,85 @@ module Make (Logger: LOGGER) = struct
       method c_Some e s x = show_var e s.GT.x (fun _ -> "Some (" ^ x.GT.fx e ^ ")")
     end
 
+  class ['a, 'b] mkshow_pair_t =
+    object
+      inherit ['a, State.t, string, 'b, State.t, string, State.t, string] @GT.pair
+      method c_Pair e s x y = show_var e s.GT.x (fun _ -> "(" ^ x.GT.fx e ^ ", " ^ y.GT.fx e ^ ")")
+    end
+
   let mkshow t = t.GT.plugins#mkshow
 
   let int = {GT.gcata = GT.int.GT.gcata;
+             GT.plugins =
+               object
+                 method show    = GT.int.GT.plugins#show
+                 method html    = GT.int.GT.plugins#html
+                 method compare = GT.int.GT.plugins#compare
+                 method eq      = GT.int.GT.plugins#eq
+                 method map     = GT.int.GT.plugins#map
+                 method foldl   = GT.int.GT.plugins#foldl
+                 method foldr   = GT.int.GT.plugins#foldr
+                 method mkshow  = (fun e x -> show_var e x (fun _ -> GT.transform(GT.int) (new mkshow_int_t) e x))
+               end
+            }
+
+  let string = {GT.gcata = GT.string.GT.gcata;
+              GT.plugins =
+                object
+                  method show    = GT.string.GT.plugins#show
+                  method html    = GT.string.GT.plugins#html
+                  method compare = GT.string.GT.plugins#compare
+                  method eq      = GT.string.GT.plugins#eq
+                  method map     = GT.string.GT.plugins#map
+                  method foldl   = GT.string.GT.plugins#foldl
+                  method foldr   = GT.string.GT.plugins#foldr
+                  method mkshow  = (fun e s -> show_var e s (fun _ -> GT.transform(GT.string) (new mkshow_string_t) e s))
+                end
+             }
+
+  let bool = {GT.gcata = GT.string.GT.gcata;
+            GT.plugins =
+              object
+                method show    = GT.bool.GT.plugins#show
+                method html    = GT.bool.GT.plugins#html
+                method compare = GT.bool.GT.plugins#compare
+                method eq      = GT.bool.GT.plugins#eq
+                method map     = GT.bool.GT.plugins#map
+                method foldl   = GT.bool.GT.plugins#foldl
+                method foldr   = GT.bool.GT.plugins#foldr
+                method mkshow  = (fun e s -> show_var e s (fun _ -> GT.transform(GT.bool) (new mkshow_bool_t) e s))
+              end
+           }
+
+  let char = {GT.gcata = GT.char.GT.gcata;
+            GT.plugins =
+              object
+                method show    = GT.char.GT.plugins#show
+                method html    = GT.char.GT.plugins#html
+                method compare = GT.char.GT.plugins#compare
+                method eq      = GT.char.GT.plugins#eq
+                method map     = GT.char.GT.plugins#map
+                method foldl   = GT.char.GT.plugins#foldl
+                method foldr   = GT.char.GT.plugins#foldr
+                method mkshow  = (fun e s -> show_var e s (fun _ -> GT.transform(GT.char) (new mkshow_char_t) e s))
+              end
+           }
+
+  let unit = {GT.gcata = GT.unit.GT.gcata;
+            GT.plugins =
+              object
+                method show    = GT.unit.GT.plugins#show
+                method html    = GT.unit.GT.plugins#html
+                method compare = GT.unit.GT.plugins#compare
+                method eq      = GT.unit.GT.plugins#eq
+                method map     = GT.unit.GT.plugins#map
+                method foldl   = GT.unit.GT.plugins#foldl
+                method foldr   = GT.unit.GT.plugins#foldr
+                method mkshow  = (fun e s -> show_var e s (fun _ -> GT.transform(GT.unit) (new mkshow_unit_t) e s))
+              end
+           }
+
+let int32 = {GT.gcata = GT.int32.GT.gcata;
              GT.plugins =
                object
                  method show    = GT.int.GT.plugins#show
@@ -407,6 +483,19 @@ module Make (Logger: LOGGER) = struct
                   method mkshow  = (fun e s -> show_var e s (fun _ -> GT.transform(GT.char) (new mkshow_char_t) e s))
                 end
              }
+  let pair = {GT.gcata = GT.pair.GT.gcata;
+              GT.plugins =
+                object
+                method show    = GT.pair.GT.plugins#show
+                method html    = GT.pair.GT.plugins#html
+                method compare = GT.pair.GT.plugins#compare
+                method eq      = GT.pair.GT.plugins#eq
+                method map     = GT.pair.GT.plugins#map
+                method foldl   = GT.pair.GT.plugins#foldl
+                method foldr   = GT.pair.GT.plugins#foldr
+                method mkshow  = (fun fa fb e s -> show_var e s (fun _ -> GT.transform(GT.pair) fa fb (new mkshow_pair_t) e s))
+              end
+           }
 
   let unit = {GT.gcata = GT.unit.GT.gcata;
               GT.plugins =
