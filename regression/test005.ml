@@ -36,9 +36,11 @@ let infero expr typ =
   infero [] expr typ
 
 
-let mkshow_env = mkshow list (mkshow pair (mkshow string) (mkshow typ))
+let mkshow_env = MiniKanren.(mkshow list (mkshow pair (mkshow string) (mkshow typ)))
 
-open Tester
+open MiniKanren
+let run = Tester.run
+let q = Tester.q
 
 let _ =
   run (mkshow typ)    1 q (fun q st -> REPR (lookupo "x" [] q st), ["q", q]);
