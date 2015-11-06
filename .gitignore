@@ -2,4 +2,5 @@
 *.native
 /test*.log
 /_build
-
+/*.html
+/*.plain

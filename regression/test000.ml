@@ -1,44 +1,4 @@
-(*
-open M
-open Printf
-
-let run2 memo printer n (goal: _ -> _ -> M.goal) =
-  let graph = Logger.create () in
-  run graph (
-    call_fresh_named "q" (fun q ->
-      call_fresh_named "r" (fun r st ->
-        let result = take' ~n:n (goal q r st) in
-        Printf.printf "%s {\n" memo;
-        List.iteri (fun i st ->
-             GraphLogger.dump_graph (Obj.magic graph) stdout;
-             Logger.output_plain graph ~filename:(sprintf "out%d" i);
-             Logger.output_html  graph ~filename:(sprintf "out%d.html" i);
-
-             Printf.printf "q=%s, r=%s\n" (printer st(refine st q)) (printer st(refine st r))
-          )
-          result;
-        Printf.printf "}\n%!"
-  )))
-
-let run1 memo printer n (goal: _ -> M.goal) =
-  let graph = Logger.create () in
-  run graph (
-    call_fresh_named "q" (fun q st ->
-      let result = take' ~n:n (goal q st) in
-      Printf.printf "%s {\n" memo;
-      List.iteri (fun i st ->
-        GraphLogger.dump_graph (Obj.magic graph) stdout;
-        Logger.output_plain graph ~filename:(sprintf "out%d" i);
-        Logger.output_html  graph ~filename:(sprintf "out%d.html" i);
-
-        Printf.printf "q=%s\n" (printer st (refine st q))
-      )
-      result;
-      Printf.printf "}\n%!"
-  ))
- *)
 open MiniKanren
-open Tester
 open Tester.M
 
 let just_a a = a === 5
@@ -94,19 +54,21 @@ let rec reverso a b =
 
 let int_list st l = mkshow(list) (mkshow(int)) st l
 
+open Tester
+
 let _ =
-  (* run int_list       1 q  (fun q   st -> REPR (appendo q [3; 4] [1; 2; 3; 4] st), ["q", q]); *)
-(*   run int_list       4 qp (fun q p st -> REPR (appendo q [] p st)               , ["q", q; "p", p]); *)
-(*   run int_list       1 q  (fun q   st -> REPR (reverso q [1; 2; 3; 4] st)       , ["q", q]); *)
-(*   run int_list       1 q  (fun q   st -> REPR (reverso [] [] st)                , ["q", q]); *)
-(*   run int_list       1 q  (fun q   st -> REPR (reverso [1; 2; 3; 4] q st)       , ["q", q]); *)
-  run int_list       1 q  (fun q   st -> ("reverso q q st", reverso q q st)       , ["q", q]);
-(*   run int_list       2 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]); *)
-(*   run int_list       3 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]); *)
-(*   run int_list      10 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]); *)
-(*   run int_list       2 q  (fun q   st -> REPR (reverso q [1] st)                , ["q", q]); *)
-(*   run int_list       1 q  (fun q   st -> REPR (reverso [1] q st)                , ["q", q]); *)
-(*   run (mkshow(int))  1 q  (fun q   st -> REPR (a_and_b q st)                    , ["q", q]); *)
-(*   run (mkshow(int))  2 q  (fun q   st -> REPR (a_and_b' q st)                   , ["q", q]); *)
-(*   run (mkshow(int)) 10 q  (fun q   st -> REPR (fives q st)                      , ["q", q]) *)
+  run int_list       1 q  (fun q   st -> REPR (appendo q [3; 4] [1; 2; 3; 4] st), ["q", q]);
+  run int_list       4 qp (fun q p st -> REPR (appendo q [] p st)               , ["q", q; "p", p]);
+  run int_list       1 q  (fun q   st -> REPR (reverso q [1; 2; 3; 4] st)       , ["q", q]);
+  run int_list       1 q  (fun q   st -> REPR (reverso [] [] st)                , ["q", q]);
+  run int_list       1 q  (fun q   st -> REPR (reverso [1; 2; 3; 4] q st)       , ["q", q]);
+  run int_list       1 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]);
+  run int_list       2 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]);
+  run int_list       3 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]);
+  run int_list      10 q  (fun q   st -> REPR (reverso q q st)                  , ["q", q]);
+  run int_list       2 q  (fun q   st -> REPR (reverso q [1] st)                , ["q", q]);
+  run int_list       1 q  (fun q   st -> REPR (reverso [1] q st)                , ["q", q]);
+  run (mkshow(int))  1 q  (fun q   st -> REPR (a_and_b q st)                    , ["q", q]);
+  run (mkshow(int))  2 q  (fun q   st -> REPR (a_and_b' q st)                   , ["q", q]);
+  run (mkshow(int)) 10 q  (fun q   st -> REPR (fives q st)                      , ["q", q]);
   ()

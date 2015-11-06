@@ -92,14 +92,14 @@ module GraphLogger = struct
       HTMLView.(tag "head" (
         tag ~attrs:"rel='stylesheet' type='text/css' href='web/_styles.css' media='screen'" "link" HTMLView.br))
     in
-    let p = HTMLView.(html (seq [head;body p])) in
+    let p = HTMLView.(html (seq [head; body p])) in
     let ch = open_out filename in
     output_string ch (HTMLView.toHTML p);
     fprintf ch "\n%!" ;
     close_out ch
 end
 
-
+open MiniKanren
 module M = MiniKanren.Make(GraphLogger)
 open M
 
@@ -118,20 +118,25 @@ let qprt = four
 
 let run printer n runner goal =
   let graph = Logger.create () in
-  run graph (fun st ->
+  M.run graph (fun st ->
     let (repr, result), vars = runner goal st in
     let (_: state Stream.t) = result in
     Printf.printf "%s, %s answer%s {\n"
       repr
       (if n = (-1) then "all" else string_of_int n)
       (if n <>  1  then "s" else "");
+
     List.iter
-      (fun st ->
+      (fun (st: M.State.t) ->
          List.iter
            (fun (s, x) -> Printf.printf "%s=%s; " s (printer st (refine st x)))
            vars;
          Printf.printf "\n"
       )
       (take' ~n:n result);
-    Printf.printf "}\n%!"
+
+    Printf.printf "}\n%!";
+    let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
+    Logger.output_plain ~filename:(out_file_prefix^".plain") graph;
+    Logger.output_html  ~filename:(out_file_prefix^".html")  graph;
   )

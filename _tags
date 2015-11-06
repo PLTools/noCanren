@@ -1,4 +1,4 @@
-true: rectypes
+true: rectypes, verbose
 true: package(settings), package(typeutil), package(GT)
 #true: syntax(camlp5o)
 true: package(GT.syntax), package(logger.syntax)
@@ -9,10 +9,9 @@ true: package(GT.syntax), package(logger.syntax)
 
 <regression/test*>: syntax(camlp5o), package(settings)
 <regression/test*.ml>: package(GT.syntax.show)
-<regression/test004.ml>: use_mkshow
-<regression/test004.ml>: package(GT.syntax.show), use_pa_minikanren
-<regression/test000.ml>: package(ostap)
-<regression/test000.native>: package(ostap)
+<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_mkshow
+<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/tester.ml>:  package(ostap)
+<regression/test*.native>:  package(ostap,str)
 
 <regression/orig/*>: traverse
-<regression/tester.ml>: package(ostap)

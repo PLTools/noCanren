@@ -1,2 +1,4 @@
 *.diff
 *.log
+*.plain
+*.html
