@@ -1,13 +1,9 @@
-module MiniKanren = struct
-  include MiniKanren
-  include Tester.M
-end
 open MiniKanren
-
-open GT
 
 @type lam = X of string | App of lam * lam | Abs of string * lam with mkshow
 @type typ = V of string | Arr of typ * typ with mkshow
+
+open Tester.M
 
 let rec lookupo a g t =
   fresh (a' t' tl)
@@ -39,8 +35,7 @@ let infero expr typ =
 let mkshow_env = MiniKanren.(mkshow list (mkshow pair (mkshow string) (mkshow typ)))
 
 open MiniKanren
-let run = Tester.run
-let q = Tester.q
+open Tester
 
 let _ =
   run (mkshow typ)    1 q (fun q st -> REPR (lookupo "x" [] q st), ["q", q]);
@@ -54,5 +49,5 @@ let _ =
   run (mkshow typ)    1 q (fun q st -> REPR (infero (Abs ("x", X "x")) q st), ["q", q]);
   run (mkshow typ)    1 q (fun q st -> REPR (infero (Abs ("f", (Abs ("x", App (X "f", X "x"))))) q st), ["q", q]);
   run (mkshow typ)    1 q (fun q st -> REPR (infero (Abs ("x", (Abs ("f", App (X "f", X "x"))))) q st), ["q", q]);
-
-  run (mkshow lam)    1 q (fun q st -> REPR (infero q (Arr (V "x", V "x")) st), ["q", q])
+  run (mkshow lam)    1 q (fun q st -> REPR (infero q (Arr (V "x", V "x")) st), ["q", q]);
+  ()

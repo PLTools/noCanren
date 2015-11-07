@@ -62,4 +62,5 @@ let _ =
   run int_list       1 q  (fun q   st -> REPR (reverso [1] q st)                , ["q", q]);
   run (mkshow(int))  1 q  (fun q   st -> REPR (a_and_b q st)                    , ["q", q]);
   run (mkshow(int))  2 q  (fun q   st -> REPR (a_and_b' q st)                   , ["q", q]);
-  run (mkshow(int)) 10 q  (fun q   st -> REPR (fives q st)                      , ["q", q])
+  run (mkshow(int)) 10 q  (fun q   st -> REPR (fives q st)                      , ["q", q]);
+  ()

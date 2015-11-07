@@ -127,7 +127,7 @@ let run printer n runner goal =
       (if n <>  1  then "s" else "");
 
     List.iter
-      (fun (st: M.State.t) ->
+      (fun (st: State.t) ->
          List.iter
            (fun (s, x) -> Printf.printf "%s=%s; " s (printer st (refine st x)))
            vars;

@@ -266,33 +266,29 @@ module UnitLogger : LOGGER = struct
   let output_html  ~filename () = ()
 end
 
-module Make (Logger: LOGGER) = struct
-  module Logger = Logger
-  module State = struct
-    type t = Env.t * Subst.t
-    let empty () = (Env.empty (), Subst.empty)
-    let env = fst
-    let show (env, subst) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
-  end
+module State = struct
+  type t = Env.t * Subst.t
+  let empty () = (Env.empty (), Subst.empty)
+  let env = fst
+  let show (env, subst) = Printf.sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
+end
 
-  type state = State.t * Logger.t * Logger.node
+let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _) x k ->
+  match Env.var e x with
+  | Some i -> Printf.sprintf "_.%d" i
+  | None   -> k ()
 
-  let show_var : State.t -> 'a -> (unit -> string) -> 'string = fun (e, _) x k ->
-    match Env.var e x with
-    | Some i -> Printf.sprintf "_.%d" i
-    | None   -> k ()
-
-  type          int       = GT.int
-  type          string    = GT.string
-  type 'a       list      = 'a GT.list
-  type 'a       option    = 'a GT.option
-  type ('a, 'b) pair      = ('a, 'b) GT.pair
-  type          bool      = GT.bool
-  type          char      = GT.char
-  type          unit      = GT.unit
-  type          int32     = GT.int32
-  type          int64     = GT.int64
-  type          nativeint = GT.nativeint
+type          int       = GT.int
+type          string    = GT.string
+type 'a       list      = 'a GT.list
+type 'a       option    = 'a GT.option
+type ('a, 'b) pair      = ('a, 'b) GT.pair
+type          bool      = GT.bool
+type          char      = GT.char
+type          unit      = GT.unit
+type          int32     = GT.int32
+type          int64     = GT.int64
+type          nativeint = GT.nativeint
 
   class mkshow_string_t =
     object
@@ -580,6 +576,11 @@ let int32 = {GT.gcata = GT.int32.GT.gcata;
                     method mkshow  = (fun fa e s -> show_var e s (fun _ -> GT.transform(GT.option) fa (new mkshow_option_t) e s))
                   end
                }
+
+
+module Make (Logger: LOGGER) = struct
+  module Logger = Logger
+  type state = State.t * Logger.t * Logger.node
 
   (* type goal = State.t -> ((State.t*Logger.t) Stream.t, Logger.t) result *)
   (* type goal = State.t -> ((State.t Stream.t * Logger.t), Logger.t) Result.t *)
