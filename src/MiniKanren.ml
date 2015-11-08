@@ -628,7 +628,9 @@ module Make (Logger: LOGGER) = struct
   let (&&&) = conj
 
   let disj f g =
-    "disj" <=> (fun st -> Stream.mplus (g st) (f st) )
+    (* When call mplus the 1st argument is evaluated earlier, so it will gives answers
+       easrlier too *)
+    "disj" <=> (fun st -> Stream.mplus (f st) (g st) )
 
 
   let (|||) = disj

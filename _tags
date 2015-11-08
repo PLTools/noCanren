@@ -1,4 +1,4 @@
-true: rectypes, verbose
+true: rectypes
 true: package(settings), package(typeutil), package(GT)
 #true: syntax(camlp5o)
 true: package(GT.syntax), package(logger.syntax)

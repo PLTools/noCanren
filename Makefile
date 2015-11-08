@@ -19,15 +19,15 @@ clean:
 #TESTS=
 REGRES_CASES=000 001 002 003 004 005
 define TESTRULES
-.PHONY: test_$(1)
-tests: test_$(1)
+.PHONY: test_$(1) test$(1).native
+test$(1).native: regression/test$(1).native
 regression/test$(1).native:
 	$(OB) -Is src $$@
 
 compile_tests: regression/test$(1).native
 
 run_tests: test_$(1)
-test_$(1): regression/test$(1).native
+test_$(1): #regression/test$(1).native
 	@cd regression  && $(TESTS_ENVIRONMENT) ../test$(1).native; \
 	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
 endef
