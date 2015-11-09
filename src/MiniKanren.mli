@@ -26,7 +26,7 @@ module type LOGGER = sig
   val make_node: t -> node
   val connect: t -> node -> node -> string -> unit
   val output_plain: filename:string -> t -> unit
-  val output_html : filename:string -> t -> unit
+  val output_html : filename:string -> string list -> t -> unit
 end
 
 module UnitLogger: LOGGER

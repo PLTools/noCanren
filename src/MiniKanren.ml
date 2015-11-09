@@ -253,7 +253,7 @@ module type LOGGER = sig
   val make_node: t -> node
   val connect: t -> node -> node -> string -> unit
   val output_plain: filename:string -> t -> unit
-  val output_html : filename:string -> t -> unit
+  val output_html : filename:string -> string list -> t -> unit
 end
 
 module UnitLogger : LOGGER = struct
@@ -263,7 +263,7 @@ module UnitLogger : LOGGER = struct
   let make_node () = ()
   let connect _ _ _ _ = ()
   let output_plain ~filename () = ()
-  let output_html  ~filename () = ()
+  let output_html  ~filename _ () = ()
 end
 
 module State = struct
