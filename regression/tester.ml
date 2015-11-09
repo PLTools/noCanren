@@ -76,37 +76,48 @@ module GraphLogger = struct
   let output_html ~filename answers g =
     let module P=HTMLView in
     let empty = P.raw "" in
-    let tag ?(attrs="") name xs = P.(tag ~attrs name (seq xs)) in
+    let tag ?(attrs="") name (xs: P.viewer list) = P.(tag ~attrs name (seq xs)) in
     let span ?(attrs="") txt = P.(tag ~attrs "span" (seq [string txt])) in
-    let div xs = tag "div" xs in
+    let script ?(attrs="") ~url = tag "script" ~attrs:(sprintf "src='%s' %s" url attrs) [] in
+    let style ~url = tag "link" ~attrs:(sprintf "rel='stylesheet' type='text/css' href='%s' media='screen'" url) [] in
+    let style_inline  text = tag "style"  ~attrs:"type='text/css'"        [P.raw text] in
+    let script_inline text = tag "script" ~attrs:"type='text/javascript'" [P.raw text] in
+    let div ?(attrs="") xs = tag ~attrs "div" xs in
+    let ul  ?(attrs="") (xs: P.viewer list) = tag ~attrs "ul"  xs in
 
     let head = tag "head"
-        [ tag "link" ~attrs:"rel='stylesheet' type='text/css' href='web/mktree.css' media='screen'" [empty]
-        (* ; tag "script" ~attrs:"src='//code.jquery.com/jquery-1.11.3.min.js'" [HTMLView.br] *)
-        ; tag "script" ~attrs:"src='web/mktree.js'" [empty]
-        ; tag "script" ~attrs:"type='text/javascript'" [P.raw "
-//$('#proof_tree')
-//addEvent(window,'load',convertTrees);
-addEvent(window,'load', function() { convertTree(document.getElementById('roottree'), false); });
-"]
-        ]
+        [ style ~url:"web/main.css"
+        ; script ~url:"web/runOnLoad.src.js"
+        ; script ~url:"web/CollapsibleLists.compressed.js"
+        ; script ~url:"web/jquery-1.11.3.min.js"
+        ; script_inline "
+runOnLoad(function(){
+  console.log('1');
+  CollapsibleLists.apply();
+});
+
+function onGenerationSelected(level) {
+  console.log(level);
+}
+                         "]
+
     in
 
     let answers_div =
-      div (List.map (fun s -> div [P.string s]) answers)
+      div (List.mapi (fun i s ->
+                      let attrs = sprintf "onclick='onGenerationSelected(%d)'" i in
+                      div ~attrs [P.string s]) answers)
     in
 
     let label ~name for_ = P.(tag ~attrs:"for='subfolder'" "label" (P.string name)) in
     let make_plock idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
       match xs with
-      | [] -> HTMLView.(li ~attrs:"class='file'" (anchor "" (string name)))
+      | [] -> P.(li (string name))
       | xs ->
          let for_ = "subfolderfor1" in
-         HTMLView.(li (seq [ (* span ~attrs:"class='bullet'" "&nbsp;" *)
-                           (* ; input ~attrs:(sprintf "type='checkbox' id='%s'" for_) (raw"") *)
-                           P.b (P.string name)
-                           ; ul (seq xs)
+         HTMLView.(li (seq [ P.string name
+                           ; ul ~attrs:(sprintf "class='level%d proofnode' level='%d'" idx idx)  (seq xs)
                            ]) )
     in
     let rec helper node : HTMLView.er list =
@@ -117,8 +128,7 @@ addEvent(window,'load', function() { convertTree(document.getElementById('roottr
         [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
     in
     let p = HTMLView.seq (helper 0) in
-    (* let p = HTMLView.ul ~attrs:"class='proof_tree mktree'" p in *)
-    let p = HTMLView.ul ~attrs:"class='mktree' id='roottree'" p in
+    let p = HTMLView.ul ~attrs:"class='collapsibleList' id='roottree'" p in
     let p = HTMLView.(html (seq [head; body (seq [answers_div; p])])) in
     let ch = open_out filename in
     output_string ch (HTMLView.toHTML p);
