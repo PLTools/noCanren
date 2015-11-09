@@ -20,7 +20,7 @@ module GraphLogger = struct
 
   let string_of_node n = string_of_int n
 
-  let create () = { l_graph=G.create 17; l_counter=0; l_level=0 }
+  let create () = { l_graph=G.create 97; l_counter=0; l_level=0 }
 
   let make_node g =
     let rez = g.l_counter in
@@ -37,11 +37,12 @@ module GraphLogger = struct
   open Printf
 
   let dump_graph g ch =
+    print_endline "dumping graph";
     let f k v =
       fprintf ch "%d: [" k;
       List.iteri (fun n (dest,name,_level) ->
                   if n<>0 then fprintf ch ",";
-                  fprintf ch "(%d,'%s')" dest name) v;
+                  fprintf ch "(%d,'%s',%d)" dest name _level) v;
       fprintf ch " ]\n"
     in
     G.iter f g.l_graph;
@@ -105,25 +106,25 @@ function onGenerationSelected(level) {
 
     let answers_div =
       div (List.mapi (fun i s ->
-                      let attrs = sprintf "onclick='onGenerationSelected(%d)'" i in
+                      let attrs = sprintf "onclick='onGenerationSelected(%d)' class='level%d'" i i in
                       div ~attrs [P.string s]) answers)
     in
 
     let label ~name for_ = P.(tag ~attrs:"for='subfolder'" "label" (P.string name)) in
-    let make_plock idx name xs =
+    let make_plock ~gen idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
       match xs with
-      | [] -> P.(li (string name))
+      | [] -> P.(li ~attrs:(sprintf "class='level%d'" gen) (string name))
       | xs ->
          let for_ = "subfolderfor1" in
          HTMLView.(li (seq [ P.string name
-                           ; ul ~attrs:(sprintf "class='level%d proofnode' level='%d'" idx idx)  (seq xs)
+                           ; ul ~attrs:(sprintf "class='level%d proofnode' level='answer%d'" gen gen)  (seq xs)
                            ]) )
     in
     let rec helper node : HTMLView.er list =
       try let xs = find g node in
           let xs = List.rev xs in
-          List.map (fun (dest,name,_) -> make_plock dest name (helper dest)) xs
+          List.map (fun (dest,name,gen) -> make_plock ~gen dest name (helper dest)) xs
       with Not_found ->
         [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
     in
@@ -164,8 +165,9 @@ let run printer n runner goal =
       (if n <>  1  then "s" else "");
 
     let answers =
+      GraphLogger.dump_graph (Obj.magic graph) stdout;
       for i=1 to n do
-        ignore (take' ~n:i result);
+        ignore (take ~n:i result);
         GraphLogger.next_level (Obj.magic graph);
       done;
       take' ~n result
@@ -186,6 +188,8 @@ let run printer n runner goal =
 
 
     Printf.printf "}\n%!";
+
+    GraphLogger.dump_graph (Obj.magic graph) stdout;
     let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
     Logger.output_plain ~filename:(out_file_prefix^".plain") graph;
     Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;

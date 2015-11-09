@@ -70,3 +70,14 @@ li.collapsibleListClosed{
 .myhidden {
   visibility: hidden;
 }
+
+
+.level1 {
+  background-color: green;
+}
+.level2 {
+  background-color: blue;
+}
+.level3 {
+  background-color: brown;
+}
