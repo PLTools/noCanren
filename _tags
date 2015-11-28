@@ -3,7 +3,7 @@ true: package(settings,typeutil,GT)
 
 true: package(GT.syntax)
 <src/MiniKanren.ml>: syntax(camlp5o), package(GT.syntax), package(logger.syntax)
-<plugin/mkshow.cmo>: syntax(camlp5o), package(GT.syntax), package(logger.syntax)
+<plugin/mkshow.cmo>: syntax(camlp5o), package(GT.syntax)
 <plugin/mkshow.ml>: syntax(camlp5o)
 <camlp5/pa_minikanren.ml>: syntax(camlp5o)
 
