@@ -4,13 +4,15 @@ TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
 
-.PHONY: all clean install uninstall tests test regression compile_tests run_tests
+.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests
 
 all:
 	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx)
 
 #check: all $(TESTS)
 #	$(OB) -Is src -Is plugin $(TESTS)
+
+celan: clean
 
 clean:
 	rm -fr _build *.log  *.native *.byte
@@ -36,3 +38,11 @@ $(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
 tests: compile_tests run_tests
 regression: tests
 test: tests
+
+
+
+install:
+	ocamlfind install MiniKanren META _build/src/MiniKanren.cm*
+
+uninstall:
+	ocamlfind remove MiniKanren
