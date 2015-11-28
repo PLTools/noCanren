@@ -15,3 +15,6 @@ true: package(GT.syntax)
 <regression/test*.native>:  package(ostap,str)
 
 <regression/orig/*>: traverse
+
+
+<ppx/smart_logger.*>: package(ppx_tools.metaquot)

@@ -1,5 +1,6 @@
 OB=ocamlbuild -use-ocamlfind
 TARGETS=src/MiniKanren.cmo plugin/mkshow.cmo camlp5/pa_minikanren.cmo
+PPX_TARGET=ppx/smart_logger.native
 TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
@@ -7,7 +8,7 @@ TESTS_ENVIRONMENT=./test.sh
 .PHONY: all celan clean install uninstall tests test regression compile_tests run_tests
 
 all:
-	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx)
+	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx) $(PPX_TARGET)
 
 #check: all $(TESTS)
 #	$(OB) -Is src -Is plugin $(TESTS)
