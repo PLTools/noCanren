@@ -5,10 +5,14 @@ TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
 
-.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests
+.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel
 
 all:
 	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx) $(PPX_TARGET)
+
+
+toplevel:
+	$(MAKE) -C toplevel
 
 #check: all $(TESTS)
 #	$(OB) -Is src -Is plugin $(TESTS)
