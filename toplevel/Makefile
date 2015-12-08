@@ -1,7 +1,7 @@
 include Makefile.conf
 -include ../Makefile.local
 
-all: toplevel.js eval.js
+all: toplevel.js #eval.js
 
 
 OCPINDENT=$(shell ocamlfind query ocp-indent -format "-package %p.lib" 2> /dev/null)
@@ -53,9 +53,9 @@ ifneq ($(YOJSON),)
 PACKAGES += yojson
 endif
 
-ifneq ($(MINIKANREN),)
-PACKAGES += MiniKanren
-endif
+#ifneq ($(MINIKANREN),)
+PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml str
+#endif
 
 ifeq ($(METAOCAML),1)
 BER_EXPORT=trx runcode print_code

@@ -4,18 +4,22 @@ PPX_TARGET=ppx/smart_logger.native
 TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
+JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel
+.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel jslib ppx
 
 all:
-	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx) $(PPX_TARGET)
+	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx) $(PPX_TARGET)  $(JSOO_LIB)
 
+ppx:
+	$(OB) $(TARGETS) $(PPX_TARGET)
 
-toplevel:
+jslib:
+	$(OB) -Is src,ppx $(JSOO_LIB)
+
+toplevel: ppx jslib
 	$(MAKE) -C toplevel
 
-#check: all $(TESTS)
-#	$(OB) -Is src -Is plugin $(TESTS)
 
 celan: clean
 
@@ -23,7 +27,6 @@ clean:
 	rm -fr _build *.log  *.native *.byte
 	$(MAKE) -C regression clean
 
-#TESTS=
 REGRES_CASES=000 001 002 003 004 005
 define TESTRULES
 .PHONY: test_$(1) test$(1).native
@@ -47,7 +50,7 @@ test: tests
 
 
 install:
-	ocamlfind install MiniKanren META _build/src/MiniKanren.cm*
+	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/jsoo_runner/jsoo_runner.cm[ia] _build/ppx/smart_logger.cmi
 
 uninstall:
 	ocamlfind remove MiniKanren

@@ -3,3 +3,9 @@ description = "miniKanren"
 requires = "GT"
 archive(byte) = "MiniKanren.cmo"
 archive(native) = "MiniKanren.cmx"
+
+package "js_of_ocaml" (
+  description="library as a dependency for toplevel"
+  requires="GT ppx_tools js_of_ocaml.ppx"
+  archive(byte)="jsoo_runner.cma"
+)

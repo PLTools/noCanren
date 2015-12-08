@@ -20,13 +20,7 @@
 
 open Lwt
 
-let () = print_endline "PIZDA"
-
-#ifdef metaocaml
-let compiler_name = "MetaOCaml"
-#else
-let compiler_name = "OCaml"
-#endif
+let compiler_name = "OCaml with MiniKanren support"
 
 let by_id s = Dom_html.getElementById s
 let by_id_coerce s f  = Js.Opt.get (f (Dom_html.getElementById s)) (fun () -> raise Not_found)
@@ -78,6 +72,7 @@ let setup_toplevel () =
     exec' (Printf.sprintf "Format.printf \"%s@.@.\";;" header3));
   exec' ("#enable \"pretty\";;");
   exec' ("#enable \"shortvar\";;");
+  exec' ("#rectypes;;");
   Sys.interactive := true;
   ()
 
@@ -89,13 +84,6 @@ let resize ~container ~textbox ()  =
   Lwt.return ()
 
 let setup_printers () =
-  (* MetaOcaml *)
-#ifdef metaocaml
-  Topdirs.dir_install_printer Format.std_formatter
-    (Longident.(Ldot(Lident "Print_code", "print_code")));
-  Topdirs.dir_install_printer Format.std_formatter
-    (Longident.(Ldot(Lident "Print_code", "print_closed_code")));
-#endif
   exec'("let _print_error fmt e = Format.pp_print_string fmt (Js.string_of_error e)");
   Topdirs.dir_install_printer Format.std_formatter (Longident.(Lident "_print_error"));
   exec'("let _print_unit fmt (_ : 'a) : 'a = Format.pp_print_string fmt \"()\"");
@@ -316,6 +304,8 @@ let run _ =
     let b = Js.to_bool in
     b e##ctrlKey || b e##shiftKey || b e##altKey || b e##metaKey in
 
+  let ctrl e = Js.to_bool e##ctrlKey in
+
   begin (* setup handlers *)
     textbox##onkeyup <-   Dom_html.handler (fun _ -> Lwt.async (resize ~container ~textbox); Js._true);
     textbox##onchange <-  Dom_html.handler (fun _ -> Lwt.async (resize ~container ~textbox); Js._true);
@@ -324,8 +314,8 @@ let run _ =
         | 13 when not (meta e) -> Lwt.async execute; Js._false
         | 13 -> Lwt.async (resize ~container ~textbox); Js._true
         | 09 -> Indent.textarea textbox; Js._false
-        | 76 when meta e -> output##innerHTML <- Js.string ""; Js._true
-        | 75 when meta e -> setup_toplevel (); Js._false
+        | 76 when ctrl e -> output##innerHTML <- Js.string ""; Js._true
+        | 75 when ctrl e -> setup_toplevel (); Js._false
         | 38 -> history_up e
         | 40 -> history_down e
         | _ -> Js._true

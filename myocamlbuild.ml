@@ -17,6 +17,12 @@ let () = dispatch (function
 	   ]
         );
 
+    flag ["compile"; "link_minikanren"]
+        (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo"
+           ; A"-ppopt";A"-L";A"-ppopt";A"plugin"
+	   ]
+        );
+
    (* flag ["compile";  "ocaml"; "use_ostap_lib1"] (S[A "-I"; A"lib"; A"bNF3.cmo"]);  *)
    (* flag ["compile";  "ocaml"; "use_ostap_lib"] (S[A"ostap.cmo"]);  *)
    (* flag ["ocamldep"; "ocaml"; "use_pa_log"]  *)

@@ -40,7 +40,7 @@ let map_value_binding (vb : value_binding) =
     { vb with pvb_expr = { vb.pvb_expr with pexp_desc = walkthrough ~fname vb.pvb_expr.pexp_desc } }
   |  _ -> vb
 
-let module_duplicate_mapper argv =
+let smart_logger argv =
   { default_mapper with
     structure_item = fun mapper sitem ->
       match sitem.pstr_desc with
@@ -48,6 +48,3 @@ let module_duplicate_mapper argv =
         { sitem with pstr_desc = Pstr_value (_rec, List.map vbs ~f:map_value_binding) }
       | x -> default_mapper.structure_item mapper sitem
   }
-
-
-let () = register "module_duplicate" module_duplicate_mapper
