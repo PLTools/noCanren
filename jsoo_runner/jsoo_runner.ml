@@ -1,4 +1,3 @@
-
 module GraphLogger = struct
   module Int = struct
     type t = int
@@ -123,7 +122,11 @@ function onGenerationSelected(level) {
     ()
 end
 
-let rewriter = Smart_logger.smart_logger [| |]
+let smart_ppx = Smart_logger.smart_logger [| |]
+
+let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
+
+let int_list st l = MiniKanren.( mkshow list (mkshow int) st l )
 
 open MiniKanren
 module M = MiniKanren.Make(GraphLogger)
@@ -145,10 +148,9 @@ let qprt = four
 let run printer n runner goal =
   let graph = Logger.create () in
   M.run graph (fun st ->
-    let (repr, result), vars = runner goal st in
+    let (result, vars) = runner goal st in
     let (_: state Stream.t) = result in
-    Printf.printf "%s, %s answer%s {\n"
-      repr
+    Printf.printf "%s answer%s {\n"
       (if n = (-1) then "all" else string_of_int n)
       (if n <>  1  then "s" else "");
 
@@ -176,7 +178,23 @@ let run printer n runner goal =
 
     Printf.printf "}\n%!";
 
-    (* Firebug.console##log (Js.string "something nasty there") *)
+    Firebug.console##log (Js.string "something nasty there")
     (* let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in *)
     (* Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph; *)
   )
+
+(* open MiniKanren *)
+(* open M *)
+
+let (_:'a -> 'a -> goal) = (===)
+let _ =
+  let a_and_b a : state -> state MiniKanren.Stream.t =
+    call_fresh
+      (fun b -> conj (a === 7)
+                     (disj (b === 6)
+                           (b === 5)
+                     )
+      )
+  in
+
+  fun () -> run (mkshow int) 1 q (fun q st -> a_and_b q st, ["q", q])

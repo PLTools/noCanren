@@ -53,26 +53,35 @@ let exec' s =
 let setup_toplevel () =
   JsooTop.initialize ();
   Sys.interactive := false;
+  (*
   exec' ("module Lwt_main = struct
              let run t = match Lwt.state t with
                | Lwt.Return x -> x
                | Lwt.Fail e -> raise e
                | Lwt.Sleep -> failwith \"Lwt_main.run: thread didn't return\"
-            end");
+          end");
+  *)
+  (*
   let header1 =
       Printf.sprintf "        %s version %%s" compiler_name in
   let header2 = Printf.sprintf
       "     Compiled with Js_of_ocaml version %s" Sys_js.js_of_ocaml_version in
   exec' (Printf.sprintf "Format.printf \"%s@.\" Sys.ocaml_version;;" header1);
   exec' (Printf.sprintf "Format.printf \"%s@.\";;" header2);
+   *)
+  (*
   (if JsooTop.get_camlp4_syntaxes () <> []
   then
     let header3 = Printf.sprintf
         "     'JsooTop.get_camlp4_syntaxes ()' to get loaded syntax extensions" in
-    exec' (Printf.sprintf "Format.printf \"%s@.@.\";;" header3));
+    exec' (Printf.sprintf "Format.printf \"%s@.@.\";;" header3)); *)
+  (*
   exec' ("#enable \"pretty\";;");
-  exec' ("#enable \"shortvar\";;");
-  exec' ("#rectypes;;");
+  exec' ("#enable \"shortvar\";;"); *)
+  exec' "#rectypes;;";
+  exec' "open MiniKanren;;";      (* for mkshow *)
+  exec' "open Jsoo_runner;;";     (* count variables *)
+  exec' "open M;;";
   Sys.interactive := true;
   ()
 

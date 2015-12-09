@@ -20,4 +20,5 @@ true: package(settings,typeutil,GT)
 
 <ppx/smart_logger.*>: package(ppx_tools.metaquot)
 
-#<jsoo_runner/jsoo_runner.ml>: package(js_of_ocaml.ppx)
+<jsoo_runner/jsoo_runner.ml>: package(ppx_tools)
+<jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx)

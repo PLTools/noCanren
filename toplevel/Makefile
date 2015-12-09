@@ -25,9 +25,9 @@ ifneq ($(DERIVING),)
 DERIVING_SYNTAX = js_of_ocaml.deriving.syntax deriving.syntax.std
 endif
 
-ifneq ($(NO_SYNTAXES),1)
-SYNTAXES= lwt.syntax js_of_ocaml.syntax $(DERIVING_SYNTAX)
-endif
+#ifneq ($(NO_SYNTAXES),1)
+#SYNTAXES= lwt.syntax js_of_ocaml.syntax $(DERIVING_SYNTAX)
+#endif
 
 JSFILES= +weak.js +toplevel.js +dynlink.js +nat.js
 
@@ -54,7 +54,7 @@ PACKAGES += yojson
 endif
 
 #ifneq ($(MINIKANREN),)
-PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml str
+PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml str GT
 #endif
 
 ifeq ($(METAOCAML),1)
@@ -76,15 +76,13 @@ MKTOP=jsoo_mktop $(SAFESTRING) \
 
 TOPLEVEL_NAME=toplevel
 TOPLEVEL_OBJS=colorize.cmo indent.cmo toplevel.cmo
-$(TOPLEVEL_NAME).js: $(TOPLEVEL_OBJS) examples.ml test_dynlink.cmo
+$(TOPLEVEL_NAME).js: $(TOPLEVEL_OBJS) examples.ml
 	$(MKTOP) \
-	$(BER) \
 	$(OSTAP) $(YOJSON) \
 	$(OCPINDENT) $(HIGLO) \
 	$(TOPLEVEL_OBJS) \
 	${addprefix -jsopt , ${JSFILES}} \
 	${addprefix -jsopt , -I ./ --file examples.ml} \
-	${addprefix -jsopt , -I ./ --file test_dynlink.cmo} \
 	-package base64 \
 	-o $(TOPLEVEL_NAME).byte
 
