@@ -1,0 +1,10 @@
+SRC .
+SRC ../ppx
+
+B ../_build/jsoo_runner
+B ../_build/ppx
+B ../_build/src
+
+PKG ppx_tools
+PKG js_of_ocaml.tyxml
+PKG js_of_ocaml.ppx

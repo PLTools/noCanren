@@ -82,6 +82,7 @@ let setup_toplevel () =
   exec' "open MiniKanren;;";      (* for mkshow *)
   exec' "open Jsoo_runner;;";     (* count variables *)
   exec' "open M;;";
+  exec' "let run = Jsoo_runner.run;;";
   Sys.interactive := true;
   ()
 

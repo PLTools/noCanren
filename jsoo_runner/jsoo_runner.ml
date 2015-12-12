@@ -52,18 +52,8 @@ module GraphLogger = struct
     G.find g.l_graph node
 
   let output_plain ~filename _ = ()
+  let output_html ~filename _answers g =
            (*
-  let output_html ~filename answers g =
-    let module P=HTMLView in
-    let empty = P.raw "" in
-    let tag ?(attrs="") name (xs: P.viewer list) = P.(tag ~attrs name (seq xs)) in
-    let span ?(attrs="") txt = P.(tag ~attrs "span" (seq [string txt])) in
-    let script ?(attrs="") ~url = tag "script" ~attrs:(sprintf "src='%s' %s" url attrs) [] in
-    let style ~url = tag "link" ~attrs:(sprintf "rel='stylesheet' type='text/css' href='%s' media='screen'" url) [] in
-    let style_inline  text = tag "style"  ~attrs:"type='text/css'"        [P.raw text] in
-    let script_inline text = tag "script" ~attrs:"type='text/javascript'" [P.raw text] in
-    let div ?(attrs="") xs = tag ~attrs "div" xs in
-    let ul  ?(attrs="") (xs: P.viewer list) = tag ~attrs "ul"  xs in
 
     let head = tag "head"
         [ style ~url:"web/main.css"
@@ -89,37 +79,43 @@ function onGenerationSelected(level) {
                       div ~attrs [P.string s]) answers)
     in
 
-    let label ~name for_ = P.(tag ~attrs:"for='subfolder'" "label" (P.string name)) in
+            *)
+    let module T = Tyxml_js.Html5 in
+    let open Tyxml_js.Html5 in
     let make_plock ~gen idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
+      let level_class  = Printf.sprintf "level%d" gen in
+
       match xs with
-      | [] -> P.(li ~attrs:(sprintf "class='level%d'" gen) (string name))
+      | [] ->
+        let open T in
+        li ~a:[a_class [level_class]] [pcdata name]
       | xs ->
          let for_ = "subfolderfor1" in
-         HTMLView.(li (seq [ P.string name
-                           ; ul ~attrs:(sprintf "class='level%d proofnode' level='answer%d'" gen gen)  (seq xs)
-                           ]) )
+         T.(li [ pcdata name
+               ; ul ~a:[a_class [level_class; "proof_node"]; Unsafe.string_attrib "level" (sprintf "answer%d" gen)] xs
+               ])
     in
-    let rec helper node : HTMLView.er list =
+    let rec helper node =
       try let xs = find g node in
           let xs = List.rev xs in
           List.map (fun (dest,name,gen) -> make_plock ~gen dest name (helper dest)) xs
       with Not_found ->
-        [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
+        T.[li [pcdata (sprintf "<No such node '%s'>" (string_of_node node))] ]
     in
-    let p = HTMLView.seq (helper 0) in
-    let p = HTMLView.ul ~attrs:"class='collapsibleList' id='roottree'" p in
-    let p = HTMLView.(html (seq [head; body (seq [answers_div; p])])) in
-    let ch = open_out filename in
-    output_string ch (HTMLView.toHTML p);
-    fprintf ch "\n%!" ;
-    close_out ch
+    let root = Dom_html.getElementById "tree_container" in
+    let () = root##.innerHTML := Js.string "" in
 
-            *)
-
-  let output_html ~filename _ _ =
-    (* Firebug.console##log (Js.string "output html"); *)
+    let deduction_tree =
+      T.(ul ~a:[a_class ["collapsibleList"]] (helper 0))
+    in
+    let (_: Dom.node Js.t) =
+      root##appendChild ((Tyxml_js.To_dom.of_ul deduction_tree) :> Dom.node Js.t)
+    in
+    let _ = Js.Unsafe.eval_string "CollapsibleLists.apply();" in
     ()
+    (* Firebug.console##log (Js.string "output html"); *)
+
 end
 
 let smart_ppx = Smart_logger.smart_logger [| |]
@@ -177,16 +173,11 @@ let run printer n runner goal =
     in
 
     Printf.printf "}\n%!";
-
-    Firebug.console##log (Js.string "something nasty there")
-    (* let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in *)
-    (* Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph; *)
+    Firebug.console##log (Js.string "something nasty there");
+    M.Logger.output_html ~filename:"" text_answers graph
   )
 
-(* open MiniKanren *)
-(* open M *)
 
-let (_:'a -> 'a -> goal) = (===)
 let _ =
   let a_and_b a : state -> state MiniKanren.Stream.t =
     call_fresh

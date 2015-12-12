@@ -81,3 +81,7 @@ li.collapsibleListClosed{
 .level3 {
   background-color: brown;
 }
+
+#tree_container {
+  height: 100px;
+}

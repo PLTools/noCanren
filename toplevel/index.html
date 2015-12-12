@@ -5,7 +5,8 @@
   <head>
     <title>OCaml toplevel</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" />
+<!--
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" /> -->
     <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" />
     <style>
 
@@ -169,13 +170,13 @@
       load_script("stdlib.cmis.js");
       load_script("js_of_ocaml.cmis.js");
       load_script("js_of_ocaml.toplevel.cmis.js");
-      load_script("js_of_ocaml.deriving.cmis.js");
-      load_script("js_of_ocaml.tyxml.cmis.js");
-      load_script("js_of_ocaml.graphics.cmis.js");
-      load_script("lwt.cmis.js");
-      load_script("react.cmis.js");
-      load_script("reactiveData.cmis.js");
-      load_script("dynlink.cmis.js");
+      //load_script("js_of_ocaml.deriving.cmis.js");
+      //load_script("js_of_ocaml.tyxml.cmis.js");
+      //load_script("js_of_ocaml.graphics.cmis.js");
+      //load_script("lwt.cmis.js");
+      //load_script("react.cmis.js");
+      //load_script("reactiveData.cmis.js");
+      //load_script("dynlink.cmis.js");
       load_script("toplevel.js");
       load_script("strftime.js");
       load_script("compiler-libs.common.cmis.js");
@@ -183,6 +184,13 @@
       load_script("GT.cmis.js");
       load_script("MiniKanren.js_of_ocaml.cmis.js");
     </script>
+
+    <!-- Collabsible lists stuff -->
+    <script type="text/javascript" src="../web/runOnLoad.src.js"></script>
+    <script type="text/javascript" src="../web/CollapsibleLists.compressed.js"></script>
+    <script type="text/javascript" src="../web/jquery-1.11.3.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="../web/main.css" media="screen"></link>
+
   </head>
   <body>
     <div id="toplevel-container">
@@ -237,10 +245,14 @@
       </table>
       <h4>Try to execute samples</h4>
       <div id="toplevel-examples" class="list-group"></div>
+<!--
       <canvas width=200 height=200 id="test-canvas"></canvas>
+-->
+      <br/>
+      <div id="tree_container"/>
+      <br/>
       <h4 class="clear">See the generated javascript code</h4>
-      <pre id="last-js">
-      </pre>
+      <pre id="last-js"/>
     </div>
   </body>
 </html>

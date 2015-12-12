@@ -6,15 +6,17 @@ TESTS_ENVIRONMENT=./test.sh
 #	regression/test003.native #regression/test004.native
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel jslib ppx
+.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel jslib ppx minikanren_stuff
 
-all:
-	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx) $(PPX_TARGET)  $(JSOO_LIB)
+all: minikanren_stuff
+
+minikanren_stuff:
+	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx)
 
 ppx:
 	$(OB) $(TARGETS) $(PPX_TARGET)
 
-jslib:
+jslib: minikanren_stuff ppx
 	$(OB) -Is src,ppx $(JSOO_LIB)
 
 toplevel: ppx jslib

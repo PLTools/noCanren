@@ -11,6 +11,11 @@ DERIVING=$(shell ocamlfind query js_of_ocaml.deriving -format "%p" 2> /dev/null)
 #YOJSON=$(shell ocamlfind query ostap -format "-package %p -rectypes" 2> /dev/null)
 MINIKANREN=$(shell ocamlfind query MiniKanren -format "-package %p -rectypes" 2> /dev/null)
 
+WITH_DERIVING=NO
+WITH_GRAPHICS=NO
+WITH_REACT=NO
+WITH_TYXML=NO
+NATDYNLINK=NO
 
 CPPO_OPT=
 ifneq ($(OCPINDENT),)
@@ -39,6 +44,7 @@ PACKAGES= \
 	js_of_ocaml.toplevel \
 	dynlink
 
+$(warning $(WITH_GRAPHICS))
 ifeq ($(WITH_GRAPHICS),YES)
 JSFILES += +graphics.js
 PACKAGES += graphics js_of_ocaml.graphics
