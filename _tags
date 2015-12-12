@@ -18,7 +18,7 @@ true: package(settings,typeutil,GT)
 
 <regression/orig/*>: traverse
 
-<ppx/smart_logger.*>: package(ppx_tools.metaquot)
+<ppx/smart_logger*>: package(ppx_tools.metaquot)
 
 <jsoo_runner/jsoo_runner.ml>: package(ppx_tools), package(js_of_ocaml.ppx)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx),package(js_of_ocaml.tyxml)
