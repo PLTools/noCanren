@@ -1,6 +1,6 @@
 (** Declare a and b *)
 let a_and_b a =
-  call_fresh_named "b" (fun b ->
+  call_fresh (fun b ->
       conj (a === 7)
            (disj (b === 6)
                  (b === 5)
@@ -28,8 +28,8 @@ let rec appendo a b ab =
 let rec reverso a b =
   disj
     (conj (a === []) (b === []))
-    (call_fresh_named "h" (fun h ->
-      (call_fresh_named "t" (fun t ->
+    (call_fresh (fun h ->
+      (call_fresh (fun t ->
           (conj (a === h::t)
               (call_fresh (fun a' ->
                  conj (appendo a' [h] b)

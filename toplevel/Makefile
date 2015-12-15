@@ -44,7 +44,6 @@ PACKAGES= \
 	js_of_ocaml.toplevel \
 	dynlink
 
-$(warning $(WITH_GRAPHICS))
 ifeq ($(WITH_GRAPHICS),YES)
 JSFILES += +graphics.js
 PACKAGES += graphics js_of_ocaml.graphics
@@ -60,7 +59,7 @@ PACKAGES += yojson
 endif
 
 #ifneq ($(MINIKANREN),)
-PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml str GT
+PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml GT
 #endif
 
 ifeq ($(METAOCAML),1)
