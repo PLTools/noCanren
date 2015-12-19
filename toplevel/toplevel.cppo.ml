@@ -357,17 +357,20 @@ let run _ =
   setup_pseudo_fs ();
   setup_toplevel ();
   setup_js_preview ();
-  setup_printers ();
+  (* setup_printers (); *)
   History.setup ();
 
   textbox##value <- Js.string "";
   (* Run initial code if any *)
-  try
-    let code = List.assoc "code" (parse_hash ()) in
-    textbox##value <- Js.string (B64.decode code);
-    Lwt.async execute
-  with
-  | Not_found -> ()
-  | exc -> Firebug.console##log_3(Js.string "exception", Js.string (Printexc.to_string exc), exc)
+  (* let () =  *)
+  (*   try *)
+  (*     let code = List.assoc "code" (parse_hash ()) in *)
+  (*     textbox##value <- Js.string (B64.decode code); *)
+  (*     Lwt.async execute *)
+  (*   with *)
+  (*   | Not_found -> () *)
+  (*   | exc -> Firebug.console##log_3(Js.string "exception", Js.string (Printexc.to_string exc), exc) *)
+  (* in *)
+  ()
 
 let _ = Dom_html.window##onload <- Dom_html.handler (fun _ -> run (); Js._false)

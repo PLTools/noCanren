@@ -5,8 +5,6 @@
   <head>
     <title>OCaml toplevel</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<!--
-    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" /> -->
     <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" />
     <style>
 
@@ -147,8 +145,8 @@
       .sharp .symbol1 { color: #993300 ; font-weight: bold ; }
       .sharp .constant { color: rgb(0, 152, 255); }
     </style>
-    <script type="text/javascript">
 
+    <script type="text/javascript">
       window.onhashchange = function() { window.location.reload() }
       var hash = window.location.hash.replace(/^#/,"");
       var fields = hash.split(/&/);
@@ -189,13 +187,21 @@
     <script type="text/javascript" src="../web/runOnLoad.src.js"></script>
     <script type="text/javascript" src="../web/CollapsibleLists.compressed.js"></script>
     <script type="text/javascript" src="../web/jquery-1.11.3.min.js"></script>
+    <!-- <script type="text/javascript" src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script> -->
+    <!-- <link href="http://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css" rel="stylesheet"> -->
+
     <link rel="stylesheet" type="text/css" href="../web/main.css" media="screen"></link>
+    <!-- <link rel="stylesheet" type="text/css" href="popup.css" media="screen"></link> -->
+    <link rel="stylesheet" type="text/css" href="../web/simplemodal/basic/basic.css" media="screen"></link>
+    <link rel="stylesheet" type="text/css" href="../web/simplemodal/basic/demo.css" media="screen"></link>
+    <script type="text/javascript"          src="../web/simplemodal/js/jquery.simplemodal.js"></script>
+    <script type="text/javascript"          src="../web/simplemodal/js/basic.js"></script>
 
   </head>
   <body>
     <div id="toplevel-container">
       <a href="http://ocsigen.org/js_of_ocaml" >
-	<img src="http://ocsigen.org/resources/logos/text_js_of_ocaml_with_shadow.png" alt="js_of_ocaml" />
+	<img src="https://ocsigen.org/resources/logos/text_js_of_ocaml_with_shadow.png" alt="js_of_ocaml" />
       </a>
       <pre id="output"></pre>
       <div>
@@ -240,19 +246,33 @@
             <td>Tab</td>
             <td>Indent code</td>
           </tr>
-
         </tbody>
       </table>
+
       <h4>Try to execute samples</h4>
       <div id="toplevel-examples" class="list-group"></div>
-<!--
-      <canvas width=200 height=200 id="test-canvas"></canvas>
--->
+      <br/>
+      <!-- <button onclick="$('#basicModalContent').modal();">Show Dialog</button> -->
+      <button onclick="$.modal(document.getElementById('basicModalContent'));">Show the Tree</button>
+
       <br/>
       <div id="tree_container"/>
       <br/>
       <h4 class="clear">See the generated javascript code</h4>
       <pre id="last-js"/>
     </div>
+
+  <!-- http://www.ericmmartin.com/projects/simplemodal/ -->
+  <div  style="visibility: hidden;">
+    <div id="basicModalContent" >
+      <h4>something</h4>
+      asdf
+      asdfqwer qwer
+    </div>
+    <div style="display:none">
+      <img src="../web/basic/x.png" alt=""/>
+    </div>
+  </div>
+
   </body>
 </html>

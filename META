@@ -9,3 +9,9 @@ package "js_of_ocaml" (
   requires="GT ppx_tools js_of_ocaml.ppx"
   archive(byte)="jsoo_runner.cma"
 )
+package "tester" (
+  description="Tests helper"
+  requires="ostap settings"
+  archive(byte)="tester.cmo"
+)
+

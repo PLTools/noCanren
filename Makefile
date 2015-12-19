@@ -52,7 +52,7 @@ test: tests
 
 
 install:
-	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/jsoo_runner/jsoo_runner.cm[ia] _build/ppx/smart_logger.cmi
+	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/jsoo_runner/jsoo_runner.cm[ia] _build/ppx/smart_logger.cmi _build/regression/tester.cm[io]
 
 uninstall:
 	ocamlfind remove MiniKanren
