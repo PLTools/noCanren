@@ -28,8 +28,39 @@ module type LOGGER = sig
   val output_plain: filename:string -> t -> unit
   val output_html : filename:string -> string list -> t -> unit
 end
-
 module UnitLogger: LOGGER
+
+(** Type of typed logic variable *)
+@type 'a logic = private Var of GT.int | Value of 'a with show, html, eq, compare, foldl, foldr, map
+
+(** Lifting primitive *)
+val (!) : 'a -> 'a logic
+
+(** Type of ligic lists *)
+@type 'a llist = Nil | Cons of 'a logic * 'a llist logic with show, html, eq, compare, foldl, foldr, map
+
+(** Infix synonym for [Cons] *)
+val (%) : 'a logic -> 'a llist logic -> 'a llist logic
+
+(** [x %< y] is a synonym for [Cons (x, !(Cons (y, !Nil)))] *)
+val (%<) : 'a logic -> 'a logic -> 'a llist logic
+
+(** [!< x] is a synonym for [Cons (x, !Nil)] *)
+val (!<) : 'a logic -> 'a llist logic
+
+(** [of_list l] converts a regular list into logic one *)
+val of_list : 'a list -> 'a llist logic
+
+(** [to_listk k l] converts logic list [l] into a regular one, calling [k] to
+    convert elements, which are not a value *)
+val to_listk : ('a llist logic -> 'a list) -> 'a llist logic -> 'a list
+
+(** Exception to raise on a non-value case *)
+exception Not_a_value
+
+(** [to_list l] converts logic list [l] into a regular one, raising
+    [Not_a_value] on a non-value case *)
+val to_list : 'a llist logic -> 'a list
 
 (** Lazy streams *)
 module Stream :
@@ -51,7 +82,8 @@ sig
   (** Printing helper *)
   val show : t -> string
 end
-
+(*
+<<<<<<< HEAD
 (** {2 GT-based printing functions} *)
 
 (** [show_var st x k] inspects [x] w.r.t. state [st] and either shows it
@@ -242,39 +274,65 @@ val pair :
   (** MiniKanren show type-indexed wrapper *)
   val mkshow : ('a, < mkshow : 'b; .. >) GT.t -> 'b
 
-
+ *)
+(** Exception to raise on infinine unification result *)
+exception Occurs_check
 
 module Make : functor (Logger: LOGGER) -> sig
   module Logger: LOGGER
 
   type state = State.t * Logger.t * Logger.node
 
-
   (** Goal converts a state into a lazy stream of states *)
   type goal = state -> state Stream.t
-  (* type goal = State.t -> (State.t Stream.t, Logger.t) Result.t *)
-  (* type goal = State.t -> State.t Stream.t *)
-
 
   (** {2 miniKanren basic primitives} *)
 
   (** Utility function for logging *)
   val (<=>) : string -> (state -> 'b) -> (state -> 'b)
 
-  (** [call_fresh f] creates a fresh logical variable and passes it to the
-      parameter *)
-  val call_fresh : ('a -> state -> 'b) -> (state -> 'b)
 
-  (** [call_fresh_name name f] works the same as [call_fresh f] but adds to
-      the log [name] of created logical variable *)
-  val call_fresh_named : string -> ('a -> state -> 'b) -> state -> 'b
+(** {2 miniKanren basic primitives} *)
 
-  (** [x === y] creates a goal, which performs a unifications of
-      [x] and [y] *)
-  val (===) : 'a -> 'a -> goal
+(** [call_fresh f] creates a fresh logical variable and passes it to the
+    parameter *)
+val call_fresh : ('a logic -> state -> 'b) -> state -> 'b
 
-  (** [conj s1 s2] creates a goal, which is a conjunction of its arguments *)
-  val conj : goal -> goal -> goal
+(** [call_fresh_named name f] works the same as [call_fresh f] but adds to
+    the log [name] of created logical variable *)
+val call_fresh_named : string -> ('a logic -> state -> 'b) -> state -> 'b
+
+(** [succ num f] increments the number of free logic variables in
+    a goal; can be used to get rid of ``fresh'' syntax extension *)
+val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
+
+(** Zero logic parameters *)
+val zero : 'a -> 'a
+
+(** One to five logic parameter(s) *)
+val one   : ('a logic ->                                                 state -> 'b) -> state -> 'b
+val two   : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+
+(** One to five logic parameter(s), conventional names *)
+val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b
+val qr    : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+
+(** [x === y] creates a goal, which performs a unifications of
+    [x] and [y] *)
+val (===) : 'a logic -> 'a logic -> goal
+
+(** [x === y] creates a goal, which performs a non-unification check for
+    [x] and [y] *)
+val (=/=) : 'a logic -> 'a logic -> goal
+
+(** [conj s1 s2] creates a goal, which is a conjunction of its arguments *)
+val conj : goal -> goal -> goal
 
   (** [&&&] is left-associative infix synonym for [conj] *)
   val (&&&) : goal -> goal -> goal
@@ -306,9 +364,20 @@ module Make : functor (Logger: LOGGER) -> sig
       state [s] *)
   val refine : State.t -> 'a -> 'a
 
-  (** [take ?(n=k) s] takes at most [k] first answers from the lazy
-      stream [s] (reexported from MKStream for convenience) *)
-  val take  : ?n:int -> state Stream.t -> state list
-  val take' : ?n:int -> state Stream.t -> State.t list
+(** [diseq] is a type for disequality constraint *)
+type diseq
+
+(** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
+    state [s] *)
+val refine : State.t -> 'a logic -> 'a logic * diseq
+
+(** [reify s x] reifies disequality constraint for a given logic variable; the result
+    is a list of logic expressions, which given variable should not be equal to *)
+val reify : diseq -> 'a logic -> 'a logic list
+
+(** [take ?(n=k) s] takes at most [k] first answers from the lazy
+    stream [s] (reexported from MKStream for convenience) *)
+val take  : ?n:int -> State.t Stream.t -> State.t list
+val take' : ?n:int -> state Stream.t -> State.t list
 
 end

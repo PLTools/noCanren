@@ -1,3 +1,5 @@
+open Printf
+
 module GraphLogger = struct
   module Int = struct
     type t = int
@@ -32,9 +34,6 @@ module GraphLogger = struct
     try let ans = G.find g.l_graph from in
         G.replace g.l_graph from ((dest,msg,g.l_level) :: ans)
     with Not_found -> G.add g.l_graph from [(dest,msg,g.l_level)]
-
-
-  open Printf
 
   let dump_graph g ch =
     print_endline "dumping graph";
@@ -154,7 +153,9 @@ let qp   = two
 let qpr  = three
 let qprt = four
 
-let run printer n runner goal =
+let empty_reifier _ _ = ""
+
+let run printer reifier n runner goal =
   let graph = Logger.create () in
   M.run graph (fun st ->
     let (repr, result), vars = runner goal st in
@@ -165,9 +166,9 @@ let run printer n runner goal =
       (if n <>  1  then "s" else "");
 
     let answers =
-      GraphLogger.dump_graph (Obj.magic graph) stdout;
+      (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
       for i=1 to n do
-        ignore (take ~n:i result);
+        ignore (take' ~n:i result);
         GraphLogger.next_level (Obj.magic graph);
       done;
       take' ~n result
@@ -177,10 +178,16 @@ let run printer n runner goal =
       answers |> List.map
         (fun (st: State.t) ->
            let b = Buffer.create 100 in
-           List.iter
-             (fun (s, x) -> Printf.bprintf b "%s=%s; " s (printer st (refine st x)))
-             vars;
-           let s = Buffer.contents b in
+           let s = List.map
+            (fun (s, x) ->
+              let v, dc = refine st x in
+              let pv = printer v in
+              match reifier dc v with
+              | "" -> sprintf "%s=%s;" s pv
+              | r  -> sprintf "%s=%s (%s);" s pv r
+             )
+             vars |> String.concat " "
+           in
            Printf.printf "%s\n%!" s;
            s
         )
@@ -189,8 +196,37 @@ let run printer n runner goal =
 
     Printf.printf "}\n%!";
 
-    GraphLogger.dump_graph (Obj.magic graph) stdout;
+    (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
     let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
     Logger.output_plain ~filename:(out_file_prefix^".plain") graph;
     Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;
   )
+
+
+let show = GT.show
+(*
+let run printer reifier n runner goal =
+  run (fun st ->
+    let (repr, result), vars = runner goal st in
+    Printf.printf "%s, %s answer%s {\n"
+      repr
+      (if n = (-1) then "all" else string_of_int n)
+      (if n <>  1  then "s" else "");
+    List.iter
+      (fun st ->
+         List.iter
+           (fun (s, x) ->
+	      let v, dc = refine st x in
+              let pv = printer v in
+              match reifier dc v with
+              | "" -> Printf.printf "%s=%s; " s pv
+              | r  -> Printf.printf "%s=%s (%s);" s pv r
+	   )
+           vars;
+         Printf.printf "\n"
+      )
+      (take ~n:n result);
+    Printf.printf "}\n%!"
+  )
+
+  *)

@@ -4,17 +4,19 @@ true: package(settings,typeutil,GT)
 <toplevel/*>:  not_hygienic
 
 
-<src/MiniKanren.ml>: syntax(camlp5o), package(GT.syntax), package(logger.syntax)
-<plugin/mkshow.cmo>: syntax(camlp5o), package(GT.syntax)
-<plugin/mkshow.ml> : syntax(camlp5o), package(GT.syntax)
+#<src/MiniKanren.ml>: syntax(camlp5o), package(GT.syntax), package(logger.syntax)
+<src/MiniKanren.ml*>: syntax(camlp5o), package(GT.syntax.all)
+#<plugin/mkshow.cmo>: syntax(camlp5o), package(GT.syntax)
+#<plugin/mkshow.ml> : syntax(camlp5o), package(GT.syntax)
 <camlp5/pa_minikanren.ml>: syntax(camlp5o), package(GT.syntax)
 
-<regression/test*>: syntax(camlp5o), package(settings)
-<regression/test0*.ml>: package(GT.syntax.show,logger.syntax)
-<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_mkshow
-<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: package(GT.syntax.show), use_pa_minikanren
-<regression/tester.ml>:  package(ostap), package(GT.syntax)
-<regression/test*.native>:  package(ostap,str), package(GT.syntax)
+<regression/tester.ml>: package(ostap)
+#<regression/test*>: syntax(camlp5o), package(settings)
+<regression/test0*.ml>: syntax(camlp5o), package(logger.syntax)
+#<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_mkshow
+<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_pa_minikanren
+<regression/test004.ml> or <regression/test005.ml>:  package(GT.syntax.show)
+<regression/test*.native>:  package(ostap,str)
 
 <regression/orig/*>: traverse
 
