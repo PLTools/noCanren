@@ -53,33 +53,6 @@ module GraphLogger = struct
 
   let output_plain ~filename _ = ()
   let output_html ~filename _answers g =
-           (*
-
-    let head = tag "head"
-        [ style ~url:"web/main.css"
-        ; script ~url:"web/runOnLoad.src.js"
-        ; script ~url:"web/CollapsibleLists.compressed.js"
-        ; script ~url:"web/jquery-1.11.3.min.js"
-        ; script_inline "
-runOnLoad(function(){
-  console.log('1');
-  CollapsibleLists.apply();
-});
-
-function onGenerationSelected(level) {
-  console.log(level);
-}
-                         "]
-
-    in
-
-    let answers_div =
-      div (List.mapi (fun i s ->
-                      let attrs = sprintf "onclick='onGenerationSelected(%d)' class='level%d'" i i in
-                      div ~attrs [P.string s]) answers)
-    in
-
-            *)
     let module T = Tyxml_js.Html5 in
     let open Tyxml_js.Html5 in
     let make_plock ~gen idx name xs =
@@ -93,7 +66,7 @@ function onGenerationSelected(level) {
       | xs ->
          let for_ = "subfolderfor1" in
          T.(li [ pcdata name
-               ; ul ~a:[a_class [level_class; "proof_node"]; Unsafe.string_attrib "level" (sprintf "answer%d" gen)] xs
+               ; ul ~a:[] xs
                ])
     in
     let rec helper node =
@@ -103,18 +76,17 @@ function onGenerationSelected(level) {
       with Not_found ->
         T.[li [pcdata (sprintf "<No such node '%s'>" (string_of_node node))] ]
     in
-    let root = Dom_html.getElementById "tree_container" in
+    let root = Dom_html.getElementById "listContainer" in
     let () = root##.innerHTML := Js.string "" in
 
     let deduction_tree =
-      T.(ul ~a:[a_class ["collapsibleList"]] (helper 0))
+      T.(ul ~a:[a_id "expList"] (helper 0))
     in
     let (_: Dom.node Js.t) =
       root##appendChild ((Tyxml_js.To_dom.of_ul deduction_tree) :> Dom.node Js.t)
     in
-    let _ = Js.Unsafe.eval_string "CollapsibleLists.apply();" in
+    let _ = Js.Unsafe.eval_string "prepareList();" in
     ()
-    (* Firebug.console##log (Js.string "output html"); *)
 
 end
 
