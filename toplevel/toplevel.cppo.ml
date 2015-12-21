@@ -192,13 +192,13 @@ let setup_share_button ~output =
        Lwt.return_unit));
       Js._false))
 
-let setup_js_preview () =
-  let ph = by_id "last-js" in
-  let runcode : (string -> 'a) = Js.Unsafe.global##toplevelEval in
-  Js.Unsafe.global##toplevelEval <- (fun bc ->
-      ph##innerHTML <- Js.string bc;
-      runcode bc
-    )
+(* let setup_js_preview () = *)
+(*   let ph = by_id "last-js" in *)
+(*   let runcode : (string -> 'a) = Js.Unsafe.global##toplevelEval in *)
+(*   Js.Unsafe.global##toplevelEval <- (fun bc -> *)
+(*       ph##innerHTML <- Js.string bc; *)
+(*       runcode bc *)
+(*     ) *)
 
 let current_position = ref 0
 let highlight_location loc =
@@ -356,7 +356,7 @@ let run _ =
   setup_examples ~container ~textbox;
   setup_pseudo_fs ();
   setup_toplevel ();
-  setup_js_preview ();
+  (* setup_js_preview (); *)
   (* setup_printers (); *)
   History.setup ();
 

@@ -184,8 +184,8 @@
     </script>
 
     <!-- Collabsible lists stuff -->
-    <script type="text/javascript" src="../web/runOnLoad.src.js"></script>
-    <script type="text/javascript" src="../web/CollapsibleLists.compressed.js"></script>
+    <!-- <script type="text/javascript" src="../web/runOnLoad.src.js"></script> -->
+    <!-- <script type="text/javascript" src="../web/CollapsibleLists.compressed.js"></script> -->
     <script type="text/javascript" src="../web/jquery-1.11.3.min.js"></script>
     <!-- <script type="text/javascript" src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script> -->
     <!-- <link href="http://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css" rel="stylesheet"> -->
@@ -225,7 +225,6 @@
         $('#expandList')
           .unbind('click')
           .click( function() {
-            console.log("A");
             $('.collapsed').addClass('expanded');
             $('.collapsed').children().show('medium');
         });
@@ -299,8 +298,10 @@
       <br/>
       <div id="tree_container"/>
       <br/>
+<!--
       <h4 class="clear">See the generated javascript code</h4>
       <pre id="last-js"/>
+-->
     </div>
 
   <!-- http://www.ericmmartin.com/projects/simplemodal/ -->
