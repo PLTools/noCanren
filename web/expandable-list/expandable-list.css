@@ -32,3 +32,21 @@
 #expList .expanded {
     background-image: url(expanded.png);
 }
+
+.listControl{
+  margin-bottom: 15px;
+}
+.listControl a {
+  border: 1px solid #555555;
+  color: #555555;
+  cursor: pointer;
+  height: 1.5em;
+  line-height: 1.5em;
+  margin-right: 5px;
+  padding: 4px 10px;
+}
+.listControl a:hover {
+  background-color:#555555;
+  color:#222222;
+  font-weight:normal;
+}

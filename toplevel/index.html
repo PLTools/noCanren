@@ -219,6 +219,25 @@
       });
     </script>
 
+    <script type="text/javascript">
+      //Create the button funtionality
+      $(document).ready(function() {
+        $('#expandList')
+          .unbind('click')
+          .click( function() {
+            console.log("A");
+            $('.collapsed').addClass('expanded');
+            $('.collapsed').children().show('medium');
+        });
+        $('#collapseList')
+          .unbind('click')
+          .click( function() {
+            $('.collapsed').removeClass('expanded');
+            $('.collapsed').children().hide('medium');
+        });
+      });
+    </script>
+
   </head>
   <body>
     <div id="toplevel-container">
@@ -287,7 +306,12 @@
   <!-- http://www.ericmmartin.com/projects/simplemodal/ -->
   <div  style="visibility: hidden;">
     <div id="basicModalContent" >
-      <h4>Deduction tree</h4>
+      <h4>Deduction tree</h4><br/>
+      <div class="listControl">
+        <a id="expandList">Expand All</a>
+        <a id="collapseList">Collapse All</a>
+      </div>
+      <br/>
       <div id="listContainer">
         <!--
         <ul id="expList">
