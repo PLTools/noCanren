@@ -1,3 +1,5 @@
+open Printf
+
 module GraphLogger = struct
   module Int = struct
     type t = int
@@ -94,8 +96,6 @@ let smart_ppx = Smart_logger.smart_logger [| |]
 
 let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
 
-let int_list st l = MiniKanren.( mkshow list (mkshow int) st l )
-
 open MiniKanren
 module M = MiniKanren.Make(GraphLogger)
 open M
@@ -113,7 +113,7 @@ let qp   = two
 let qpr  = three
 let qprt = four
 
-let run printer n runner goal =
+let run printer reifier n runner goal =
   let graph = Logger.create () in
   M.run graph (fun st ->
     let (result, vars) = runner goal st in
@@ -123,9 +123,9 @@ let run printer n runner goal =
       (if n <>  1  then "s" else "");
 
     let answers =
-      GraphLogger.dump_graph (Obj.magic graph) stdout;
+      (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
       for i=1 to n do
-        ignore (take ~n:i result);
+        ignore (take' ~n:i result);
         GraphLogger.next_level (Obj.magic graph);
       done;
       take' ~n result
@@ -135,29 +135,38 @@ let run printer n runner goal =
       answers |> List.map
         (fun (st: State.t) ->
            let b = Buffer.create 100 in
-           List.iter
-             (fun (s, x) -> Printf.bprintf b "%s=%s; " s (printer st (refine st x)))
-             vars;
-           let s = Buffer.contents b in
+           let s = List.map
+            (fun (s, x) ->
+              let v, dc = refine st x in
+              let pv = printer v in
+              match reifier dc v with
+              | "" -> sprintf "%s=%s;" s pv
+              | r  -> sprintf "%s=%s (%s);" s pv r
+             )
+             vars |> String.concat " "
+           in
            Printf.printf "%s\n%!" s;
            s
         )
     in
 
     Printf.printf "}\n%!";
-    Firebug.console##log (Js.string "something nasty there");
     M.Logger.output_html ~filename:"" text_answers graph
   )
 
+let empty_reifier _ _ = ""
+
+let show_int      = GT.( show(logic) (show int) )
+let show_int_list = GT.( show(logic) (show(llist) (show int)) )
 
 let _ =
   let a_and_b a : state -> state MiniKanren.Stream.t =
     call_fresh
-      (fun b -> conj (a === 7)
-                     (disj (b === 6)
-                           (b === 5)
+      (fun b -> conj (a === !7)
+                     (disj (b === !6)
+                           (b === !5)
                      )
       )
   in
 
-  fun () -> run (mkshow int) 1 q (fun q st -> a_and_b q st, ["q", q])
+  fun () -> run show_int empty_reifier 1 q (fun q st -> a_and_b q st, ["q", q])
