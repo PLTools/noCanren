@@ -1,26 +1,24 @@
 true: rectypes
-true: package(settings,typeutil,GT)
-
 <toplevel/*>:  not_hygienic
 
-
-#<src/MiniKanren.ml>: syntax(camlp5o), package(GT.syntax), package(logger.syntax)
-<src/MiniKanren.ml*>: syntax(camlp5o), package(GT.syntax.all)
-#<plugin/mkshow.cmo>: syntax(camlp5o), package(GT.syntax)
-#<plugin/mkshow.ml> : syntax(camlp5o), package(GT.syntax)
+<src/MiniKanren.ml*>: syntax(camlp5o), package(typeutil,GT.syntax.all)
 <camlp5/pa_minikanren.ml>: syntax(camlp5o), package(GT.syntax)
 
-<regression/tester.ml>: package(ostap)
-#<regression/test*>: syntax(camlp5o), package(settings)
-<regression/test0*.ml>: syntax(camlp5o), package(logger.syntax)
-#<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_mkshow
-<regression/test003.ml> or <regression/test004.ml> or <regression/test005.ml>: use_pa_minikanren
-<regression/test004.ml> or <regression/test005.ml>:  package(GT.syntax.show)
-<regression/test*.native>:  package(ostap,str)
-
 <regression/orig/*>: traverse
+<regression/tester.ml>: package(ostap,GT)
+<regression/test0*.ml>: syntax(camlp5o), package(logger.syntax,GT)
+<regression/test*.native>: package(GT,ostap,str)
+<regression/test003.ml>: use_pa_minikanren
+
+<regression/test004.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test005.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test006.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test007.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test009.ml>: package(GT.syntax.show), use_pa_minikanren
+<regression/test010.ml>: use_pa_minikanren
+<regression/test011.ml>: package(GT.syntax.show), use_pa_minikanren
 
 <ppx/smart_logger*>: package(ppx_tools.metaquot)
 
-<jsoo_runner/jsoo_runner.ml>: package(ppx_tools), package(js_of_ocaml.ppx)
+<jsoo_runner/jsoo_runner.ml>: package(ppx_tools,js_of_ocaml.ppx,GT)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx),package(js_of_ocaml.tyxml)

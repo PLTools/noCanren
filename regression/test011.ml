@@ -1,8 +1,9 @@
-1open GT
+open GT
 open MiniKanren
-open Tester
 
 @type t = N | A of t logic with show
+
+open Tester.M
 
 let show_t         = show(logic) (show t)
 let show_int       = show(logic) (show int)
@@ -15,13 +16,13 @@ let int_reifier dc x =
   | [] -> ""
   | cs -> show(list) (fun c -> Printf.sprintf "%s =/= %s" (show_int x) (show_int c)) cs
 
-let list_reifier dc t = 
+let list_reifier dc t =
   let h = Hashtbl.create 10 in
   let check_var i = Hashtbl.mem h i in
   let add_var   i = Hashtbl.add h i true in
   match t with
   | (Var i) as x ->
-      if check_var i 
+      if check_var i
       then ""
       else begin
 	add_var i;
@@ -29,10 +30,13 @@ let list_reifier dc t =
 	| [] -> ""
 	| cs -> show(list) (fun c -> Printf.sprintf "%s =/= %s" (show_list x) (show_list c)) cs
       end
-  | Value l -> 
+  | Value l ->
       List.fold_left (fun acc -> function (Var i) as x when not (check_var i) -> add_var i; acc ^ int_reifier dc x | _ -> acc) "" l
 
-let _ = 
+
+open Tester
+
+let _ =
   run show_t         empty_reifier (-1) q (fun q st -> REPR((fresh(x) (x =/= !(A x)))                                                                   st), ["q", q]);
   run show_int       empty_reifier (-1) q (fun q st -> REPR ((fresh (x y z)(x =/= y)(x === ![!0; z; !1])(y === ![!0; !1; !1]))                          st), ["q", q]);
   run show_list_list empty_reifier (-1) q (fun q st -> REPR ((fresh (x y z)(x =/= y)(x === ![!0; z; !1])(y === ![!0; !1; !1])(z === !1)(![x; y] === q)) st), ["q", q]);
@@ -95,11 +99,11 @@ let _ =
          (rembero x d res) &&&
          (conde [
              (a === x) &&& (out === res);
-             (out === a % res)   
+             (out === a % res)
           ])
        )
      ]
-   in 
+   in
    run show_llist empty_reifier (-1) q (fun q st -> REPR (rembero !1 (!1 % (!2 % (!1 %< !3))) q          st), ["q", q]);
    run show_llist empty_reifier (-1) q (fun q st -> REPR (rembero !1 (!1 % (!2 %< !3)) (!1 % (!2 %< !3)) st), ["q", q]);
 
@@ -111,10 +115,10 @@ let _ =
          (rembero x d res) &&&
          (conde [
              (a === x) &&& (out === res);
-             (a =/= x) &&& (out === a % res)   
+             (a =/= x) &&& (out === a % res)
           ])
        )
      ]
-   in 
+   in
    run show_llist empty_reifier (-1) q (fun q st -> REPR (rembero !1 (!1 % (!2 % (!1 %< !3))) q          st), ["q", q]);
    run show_llist empty_reifier (-1) q (fun q st -> REPR (rembero !1 (!1 % (!2 %< !3)) (!1 % (!2 %< !3)) st), ["q", q])

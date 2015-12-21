@@ -29,7 +29,8 @@ clean:
 	rm -fr _build *.log  *.native *.byte
 	$(MAKE) -C regression clean
 
-REGRES_CASES=000 001 002 003 004 005
+REGRES_CASES=$(shell seq -s " " -f %03g 0 11)
+$(warning $(REGRES_CASES))
 define TESTRULES
 .PHONY: test_$(1) test$(1).native
 test$(1).native: regression/test$(1).native

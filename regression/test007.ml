@@ -1,8 +1,9 @@
 open GT
 open MiniKanren
-open Tester
 
 @type lam = X of string logic | App of lam logic * lam logic | Abs of string logic * lam logic with show
+
+open Tester.M
 
 let match_lam a var app abs =
   conde [
@@ -42,7 +43,9 @@ let rec evalo m n =
     )
     (fun _ _ -> n === m)
 
-let show_lam = show logic (show lam)
+let show_lam = GT.( show logic (show lam) )
+
+open Tester
 
 let _ =
   run show_lam empty_reifier 1  q (fun q   st -> REPR (substo !(X !"x") !"x" !(X !"y") q                    st), ["q", q]);

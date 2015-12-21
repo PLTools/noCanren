@@ -42,7 +42,7 @@ let show_string = GT.( show logic (show string) )
 open Tester
 
 let _ =
-  run show_typ    empty_reifier  1 q (fun q st -> REPR (lookupo !"x" (of_list []) q                                          st), ["q", q]);
+  run show_typ    empty_reifier 1 q (fun q st -> REPR (lookupo !"x" (of_list []) q                                          st), ["q", q]);
   run show_typ    empty_reifier 1 q (fun q st -> REPR (lookupo !"x" (of_list [!"x", !(V !"x")]) q                           st), ["q", q]);
   run show_typ    empty_reifier 1 q (fun q st -> REPR (lookupo !"x" (of_list [!"y", !(V !"y"); !"x", !(V !"x")]) q          st), ["q", q]);
 

@@ -1,3 +1,17 @@
+type config = { mutable do_html: bool   (* html output of deduction tree *)
+              ; mutable do_plain: bool  (* plain text output of deduction tree *)
+              }
+let config  = { do_html=false
+              ; do_plain=false
+              }
+
+let () =
+  let specs = [ ("-html",    Arg.Unit (fun () -> config.do_html  <- true), "html output")
+              ; ("-text",    Arg.Unit (fun () -> config.do_plain <- true), "plain text output")
+              ] in
+  Arg.parse specs (fun _ -> ())
+            "usage there"
+
 open Printf
 
 module GraphLogger = struct
@@ -75,15 +89,11 @@ module GraphLogger = struct
 
   let output_html ~filename answers g =
     let module P=HTMLView in
-    let empty = P.raw "" in
     let tag ?(attrs="") name (xs: P.viewer list) = P.(tag ~attrs name (seq xs)) in
-    let span ?(attrs="") txt = P.(tag ~attrs "span" (seq [string txt])) in
     let script ?(attrs="") ~url = tag "script" ~attrs:(sprintf "src='%s' %s" url attrs) [] in
     let style ~url = tag "link" ~attrs:(sprintf "rel='stylesheet' type='text/css' href='%s' media='screen'" url) [] in
-    let style_inline  text = tag "style"  ~attrs:"type='text/css'"        [P.raw text] in
     let script_inline text = tag "script" ~attrs:"type='text/javascript'" [P.raw text] in
     let div ?(attrs="") xs = tag ~attrs "div" xs in
-    let ul  ?(attrs="") (xs: P.viewer list) = tag ~attrs "ul"  xs in
 
     let head = tag "head"
         [ style ~url:"web/main.css"
@@ -109,13 +119,12 @@ function onGenerationSelected(level) {
                       div ~attrs [P.string s]) answers)
     in
 
-    let label ~name for_ = P.(tag ~attrs:"for='subfolder'" "label" (P.string name)) in
     let make_plock ~gen idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
       match xs with
       | [] -> P.(li ~attrs:(sprintf "class='level%d'" gen) (string name))
       | xs ->
-         let for_ = "subfolderfor1" in
+         (* let for_ = "subfolderfor1" in *)
          HTMLView.(li (seq [ P.string name
                            ; ul ~attrs:(sprintf "class='level%d proofnode' level='answer%d'" gen gen)  (seq xs)
                            ]) )
@@ -177,7 +186,6 @@ let run printer reifier n runner goal =
     let text_answers =
       answers |> List.map
         (fun (st: State.t) ->
-           let b = Buffer.create 100 in
            let s = List.map
             (fun (s, x) ->
               let v, dc = refine st x in
@@ -197,9 +205,12 @@ let run printer reifier n runner goal =
     Printf.printf "}\n%!";
 
     (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
-    let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
-    Logger.output_plain ~filename:(out_file_prefix^".plain") graph;
-    Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;
+    if config.do_plain then
+      let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
+      let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
+      ();
+    if config.do_html
+    then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;
   )
 
 
