@@ -129,7 +129,7 @@ let setup_examples ~container ~textbox =
               Lwt.return_unit);
             true
 	 )] [pcdata name]) in
-      Dom.appendChild example_container (Tyxml_js.To_dom.of_a a);
+      Dom.insertBefore example_container (Tyxml_js.To_dom.of_a a) example_container##firstChild;
       ""
     ) "" !all in
   ()
