@@ -71,7 +71,7 @@ li.collapsibleListClosed{
   visibility: hidden;
 }
 
-
+/*
 .level1 {
   background-color: green;
 }
@@ -81,7 +81,7 @@ li.collapsibleListClosed{
 .level3 {
   background-color: brown;
 }
-
+*/
 #tree_container {
   height: 100px;
 }

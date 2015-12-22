@@ -388,13 +388,14 @@ type state = State.t * Logger.t * Logger.node
 
 type goal = state -> state Stream.t
 
-let change_env: State.t -> Env.t -> State.t =
-  fun (_,s,ss) e -> (e,s,ss)
+let make_leaf msg (_,root,from) =
+  let dest = Logger.make_node root in
+  Logger.connect root from dest msg
 
-  let adjust_state msg (st,l,root) =
-    let dest = Logger.make_node l in
-    Logger.connect l root dest msg;
-    (st,l,dest)
+  let adjust_state msg (st,root,l) =
+    let dest = Logger.make_node root in
+    Logger.connect root l dest msg;
+    (st,root,dest)
 
   let (<=>)  : string -> (state -> 'b) -> (state -> 'b)
     = fun msg f st -> f (adjust_state msg st)
@@ -431,11 +432,16 @@ let pqrst = five
 
 exception Disequality_violated
 
-let (===) x y ((env, subst, constr), root, l) =
+let (===) x y st =
+  let (((env, subst, constr), root, l) as state1) =
+    adjust_state (sprintf "unify '%s' and '%s'" (generic_show !!x) (generic_show !!y)) st
+  in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
-    | None -> Stream.nil
+    | None ->
+       make_leaf "Failed" state1;
+       Stream.nil
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
@@ -455,10 +461,15 @@ let (===) x y ((env, subst, constr), root, l) =
             []
             constr
 	  in
+          let (_,root,_) = adjust_state "Success" state1 in
           Stream.cons ((env, s, constr'),root,l) Stream.nil
-        with Disequality_violated -> Stream.nil
+        with Disequality_violated ->
+          let () = make_leaf "Disequality violated" state1 in
+          Stream.nil
     end
-  with Occurs_check -> Stream.nil
+  with Occurs_check ->
+    let () = make_leaf "Occurs check failed" state1 in
+    Stream.nil
 
 let (=/=) x y (((env, subst, constr) as st),root,l) =
   let normalize_store prefix constr =

@@ -59,12 +59,12 @@ module GraphLogger = struct
     let open Tyxml_js.Html5 in
     let make_plock ~gen idx name xs =
       let name = sprintf "%s: %s" (string_of_node idx) name in
-      let level_class  = Printf.sprintf "level%d" gen in
+      (* let level_class  = Printf.sprintf "level%d" gen in *)
 
       match xs with
       | [] ->
         let open T in
-        li ~a:[a_class [level_class]] [pcdata name]
+        T.(li (* ~a:[a_class [level_class]] *) [pcdata name])
       | xs ->
          T.(li [ pcdata name
                ; ul ~a:[] xs
