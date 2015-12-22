@@ -66,7 +66,6 @@ module GraphLogger = struct
         let open T in
         li ~a:[a_class [level_class]] [pcdata name]
       | xs ->
-         let for_ = "subfolderfor1" in
          T.(li [ pcdata name
                ; ul ~a:[] xs
                ])
@@ -134,7 +133,6 @@ let run printer reifier n runner goal =
     let text_answers =
       answers |> List.map
         (fun (st: State.t) ->
-           let b = Buffer.create 100 in
            let s = List.map
             (fun (s, x) ->
               let v, dc = refine st x in

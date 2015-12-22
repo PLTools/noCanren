@@ -85,6 +85,8 @@ let logf fmt =
 
 let (!!) = Obj.magic;;
 
+open GT (* To disable some warnings *)
+
 @type 'a logic = Var of GT.int | Value of 'a with show, html, eq, compare, foldl, foldr, map
 
 let logic = {
@@ -162,7 +164,7 @@ let rec wrap (x : Obj.t) =
         (fun _ -> true)
         [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
          forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-         final_tag  ; unaligned_tag; out_of_heap_tag
+         custom_tag ; unaligned_tag; out_of_heap_tag
         ]
     in
     let is_unboxed obj =
