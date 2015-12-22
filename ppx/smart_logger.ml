@@ -12,12 +12,22 @@ let is_state_pattern pat =
   | Ppat_var v when v.txt = "st" || v.txt = "state" -> Some v.txt
   | _ -> None
 
-let is_call_fresh e =
+let need_insert_fname ~name e =
   match e.pexp_desc with
-  | Pexp_ident i when i.txt = Lident "call_fresh" -> true
+  | Pexp_ident i when i.txt = Lident name -> true
   | _ -> false
 
+let is_call_fresh = need_insert_fname ~name:"call_fresh"
+let is_conj = need_insert_fname ~name:"conj"
+let is_disj = need_insert_fname ~name:"disj"
+
 let rec walkthrough ~fname (expr: expression) =
+
+  let add_fname () =
+    [%expr [%e Ast_helper.Exp.constant (Const_string (fname,None))] <=>
+           [%e expr]
+    ]
+  in
   match expr.pexp_desc with
   | Pexp_fun (_label, _opt, pat, e2) -> begin
       match is_state_pattern pat with
@@ -36,10 +46,9 @@ let rec walkthrough ~fname (expr: expression) =
         in
         { expr with pexp_desc= Pexp_fun (_label, _opt, pat, new_body) }
     end
-  | Pexp_apply (e,es) when is_call_fresh e ->
-    [%expr [%e Ast_helper.Exp.constant (Const_string (fname,None))] <=>
-           [%e expr]
-    ]
+  | Pexp_apply (e,_) when is_call_fresh e -> add_fname ()
+  | Pexp_apply (e,_) when is_disj e -> add_fname ()
+  | Pexp_apply (e,_) when is_conj e -> add_fname ()
 
   | _ -> expr
 
