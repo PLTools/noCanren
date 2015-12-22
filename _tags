@@ -19,6 +19,7 @@ true: rectypes
 <regression/test011.ml>: package(GT.syntax.show), use_pa_minikanren
 
 <ppx/smart_logger*>: package(ppx_tools.metaquot)
+<ppx/pa_minikanren*>: package(ppx_tools.metaquot)
 
 <jsoo_runner/jsoo_runner.ml>: package(ppx_tools,js_of_ocaml.ppx,GT)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx),package(js_of_ocaml.tyxml)

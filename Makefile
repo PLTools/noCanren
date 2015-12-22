@@ -1,6 +1,6 @@
 OB=ocamlbuild -use-ocamlfind
 TARGETS=src/MiniKanren.cmo camlp5/pa_minikanren.cmo
-PPX_TARGET=ppx/smart_logger_bin.native
+PPX_TARGETS=ppx/smart_logger_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
@@ -14,7 +14,7 @@ minikanren_stuff:
 	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx)
 
 ppx:
-	$(OB) $(TARGETS) $(PPX_TARGET)
+	$(OB) $(TARGETS) $(PPX_TARGETS)
 
 jslib: minikanren_stuff ppx
 	$(OB) -Is src,ppx $(JSOO_LIB)

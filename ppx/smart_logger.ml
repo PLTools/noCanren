@@ -68,3 +68,53 @@ let smart_logger argv =
         { sitem with pstr_desc = Pstr_value (_rec, List.map vbs ~f:map_value_binding) }
       | x -> default_mapper.structure_item mapper sitem
   }
+
+
+let option_map ~f = function Some x -> Some (f x) | None -> None
+let option_bind ~f = function Some x -> f x | None -> None
+
+exception Not_an_ident
+let reconstruct_args e =
+  let are_all_idents (xs: (_*expression) list) =
+    try Some (List.map (fun (_,e) ->
+                        match e.pexp_desc with
+                        | Pexp_ident {txt=(Longident.Lident i);_} -> i
+                        | _ -> raise Not_an_ident) xs)
+    with Not_an_ident -> None
+  in
+  match e.pexp_desc with
+  | Pexp_apply ({pexp_desc=Pexp_ident {txt=Longident.Lident arg1; _}}, ys) -> begin
+      option_map (are_all_idents ys) ~f:(fun xs -> arg1::xs )
+    end
+  | _ -> None
+
+let rec pamk_e mapper e : expression =
+  match e.pexp_desc with
+  | Pexp_apply (e1,[(_,args); (_,body)]) -> begin
+      let new_body : expression = pamk_e mapper body in
+      match reconstruct_args args with
+      | Some xs ->
+         let (_: string list) = xs in
+         let new_body = List.fold_right
+                          ~f:(fun ident acc ->
+                              [%expr call_fresh (fun [%p pvar ident ] -> [%e acc]) ]
+                             )
+                          ~init:new_body xs
+         in
+         new_body
+         (* {e with pexp_desc=Pexp_apply (e1,["",new_body]) } *)
+      | None -> {e with pexp_desc=Pexp_apply (e1,["",new_body]) }
+    end
+  | Pexp_apply (e, xs) ->
+     {e with pexp_desc=Pexp_apply (mapper.expr mapper e,
+                                   List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) }
+  | Pexp_fun (l,opt,pat,e) ->
+     { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
+
+  (* TODO: support all cases *)
+  | _ -> e
+
+
+let pa_minikanren argv =
+  { default_mapper with expr = fun mapper e -> pamk_e mapper e
+  }
