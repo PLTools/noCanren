@@ -54,3 +54,10 @@ let _ =
 let _ =
   run show_int_list empty_reifier 1 q
       (fun q st -> (reverso q (of_list [1; 2; 3; 4]) st), ["q", q])
+
+(** Declare fives *)
+let rec fives x = (x === !5) ||| defer (fives x)
+
+(** Run fives *)
+let _ =
+  run show_int empty_reifier 10 q (fun q st -> (fives q st), ["q", q])

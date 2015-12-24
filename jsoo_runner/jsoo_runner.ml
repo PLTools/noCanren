@@ -92,7 +92,7 @@ module GraphLogger = struct
 end
 
 let smart_ppx = Smart_logger.smart_logger [| |]
-
+let pa_minikanren_ppx = Smart_logger.pa_minikanren [| |]
 let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
 
 open MiniKanren

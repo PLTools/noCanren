@@ -12,6 +12,16 @@ let is_state_pattern pat =
   | Ppat_var v when v.txt = "st" || v.txt = "state" -> Some v.txt
   | _ -> None
 
+let is_defer e =
+  match e.pexp_desc with
+  | Pexp_ident i when i.txt = Longident.Lident "defer" -> true
+  | _ -> false
+
+let is_fresh e =
+  match e.pexp_desc with
+  | Pexp_ident i when i.txt = Longident.Lident "fresh" -> true
+  | _ -> false
+
 let need_insert_fname ~name e =
   match e.pexp_desc with
   | Pexp_ident i when i.txt = Lident name -> true
@@ -83,14 +93,18 @@ let reconstruct_args e =
     with Not_an_ident -> None
   in
   match e.pexp_desc with
-  | Pexp_apply ({pexp_desc=Pexp_ident {txt=Longident.Lident arg1; _}}, ys) -> begin
+  | Pexp_apply ({pexp_desc=Pexp_ident {txt=Longident.Lident arg1; _}}, ys) ->
+     (* fresh (var1 var2 var3) body *)
       option_map (are_all_idents ys) ~f:(fun xs -> arg1::xs )
-    end
+
+  | Pexp_ident {txt=Longident.Lident arg1; _} ->
+     (* fresh arg0 body *)
+     Some [arg1]
   | _ -> None
 
 let rec pamk_e mapper e : expression =
   match e.pexp_desc with
-  | Pexp_apply (e1,[(_,args); (_,body)]) -> begin
+  | Pexp_apply (e1,[(_,args); (_,body)]) when is_fresh e1 -> begin
       let new_body : expression = pamk_e mapper body in
       match reconstruct_args args with
       | Some xs ->
@@ -102,9 +116,12 @@ let rec pamk_e mapper e : expression =
                           ~init:new_body xs
          in
          new_body
-         (* {e with pexp_desc=Pexp_apply (e1,["",new_body]) } *)
-      | None -> {e with pexp_desc=Pexp_apply (e1,["",new_body]) }
+      | None ->
+         eprintf "Can't reconstruct args of 'fresh'";
+         {e with pexp_desc=Pexp_apply (e1,["",new_body]) }
     end
+  | Pexp_apply (d, [(_,body)]) when is_defer d ->
+     [%expr (fun __st__ -> MiniKanren.Stream.from_fun (fun () -> [%e body] __st__)) ]
   | Pexp_apply (e, xs) ->
      {e with pexp_desc=Pexp_apply (mapper.expr mapper e,
                                    List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) }
