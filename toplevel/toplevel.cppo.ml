@@ -83,6 +83,8 @@ let setup_toplevel () =
   exec' "open Jsoo_runner;;";     (* count variables *)
   exec' "open M;;";
   exec' "let run = Jsoo_runner.run;;";
+  exec' "#ppx2 Jsoo_runner.pa_minikanren_ppx;;";
+  exec' "#ppx2 Jsoo_runner.smart_ppx;;";
   Sys.interactive := true;
   ()
 

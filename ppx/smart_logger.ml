@@ -29,7 +29,8 @@ let need_insert_fname ~name e =
 
 let is_call_fresh = need_insert_fname ~name:"call_fresh"
 let is_conj = need_insert_fname ~name:"conj"
-let is_disj = need_insert_fname ~name:"disj"
+let is_disj e =
+  need_insert_fname ~name:"disj" e || need_insert_fname ~name:"|||" e
 
 let rec walkthrough ~fname (expr: expression) =
 
