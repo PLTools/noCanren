@@ -1,5 +1,5 @@
 PKG GT ostap oUnit
-SRC src
+SRC src src_test
 SRC regression
 SRC plugin
 SRC camlp5
