@@ -316,23 +316,23 @@ val three : ('a logic -> 'b logic -> 'c logic ->                         state -
 val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
 val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
 
-(** One to five logic parameter(s), conventional names *)
-val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b
-val qr    : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
-val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
-val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
-val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+  (** One to five logic parameter(s), conventional names *)
+  val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b
+  val qr    : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+  val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+  val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+  val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
 
-(** [x === y] creates a goal, which performs a unifications of
-    [x] and [y] *)
-val (===) : 'a logic -> 'a logic -> goal
+  (** [x === y] creates a goal, which performs a unifications of
+      [x] and [y] *)
+  val (===) : 'a logic -> 'a logic -> goal
 
-(** [x === y] creates a goal, which performs a non-unification check for
-    [x] and [y] *)
-val (=/=) : 'a logic -> 'a logic -> goal
+  (** [x === y] creates a goal, which performs a non-unification check for
+      [x] and [y] *)
+  val (=/=) : 'a logic -> 'a logic -> goal
 
-(** [conj s1 s2] creates a goal, which is a conjunction of its arguments *)
-val conj : goal -> goal -> goal
+  (** [conj s1 s2] creates a goal, which is a conjunction of its arguments *)
+  val conj : goal -> goal -> goal
 
   (** [&&&] is left-associative infix synonym for [conj] *)
   val (&&&) : goal -> goal -> goal
@@ -360,24 +360,20 @@ val conj : goal -> goal -> goal
       initial state *)
   val run : Logger.t -> (state -> 'a) -> 'a
 
+  (** [diseq] is a type for disequality constraint *)
+  type diseq
+
   (** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
       state [s] *)
-  val refine : State.t -> 'a -> 'a
+  val refine : State.t -> 'a logic -> 'a logic * diseq
 
-(** [diseq] is a type for disequality constraint *)
-type diseq
+  (** [reify s x] reifies disequality constraint for a given logic variable; the result
+      is a list of logic expressions, which given variable should not be equal to *)
+  val reify : diseq -> 'a logic -> 'a logic list
 
-(** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
-    state [s] *)
-val refine : State.t -> 'a logic -> 'a logic * diseq
-
-(** [reify s x] reifies disequality constraint for a given logic variable; the result
-    is a list of logic expressions, which given variable should not be equal to *)
-val reify : diseq -> 'a logic -> 'a logic list
-
-(** [take ?(n=k) s] takes at most [k] first answers from the lazy
-    stream [s] (reexported from MKStream for convenience) *)
-val take  : ?n:int -> State.t Stream.t -> State.t list
-val take' : ?n:int -> state Stream.t -> State.t list
+  (** [take ?(n=k) s] takes at most [k] first answers from the lazy
+      stream [s] (reexported from MKStream for convenience) *)
+  val take  : ?n:int -> State.t Stream.t -> State.t list
+  val take' : ?n:int -> state Stream.t -> State.t list
 
 end

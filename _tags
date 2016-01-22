@@ -1,8 +1,10 @@
 true: rectypes
 <toplevel/*>:  not_hygienic
 
-<src/MiniKanren.ml*>: syntax(camlp5o), package(typeutil,GT.syntax.all)
+<src/MiniKanren.mli> or <src/MiniKanrenImpl.ml>: syntax(camlp5o), package(typeutil,GT.syntax.all)
+<src/MiniKanren.ml>: package(typeutil,GT)
 <camlp5/pa_minikanren.ml>: syntax(camlp5o), package(GT.syntax)
+#<src/MiniKanren.mli>: syntax(camlp5o), package(GT.syntax.all,typeutil)
 
 <regression/orig/*>: traverse
 <regression/tester.ml>: package(ostap,GT)
