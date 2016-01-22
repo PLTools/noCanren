@@ -1,5 +1,4 @@
-PKG GT
-PKG ostap
+PKG GT ostap oUnit
 SRC src
 SRC regression
 SRC plugin

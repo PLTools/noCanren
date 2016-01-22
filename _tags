@@ -25,3 +25,5 @@ true: rectypes
 
 <jsoo_runner/jsoo_runner.ml>: package(ppx_tools,js_of_ocaml.ppx,GT)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx),package(js_of_ocaml.tyxml)
+
+<src_test/*>: package(oUnit), package(typeutil,GT)

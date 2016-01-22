@@ -50,7 +50,8 @@ tests: compile_tests run_tests
 regression: tests
 test: tests
 
-
+unittests:
+	$(OB) -I src src_test/test.native && ./test.native
 
 install:
 	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/jsoo_runner/jsoo_runner.cm[ia] _build/ppx/smart_logger.cmi _build/regression/tester.cm[io]
