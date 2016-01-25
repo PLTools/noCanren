@@ -1,5 +1,5 @@
 OB=ocamlbuild -use-ocamlfind
-TARGETS=src/MiniKanren.cmo camlp5/pa_minikanren.cmo
+TARGETS=src/MiniKanren.cmo
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \

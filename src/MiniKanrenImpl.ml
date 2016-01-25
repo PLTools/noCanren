@@ -104,34 +104,32 @@ let logf fmt =
   else Printf.kprintf (fun fmt -> ignore (Printf.sprintf "%s" fmt)) fmt
 *)
 
-let (!!) = Obj.magic;;
+let (!!) = Obj.magic
 
-open GT (* To disable some warnings *)
+type 'a logic = Var of int | Value of 'a
 
-@type 'a logic = Var of GT.int | Value of 'a with show, html, eq, compare, foldl, foldr, map
+(* let logic = { *)
+(*   logic with plugins = *)
+(*     object *)
+(*       method html    = logic.plugins#html *)
+(*       method eq      = logic.plugins#eq *)
+(*       method compare = logic.plugins#compare *)
+(*       method foldr   = logic.plugins#foldr *)
+(*       method foldl   = logic.plugins#foldl *)
+(*       method map     = logic.plugins#map *)
+(*       method show fa x = *)
+(*         GT.transform(logic) *)
+(*            (GT.lift fa) *)
+(*            (object inherit ['a] @logic[show] *)
+(*               method c_Var   _ _ i = Printf.sprintf "_.%d" i *)
+(*               method c_Value _ _ x = x.GT.fx () *)
+(*             end) *)
+(*            () *)
+(*            x *)
+(*     end *)
+(* };; *)
 
-let logic = {
-  logic with plugins =
-    object
-      method html    = logic.plugins#html
-      method eq      = logic.plugins#eq
-      method compare = logic.plugins#compare
-      method foldr   = logic.plugins#foldr
-      method foldl   = logic.plugins#foldl
-      method map     = logic.plugins#map
-      method show fa x =
-        GT.transform(logic)
-           (GT.lift fa)
-           (object inherit ['a] @logic[show]
-              method c_Var   _ _ i = Printf.sprintf "_.%d" i
-              method c_Value _ _ x = x.GT.fx ()
-            end)
-           ()
-           x
-    end
-};;
-
-@type 'a llist = Nil | Cons of 'a logic * 'a llist logic with show, html, eq, compare, foldl, foldr, map
+type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
 let (!) x = Value x
 
@@ -153,27 +151,27 @@ let rec to_listk k = function
 
 let to_list l = to_listk (fun _ -> raise Not_a_value) l
 
-let llist = {
-  llist with plugins =
-    object
-      method html    = llist.plugins#html
-      method eq      = llist.plugins#eq
-      method compare = llist.plugins#compare
-      method foldr   = llist.plugins#foldr
-      method foldl   = llist.plugins#foldl
-      method map     = llist.plugins#map
-      method show fa x = "[" ^
-        (GT.transform(llist)
-           (GT.lift fa)
-           (object inherit ['a] @llist[show]
-              method c_Nil   _ _      = ""
-              method c_Cons  i s x xs = GT.show(logic) fa x ^ (match xs with Value Nil -> "" | _ -> "; " ^ GT.show(logic) (s.GT.f i) xs)
-            end)
-           ()
-           x
-        ) ^ "]"
-    end
-}
+(* let llist = { *)
+(*   llist with plugins = *)
+(*     object *)
+(*       method html    = llist.plugins#html *)
+(*       method eq      = llist.plugins#eq *)
+(*       method compare = llist.plugins#compare *)
+(*       method foldr   = llist.plugins#foldr *)
+(*       method foldl   = llist.plugins#foldl *)
+(*       method map     = llist.plugins#map *)
+(*       method show fa x = "[" ^ *)
+(*         (GT.transform(llist) *)
+(*            (GT.lift fa) *)
+(*            (object inherit ['a] @llist[show] *)
+(*               method c_Nil   _ _      = "" *)
+(*               method c_Cons  i s x xs = GT.show(logic) fa x ^ (match xs with Value Nil -> "" | _ -> "; " ^ GT.show(logic) (s.GT.f i) xs) *)
+(*             end) *)
+(*            () *)
+(*            x *)
+(*         ) ^ "]" *)
+(*     end *)
+(* } *)
 
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
@@ -378,7 +376,11 @@ module State =
     type t = Env.t * Subst.t * Subst.t list
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
-    let show  (env, subst, constr) = Printf.sprintf "st {%s, %s, %s}" (Env.show env) (Subst.show subst) (GT.show(GT.list) Subst.show constr)
+    let show  (env, subst, constr) =
+      sprintf "st {%s, %s, %s}"
+              (Env.show env) (Subst.show subst)
+              (* (GT.show(GT.list) Subst.show constr) *)
+              "<showing list of constraints should be implemented with implicits>"
   end
 
 

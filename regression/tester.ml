@@ -64,25 +64,24 @@ module GraphLogger = struct
   let find g node =
     G.find g.l_graph node
 
-  module P = Ostap.Pretty
-
   let output_plain ~filename g =
-    let make_plock idx name xs =
-      let name = sprintf "%s: %s" (string_of_node idx) name in
-      match xs with
-      | [] -> P.string name
-      | xs -> P.plock (P.string name) (P.boxed (P.listByBreak xs))
-    in
-    let rec helper node : P.printer list =
-      try let xs = find g node in
-          let xs = List.rev xs in
-          List.map (fun (dest,name,_) -> make_plock dest name (helper dest)) xs
-      with Not_found -> (* failwith "bad graph" *)
-        [P.string (sprintf "<No such node '%s'>" (string_of_node node))]
-    in
-    let p = make_plock 0 "root" (helper 0) in
+    (* let make_plock idx name xs = *)
+    (*   let name = sprintf "%s: %s" (string_of_node idx) name in *)
+    (*   match xs with *)
+    (*   | [] -> P.string name *)
+    (*   | xs -> P.plock (P.string name) (P.boxed (P.listByBreak xs)) *)
+    (* in *)
+    (* let rec helper node : P.printer list = *)
+    (*   try let xs = find g node in *)
+    (*       let xs = List.rev xs in *)
+    (*       List.map (fun (dest,name,_) -> make_plock dest name (helper dest)) xs *)
+    (*   with Not_found -> (\* failwith "bad graph" *\) *)
+    (*     [P.string (sprintf "<No such node '%s'>" (string_of_node node))] *)
+    (* in *)
+    (* let p = make_plock 0 "root" (helper 0) in *)
+    let p = "plain output requires ostap and is suppressed for now" in
     let ch = open_out filename in
-    output_string ch (P.toString p);
+    output_string ch "plain output requires ostap and is suppressed for now";
     fprintf ch "\n%!" ;
     close_out ch
 
@@ -212,32 +211,3 @@ let run printer reifier n runner goal =
     if config.do_html
     then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;
   )
-
-
-let show = GT.show
-(*
-let run printer reifier n runner goal =
-  run (fun st ->
-    let (repr, result), vars = runner goal st in
-    Printf.printf "%s, %s answer%s {\n"
-      repr
-      (if n = (-1) then "all" else string_of_int n)
-      (if n <>  1  then "s" else "");
-    List.iter
-      (fun st ->
-         List.iter
-           (fun (s, x) ->
-	      let v, dc = refine st x in
-              let pv = printer v in
-              match reifier dc v with
-              | "" -> Printf.printf "%s=%s; " s pv
-              | r  -> Printf.printf "%s=%s (%s);" s pv r
-	   )
-           vars;
-         Printf.printf "\n"
-      )
-      (take ~n:n result);
-    Printf.printf "}\n%!"
-  )
-
-  *)
