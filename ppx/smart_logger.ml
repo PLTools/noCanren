@@ -119,7 +119,7 @@ let rec pamk_e mapper e : expression =
          new_body
       | None ->
          eprintf "Can't reconstruct args of 'fresh'";
-         {e with pexp_desc=Pexp_apply (e1,["",new_body]) }
+         {e with pexp_desc=Pexp_apply (e1,[Papp_simple,new_body]) }
     end
   | Pexp_apply (d, [(_,body)]) when is_defer d ->
      [%expr (fun __st__ -> MiniKanren.Stream.from_fun (fun () -> [%e body] __st__)) ]

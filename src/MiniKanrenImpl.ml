@@ -326,8 +326,10 @@ module Subst :
     let rec walk' env var subst =
       match Env.var env var with
       | None ->
+          let Value (var, printer) = !! var in
 	  (match wrap (Obj.repr var) with
-	   | Unboxed _ -> !!var
+	   | Unboxed _ -> Value(var,printer)
+	   | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
 	   | Boxed (t, s, f) ->
                let var = Obj.dup (Obj.repr var) in
                let sf =
@@ -338,8 +340,7 @@ module Subst :
 	       for i = 0 to s - 1 do
                  sf var i (!!(walk' env (!!(f i)) subst))
                done;
-	       !!var
-	   | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
+	       Value(!!var, printer)
           )
 
       | Some i ->
@@ -350,8 +351,9 @@ module Subst :
     let unify env x y subst =
       let rec unify x y (delta, subst) =
         let extend xi x term delta subst =
-          if occurs env xi term subst then raise Occurs_check
-          else (xi, !!x, !!term)::delta, Some (!! (M.add xi (!!x, term) (!! subst)))
+          (* if occurs env xi term subst then raise Occurs_check *)
+          (* else  *)
+            (xi, !!x, !!term)::delta, Some (!! (M.add xi (!!x, term) (!! subst)))
         in
         match subst with
         | None -> delta, None
