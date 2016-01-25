@@ -9,7 +9,7 @@ true: rectypes
 <regression/orig/*>: traverse
 <regression/tester.ml>: package(typeutil)
 #<regression/test0*.ml>: syntax(camlp5o), package(logger.syntax,GT)
-<regression/test*.native>: package(ostap,str)
+<regression/test*.native>: package(str,typeutil)
 <regression/test003.ml>: use_pa_minikanren
 
 #<regression/test004.ml>: package(GT.syntax.show), use_pa_minikanren

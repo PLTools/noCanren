@@ -163,7 +163,9 @@ let qprt = four
 
 let empty_reifier _ _ = ""
 
-let run printer reifier n runner goal =
+open ImplicitPrinters
+
+let run reifier n runner goal =
   let graph = Logger.create () in
   M.run graph (fun st ->
     let (repr, result), vars = runner goal st in
@@ -188,10 +190,10 @@ let run printer reifier n runner goal =
            let s = List.map
             (fun (s, x) ->
               let v, dc = refine st x in
-              let pv = printer v in
+              (* let pv = printer v in *)
               match reifier dc v with
-              | "" -> sprintf "%s=%s;" s pv
-              | r  -> sprintf "%s=%s (%s);" s pv r
+              | "" -> sprintf "%s=%s;" s (show_logic_naive v)
+              | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r
              )
              vars |> String.concat " "
            in

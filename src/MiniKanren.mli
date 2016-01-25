@@ -31,10 +31,19 @@ end
 module UnitLogger: LOGGER
 
 (** Type of typed logic variable *)
-type 'a logic = private Var of int | Value of 'a
+type 'a logic = private Var of int | Value of 'a * ('a -> string)
 
 (** Lifting primitive *)
 val (!) : 'a -> 'a logic
+
+val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+
+module Show_logic : functor {X : ImplicitPrinters.SHOW} -> sig
+                        type t = X.t logic
+                        val show : X.t logic -> string
+end
+
+val show_logic_naive : 'a logic -> string
 
 (** Type of ligic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic

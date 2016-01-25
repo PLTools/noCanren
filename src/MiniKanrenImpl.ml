@@ -106,7 +106,25 @@ let logf fmt =
 
 let (!!) = Obj.magic
 
-type 'a logic = Var of int | Value of 'a
+type 'a logic = Var of int | Value of 'a * ('a -> string)
+
+let (!) x = Value (x, (fun _ -> "<not implemented>"))
+let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
+
+module Show_logic_impl {X : ImplicitPrinters.SHOW} = struct
+    type t = X.t logic
+    let show l =
+      match l with
+      | Var n -> sprintf "_.%d" n
+      | Value (x,_) -> X.show x
+end
+
+implicit module Show_logic = Show_logic_impl
+
+let show_logic_naive =
+  function
+  | Var n -> sprintf "_.%d" n
+  | Value (x,printer) -> printer x
 
 (* let logic = { *)
 (*   logic with plugins = *)
@@ -131,8 +149,6 @@ type 'a logic = Var of int | Value of 'a
 
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
-let (!) x = Value x
-
 let (%)  x y = !(Cons (x, y))
 let (%<) x y = !(Cons (x, !(Cons (y, !Nil))))
 let (!<) x   = !(Cons (x, !Nil))
@@ -145,8 +161,8 @@ exception Not_a_value
 exception Occurs_check
 
 let rec to_listk k = function
-| Value Nil -> []
-| Value (Cons (Value x, xs)) -> x :: to_listk k xs
+| Value (Nil,_) -> []
+| Value (Cons (Value (x,_), xs),_) -> x :: to_listk k xs
 | z -> k z
 
 let to_list l = to_listk (fun _ -> raise Not_a_value) l
