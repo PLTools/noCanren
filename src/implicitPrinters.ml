@@ -12,7 +12,7 @@ let show {S : SHOW} x = S.show x;;
 
 implicit module Show_float = struct
     type t = float
-    let show x = sprintf "Show_float: %f%!" x
+    let show x = sprintf "%f" x
 end
 
 module Show_list_impl {X : SHOW} = struct
@@ -28,5 +28,5 @@ implicit module Show_list = Show_list_impl
 
 implicit module Show_int = struct
     type t = int
-    let show x = sprintf "Show_int: %d%!" x
+    let show x = sprintf "%d" x
 end

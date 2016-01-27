@@ -149,13 +149,44 @@ let show_logic_naive =
 
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
-let (%)  x y = !(Cons (x, y))
-let (%<) x y = !(Cons (x, !(Cons (y, !Nil))))
-let (!<) x   = !(Cons (x, !Nil))
+let llist_nil = Value(Nil, fun _ -> "[]")
+let llist_printer v =
+  let b = Buffer.create 49 in
+  let rec helper = function
+    | Cons (h,tl) -> begin
+        Buffer.add_string b (show_logic_naive h);
+        Buffer.add_string b " :: ";
+        match tl with
+        | Var n -> Buffer.add_string b (show_logic_naive tl)
+        | Value (v,pr) -> Buffer.add_string b (pr v)
+      end
+    | Nil -> Buffer.add_string b "[]"
+  in
+  helper v;
+  Buffer.contents b
 
-let rec of_list = function
-| [] -> !Nil
-| x::xs -> !x % (of_list xs)
+let (%)  x y =
+  Value (Cons (x, y), llist_printer)
+
+let (%<) x y =
+  let ans = Value( Cons(y,llist_nil), llist_printer) in
+  let ans = Value( Cons(x,ans), llist_printer) in
+  ans
+  (* !(Cons (x, !(Cons (y, !Nil)))) *)
+
+let (!<) x   =
+  let printer = function
+    | Cons (v, Value (Nil,_)) -> sprintf "[%s]" (show_logic_naive v)
+    | _ -> assert false
+  in
+  Value (Cons (x, !Nil), printer)
+
+let of_list {S : ImplicitPrinters.SHOW} xs =
+  let rec helper = function
+    | [] -> llist_nil
+    | x::xs -> (Value (x, S.show)) % (helper xs)
+  in
+  helper xs
 
 exception Not_a_value
 exception Occurs_check
@@ -326,12 +357,12 @@ module Subst :
     let rec walk' env var subst =
       match Env.var env var with
       | None ->
-          let Value (var, printer) = !! var in
-	  (match wrap (Obj.repr var) with
-	   | Unboxed _ -> Value(var,printer)
+          let Value (v, printer) = !! var in
+	  (match wrap (Obj.repr v) with
+	   | Unboxed _ -> !!var
 	   | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
 	   | Boxed (t, s, f) ->
-               let var = Obj.dup (Obj.repr var) in
+               let var = Obj.dup (Obj.repr v) in
                let sf =
 		 if t = Obj.double_array_tag
 		 then !! Obj.set_double_field
@@ -347,6 +378,7 @@ module Subst :
 	  (try walk' env (snd (M.find i (!! subst))) subst
 	   with Not_found -> !!var
 	  )
+
 
     let unify env x y subst =
       let rec unify x y (delta, subst) =
@@ -364,7 +396,9 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
 	    | _      , Some yi -> extend yi y x delta subst
 	    | _ ->
-	        let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
+                let Value (xx,xprinter) = !!x in
+                let Value (yy,yprinter) = !!y in
+	        let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->

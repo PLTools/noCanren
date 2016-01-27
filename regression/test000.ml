@@ -27,7 +27,7 @@ let rec fives x =
 let rec appendo a b ab =
   "appendo" <=>
   disj
-    (conj (a === !Nil) (b === ab) )
+    (conj (a === llist_nil) (b === ab) )
     (call_fresh (fun h ->
       (call_fresh (fun t ->
         (conj (a === h % t)
@@ -38,20 +38,20 @@ let rec appendo a b ab =
       )))
     ))
 
-let rec reverso a b =
-  "reverso" <=>
-  disj
-    (conj (a === !Nil) (b === !Nil))
-    (call_fresh (fun h ->
-      (call_fresh (fun t ->
-          (conj (a === h % t)
-                (call_fresh (fun a' ->
-                   conj (appendo a' !< h b)
-                        (reverso t a')
-                ))
-        )
-    )
-    )))
+(* let rec reverso a b = *)
+(*   "reverso" <=> *)
+(*   disj *)
+(*     (conj (a === nil) (b === nil)) *)
+(*     (call_fresh (fun h -> *)
+(*       (call_fresh (fun t -> *)
+(*           (conj (a === h % t) *)
+(*                 (call_fresh (fun a' -> *)
+(*                    conj (appendo a' !< h b) *)
+(*                         (reverso t a') *)
+(*                 )) *)
+(*         ) *)
+(*     ) *)
+(*     ))) *)
 
 (* let show_int      = GT.( show(logic) (show int) ) *)
 (* let show_int_list = GT.( show(logic) (show(llist) (show int)) ) *)
@@ -60,7 +60,7 @@ open Tester
 
 let repr x = ("",x)
 let _ =
-  run empty_reifier 10  q (fun q   st -> repr (fives    q st), ["q", q]);
+  run empty_reifier  6  q (fun q   st -> repr (fives    q st), ["q", q]);
   run empty_reifier  1  q (fun q   st -> repr (a_and_b  q st), ["q", q]);
   run empty_reifier  2  q (fun q   st -> repr (a_and_b' q st), ["q", q]);
   run empty_reifier  1  q (fun q   st -> repr (appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4]) st), ["q", q]);
