@@ -1,4 +1,4 @@
-OB=ocamlbuild -use-ocamlfind
+OB=ocamlbuild -use-ocamlfind -classic-display
 TARGETS=src/MiniKanren.cmo
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
@@ -34,7 +34,7 @@ $(warning $(REGRES_CASES))
 define TESTRULES
 .PHONY: test_$(1) test$(1).native
 test$(1).native: regression/test$(1).native
-regression/test$(1).native:
+regression/test$(1).native: regression/test$(1).ml
 	$(OB) -Is src $$@
 
 compile_tests: regression/test$(1).native
