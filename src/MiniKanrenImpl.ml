@@ -296,12 +296,19 @@ module Env :
 
     let var (h, _) x =
       if H.mem h (!! x)
-      then let Var i = !! x in Some i
+      then match !!x with
+           | Var i -> Some i
+           | Value _ -> failwith "Value _ should not get to the environment"
       else None
 
     let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h []
 
-    let show env = (List.fold_left (fun acc (Var i) -> acc ^ (Printf.sprintf "$%d; " i)) "env {" (vars env)) ^ "}"
+    let show env =
+      let f = function
+        | Var i -> sprintf "$%d; " i
+        | Value _ -> assert false
+      in
+      sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
 
   end
 
@@ -575,10 +582,12 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   let (|||) = disj
 
   let rec (?|) = function
+    | [] -> failwith "not implemented. should not happen"
     | [h]  -> h
     | h::t -> h ||| ?| t
 
   let rec (?&) = function
+    | [] -> failwith "not implemented. should not happen"
     | [h]  -> h
     | h::t -> h &&& ?& t
 
