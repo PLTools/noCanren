@@ -62,29 +62,33 @@ module GraphLogger = struct
     flush ch
 
   let find g node =
-    G.find g.l_graph node
+    G.find g.l_graph node |> List.rev
+
+
+  let single name = printf "@,@[<v 1>%s@]\n%!" name
+  let start  name = printf "@,@[<v 1>%s\n%!" name
+  let stop () = printf "@]%!"
 
   let output_plain ~filename g =
-    (* let make_plock idx name xs = *)
-    (*   let name = sprintf "%s: %s" (string_of_node idx) name in *)
-    (*   match xs with *)
-    (*   | [] -> P.string name *)
-    (*   | xs -> P.plock (P.string name) (P.boxed (P.listByBreak xs)) *)
-    (* in *)
-    (* let rec helper node : P.printer list = *)
-    (*   try let xs = find g node in *)
-    (*       let xs = List.rev xs in *)
-    (*       List.map (fun (dest,name,_) -> make_plock dest name (helper dest)) xs *)
-    (*   with Not_found -> (\* failwith "bad graph" *\) *)
-    (*     [P.string (sprintf "<No such node '%s'>" (string_of_node node))] *)
-    (* in *)
-    (* let p = make_plock 0 "root" (helper 0) in *)
-    let p = "plain output requires ostap and is suppressed for now" in
     let ch = open_out filename in
-    output_string ch "plain output requires ostap and is suppressed for now";
-    fprintf ch "\n%!" ;
+    let open Format in
+    let ppf = formatter_of_out_channel ch in
+    let rec iter_graph name xs =
+      (* printf "iter_graph with name=%s, xs.len = %d\n%!" name (List.length xs); *)
+      match xs with
+      | [] -> fprintf ppf "@,@[<v 1>%s@]" name;
+      | xs ->
+         fprintf ppf "@,@[<v 1>%s" name;
+         List.iter (fun (dest, name,_) ->
+                    try let nodes = find g dest in
+                        iter_graph name nodes;
+                        fprintf ppf "@]"
+                    with Not_found -> fprintf ppf "@,@[<v 1>%s@]" (string_of_node dest)
+                   ) xs
+    in
+    iter_graph "root" (find g 0);
+    force_newline ();
     close_out ch
-
 
   let output_html ~filename answers g =
     let module P=HTMLView in
