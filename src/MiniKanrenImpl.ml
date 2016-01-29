@@ -172,7 +172,6 @@ let (%<) x y =
   let ans = Value( Cons(y,llist_nil), llist_printer) in
   let ans = Value( Cons(x,ans), llist_printer) in
   ans
-  (* !(Cons (x, !(Cons (y, !Nil)))) *)
 
 let (!<) x   =
   let printer = function
@@ -487,9 +486,12 @@ let pqrst = five
 
 exception Disequality_violated
 
+let snd3 (_,x,_) = x
+
 let (===) x y st =
   let (((env, subst, constr), root, l) as state1) =
-    adjust_state (sprintf "unify '%s' and '%s'" (generic_show !!x) (generic_show !!y)) st
+    st |> adjust_state @@ sprintf "unify '%s' and '%s'"
+                                  (show_logic_naive !!x) (show_logic_naive !!y)
   in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
@@ -516,7 +518,8 @@ let (===) x y st =
             []
             constr
 	  in
-          let (_,root,_) = adjust_state "Success" state1 in
+          let (_,root,_) =
+            state1 |> adjust_state @@ sprintf "Success: subs=%s" (Subst.show s) in
           Stream.cons ((env, s, constr'),root,l) Stream.nil
         with Disequality_violated ->
           let () = make_leaf "Disequality violated" state1 in
