@@ -54,7 +54,9 @@ unittests:
 	$(OB) -I src src_test/test.byte && ./test.byte
 
 install:
-	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/jsoo_runner/jsoo_runner.cm[ia] _build/ppx/smart_logger.cmi _build/regression/tester.cm[io]
+	ocamlfind install MiniKanren META _build/src/MiniKanren.cm* _build/src/*.cmi \
+	_build/jsoo_runner/jsoo_runner.cm[ia] \
+	_build/ppx/smart_logger.cmi _build/regression/tester.cm[io]
 
 uninstall:
 	ocamlfind remove MiniKanren

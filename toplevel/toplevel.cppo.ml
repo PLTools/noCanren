@@ -61,14 +61,13 @@ let setup_toplevel () =
                | Lwt.Sleep -> failwith \"Lwt_main.run: thread didn't return\"
           end");
   *)
-  (*
+
   let header1 =
       Printf.sprintf "        %s version %%s" compiler_name in
   let header2 = Printf.sprintf
       "     Compiled with Js_of_ocaml version %s" Sys_js.js_of_ocaml_version in
   exec' (Printf.sprintf "Format.printf \"%s@.\" Sys.ocaml_version;;" header1);
   exec' (Printf.sprintf "Format.printf \"%s@.\";;" header2);
-   *)
   (*
   (if JsooTop.get_camlp4_syntaxes () <> []
   then
@@ -78,14 +77,15 @@ let setup_toplevel () =
   (*
   exec' ("#enable \"pretty\";;");
   exec' ("#enable \"shortvar\";;"); *)
+  Sys.interactive := true;
   exec' "#rectypes;;";
+  exec' "open ImplicitPrinters;;";
   exec' "open MiniKanren;;";      (* for mkshow *)
   exec' "open Jsoo_runner;;";     (* count variables *)
   exec' "open M;;";
   exec' "let run = Jsoo_runner.run;;";
   exec' "#ppx2 Jsoo_runner.pa_minikanren_ppx;;";
   exec' "#ppx2 Jsoo_runner.smart_ppx;;";
-  Sys.interactive := true;
   ()
 
 let resize ~container ~textbox ()  =
@@ -96,7 +96,10 @@ let resize ~container ~textbox ()  =
   Lwt.return ()
 
 let setup_printers () =
-  exec'("let _print_error fmt e = Format.pp_print_string fmt (Js.string_of_error e)");
+  exec'("let _print_error fmt e =
+           let stack = Printexc.get_callstack 10 in
+           Format.pp_print_string fmt (Printexc.raw_backtrace_to_string stack);
+           Format.pp_print_string fmt (Js.string_of_error e)");
   Topdirs.dir_install_printer Format.std_formatter (Longident.(Lident "_print_error"));
   exec'("let _print_unit fmt (_ : 'a) : 'a = Format.pp_print_string fmt \"()\"");
   Topdirs.dir_install_printer Format.std_formatter (Longident.(Lident "_print_unit"))
@@ -359,7 +362,7 @@ let run _ =
   setup_pseudo_fs ();
   setup_toplevel ();
   (* setup_js_preview (); *)
-  (* setup_printers (); *)
+  setup_printers ();
   History.setup ();
 
   textbox##value <- Js.string "";

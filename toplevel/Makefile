@@ -42,7 +42,7 @@ PACKAGES= \
 	js_of_ocaml $(DERIVING) \
 	js_of_ocaml.tyxml \
 	js_of_ocaml.toplevel \
-	dynlink
+#	dynlink
 
 ifeq ($(WITH_GRAPHICS),YES)
 JSFILES += +graphics.js
@@ -111,9 +111,9 @@ colorize.cmo: colorize.cmi
 	cppo ${CPPO_OPT} $< -o $@
 
 %.cmi:%.mli
-	ocamlfind ocamlc -c -package js_of_ocaml,js_of_ocaml.tyxml $<
+	ocamlfind ocamlc -c -g -package js_of_ocaml,js_of_ocaml.tyxml $<
 %.cmo:%.ml
-	ocamlfind ocamlc -c -rectypes -syntax camlp4o $(SAFESTRING) \
+	ocamlfind ocamlc -c -g -rectypes -syntax camlp4o $(SAFESTRING) \
 		-package js_of_ocaml.syntax,lwt,js_of_ocaml.tyxml,js_of_ocaml.toplevel \
 		-package base64 \
 		-I camlp4 \
