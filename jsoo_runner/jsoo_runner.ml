@@ -112,7 +112,7 @@ let qp   = two
 let qpr  = three
 let qprt = four
 
-let run printer reifier n runner goal =
+let run reifier n runner goal =
   let graph = Logger.create () in
   M.run graph (fun st ->
     let (result, vars) = runner goal st in
@@ -136,7 +136,7 @@ let run printer reifier n runner goal =
            let s = List.map
             (fun (s, x) ->
               let v, dc = refine st x in
-              let pv = printer v in
+              let pv = show_logic_naive v in
               match reifier dc v with
               | "" -> sprintf "%s=%s;" s pv
               | r  -> sprintf "%s=%s (%s);" s pv r
@@ -154,8 +154,8 @@ let run printer reifier n runner goal =
 
 let empty_reifier _ _ = ""
 
-let show_int      = GT.( show(logic) (show int) )
-let show_int_list = GT.( show(logic) (show(llist) (show int)) )
+(* let show_int      = GT.( show(logic) (show int) ) *)
+(* let show_int_list = GT.( show(logic) (show(llist) (show int)) ) *)
 
 let _ =
   let a_and_b a : state -> state MiniKanren.Stream.t =
@@ -167,4 +167,4 @@ let _ =
       )
   in
 
-  fun () -> run show_int empty_reifier 1 q (fun q st -> a_and_b q st, ["q", q])
+  fun () -> run empty_reifier 1 q (fun q st -> a_and_b q st, ["q", q])

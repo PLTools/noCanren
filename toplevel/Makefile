@@ -59,7 +59,7 @@ PACKAGES += yojson
 endif
 
 #ifneq ($(MINIKANREN),)
-PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml GT
+PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml
 #endif
 
 ifeq ($(METAOCAML),1)

@@ -12,7 +12,7 @@ true: rectypes, debug
 <regression/test*.native> or <regression/test*.byte>: package(str,typeutil)
 <regression/test003.ml>: use_pa_minikanren
 
-<regression/test000.*>: ppx(ppx/smart_logger_bin.native)
+<regression/test000.*>: ppx(ppx/smart_logger_bin.native), ppx(ppx/ppx_repr_bin.native)
 #<regression/test004.ml>: package(GT.syntax.show), use_pa_minikanren
 #<regression/test005.ml>: package(GT.syntax.show), use_pa_minikanren
 #<regression/test006.ml>: package(GT.syntax.show), use_pa_minikanren
