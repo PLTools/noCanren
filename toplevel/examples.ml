@@ -48,7 +48,7 @@ let _ =
 (** Run appendo 2 *)
 let _ =
   run empty_reifier  4 qr
-      (fun q r st -> (appendo q (of_list []) r st), ["q", q; "r", r])
+      (fun q r st -> (appendo q llist_nil r st), ["q", q; "r", r])
 
 (** Run reverso 1 *)
 let _ =

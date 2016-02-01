@@ -330,7 +330,17 @@ module Subst :
 
     type t = (Obj.t * Obj.t) M.t
 
-    let show m = (M.fold (fun i (_, x) s -> s ^ Printf.sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
+    let show m =
+      let b = Buffer.create 40 in
+      let open ImplicitPrinters in
+      bprintf b "subst {";
+      M.iter (fun ikey (_, x) ->
+              bprintf b "%s -> " (show_logic_naive (Var ikey));
+              bprintf b "%s; "   (show_logic_naive (Value (fst !!x, snd !!x)) )
+             ) m;
+      bprintf b "}";
+      Buffer.contents b
+
 
     let empty = M.empty
 
