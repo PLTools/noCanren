@@ -63,11 +63,11 @@ let _ =
   run  empty_reifier  4 qr (fun q r st -> REPR (appendo q (of_list ([]:int list) ) r                          st), ["q", q; "r", r]);
   run  empty_reifier  1  q (fun q   st -> REPR (reverso q (of_list [1; 2; 3; 4])                  st), ["q", q]);
   (* run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list []) (of_list [])                 st), ["q", q]); *)
-  run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list [1; 2; 3; 4]) q                  st), ["q", q]);
-  run  empty_reifier  1  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]);
-  run  empty_reifier  2  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]);
-  run  empty_reifier  3  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]);
-  run  empty_reifier 10  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]);
-  run  empty_reifier  2  q (fun q   st -> REPR (reverso q (of_list [1])                           st), ["q", q]);
-  run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list [1]) q                           st), ["q", q]);
+  (* run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list [1; 2; 3; 4]) q                  st), ["q", q]); *)
+  (* run  empty_reifier  1  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]); *)
+  (* run  empty_reifier  2  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]); *)
+  (* run  empty_reifier  3  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]); *)
+  (* run  empty_reifier 10  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]); *)
+  (* run  empty_reifier  2  q (fun q   st -> REPR (reverso q (of_list [1])                           st), ["q", q]); *)
+  (* run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list [1]) q                           st), ["q", q]); *)
   ()

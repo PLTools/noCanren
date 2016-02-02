@@ -30,3 +30,8 @@ implicit module Show_int = struct
     type t = int
     let show x = sprintf "%d" x
 end
+
+implicit module Show_string = struct
+    type t = string
+    let show x = x
+end

@@ -61,6 +61,11 @@ val (!<) : 'a logic -> 'a llist logic
 (** [of_list l] converts a regular list into logic one *)
 val of_list : {S : ImplicitPrinters.SHOW} -> S.t list -> S.t llist logic
 
+(** [to_value x] converts logic into value; raises [Not_a_value] on a
+    non-value case
+*)
+val to_value : 'a logic -> 'a
+
 (** [to_listk k l] converts logic list [l] into a regular one, calling [k] to
     convert elements, which are not a value *)
 val to_listk : ('a llist logic -> 'a list) -> 'a llist logic -> 'a list
@@ -110,29 +115,27 @@ module Make : functor (Logger: LOGGER) -> sig
   val (<=>) : string -> (state -> 'b) -> (state -> 'b)
 
 
-(** {2 miniKanren basic primitives} *)
-
-(** [call_fresh f] creates a fresh logical variable and passes it to the
+  (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
-val call_fresh : ('a logic -> state -> 'b) -> state -> 'b
+  val call_fresh : ('a logic -> state -> 'b) -> state -> 'b
 
-(** [call_fresh_named name f] works the same as [call_fresh f] but adds to
+  (** [call_fresh_named name f] works the same as [call_fresh f] but adds to
     the log [name] of created logical variable *)
-val call_fresh_named : string -> ('a logic -> state -> 'b) -> state -> 'b
+  val call_fresh_named : string -> ('a logic -> state -> 'b) -> state -> 'b
 
-(** [succ num f] increments the number of free logic variables in
+  (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
+  val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
 
-(** Zero logic parameters *)
-val zero : 'a -> 'a
+  (** Zero logic parameters *)
+  val zero : 'a -> 'a
 
-(** One to five logic parameter(s) *)
-val one   : ('a logic ->                                                 state -> 'b) -> state -> 'b
-val two   : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
-val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
-val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
-val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+  (** One to five logic parameter(s) *)
+  val one   : ('a logic ->                                                 state -> 'b) -> state -> 'b
+  val two   : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+  val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+  val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+  val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
 
   (** One to five logic parameter(s), conventional names *)
   val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b

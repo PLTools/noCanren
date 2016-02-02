@@ -190,6 +190,8 @@ let of_list {S : ImplicitPrinters.SHOW} xs =
 exception Not_a_value
 exception Occurs_check
 
+let to_value = function Var _ -> raise Not_a_value | Value (x,_) -> x
+
 let rec to_listk k = function
 | Value (Nil,_) -> []
 | Value (Cons (Value (x,_), xs),_) -> x :: to_listk k xs
@@ -292,6 +294,7 @@ module Env :
     let fresh (h, current) =
       let v = Var current in
       H.add h v ();
+      printf "extending environment with variable _.%d\n%!" current;
       (!!v, (h, current+1))
 
     let var (h, _) x =
@@ -506,6 +509,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
+  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive !!x) (show_logic_naive !!y)
