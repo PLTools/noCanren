@@ -454,17 +454,24 @@ module State =
               "<showing list of constraints should be implemented with implicits>"
   end
 
-
+let fst3 (x,_,_) = x
 
 module Make (Logger: LOGGER) = struct
-module Logger = Logger
-type state = State.t * Logger.t * Logger.node
+  module Logger = Logger
+  type state = State.t * Logger.t * Logger.node
 
-type goal = state -> state Stream.t
+  let describe_log (_,log,node) = (log,node)
 
-let make_leaf msg (_,root,from) =
-  let dest = Logger.make_node root in
-  Logger.connect root from dest msg
+  let concrete : state -> State.t = fst3
+
+  type goal = state -> state Stream.t
+
+  let delay_goal: (unit -> goal) -> goal =
+    fun f -> fun st -> Stream.from_fun @@ (fun () -> f () st)
+
+  let make_leaf msg (_,root,from) =
+    let dest = Logger.make_node root in
+    Logger.connect root from dest msg
 
   let adjust_state msg (st,root,l) =
     let dest = Logger.make_node root in
@@ -489,9 +496,14 @@ let make_leaf msg (_,root,from) =
       state
 
 
-let succ prev f = call_fresh (fun x -> prev (f x))
+let succ prev f =
+  call_fresh (fun x ->
+      let (g,ans) = f x in
+      prev (g, x :: ans)
+    )
 
-let zero  f = f
+let zero: 'a 'b . (goal * 'a logic list) -> goal * 'b logic list =
+  fun (f,_) -> (f, [])
 let one   f = succ zero f
 let two   f = succ one f
 let three f = succ two f
@@ -592,7 +604,6 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
        easrlier too *)
     "disj" <=> (fun st -> Stream.mplus (f st) (g st) )
 
-
   let (|||) = disj
 
   let rec (?|) = function
@@ -607,44 +618,72 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let conde = (?|)
 
-  let run l f =
+  let run l (g: goal) =
     let root_node = Logger.make_node l in
-    f (State.empty (), l, root_node)
+    g (State.empty (), l, root_node)
 
-type diseq = Env.t * Subst.t list
+  type diseq = Env.t * Subst.t list
 
-let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c))
+  let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c))
 
-let reify (env, dcs) = function
-| (Var xi) as v ->
-    List.fold_left (fun acc s ->
-      match Subst.walk' env (!!v) s with
-      | Var yi when yi = xi -> acc
-      | t -> t :: acc
-    )
-    []
-    dcs
-| _ -> []
+  let reify (env, dcs) = function
+    | (Var xi) as v ->
+       List.fold_left
+         (fun acc s ->
+          match Subst.walk' env (!!v) s with
+          | Var yi when yi = xi -> acc
+          | t -> t :: acc
+         )
+         []
+         dcs
+    | _ -> []
 
-let take = Stream.take
-let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
+  let take = Stream.take
+  let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
+  module Convenience =
+  struct
+    let run reifier n (runner: 'b -> goal * ('a logic * string) ) (goal: 'b) =
+      let graph = Logger.create () in
+      run graph (fun st ->
+          let (repr, result), vars = runner goal st in
+          let (_: state Stream.t) = result in
+          Printf.printf "%s, %s answer%s {\n"
+            repr
+            (if n = (-1) then "all" else string_of_int n)
+            (if n <>  1  then "s" else "");
+
+          let answers =
+            (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
+            (* for i=1 to n do *)
+            (*   ignore (take' ~n:i result); *)
+            (*   GraphLogger.next_level (Obj.magic graph); *)
+            (* done; *)
+            take' ~n result
+          in
+
+          let text_answers =
+            answers |> List.map (fun (st: State.t) ->
+                let s = List.map
+                    (fun (s, x) ->
+                       let v, dc = refine st x in
+                       match reifier dc v with
+                       | "" -> sprintf "%s=%s;" s (show_logic_naive v)
+                       | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r
+                    )
+                    vars |> String.concat " "
+                in
+                Printf.printf "%s\n%!" s;
+                s
+              )
+          in
+
+          ignore (Printf.printf "}\n%!");
+          Stream.nil
+        );
+      ()
+
+    let _:int = run
+    let run1: 'a . ('a logic -> goal) -> unit  = run (fun _ _ -> "") 1 one
+  end
 end
-
-
-(* Maybe need copy paste logging *)
-          (*
-  let (===) x y ((env, subst), l, root) =
-    (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = "
-                       (generic_show !!x)
-                       (generic_show !!y) (State.show (env, subst))); *)
-    match Subst.unify env x y (Some subst) with
-    | None   ->
-        let dest = Logger.make_node l in
-        Logger.connect l root dest (sprintf "unify '%s' and '%s' in '%s' failed" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) );
-        Stream.nil
-    | Some new_s ->
-        let dest = Logger.make_node l in
-        Logger.connect l root dest (sprintf "unify '%s' and '%s' in '%s' = '%s'" (generic_show !!x) (generic_show !!y) (State.show (env, subst)) (State.show (env, new_s)) );
-        Stream.cons ((env, new_s), l, root) Stream.nil
-        *)

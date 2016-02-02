@@ -104,45 +104,51 @@ exception Occurs_check
 module Make : functor (Logger: LOGGER) -> sig
   module Logger: LOGGER
 
-  type state = State.t * Logger.t * Logger.node
+  type state (* = State.t * Logger.t * Logger.node *)
+
+  val describe_log: state -> Logger.t * Logger.node
+  val concrete: state -> State.t
 
   (** Goal converts a state into a lazy stream of states *)
-  type goal = state -> state Stream.t
+  type goal (* = state -> state Stream.t *)
+
+  val delay_goal: (unit -> goal) -> goal
 
   (** {2 miniKanren basic primitives} *)
 
   (** Utility function for logging *)
-  val (<=>) : string -> (state -> 'b) -> (state -> 'b)
+  val (<=>) : string -> goal -> goal
 
 
   (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
   val call_fresh : ('a logic -> state -> 'b) -> state -> 'b
+  val call_fresh : ('a logic -> goal) -> goal
 
   (** [call_fresh_named name f] works the same as [call_fresh f] but adds to
     the log [name] of created logical variable *)
-  val call_fresh_named : string -> ('a logic -> state -> 'b) -> state -> 'b
+  val call_fresh_named : string -> ('a logic -> goal) -> goal
 
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-  val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
+  val succ : ('a -> goal) -> ('c logic -> 'a) -> goal
 
   (** Zero logic parameters *)
   val zero : 'a -> 'a
 
   (** One to five logic parameter(s) *)
-  val one   : ('a logic ->                                                 state -> 'b) -> state -> 'b
-  val two   : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
-  val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
-  val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
-  val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+  val one   : ('a logic ->                                                 goal) -> goal
+  val two   : ('a logic -> 'b logic ->                                     goal) -> goal
+  val three : ('a logic -> 'b logic -> 'c logic ->                         goal) -> goal
+  val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             goal) -> goal
+  val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> goal) -> goal
 
   (** One to five logic parameter(s), conventional names *)
-  val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b
-  val qr    : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
-  val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
-  val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
-  val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+  val q     : ('a logic ->                                                 goal) -> goal
+  val qr    : ('a logic -> 'b logic ->                                     goal) -> goal
+  (* val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd *)
+  (* val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e *)
+  (* val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f *)
 
   (** [x === y] creates a goal, which performs a unifications of
       [x] and [y] *)
@@ -179,7 +185,7 @@ module Make : functor (Logger: LOGGER) -> sig
 
   (** [run s] runs a state transformer [s] (not necessarily a goal) in
       initial state *)
-  val run : Logger.t -> (state -> 'a) -> 'a
+  val run : Logger.t -> goal -> state Stream.t
 
   (** [diseq] is a type for disequality constraint *)
   type diseq
@@ -196,5 +202,11 @@ module Make : functor (Logger: LOGGER) -> sig
       stream [s] (reexported from MKStream for convenience) *)
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
+
+  module Convenience : sig
+    (* val run : (_ -> _ -> string) -> int -> ('b -> goal) -> goal -> unit
+    *)
+    val run1: ('a logic -> goal) -> unit
+  end
 
 end

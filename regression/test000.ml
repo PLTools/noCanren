@@ -1,6 +1,8 @@
 open MiniKanren
+open Tester
 open Tester.M
 open ImplicitPrinters
+
 
 let just_a a = a === (embed 5)
 
@@ -22,10 +24,9 @@ let a_and_b' b =
 
 let rec fives x =
   disj (x === embed 5)
-       (fun st -> Stream.from_fun (fun () -> fives x st))
+       (delay_goal (fun () -> fives x))
 
 let rec appendo a b ab =
-  "appendo" <=>
   disj
     (conj (a === llist_nil) (b === ab) )
     (call_fresh (fun h ->
@@ -39,7 +40,6 @@ let rec appendo a b ab =
     ))
 
 let rec reverso a b =
-  "reverso" <=>
   disj
     (conj (a === llist_nil) (b === llist_nil))
     (call_fresh (fun h ->
@@ -53,15 +53,16 @@ let rec reverso a b =
     )
     )))
 
-open Tester
+(* open Tester *)
+(* let run = Convenience.run *)
 
 let _ =
-  run empty_reifier  6  q (fun q   st -> REPR (fives    q st), ["q", q]);
-  run empty_reifier  1  q (fun q   st -> REPR (a_and_b  q st), ["q", q]);
-  run empty_reifier  2  q (fun q   st -> REPR (a_and_b' q st), ["q", q]);
-  run empty_reifier  1  q (fun q   st -> REPR (appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4]) st), ["q", q]);
-  run  empty_reifier  4 qr (fun q r st -> REPR (appendo q (of_list ([]:int list) ) r                          st), ["q", q; "r", r]);
-  run  empty_reifier  1  q (fun q   st -> REPR (reverso q (of_list [1; 2; 3; 4])                  st), ["q", q]);
+  run1 (fun q   -> REPR (fives    q ), ["q", q]);
+  (* run empty_reifier  1  q (fun q   -> REPR (a_and_b  q ), ["q", q]); *)
+  (* run empty_reifier  2  q (fun q   -> REPR (a_and_b' q ), ["q", q]); *)
+  (* run empty_reifier  1  q (fun q   -> REPR (appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4]) st), ["q", q]); *)
+  (* run  empty_reifier  4 qr (fun q r st -> REPR (appendo q (of_list ([]:int list) ) r                          st), ["q", q; "r", r]); *)
+  (* run  empty_reifier  1  q (fun q   st -> REPR (reverso q (of_list [1; 2; 3; 4])                  st), ["q", q]); *)
   (* run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list []) (of_list [])                 st), ["q", q]); *)
   (* run  empty_reifier  1  q (fun q   st -> REPR (reverso (of_list [1; 2; 3; 4]) q                  st), ["q", q]); *)
   (* run  empty_reifier  1  q (fun q   st -> REPR (reverso q q                                       st), ["q", q]); *)

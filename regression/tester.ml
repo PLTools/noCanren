@@ -1,3 +1,5 @@
+open Printf
+
 type config = { mutable do_html: bool   (* html output of deduction tree *)
               ; mutable do_plain: bool  (* plain text output of deduction tree *)
               }
@@ -11,8 +13,6 @@ let () =
               ] in
   Arg.parse specs (fun _ -> ())
             "usage there"
-
-open Printf
 
 module GraphLogger = struct
   module Int = struct
@@ -148,72 +148,59 @@ function onGenerationSelected(level) {
     close_out ch
 end
 
-open MiniKanren
+(* open MiniKanren *)
 module M = MiniKanren.Make(GraphLogger)
-open M
+(* open M *)
 
-let succ prev f = call_fresh (fun x -> prev (f x))
+(* let empty_reifier _ _ = "" *)
 
-let zero  f = f
-let one   f = succ zero f
-let two   f = succ one f
-let three f = succ two f
-let four  f = succ three f
+(* open ImplicitPrinters *)
 
-let q    = one
-let qp   = two
-let qpr  = three
-let qprt = four
+(* let run reifier n runner goal = *)
+(*   let graph = Logger.create () in *)
+(*   M.run graph (fun st -> *)
+(*     let (repr, result), vars = runner goal st in *)
+(*     let (_: state Stream.t) = result in *)
+(*     Printf.printf "%s, %s answer%s {\n" *)
+(*       repr *)
+(*       (if n = (-1) then "all" else string_of_int n) *)
+(*       (if n <>  1  then "s" else ""); *)
 
-let empty_reifier _ _ = ""
+(*     let answers = *)
+(*       (\* GraphLogger.dump_graph (Obj.magic graph) stdout; *\) *)
+(*       for i=1 to n do *)
+(*         ignore (take' ~n:i result); *)
+(*         GraphLogger.next_level (Obj.magic graph); *)
+(*       done; *)
+(*       take' ~n result *)
+(*     in *)
 
-open ImplicitPrinters
-
-let run reifier n runner goal =
-  let graph = Logger.create () in
-  M.run graph (fun st ->
-    let (repr, result), vars = runner goal st in
-    let (_: state Stream.t) = result in
-    Printf.printf "%s, %s answer%s {\n"
-      repr
-      (if n = (-1) then "all" else string_of_int n)
-      (if n <>  1  then "s" else "");
-
-    let answers =
-      (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
-      for i=1 to n do
-        ignore (take' ~n:i result);
-        GraphLogger.next_level (Obj.magic graph);
-      done;
-      take' ~n result
-    in
-
-    let text_answers =
-      answers |> List.map
-        (fun (st: State.t) ->
-           let s = List.map
-            (fun (s, x) ->
-              let v, dc = refine st x in
-              (* let pv = printer v in *)
-              match reifier dc v with
-              | "" -> sprintf "%s=%s;" s (show_logic_naive v)
-              | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r
-             )
-             vars |> String.concat " "
-           in
-           Printf.printf "%s\n%!" s;
-           s
-        )
-    in
+(*     let text_answers = *)
+(*       answers |> List.map *)
+(*         (fun (st: State.t) -> *)
+(*            let s = List.map *)
+(*             (fun (s, x) -> *)
+(*               let v, dc = refine st x in *)
+(*               (\* let pv = printer v in *\) *)
+(*               match reifier dc v with *)
+(*               | "" -> sprintf "%s=%s;" s (show_logic_naive v) *)
+(*               | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r *)
+(*              ) *)
+(*              vars |> String.concat " " *)
+(*            in *)
+(*            Printf.printf "%s\n%!" s; *)
+(*            s *)
+(*         ) *)
+(*     in *)
 
 
-    Printf.printf "}\n%!";
+(*     Printf.printf "}\n%!"; *)
 
-    (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
-    if config.do_plain then
-      let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in
-      let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
-      ();
-    if config.do_html
-    then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph;
-  )
+(*     (\* GraphLogger.dump_graph (Obj.magic graph) stdout; *\) *)
+(*     if config.do_plain then *)
+(*       let out_file_prefix = Str.global_replace (Str.regexp " ") "_" repr in *)
+(*       let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in *)
+(*       (); *)
+(*     if config.do_html *)
+(*     then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph; *)
+(*   ) *)
