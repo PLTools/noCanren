@@ -495,26 +495,41 @@ module Make (Logger: LOGGER) = struct
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
+type var_storage = { mutable storage : int list }
+let empty_storage = { storage=[] }
 
-let succ prev f =
+let zero f =
+  (* st.storage <- []; *)
+  f
+
+let succ  prev f =
   call_fresh (fun x ->
-      let (g,ans) = f x in
-      prev (g, x :: ans)
+      (* st.storage <- 1 :: st.storage; *)
+      prev @@ f x
     )
 
-let zero: 'a 'b . (goal * 'a logic list) -> goal * 'b logic list =
-  fun (f,_) -> (f, [])
-let one   f = succ zero f
-let two   f = succ one f
-let three f = succ two f
-let four  f = succ three f
-let five  f = succ four f
+(* let (_:  ('a -> 'goal) -> ('c logic -> 'a) -> 'goal) = *)
+(*   succ *)
+(* let zero: 'a 'b . (goal * 'a logic list) -> goal * 'b logic list = *)
+(*   fun (f,_) -> (f, []) *)
 
-let q     = one
-let qr    = two
-let qrs   = three
-let qrst  = four
-let pqrst = five
+let one  f  = succ zero f
+(* let (_: _ -> *)
+(*         ('a logic -> var_storage -> 'goal) -> *)
+(*         var_storage -> *)
+(*         'goal *)
+(*     ) = one *)
+let two   f  = succ one f
+(* let (_:int) = two *)
+(* let three f  = succ st two f *)
+(* let four  f  = succ st three f *)
+(* let five  f  = succ st four f *)
+
+(* let q     = one *)
+(* let qr    = two *)
+(* let qrs   = three *)
+(* let qrst  = four *)
+(* let pqrst = five *)
 
 exception Disequality_violated
 
@@ -641,12 +656,20 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   let take = Stream.take
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
+  let run_ = run
+
   module Convenience =
   struct
-    let run reifier n (runner: 'b -> goal * ('a logic * string) ) (goal: 'b) =
+    let run n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
       let graph = Logger.create () in
-      run graph (fun st ->
-          let (repr, result), vars = runner goal st in
+      run_ graph (fun st ->
+          (* let (goal,vars) = runner goal in *)
+          (* let repr,result = *)
+          (*   let (repr,f) = runner goal q in *)
+          (*   (repr, f st) *)
+          (* in *)
+
+          let result = runner empty_storage goal st in
           let (_: state Stream.t) = result in
           Printf.printf "%s, %s answer%s {\n"
             repr
@@ -654,22 +677,16 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
             (if n <>  1  then "s" else "");
 
           let answers =
-            (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
-            (* for i=1 to n do *)
-            (*   ignore (take' ~n:i result); *)
-            (*   GraphLogger.next_level (Obj.magic graph); *)
-            (* done; *)
             take' ~n result
           in
 
+          let vars = [] in
           let text_answers =
             answers |> List.map (fun (st: State.t) ->
                 let s = List.map
                     (fun (s, x) ->
                        let v, dc = refine st x in
-                       match reifier dc v with
-                       | "" -> sprintf "%s=%s;" s (show_logic_naive v)
-                       | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r
+                       sprintf "%s=%s;" s (show_logic_naive v)
                     )
                     vars |> String.concat " "
                 in
@@ -683,7 +700,50 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
         );
       ()
 
-    let _:int = run
-    let run1: 'a . ('a logic -> goal) -> unit  = run (fun _ _ -> "") 1 one
+
+    let run1 n (goal: 'a logic -> string*goal) =
+      let graph = Logger.create () in
+      run_ graph (fun st ->
+          let q,st =
+            match st with
+            | ((env,subs,restr),l1,l2) ->
+              let x,env' = Env.fresh env in
+              let new_state = ((env',subs,restr),l1,l2) in
+              x,new_state
+          in
+          let repr,result =
+            let (repr,f) = goal q in
+            (repr, f st)
+          in
+          let vars = ["q", q] in
+          let (_: state Stream.t) = result in
+          Printf.printf "%s, %s answer%s {\n"
+            repr
+            (if n = (-1) then "all" else string_of_int n)
+            (if n <>  1  then "s" else "");
+
+          let answers = take' ~n result in
+
+          let text_answers =
+            answers |> List.map (fun (st: State.t) ->
+                let s = List.map
+                    (fun (s, x) ->
+                       let v, dc = refine st x in
+                       (* match reifier dc v with *)
+                       (* | "" -> *) sprintf "%s=%s;" s (show_logic_naive v)
+                       (* | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r *)
+                    )
+                    vars |> String.concat " "
+                in
+                Printf.printf "%s\n%!" s;
+                s
+              )
+          in
+
+          ignore (Printf.printf "}\n%!");
+          Stream.nil
+        );
+      ()
+
   end
 end

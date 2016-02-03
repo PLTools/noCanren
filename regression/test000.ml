@@ -54,10 +54,13 @@ let rec reverso a b =
     )))
 
 (* open Tester *)
-(* let run = Convenience.run *)
+let run  = Convenience.run
+let run1 = Convenience.run1
+
 
 let _ =
-  run1 (fun q   -> REPR (fives    q ), ["q", q]);
+  (* run1  1 (REPR fives); *)
+  run 1 one ("", (fun q _ -> fives q) );
   (* run empty_reifier  1  q (fun q   -> REPR (a_and_b  q ), ["q", q]); *)
   (* run empty_reifier  2  q (fun q   -> REPR (a_and_b' q ), ["q", q]); *)
   (* run empty_reifier  1  q (fun q   -> REPR (appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4]) st), ["q", q]); *)
