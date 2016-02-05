@@ -495,17 +495,17 @@ module Make (Logger: LOGGER) = struct
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
-type var_storage = { mutable storage : int list }
+type var_storage = { mutable storage : 'a . 'a logic list }
 let empty_storage = { storage=[] }
 
-let zero f =
+let zero (st: var_storage) f =
   (* st.storage <- []; *)
   f
 
-let succ  prev f =
+let succ (type c) (st: var_storage)  (prev: var_storage -> 'a -> goal) (f: c logic -> 'a) : goal =
   call_fresh (fun x ->
-      (* st.storage <- 1 :: st.storage; *)
-      prev @@ f x
+      st.storage <- Var 1 :: st.storage;
+      prev st @@ f x
     )
 
 (* let (_:  ('a -> 'goal) -> ('c logic -> 'a) -> 'goal) = *)
@@ -513,13 +513,13 @@ let succ  prev f =
 (* let zero: 'a 'b . (goal * 'a logic list) -> goal * 'b logic list = *)
 (*   fun (f,_) -> (f, []) *)
 
-let one  f  = succ zero f
+let one st f  = succ st zero f
 (* let (_: _ -> *)
 (*         ('a logic -> var_storage -> 'goal) -> *)
 (*         var_storage -> *)
 (*         'goal *)
 (*     ) = one *)
-let two   f  = succ one f
+let two st  f  = succ st one f
 (* let (_:int) = two *)
 (* let three f  = succ st two f *)
 (* let four  f  = succ st three f *)

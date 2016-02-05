@@ -132,13 +132,13 @@ module Make : functor (Logger: LOGGER) -> sig
   type var_storage
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-  (* val succ : var_storage -> (var_storage -> 'a -> goal) -> ('c logic -> 'a) -> goal *)
+  (* val succ : var_storage -> ('a -> goal) -> ('c logic -> 'a) -> goal *)
 
   (** Zero logic parameters *)
-  val zero : (* var_storage -> *) 'a -> 'a
+  val zero : var_storage -> 'a -> 'a
 
   (** One to five logic parameter(s) *)
-  val one   : (* var_storage -> *)  ('a logic -> (* var_storage -> *) goal) -> goal
+  val one   : var_storage -> ('a logic -> goal) -> goal
   (* val two   : ('a logic -> 'b logic ->                                     'goal) -> 'goal *)
   (* val three : ('a logic -> 'b logic -> 'c logic ->                         'goal) -> 'goal *)
   (* val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             'goal) -> 'goal *)
