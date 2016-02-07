@@ -283,10 +283,23 @@ module Env :
       struct
         type t = unit logic
         let hash = Hashtbl.hash
-        let equal = (==)
+        let equal a b =
+          match a,b with
+          | Var n, Var m when m=n -> true
+          | Var _, Var _ -> false
+          | _ -> a == b
       end)
 
     type t = unit H.t * int
+
+    let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h []
+
+    let show env =
+      let f = function
+        | Var i -> sprintf "_.%d (%d); " i (Hashtbl.hash !! (Var i))
+        | Value _ -> assert false
+      in
+      sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
 
     let counter_start = 10 (* 1 to be able to detect empty list *)
     let empty () = (H.create 1024, counter_start)
@@ -294,24 +307,17 @@ module Env :
     let fresh (h, current) =
       let v = Var current in
       H.add h v ();
-      printf "extending environment with variable _.%d\n%!" current;
+      assert (H.mem h v);
+      assert (H.mem h !!(Var current));
       (!!v, (h, current+1))
 
-    let var (h, _) x =
+    let var ((h, _) as env) x =
       if H.mem h (!! x)
       then match !!x with
            | Var i -> Some i
            | Value _ -> failwith "Value _ should not get to the environment"
-      else None
-
-    let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h []
-
-    let show env =
-      let f = function
-        | Var i -> sprintf "$%d; " i
-        | Value _ -> assert false
-      in
-      sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
+      else
+        None
 
   end
 
@@ -495,7 +501,7 @@ module Make (Logger: LOGGER) = struct
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
-type var_storage = { mutable storage : 'a . 'a logic list }
+type var_storage = { mutable storage : int list }
 let empty_storage = { storage=[] }
 
 let zero (st: var_storage) f =
@@ -503,9 +509,12 @@ let zero (st: var_storage) f =
   f
 
 let succ (type c) (st: var_storage)  (prev: var_storage -> 'a -> goal) (f: c logic -> 'a) : goal =
-  call_fresh (fun x ->
-      st.storage <- Var 1 :: st.storage;
-      prev st @@ f x
+  call_fresh (fun logic ->
+    match logic with
+    | Value (_,_) -> failwith "call_fresh should not return a value, error"
+    | Var n ->
+      st.storage <- n :: st.storage;
+      prev st @@ f logic
     )
 
 (* let (_:  ('a -> 'goal) -> ('c logic -> 'a) -> 'goal) = *)
@@ -536,7 +545,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
+  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive !!x) (show_logic_naive !!y)
@@ -661,17 +670,11 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   module Convenience =
   struct
     let run n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
-      let graph = Logger.create () in
-      run_ graph (fun st ->
-          (* let (goal,vars) = runner goal in *)
-          (* let repr,result = *)
-          (*   let (repr,f) = runner goal q in *)
-          (*   (repr, f st) *)
-          (* in *)
-
-          let result = runner empty_storage goal st in
-          let (_: state Stream.t) = result in
-          Printf.printf "%s, %s answer%s {\n"
+      run_ (Logger.create ()) (fun st ->
+        let stor = { storage=[] } in
+        let result = runner stor goal st in
+        let (_: state Stream.t) = result in
+          Printf.printf "'%s', %s answer%s {\n"
             repr
             (if n = (-1) then "all" else string_of_int n)
             (if n <>  1  then "s" else "");
@@ -680,13 +683,15 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
             take' ~n result
           in
 
-          let vars = [] in
+          let vars = List.map (fun n -> Var n) stor.storage in
           let text_answers =
             answers |> List.map (fun (st: State.t) ->
                 let s = List.map
-                    (fun (s, x) ->
+                    (fun x ->
+                       (* print_endline @@ show_logic_naive x; *)
+                       (* print_endline @@ State.show st; *)
                        let v, dc = refine st x in
-                       sprintf "%s=%s;" s (show_logic_naive v)
+                       sprintf "%s=%s;" (show_logic_naive x) (show_logic_naive v)
                     )
                     vars |> String.concat " "
                 in
@@ -697,9 +702,7 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
           ignore (Printf.printf "}\n%!");
           Stream.nil
-        );
-      ()
-
+        ) |> ignore
 
     let run1 n (goal: 'a logic -> string*goal) =
       let graph = Logger.create () in
