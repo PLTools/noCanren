@@ -658,6 +658,15 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let run_ = run
 
+  let make_var_pairs ~varnames stor =
+    let vars = List.map (fun n -> Var n) stor.storage in
+      let rec loop acc = function
+        | ([],_) -> acc
+        | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[])
+        | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns)
+    in
+    List.rev @@ loop [] (vars,varnames)
+
   module Convenience =
   struct
     let run ?(varnames=[]) n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
@@ -670,16 +679,7 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
           (if n = (-1) then "all" else string_of_int n)
           (if n <>  1  then "s" else "");
 
-
-        let vars = List.map (fun n -> Var n) stor.storage in
-        let vars' =
-          let rec loop acc = function
-            | ([],_) -> acc
-            | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[])
-            | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns)
-          in
-          List.rev @@ loop [] (vars,varnames)
-        in
+        let vars' = make_var_pairs ~varnames stor in
 
         let text_answers =
           let answers = take' ~n result in

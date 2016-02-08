@@ -95,32 +95,21 @@ let smart_ppx = Smart_logger.smart_logger [| |]
 let pa_minikanren_ppx = Smart_logger.pa_minikanren [| |]
 let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
 
-open MiniKanren
-module M = MiniKanren.Make(GraphLogger)
+open MiniKanrenImpl
+module M = Make(GraphLogger)
 open M
 
-let succ prev f = call_fresh (fun x -> prev (f x))
-
-let zero  f = f
-let one   f = succ zero f
-let two   f = succ one f
-let three f = succ two f
-let four  f = succ three f
-
-let q    = one
-let qp   = two
-let qpr  = three
-let qprt = four
-
-let run reifier n runner goal =
+let run ?(varnames=[]) n runner (repr,goal) =
   let graph = Logger.create () in
   M.run graph (fun st ->
-    let (result, vars) = runner goal st in
-    let (_: state Stream.t) = result in
+    let stor = { storage=[] } in
+    let result = runner stor goal st in
+
     Printf.printf "%s answer%s {\n"
       (if n = (-1) then "all" else string_of_int n)
       (if n <>  1  then "s" else "");
 
+    let vars' = make_var_pairs ~varnames stor in
     let answers =
       (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
       for i=1 to n do
@@ -134,37 +123,32 @@ let run reifier n runner goal =
       answers |> List.map
         (fun (st: State.t) ->
            let s = List.map
-            (fun (s, x) ->
-              let v, dc = refine st x in
-              let pv = show_logic_naive v in
-              match reifier dc v with
-              | "" -> sprintf "%s=%s;" s pv
-              | r  -> sprintf "%s=%s (%s);" s pv r
+            (fun (x, varname) ->
+              let rez, _dc = refine st x in
+              sprintf "%s=%s;" varname (show_logic_naive rez)
              )
-             vars |> String.concat " "
+             vars' |> String.concat " "
            in
-           Printf.printf "%s\n%!" s;
+           printf "%s\n%!" s;
            s
         )
     in
 
     Printf.printf "}\n%!";
-    M.Logger.output_html ~filename:"" text_answers graph
+    M.Logger.output_html ~filename:"" text_answers graph;
+    result
   )
 
-let empty_reifier _ _ = ""
-
-(* let show_int      = GT.( show(logic) (show int) ) *)
-(* let show_int_list = GT.( show(logic) (show(llist) (show int)) ) *)
+open ImplicitPrinters
 
 let _ =
-  let a_and_b a : state -> state MiniKanren.Stream.t =
+  let a_and_b a : M.goal =
     call_fresh
-      (fun b -> conj (a === !7)
-                     (disj (b === !6)
-                           (b === !5)
+      (fun b -> conj (a === embed 7)
+                     (disj (b === embed 6)
+                           (b === embed 5)
                      )
       )
   in
 
-  fun () -> run empty_reifier 1 q (fun q st -> a_and_b q st, ["q", q])
+  fun () -> run 1 one ("descr",a_and_b)
