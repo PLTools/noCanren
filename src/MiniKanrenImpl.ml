@@ -534,8 +534,8 @@ let two st  f  = succ st one f
 (* let four  f  = succ st three f *)
 (* let five  f  = succ st four f *)
 
-(* let q     = one *)
-(* let qr    = two *)
+let q     = one
+let qr    = two
 (* let qrs   = three *)
 (* let qrst  = four *)
 (* let pqrst = five *)

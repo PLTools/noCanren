@@ -32,7 +32,7 @@ clean:
 REGRES_CASES=$(shell seq -s " " -f %03g 0 0)
 REGRES_CASES:=$(REGRES_CASES) bad000
 
-$(warning $(REGRES_CASES))
+#$(warning $(REGRES_CASES))
 define TESTRULES
 .PHONY: test_$(1) test$(1).native
 test$(1).native: regression/test$(1).native

@@ -31,7 +31,7 @@ end
 module UnitLogger: LOGGER
 
 (** Type of typed logic variable *)
-type 'a logic = private Var of int | Value of 'a * ('a -> string)
+type 'a logic = 'a MiniKanrenImpl.logic = private Var of int | Value of 'a * ('a -> string)
 
 (** Lifting primitive *)
 val (!) : 'a -> 'a logic
@@ -138,15 +138,15 @@ module Make : functor (Logger: LOGGER) -> sig
   val zero : var_storage -> 'a -> 'a
 
   (** One to five logic parameter(s) *)
-  val one   : var_storage -> ('a logic -> goal) -> goal
-  (* val two   : ('a logic -> 'b logic ->                                     'goal) -> 'goal *)
+  val one   : var_storage -> ('a logic ->                                     goal) -> goal
+  val two   : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
   (* val three : ('a logic -> 'b logic -> 'c logic ->                         'goal) -> 'goal *)
   (* val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             'goal) -> 'goal *)
   (* val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> 'goal) -> 'goal *)
 
   (** One to five logic parameter(s), conventional names *)
-  (* val q     : ('a logic ->                                                 'goal) -> 'goal *)
-  (* val qr    : ('a logic -> 'b logic ->                                     'goal) -> 'goal *)
+  val q     : var_storage -> ('a logic ->                                     goal) -> goal
+  val qr    : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
   (* val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd *)
   (* val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e *)
   (* val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f *)
