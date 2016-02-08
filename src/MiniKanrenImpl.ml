@@ -124,7 +124,10 @@ implicit module Show_logic = Show_logic_impl
 let show_logic_naive =
   function
   | Var n -> sprintf "_.%d" n
-  | Value (x,printer) -> printer x
+  | Value (x,printer) ->
+    (* TODO: add assert that printer is a function *)
+    (* but fix js_of_ocaml before doing that *)
+    printer x
 
 (* let logic = { *)
 (*   logic with plugins = *)
@@ -178,7 +181,7 @@ let (!<) x   =
     | Cons (v, Value (Nil,_)) -> sprintf "[%s]" (show_logic_naive v)
     | _ -> assert false
   in
-  Value (Cons (x, !Nil), printer)
+  Value (Cons (x, llist_nil), printer)
 
 let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
@@ -311,7 +314,7 @@ module Env :
       assert (H.mem h !!(Var current));
       (!!v, (h, current+1))
 
-    let var ((h, _) as env) x =
+    let var (h, _) x =
       if H.mem h (!! x)
       then match !!x with
            | Var i -> Some i
@@ -344,9 +347,10 @@ module Subst :
       let open ImplicitPrinters in
       bprintf b "subst {";
       M.iter (fun ikey (_, x) ->
-              bprintf b "%s -> " (show_logic_naive (Var ikey));
-              bprintf b "%s; "   (show_logic_naive (Value (fst !!x, snd !!x)) )
-             ) m;
+          (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
+          bprintf b "%s -> " (show_logic_naive (Var ikey));
+          bprintf b "%s; "   (show_logic_naive !!x (* (Value (fst !!x, snd !!x)) *) )
+        ) m;
       bprintf b "}";
       Buffer.contents b
 
@@ -504,9 +508,7 @@ module Make (Logger: LOGGER) = struct
 type var_storage = { mutable storage : int list }
 let empty_storage = { storage=[] }
 
-let zero (st: var_storage) f =
-  (* st.storage <- []; *)
-  f
+let zero (st: var_storage) f = f
 
 let succ (type c) (st: var_storage)  (prev: var_storage -> 'a -> goal) (f: c logic -> 'a) : goal =
   call_fresh (fun logic ->
@@ -517,28 +519,17 @@ let succ (type c) (st: var_storage)  (prev: var_storage -> 'a -> goal) (f: c log
       prev st @@ f logic
     )
 
-(* let (_:  ('a -> 'goal) -> ('c logic -> 'a) -> 'goal) = *)
-(*   succ *)
-(* let zero: 'a 'b . (goal * 'a logic list) -> goal * 'b logic list = *)
-(*   fun (f,_) -> (f, []) *)
-
-let one st f  = succ st zero f
-(* let (_: _ -> *)
-(*         ('a logic -> var_storage -> 'goal) -> *)
-(*         var_storage -> *)
-(*         'goal *)
-(*     ) = one *)
-let two st  f  = succ st one f
-(* let (_:int) = two *)
-(* let three f  = succ st two f *)
-(* let four  f  = succ st three f *)
-(* let five  f  = succ st four f *)
+let one   st f  = succ st zero f
+let two   st f  = succ st one f
+let three st f  = succ st two f
+let four  st f  = succ st three f
+let five  st f  = succ st four f
 
 let q     = one
 let qr    = two
-(* let qrs   = three *)
-(* let qrst  = four *)
-(* let pqrst = five *)
+let qrs   = three
+let qrst  = four
+let pqrst = five
 
 exception Disequality_violated
 
@@ -709,49 +700,50 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
         Stream.nil
       ) |> ignore
 
-    let run1 n (goal: 'a logic -> string*goal) =
-      let graph = Logger.create () in
-      run_ graph (fun st ->
-          let q,st =
-            match st with
-            | ((env,subs,restr),l1,l2) ->
-              let x,env' = Env.fresh env in
-              let new_state = ((env',subs,restr),l1,l2) in
-              x,new_state
-          in
-          let repr,result =
-            let (repr,f) = goal q in
-            (repr, f st)
-          in
-          let vars = ["q", q] in
-          let (_: state Stream.t) = result in
-          Printf.printf "%s, %s answer%s {\n"
-            repr
-            (if n = (-1) then "all" else string_of_int n)
-            (if n <>  1  then "s" else "");
+    (* let run1 n (goal: 'a logic -> string*goal) = *)
+    (*   let _ : _ Stream.t = *)
+    (*     run_ (Logger.create () ) (fun st -> *)
+    (*       let q,st = *)
+    (*         match st with *)
+    (*         | ((env,subs,restr),l1,l2) -> *)
+    (*           let x,env' = Env.fresh env in *)
+    (*           let new_state = ((env',subs,restr),l1,l2) in *)
+    (*           x,new_state *)
+    (*       in *)
+    (*       let repr,result = *)
+    (*         let (repr,f) = goal q in *)
+    (*         (repr, f st) *)
+    (*       in *)
+    (*       let vars = ["q", q] in *)
+    (*       let (_: state Stream.t) = result in *)
+    (*       Printf.printf "%s, %s answer%s {\n" *)
+    (*         repr *)
+    (*         (if n = (-1) then "all" else string_of_int n) *)
+    (*         (if n <>  1  then "s" else ""); *)
 
-          let answers = take' ~n result in
+    (*       let answers = take' ~n result in *)
 
-          let text_answers =
-            answers |> List.map (fun (st: State.t) ->
-                let s = List.map
-                    (fun (s, x) ->
-                       let v, dc = refine st x in
-                       (* match reifier dc v with *)
-                       (* | "" -> *) sprintf "%s=%s;" s (show_logic_naive v)
-                       (* | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r *)
-                    )
-                    vars |> String.concat " "
-                in
-                Printf.printf "%s\n%!" s;
-                s
-              )
-          in
+    (*       let text_answers = *)
+    (*         answers |> List.map (fun (st: State.t) -> *)
+    (*             let s = List.map *)
+    (*                 (fun (s, x) -> *)
+    (*                    let v, dc = refine st x in *)
+    (*                    (\* match reifier dc v with *\) *)
+    (*                    (\* | "" -> *\) sprintf "%s=%s;" s (show_logic_naive v) *)
+    (*                    (\* | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r *\) *)
+    (*                 ) *)
+    (*                 vars |> String.concat " " *)
+    (*             in *)
+    (*             Printf.printf "%s\n%!" s; *)
+    (*             s *)
+    (*           ) *)
+    (*       in *)
 
-          ignore (Printf.printf "}\n%!");
-          Stream.nil
-        );
-      ()
+    (*       ignore (Printf.printf "}\n%!"); *)
+    (*       Stream.nil *)
+    (*     ) *)
+    (*   in *)
+    (*   () *)
 
   end
 end

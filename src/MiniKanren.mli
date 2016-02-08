@@ -122,17 +122,18 @@ module Make : functor (Logger: LOGGER) -> sig
 
   (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
-  (* val call_fresh : ('a logic -> state -> 'b) -> state -> 'b *)
   val call_fresh : ('a logic -> goal) -> goal
 
   (** [call_fresh_named name f] works the same as [call_fresh f] but adds to
     the log [name] of created logical variable *)
   val call_fresh_named : string -> ('a logic -> goal) -> goal
 
+  (** An abstract type which is used to collect fresh variable during [succ] invocation *)
   type var_storage
+
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-  (* val succ : var_storage -> ('a -> goal) -> ('c logic -> 'a) -> goal *)
+  val succ : var_storage -> (var_storage -> 'a -> goal) -> ('c logic -> 'a) -> goal
 
   (** Zero logic parameters *)
   val zero : var_storage -> 'a -> 'a
@@ -140,16 +141,16 @@ module Make : functor (Logger: LOGGER) -> sig
   (** One to five logic parameter(s) *)
   val one   : var_storage -> ('a logic ->                                     goal) -> goal
   val two   : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
-  (* val three : ('a logic -> 'b logic -> 'c logic ->                         'goal) -> 'goal *)
-  (* val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             'goal) -> 'goal *)
-  (* val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> 'goal) -> 'goal *)
+  val three : var_storage -> ('a logic -> 'b logic -> 'c logic ->                         goal) -> goal
+  val four  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic ->             goal) -> goal
+  val five  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> goal) -> goal
 
   (** One to five logic parameter(s), conventional names *)
   val q     : var_storage -> ('a logic ->                                     goal) -> goal
   val qr    : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
-  (* val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd *)
-  (* val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e *)
-  (* val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f *)
+  val qrs   : var_storage -> ('a logic -> 'b logic -> 'c logic ->                         goal) -> goal
+  val qrst  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic ->             goal) -> goal
+  val pqrst : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> goal) -> goal
 
   (** [x === y] creates a goal, which performs a unifications of
       [x] and [y] *)
@@ -206,7 +207,7 @@ module Make : functor (Logger: LOGGER) -> sig
 
   module Convenience : sig
     val run : ?varnames:string list -> int -> (var_storage -> 'b -> goal) -> string * 'b -> unit
-    val run1: int -> (('a logic -> string*goal)) -> unit
+    (* val run1: int -> (('a logic -> string*goal)) -> unit *)
   end
 
 end

@@ -30,7 +30,7 @@ clean:
 	$(MAKE) -C regression clean
 
 REGRES_CASES=$(shell seq -s " " -f %03g 0 0)
-REGRES_CASES:=$(REGRES_CASES) bad000
+#REGRES_CASES:=$(REGRES_CASES) bad000
 
 #$(warning $(REGRES_CASES))
 define TESTRULES
