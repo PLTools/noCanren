@@ -6,7 +6,7 @@ TESTS_ENVIRONMENT=./test.sh
 #	regression/test003.native #regression/test004.native
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean install uninstall tests test regression compile_tests run_tests toplevel jslib ppx minikanren_stuff
+.PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests toplevel jslib ppx minikanren_stuff
 
 all: minikanren_stuff
 
@@ -47,6 +47,9 @@ test_$(1): #regression/test$(1).native
 	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
 endef
 $(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
+
+promote:
+	$(MAKE) -C regression promote TEST=$(TEST)
 
 tests: compile_tests run_tests
 regression: tests

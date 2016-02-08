@@ -1,9 +1,11 @@
 REGRES_CASES=000 001 002 003 004
 
-.PHONY: all tests clean
+.PHONY: all tests promote clean
 
 tests: all
 
+promote:
+	cp $(TEST).log orig/$(TEST).log -v
 
 define TESTRULES
 .PHONY: test_$(1)

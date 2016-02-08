@@ -665,7 +665,7 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
         let stor = { storage=[] } in
         let result = runner stor goal st in
         let (_: state Stream.t) = result in
-        printf "'%s', %s answer%s {\n"
+        printf "`%s`, %s answer%s {\n"
           repr
           (if n = (-1) then "all" else string_of_int n)
           (if n <>  1  then "s" else "");
