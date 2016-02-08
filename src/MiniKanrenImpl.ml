@@ -369,40 +369,40 @@ module Subst :
       | Some yi -> xi = yi
       | None ->
          let wy = wrap (Obj.repr y) in
-	 match wy with
-	 | Unboxed _ -> false
-	 | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
-	 | Boxed (_, s, f) ->
+         match wy with
+         | Unboxed _ -> false
+         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
+         | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
-	      else occurs env xi (!!(f i)) subst || inner (i+1)
-	    in
-	    inner 0
+              else occurs env xi (!!(f i)) subst || inner (i+1)
+            in
+            inner 0
 
     let rec walk' env var subst =
       match Env.var env var with
       | None ->
           let Value (v, printer) = !! var in
-	  (match wrap (Obj.repr v) with
-	   | Unboxed _ -> !!var
-	   | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
-	   | Boxed (t, s, f) ->
+          (match wrap (Obj.repr v) with
+           | Unboxed _ -> !!var
+           | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
+           | Boxed (t, s, f) ->
                let var = Obj.dup (Obj.repr v) in
                let sf =
-		 if t = Obj.double_array_tag
-		 then !! Obj.set_double_field
-		 else Obj.set_field
-	       in
-	       for i = 0 to s - 1 do
+                 if t = Obj.double_array_tag
+                 then !! Obj.set_double_field
+                 else Obj.set_field
+               in
+               for i = 0 to s - 1 do
                  sf var i (!!(walk' env (!!(f i)) subst))
                done;
-	       Value(!!var, printer)
+               Value(!!var, printer)
           )
 
       | Some i ->
-	  (try walk' env (snd (M.find i (!! subst))) subst
-	   with Not_found -> !!var
-	  )
+          (try walk' env (snd (M.find i (!! subst))) subst
+           with Not_found -> !!var
+          )
 
 
     let unify env x y subst =
@@ -419,30 +419,30 @@ module Subst :
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
             | Some xi, _       -> extend xi x y delta subst
-	    | _      , Some yi -> extend yi y x delta subst
-	    | _ ->
+            | _      , Some yi -> extend yi y x delta subst
+            | _ ->
                 let Value (xx,xprinter) = !!x in
                 let Value (yy,yprinter) = !!y in
-	        let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in
+                let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
-	  	    then
-		      let rec inner i (delta, subst) =
-			match subst with
+                    then
+                      let rec inner i (delta, subst) =
+                        match subst with
                         | None -> delta, None
                         | Some _ ->
-  	                   if i < sx
-		           then inner (i+1) (unify (!!(fx i)) (!!(fy i)) (delta, subst))
-		           else delta, subst
+                           if i < sx
+                           then inner (i+1) (unify (!!(fx i)) (!!(fy i)) (delta, subst))
+                           else delta, subst
                       in
-		      inner 0 (delta, s)
+                      inner 0 (delta, s)
                     else delta, None
-	         | Invalid n, _
+                 | Invalid n, _
                  | _, Invalid n -> invalid_arg (Printf.sprintf "Invalid values for unification (%d)" n)
-	         | _ -> delta, None
-	        )
+                 | _ -> delta, None
+                )
       in
       unify x y ([], subst)
 
@@ -562,19 +562,19 @@ let (===) x y st =
           let constr' =
             List.fold_left (fun css' cs ->
               let x, t  = Subst.split cs in
-	      try
+              try
                 let p, s' = Subst.unify env (!!x) (!!t) subst' in
                 match s' with
-	        | None -> css'
-	        | Some _ ->
+                | None -> css'
+                | Some _ ->
                     match p with
-	            | [] -> raise Disequality_violated
-	            | _  -> (Subst.of_list p)::css'
-	      with Occurs_check -> css'
+                    | [] -> raise Disequality_violated
+                    | _  -> (Subst.of_list p)::css'
+              with Occurs_check -> css'
             )
             []
             constr
-	  in
+          in
           let (_,root,_) =
             state1 |> adjust_state @@ sprintf "Success: subs=%s" (Subst.show s) in
           Stream.cons ((env, s, constr'),root,l) Stream.nil
@@ -593,15 +593,15 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
     let subsumes subst (vs, ts) =
       try
         match Subst.unify env !!vs !!ts (Some subst) with
-	| [], Some _ -> true
+        | [], Some _ -> true
         | _ -> false
       with Occurs_check -> false
     in
     let rec traverse = function
     | [] -> [subst]
     | (c::cs) as ccs ->
-	if subsumes subst (Subst.split c)
-	then ccs
+        if subsumes subst (Subst.split c)
+        then ccs
         else if subsumes c prefix
              then traverse cs
              else c :: traverse cs
@@ -669,40 +669,45 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   module Convenience =
   struct
-    let run n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
+    let run ?(varnames=[]) n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
       run_ (Logger.create ()) (fun st ->
         let stor = { storage=[] } in
         let result = runner stor goal st in
         let (_: state Stream.t) = result in
-          Printf.printf "'%s', %s answer%s {\n"
-            repr
-            (if n = (-1) then "all" else string_of_int n)
-            (if n <>  1  then "s" else "");
+        printf "'%s', %s answer%s {\n"
+          repr
+          (if n = (-1) then "all" else string_of_int n)
+          (if n <>  1  then "s" else "");
 
-          let answers =
-            take' ~n result
+
+        let vars = List.map (fun n -> Var n) stor.storage in
+        let vars' =
+          let rec loop acc = function
+            | ([],_) -> acc
+            | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[])
+            | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns)
           in
+          List.rev @@ loop [] (vars,varnames)
+        in
 
-          let vars = List.map (fun n -> Var n) stor.storage in
-          let text_answers =
-            answers |> List.map (fun (st: State.t) ->
-                let s = List.map
-                    (fun x ->
-                       (* print_endline @@ show_logic_naive x; *)
-                       (* print_endline @@ State.show st; *)
-                       let v, dc = refine st x in
-                       sprintf "%s=%s;" (show_logic_naive x) (show_logic_naive v)
-                    )
-                    vars |> String.concat " "
-                in
-                Printf.printf "%s\n%!" s;
-                s
-              )
-          in
+        let text_answers =
+          let answers = take' ~n result in
+          answers |> List.map (fun (st: State.t) ->
+              let s = List.map
+                  (fun (var,varname) ->
+                     let rez, _dc = refine st var in
+                     sprintf "%s=%s;" varname (show_logic_naive rez)
+                  )
+                  vars' |> String.concat " "
+              in
+              printf "%s\n%!" s;
+              s
+            )
+        in
 
-          ignore (Printf.printf "}\n%!");
-          Stream.nil
-        ) |> ignore
+        let () = printf "}\n%!" in
+        Stream.nil
+      ) |> ignore
 
     let run1 n (goal: 'a logic -> string*goal) =
       let graph = Logger.create () in

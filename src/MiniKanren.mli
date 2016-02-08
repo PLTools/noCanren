@@ -205,7 +205,7 @@ module Make : functor (Logger: LOGGER) -> sig
   val take' : ?n:int -> state Stream.t -> State.t list
 
   module Convenience : sig
-    val run : int -> (var_storage -> 'b -> goal) -> string * 'b -> unit
+    val run : ?varnames:string list -> int -> (var_storage -> 'b -> goal) -> string * 'b -> unit
     val run1: int -> (('a logic -> string*goal)) -> unit
   end
 
