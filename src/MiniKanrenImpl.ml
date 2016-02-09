@@ -531,6 +531,19 @@ let qrs   = three
 let qrst  = four
 let pqrst = five
 
+let id x = x
+
+module PolyPairs = struct
+  let zero = fun k -> k ()
+
+  let one = fun k x -> k (x,())
+  let s prev k x = prev (fun v -> k (x,v))
+  let p sel = sel (fun x -> x)
+
+  (* let two = (s one) id *)
+  (* let three = (s @@ s one) id *)
+end;;
+
 exception Disequality_violated
 
 let snd3 (_,x,_) = x
