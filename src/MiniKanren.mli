@@ -128,26 +128,23 @@ module Make : functor (Logger: LOGGER) -> sig
     the log [name] of created logical variable *)
   val call_fresh_named : string -> ('a logic -> goal) -> goal
 
-  (** An abstract type which is used to collect fresh variable during [succ] invocation *)
-  (* type var_storage *)
-
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-  val succ : ('a -> goal) -> ('c logic -> 'a) -> goal
+  val succ : ('a -> state -> 'z) -> ('c logic -> 'a) -> state -> 'z
 
   (** Zero logic parameters *)
   val zero : 'a -> 'a
 
   (** One to five logic parameter(s) *)
-  val one   : ('a logic ->                                     state -> 'z) -> state -> 'z
-  val two   : ('a logic -> 'b logic ->                         state -> 'z) -> state -> 'z
+  val one   : ('a logic ->                                                 state -> 'z) -> state -> 'z
+  val two   : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z
   val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
   val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
   val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
 
   (** One to five logic parameter(s), conventional names *)
-  val q     : ('a logic ->                                     state -> 'z) -> state -> 'z
-  val qr    : ('a logic -> 'b logic ->                         state -> 'z) -> state -> 'z
+  val q     : ('a logic ->                                                 state -> 'z) -> state -> 'z
+  val qr    : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z
   val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
   val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
   val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
@@ -208,18 +205,18 @@ module Make : functor (Logger: LOGGER) -> sig
   module PolyPairs : sig
     val id : 'a -> 'a
 
-    val one : ( (State.t list -> 'a logic list) * unit -> 'b) -> 'a logic -> 'b
+    type 'a xxx = state Stream.t -> int -> ('a logic * diseq) list
+
+    val one : ('a xxx * unit -> 'b) -> 'a logic -> 'b
     val succ : (('a -> 'b) -> 'c) ->
-         ((State.t list -> 'e logic list) * 'a -> 'b) ->
-         'f -> 'c
+               ('e xxx * 'a -> 'b) ->
+              'f -> 'c
     val p : (('a -> 'a) -> 'b) -> 'b
   end
 
   module Convenience : sig
     (* val run : ?varnames:string list -> int -> (var_storage -> 'b -> state -> state Stream.t) -> string * 'b -> (state -> 'b -> 'c) -> unit *)
 
-    val run5 : ('a -> state -> 'b) -> 'a -> 'b
-    (* val run1: int -> (('a logic -> string*goal)) -> unit *)
+    val run : ('a -> state -> 'b) -> 'a -> 'b
   end
-
 end

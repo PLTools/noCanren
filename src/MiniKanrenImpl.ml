@@ -505,12 +505,9 @@ module Make (Logger: LOGGER) = struct
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
-(* type var_storage = { mutable storage : int list } *)
-(* let empty_storage = { storage=[] } *)
-
 let zero f = f
 
-let succ (prev: 'a -> state -> 'z) (f: _ logic -> 'a) : state -> 'z =
+let succ (prev: 'a -> state -> 'z) (f: 'c logic -> 'a) : state -> 'z =
   call_fresh (fun logic -> prev @@ f logic)
 
 let one   f  = succ zero f
@@ -675,29 +672,22 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   module PolyPairs = struct
     let id x = x
 
-    let find_value var st = refine st var |> fst (* diseq are ignored *)
-    let mapper var sts = List.map (find_value var) sts
+    let find_value var st = refine st var (* |> fst (\* diseq are ignored *\) *)
+    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
 
-    let one: ( (State.t list -> 'a logic list) * unit -> 'b) -> 'a logic -> 'b = fun k var -> k (mapper var, ())
+    type 'a xxx = state Stream.t -> int -> ('a logic * diseq) list
+
+    let one: ('a xxx * unit -> 'b) -> 'a logic -> 'b = fun k var -> k (mapper var, ())
     let succ = fun prev k var -> prev (fun v -> k (mapper var,v))
     let p sel = sel id
-
   end
 
   module Convenience =
   struct
-
-    (* let run5 runner goalish = *)
-    (*   run_ (Logger.create ()) (fun st -> *)
-    (*       runner goalish *)
-    (*     ) *)
-
-    let run5 runner goalish =
+    let run runner goalish =
       run_ (Logger.create ()) (fun st ->
           runner goalish st
         )
-
-    (* let (_:int) = run5 *)
 
     (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
     (*   run_ (Logger.create ()) (fun st -> *)

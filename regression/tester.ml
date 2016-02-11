@@ -154,7 +154,32 @@ module M = MiniKanren.Make(GraphLogger)
 
 (* let empty_reifier _ _ = "" *)
 
-(* open ImplicitPrinters *)
+open ImplicitPrinters
+open M
+
+let run1 ~n goal =
+  let states, (qf,()) = M.Convenience.run q (fun q st -> goal q st, PolyPairs.(one id) q) in
+  let (_: state MiniKanren.Stream.t) = states in
+
+  printf "Asking for max %d results {\n%!" n;
+  List.iter (fun (q,_) ->
+      printf "q=%s\n%!" (MiniKanren.show_logic_naive q);
+    ) (qf states n);
+  printf "}\n%!"
+
+let run2 ~n goal =
+  let states, (qf,(rf,())) = M.Convenience.run qr (fun q r st -> goal q r st, PolyPairs.((succ one) id) q r) in
+  let (_: state MiniKanren.Stream.t) = states in
+
+  printf "Asking for max %d results {\n%!" n;
+  List.iter2 (fun (q,_) (r,_) ->
+      printf "q=%s; r=%s\n%!" (MiniKanren.show_logic_naive q) (MiniKanren.show_logic_naive r);
+    ) (qf states n) (rf states n);
+  printf "}\n%!"
+
+
+
+
 
 (* let run reifier n runner goal = *)
 (*   let graph = Logger.create () in *)
