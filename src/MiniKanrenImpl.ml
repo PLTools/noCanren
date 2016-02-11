@@ -682,6 +682,26 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
     let p sel = sel id
   end
 
+  module PolyPairs2 = struct
+    (* is an attempt to lift stream inside *)
+    let id x = x
+
+    let find_value var st = refine st var (* |> fst (\* diseq are ignored *\) *)
+    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
+
+    type 'a xxx = int -> ('a logic * diseq) list
+
+    let one: ('a xxx * unit -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream, ())
+    let succ = fun prev k stream var -> prev  (fun v -> k (mapper var stream, v)) stream
+
+    let (_: state Stream.t ->
+         'a ->
+         'b logic ->
+         (int -> ('c logic * diseq) list) * ('b xxx * unit) ) = (succ one) id
+
+    let p sel = sel id
+  end
+
   module Convenience =
   struct
     let run runner goalish =

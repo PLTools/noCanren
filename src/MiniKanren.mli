@@ -214,6 +214,18 @@ module Make : functor (Logger: LOGGER) -> sig
     val p : (('a -> 'a) -> 'b) -> 'b
   end
 
+  module PolyPairs2 : sig
+    val id : 'a -> 'a
+
+    type 'a xxx = int -> ('a logic * diseq) list
+
+    val one : ('a xxx * unit -> 'b) -> state Stream.t -> 'a logic -> 'b
+    val succ : (('a -> 'b) -> state Stream.t -> 'c) ->
+               ('e xxx * 'a -> 'b) -> state Stream.t ->
+              'f -> 'c
+    val p : (('a -> 'a) -> 'b) -> 'b
+  end
+
   module Convenience : sig
     (* val run : ?varnames:string list -> int -> (var_storage -> 'b -> state -> state Stream.t) -> string * 'b -> (state -> 'b -> 'c) -> unit *)
 
