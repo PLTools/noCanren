@@ -58,21 +58,21 @@ let wtfo xs n = conj (nilo xs) (seveno n)
 open Tester
 
 let _ =
-  run1 ~n:5 fives;
-  run1 ~n:1 a_and_b;
-  run1 ~n:1 a_and_b';
+  run1 ~n:5 (REPR fives);
+  run1 ~n:1 (REPR a_and_b);
+  run1 ~n:1 (REPR a_and_b');
 
-  run1 ~n:1 (fun q -> appendo q (of_list [3;4]) (of_list [1;2;3;4]) );
-  run2 ~n:4 (fun q r -> appendo q (of_list ([]: int list)) r);
-  run2 ~n:4 (fun q r -> appendo (of_list [1]) q r);
+  run1 ~n:1 (REPR(fun q -> appendo q (of_list [3;4]) (of_list [1;2;3;4]) ) );
+  run2 ~n:4 (REPR(fun q r -> appendo q (of_list ([]: int list)) r) );
+  run2 ~n:4 (REPR(fun q r -> appendo (of_list [1]) q r) );
 
-  run1 ~n:1  (fun q -> reverso q (of_list [1; 2; 3; 4]) );
-  run1 ~n:1  (fun q -> reverso q q );
-  run1 ~n:2  (fun q -> reverso q q );
-  run1 ~n:5  (fun q -> reverso q q );
+  run1 ~n:1  (REPR(fun q -> reverso q (of_list [1; 2; 3; 4]) ) );
+  run1 ~n:1  (REPR(fun q -> reverso q q) );
+  run1 ~n:2  (REPR(fun q -> reverso q q) );
+  run1 ~n:5  (REPR(fun q -> reverso q q) );
 
-  run1 ~n:1  (fun q -> reverso q (of_list [1]) );
-  run1 ~n:1  (fun q -> reverso (of_list [1]) q );
+  run1 ~n:1  (REPR(fun q -> reverso q (of_list [1]) ) );
+  run1 ~n:1  (REPR(fun q -> reverso (of_list [1]) q ) );
 
   (* run 1   q ~varnames:["q"]     (REPR a_and_b); *)
   (* run 2   q ~varnames:["q"]     (REPR a_and_b'); *)
