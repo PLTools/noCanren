@@ -110,7 +110,7 @@ module Make : functor (Logger: LOGGER) -> sig
   val concrete: state -> State.t
 
   (** Goal converts a state into a lazy stream of states *)
-  type goal (* = state -> state Stream.t *)
+  type goal = state -> state Stream.t
 
   val delay_goal: (unit -> goal) -> goal
 
@@ -129,28 +129,28 @@ module Make : functor (Logger: LOGGER) -> sig
   val call_fresh_named : string -> ('a logic -> goal) -> goal
 
   (** An abstract type which is used to collect fresh variable during [succ] invocation *)
-  type var_storage
+  (* type var_storage *)
 
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)
-  val succ : var_storage -> (var_storage -> 'a -> goal) -> ('c logic -> 'a) -> goal
+  val succ : ('a -> goal) -> ('c logic -> 'a) -> goal
 
   (** Zero logic parameters *)
-  val zero : var_storage -> 'a -> 'a
+  val zero : 'a -> 'a
 
   (** One to five logic parameter(s) *)
-  val one   : var_storage -> ('a logic ->                                     goal) -> goal
-  val two   : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
-  val three : var_storage -> ('a logic -> 'b logic -> 'c logic ->                         goal) -> goal
-  val four  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic ->             goal) -> goal
-  val five  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> goal) -> goal
+  val one   : ('a logic ->                                     state -> 'z) -> state -> 'z
+  val two   : ('a logic -> 'b logic ->                         state -> 'z) -> state -> 'z
+  val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
+  val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
+  val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
 
   (** One to five logic parameter(s), conventional names *)
-  val q     : var_storage -> ('a logic ->                                     goal) -> goal
-  val qr    : var_storage -> ('a logic -> 'b logic ->                         goal) -> goal
-  val qrs   : var_storage -> ('a logic -> 'b logic -> 'c logic ->                         goal) -> goal
-  val qrst  : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic ->             goal) -> goal
-  val pqrst : var_storage -> ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> goal) -> goal
+  val q     : ('a logic ->                                     state -> 'z) -> state -> 'z
+  val qr    : ('a logic -> 'b logic ->                         state -> 'z) -> state -> 'z
+  val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
+  val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
+  val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
 
   (** [x === y] creates a goal, which performs a unifications of
       [x] and [y] *)
@@ -187,7 +187,7 @@ module Make : functor (Logger: LOGGER) -> sig
 
   (** [run s] runs a state transformer [s] (not necessarily a goal) in
       initial state *)
-  val run : Logger.t -> goal -> state Stream.t
+  val run : Logger.t -> (state -> 'a) -> 'a
 
   (** [diseq] is a type for disequality constraint *)
   type diseq
@@ -205,8 +205,20 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
+  module PolyPairs : sig
+    val id : 'a -> 'a
+
+    val one : ( (State.t list -> 'a logic list) * unit -> 'b) -> 'a logic -> 'b
+    val succ : (('a -> 'b) -> 'c) ->
+         ((State.t list -> 'e logic list) * 'a -> 'b) ->
+         'f -> 'c
+    val p : (('a -> 'a) -> 'b) -> 'b
+  end
+
   module Convenience : sig
-    val run : ?varnames:string list -> int -> (var_storage -> 'b -> goal) -> string * 'b -> unit
+    (* val run : ?varnames:string list -> int -> (var_storage -> 'b -> state -> state Stream.t) -> string * 'b -> (state -> 'b -> 'c) -> unit *)
+
+    val run5 : ('a -> state -> 'b) -> 'a -> 'b
     (* val run1: int -> (('a logic -> string*goal)) -> unit *)
   end
 

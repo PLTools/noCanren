@@ -8,7 +8,7 @@ let a_and_b a =
   )
 
 (** Eval a and b *)
-let _ = run  empty_reifier 1 q (fun q st -> a_and_b q st, ["q", q])
+let _ =   run 1   q ~varnames:["q"]     (REPR a_and_b)
 
 (** Declare appendo *)
 let rec appendo a b ab =
@@ -42,22 +42,19 @@ let rec reverso a b =
 
 (** Run appendo 1 *)
 let _ =
-  run empty_reifier 1 q
-      (fun q st -> (appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4]) st), ["q", q])
+  run 1 q ~varnames:["q"] (REPR (fun q -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) )
 
 (** Run appendo 2 *)
 let _ =
-  run empty_reifier  4 qr
-      (fun q r st -> (appendo q llist_nil r st), ["q", q; "r", r])
+  run 4 qr ~varnames:["q"; "r"] (REPR (fun q r -> appendo q llist_nil r)
 
 (** Run reverso 1 *)
 let _ =
-  run empty_reifier 1 q
-      (fun q st -> (reverso q (of_list [1; 2; 3; 4]) st), ["q", q])
+  run 1 q ~varnames:["q"] (REPR (fun q -> (reverso q (of_list [1; 2; 3; 4]))) )
 
 (** Declare fives *)
-let rec fives x = (x === !5) ||| defer (fives x)
+let rec fives x = (x === embed 5) ||| delay_goal (fun () -> fives x)
 
 (** Run fives *)
 let _ =
-  run empty_reifier 10 q (fun q st -> (fives q st), ["q", q])
+  run 1   q ~varnames:["q"]     (REPR fives)

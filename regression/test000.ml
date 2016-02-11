@@ -53,20 +53,36 @@ let rec reverso a b =
     )
     )))
 
-let run  = Convenience.run
+let nilo a = (a === llist_nil)
+let seveno x = (x === embed 7)
+let wtfo xs n = conj (nilo xs) (seveno n)
+
+let run  = Convenience.run5
 
 let _ =
-  run 1   q ~varnames:["q"]     (REPR fives);
-  run 1   q ~varnames:["q"]     (REPR a_and_b);
-  run 2   q ~varnames:["q"]     (REPR a_and_b');
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) );
-  run 4  qr ~varnames:["q"]     (REPR (fun q r -> appendo q (of_list ([]:int list)) r) );
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1; 2; 3; 4])) );
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1; 2; 3; 4]) q) );
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list ([]: int list)) (of_list ([]: int list)) ));
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   ));
-  run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   ));
-  run 10  q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   ));
-  run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1])       ));
-  run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1]) q       ));
+  let () =
+    let states, (qf,()) = M.Convenience.run5 q (fun q st -> fives q st, PolyPairs.(one id) q) in
+    let (_: state Stream.t) = states in
+    ()
+  in
+
+  let () =
+    let states, (qf,(rf,())) = M.Convenience.run5 qr (fun q r st -> appendo q (of_list ([]: int list)) r st, PolyPairs.((succ one) id) q r) in
+    let (_: state Stream.t) = states in
+    ()
+  in
+
+  (* run 1   q ~varnames:["q"]     (REPR a_and_b); *)
+  (* run 2   q ~varnames:["q"]     (REPR a_and_b'); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) ); *)
+  (* let _ : int = run 1 qr ~varnames:[] ("wtfo", wtfo) (\* (fun _state -> PolyPairs.(p @@ s one) ) *\) in *)
+  (* run 4  qr ~varnames:["q"]     (REPR (fun q r -> appendo q (of_list ([]:int list)) r) ); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1; 2; 3; 4])) ); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1; 2; 3; 4]) q) ); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list ([]: int list)) (of_list ([]: int list)) )); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
+  (* run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
+  (* run 10  q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
+  (* run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1])       )); *)
+  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1]) q       )); *)
   ()

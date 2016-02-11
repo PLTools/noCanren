@@ -505,25 +505,19 @@ module Make (Logger: LOGGER) = struct
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
-type var_storage = { mutable storage : int list }
-let empty_storage = { storage=[] }
+(* type var_storage = { mutable storage : int list } *)
+(* let empty_storage = { storage=[] } *)
 
-let zero (st: var_storage) f = f
+let zero f = f
 
-let succ (type c) (st: var_storage)  (prev: var_storage -> 'a -> goal) (f: c logic -> 'a) : goal =
-  call_fresh (fun logic ->
-    match logic with
-    | Value (_,_) -> failwith "call_fresh should not return a value, error"
-    | Var n ->
-      st.storage <- n :: st.storage;
-      prev st @@ f logic
-    )
+let succ (prev: 'a -> state -> 'z) (f: _ logic -> 'a) : state -> 'z =
+  call_fresh (fun logic -> prev @@ f logic)
 
-let one   st f  = succ st zero f
-let two   st f  = succ st one f
-let three st f  = succ st two f
-let four  st f  = succ st three f
-let five  st f  = succ st four f
+let one   f  = succ zero f
+let two   f  = succ one f
+let three f  = succ two f
+let four  f  = succ three f
+let five  f  = succ four f
 
 let q     = one
 let qr    = two
@@ -531,18 +525,16 @@ let qrs   = three
 let qrst  = four
 let pqrst = five
 
-let id x = x
+(* module PolyPairs = struct *)
+(*   let zero = fun k -> k () *)
 
-module PolyPairs = struct
-  let zero = fun k -> k ()
+(*   let one = fun k x -> k (x,()) *)
+(*   let s prev k x = prev (fun v -> k (x,v)) *)
+(*   let p sel = sel (fun x -> x) *)
 
-  let one = fun k x -> k (x,())
-  let s prev k x = prev (fun v -> k (x,v))
-  let p sel = sel (fun x -> x)
-
-  (* let two = (s one) id *)
-  (* let three = (s @@ s one) id *)
-end;;
+(*   (\* let two = (s one) id *\) *)
+(*   (\* let three = (s @@ s one) id *\) *)
+(* end;; *)
 
 exception Disequality_violated
 
@@ -646,7 +638,7 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let conde = (?|)
 
-  let run l (g: goal) =
+  let run l (g: state -> _) =
     let root_node = Logger.make_node l in
     g (State.empty (), l, root_node)
 
@@ -671,47 +663,72 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let run_ = run
 
-  let make_var_pairs ~varnames stor =
-    let vars = List.map (fun n -> Var n) stor.storage in
-      let rec loop acc = function
-        | ([],_) -> acc
-        | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[])
-        | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns)
-    in
-    List.rev @@ loop [] (vars,varnames)
+  (* let make_var_pairs ~varnames stor = *)
+  (*   let vars = List.map (fun n -> Var n) stor.storage in *)
+  (*     let rec loop acc = function *)
+  (*       | ([],_) -> acc *)
+  (*       | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[]) *)
+  (*       | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns) *)
+  (*   in *)
+  (*   List.rev @@ loop [] (vars,varnames) *)
+
+  module PolyPairs = struct
+    let id x = x
+
+    let find_value var st = refine st var |> fst (* diseq are ignored *)
+    let mapper var sts = List.map (find_value var) sts
+
+    let one: ( (State.t list -> 'a logic list) * unit -> 'b) -> 'a logic -> 'b = fun k var -> k (mapper var, ())
+    let succ = fun prev k var -> prev (fun v -> k (mapper var,v))
+    let p sel = sel id
+
+  end
 
   module Convenience =
   struct
-    let run ?(varnames=[]) n (runner: var_storage -> 'b -> goal) ( (repr,goal): string * 'b) =
+
+    (* let run5 runner goalish = *)
+    (*   run_ (Logger.create ()) (fun st -> *)
+    (*       runner goalish *)
+    (*     ) *)
+
+    let run5 runner goalish =
       run_ (Logger.create ()) (fun st ->
-        let stor = { storage=[] } in
-        let result = runner stor goal st in
-        let (_: state Stream.t) = result in
-        printf "`%s`, %s answer%s {\n"
-          repr
-          (if n = (-1) then "all" else string_of_int n)
-          (if n <>  1  then "s" else "");
+          runner goalish st
+        )
 
-        let vars' = make_var_pairs ~varnames stor in
+    (* let (_:int) = run5 *)
 
-        let text_answers =
-          let answers = take' ~n result in
-          answers |> List.map (fun (st: State.t) ->
-              let s = List.map
-                  (fun (var,varname) ->
-                     let rez, _dc = refine st var in
-                     sprintf "%s=%s;" varname (show_logic_naive rez)
-                  )
-                  vars' |> String.concat " "
-              in
-              printf "%s\n%!" s;
-              s
-            )
-        in
+    (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
+    (*   run_ (Logger.create ()) (fun st -> *)
+    (*     let stor = { storage=[] } in *)
+    (*     let result = runner stor goal st in *)
+    (*     let (_: state Stream.t) = result in *)
+    (*     printf "`%s`, %s answer%s {\n" *)
+    (*       repr *)
+    (*       (if n = (-1) then "all" else string_of_int n) *)
+    (*       (if n <>  1  then "s" else ""); *)
 
-        let () = printf "}\n%!" in
-        Stream.nil
-      ) |> ignore
+    (*     let vars' = make_var_pairs ~varnames stor in *)
+
+    (*     let text_answers = *)
+    (*       let answers = take' ~n result in *)
+    (*       answers |> List.map (fun (st: State.t) -> *)
+    (*           let s = List.map *)
+    (*               (fun (var,varname) -> *)
+    (*                  let rez, _dc = refine st var in *)
+    (*                  sprintf "%s=%s;" varname (show_logic_naive rez) *)
+    (*               ) *)
+    (*               vars' |> String.concat " " *)
+    (*           in *)
+    (*           printf "%s\n%!" s; *)
+    (*           s *)
+    (*         ) *)
+    (*     in *)
+
+    (*     let () = printf "}\n%!" in *)
+    (*     Stream.nil *)
+    (*   ) |> ignore *)
 
     (* let run1 n (goal: 'a logic -> string*goal) = *)
     (*   let _ : _ Stream.t = *)
