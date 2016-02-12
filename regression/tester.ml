@@ -154,24 +154,32 @@ open MiniKanren
 open ImplicitPrinters
 open M
 
+let () =
+  (* some code to check that types are good. nothing is really executed there *)
+  let (goal3: 'a logic -> 'b logic -> 'c logic -> goal) = fun _ _ _ -> Obj.magic () in
+  let ans () = M.Convenience.run qrs (fun q r s st -> goal3 q r s st, (fun stream -> PolyPairs.((succ @@ succ one) id) stream q r s) ) in
+  let (_: unit -> 'c M.PolyPairs.xxx * ('d M.PolyPairs.xxx * 'e M.PolyPairs.xxx) ) = ans in
+  ()
+
 let run1 ~n (title, goal) =
-  let states, (qf,()) = M.Convenience.run q (fun q st -> goal q st, PolyPairs.(one id) q) in
-  let (_: state MiniKanren.Stream.t) = states in
+  let qf = M.Convenience.run q (fun q st -> goal q st, (fun stream -> PolyPairs.(one id) stream q) ) in
 
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter (fun (q,_) ->
       printf "q=%s\n%!" (show_logic_naive q);
-    ) (qf states n);
+    ) (qf n);
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  let states, (qf,(rf,())) = M.Convenience.run qr (fun q r st -> goal q r st, PolyPairs.((succ one) id) q r) in
-  let (_: state Stream.t) = states in
+  let qf,rf = M.Convenience.run qr (fun q r st ->
+    let foo stream : 'a M.PolyPairs.xxx * 'b M.PolyPairs.xxx = PolyPairs.((succ one) id) stream q r in
+    goal q r st, foo
+  ) in
 
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter2 (fun (q,_) (r,_) ->
       printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
-    ) (qf states n) (rf states n);
+    ) (qf n) (rf n);
   printf "}\n%!"
 
 

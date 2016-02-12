@@ -660,44 +660,21 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let run_ = run
 
-  (* let make_var_pairs ~varnames stor = *)
-  (*   let vars = List.map (fun n -> Var n) stor.storage in *)
-  (*     let rec loop acc = function *)
-  (*       | ([],_) -> acc *)
-  (*       | (x::xs,[]) -> loop ((x, show_logic_naive x) :: acc) (xs,[]) *)
-  (*       | (x::xs,n::ns) -> loop ((x,n) :: acc) (xs,ns) *)
-  (*   in *)
-  (*   List.rev @@ loop [] (vars,varnames) *)
-
   module PolyPairs = struct
     let id x = x
 
-    let find_value var st = refine st var (* |> fst (\* diseq are ignored *\) *)
-    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
-
-    type 'a xxx = state Stream.t -> int -> ('a logic * diseq) list
-
-    let one: ('a xxx * unit -> 'b) -> 'a logic -> 'b = fun k var -> k (mapper var, ())
-    let succ = fun prev k var -> prev (fun v -> k (mapper var,v))
-    let p sel = sel id
-  end
-
-  module PolyPairs2 = struct
-    (* is an attempt to lift stream inside *)
-    let id x = x
-
-    let find_value var st = refine st var (* |> fst (\* diseq are ignored *\) *)
+    let find_value var st = refine st var
     let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
 
     type 'a xxx = int -> ('a logic * diseq) list
 
-    let one: ('a xxx * unit -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream, ())
-    let succ = fun prev k stream var -> prev  (fun v -> k (mapper var stream, v)) stream
+    let one: ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream)
+    let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
 
     let (_: state Stream.t ->
-         'a ->
+         'a logic ->
          'b logic ->
-         (int -> ('c logic * diseq) list) * ('b xxx * unit) ) = (succ one) id
+         ('a xxx) * ('b xxx) ) = (succ one) id
 
     let p sel = sel id
   end
@@ -706,7 +683,8 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   struct
     let run runner goalish =
       run_ (Logger.create ()) (fun st ->
-          runner goalish st
+          let stream, f = runner goalish st in
+          f stream
         )
 
     (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
