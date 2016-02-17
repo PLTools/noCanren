@@ -31,7 +31,12 @@ end
 module UnitLogger: LOGGER
 
 (** Type of typed logic variable *)
-type 'a logic = 'a MiniKanrenImpl.logic = private Var of int | Value of 'a * ('a -> string)
+type 'a logic = 'a MiniKanrenImpl.logic = private Var of 'a var_desc | Value of 'a * ('a -> string)
+and  'a var_desc = 'a MiniKanrenImpl.var_desc =
+  { index: int
+  ; mutable reifier: unit -> 'a logic
+  }
+
 
 (** Lifting primitive *)
 val (!) : 'a -> 'a logic

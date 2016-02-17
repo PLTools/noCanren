@@ -106,7 +106,15 @@ let logf fmt =
 
 let (!!) = Obj.magic
 
-type 'a logic = Var of int | Value of 'a * ('a -> string)
+type 'a logic = Var of 'a var_desc | Value of 'a * ('a -> string)
+and 'a var_desc =
+  { index: int
+  ; mutable reifier: unit -> 'a logic
+  }
+
+let var_of_int index =
+  let rec ans = Var { index; reifier=fun () -> ans } in
+  ans
 
 let (!) x = Value (x, (fun _ -> "<not implemented>"))
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
@@ -115,7 +123,7 @@ module Show_logic_impl {X : ImplicitPrinters.SHOW} = struct
     type t = X.t logic
     let show l =
       match l with
-      | Var n -> sprintf "_.%d" n
+      | Var {index; _} -> sprintf "_.%d" index
       | Value (x,_) -> X.show x
 end
 
@@ -123,7 +131,7 @@ implicit module Show_logic = Show_logic_impl
 
 let show_logic_naive =
   function
-  | Var n -> sprintf "_.%d" n
+  | Var {index;_} -> sprintf "_.%d" index
   | Value (x,printer) ->
     (* TODO: add assert that printer is a function *)
     (* but fix js_of_ocaml before doing that *)
@@ -286,11 +294,11 @@ module Env :
       struct
         type t = unit logic
         let hash = Hashtbl.hash
-        let equal a b =
-          match a,b with
-          | Var n, Var m when m=n -> true
-          | Var _, Var _ -> false
-          | _ -> a == b
+        let equal a b = a == b
+          (* match a,b with *)
+          (* | Var n, Var m when m=n -> true *)
+          (* | Var _, Var _ -> false *)
+          (* | _ -> a == b *)
       end)
 
     type t = unit H.t * int
@@ -299,7 +307,7 @@ module Env :
 
     let show env =
       let f = function
-        | Var i -> sprintf "_.%d (%d); " i (Hashtbl.hash !! (Var i))
+        | (Var {index=i;_}) as v -> sprintf "_.%d (%d); " i (Hashtbl.hash v)
         | Value _ -> assert false
       in
       sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
@@ -308,16 +316,16 @@ module Env :
     let empty () = (H.create 1024, counter_start)
 
     let fresh (h, current) =
-      let v = Var current in
+      let rec v = Var {index=current; reifier=fun () -> v } in
       H.add h v ();
       assert (H.mem h v);
-      assert (H.mem h !!(Var current));
+      (* assert (H.mem h !!(Var current)); *)
       (!!v, (h, current+1))
 
     let var (h, _) x =
       if H.mem h (!! x)
       then match !!x with
-           | Var i -> Some i
+           | Var {index;_} -> Some index
            | Value _ -> failwith "Value _ should not get to the environment"
       else
         None
@@ -348,7 +356,7 @@ module Subst :
       bprintf b "subst {";
       M.iter (fun ikey (_, x) ->
           (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
-          bprintf b "%s -> " (show_logic_naive (Var ikey));
+          bprintf b "%s -> " (show_logic_naive (var_of_int ikey));
           bprintf b "%s; "   (show_logic_naive !!x (* (Value (fst !!x, snd !!x)) *) )
         ) m;
       bprintf b "}";
