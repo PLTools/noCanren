@@ -133,27 +133,6 @@ module Make : functor (Logger: LOGGER) -> sig
     the log [name] of created logical variable *)
   val call_fresh_named : string -> ('a logic -> goal) -> goal
 
-  (** [succ num f] increments the number of free logic variables in
-    a goal; can be used to get rid of ``fresh'' syntax extension *)
-  val succ : ('a -> state -> 'z) -> ('c logic -> 'a) -> state -> 'z
-
-  (** Zero logic parameters *)
-  val zero : 'a -> 'a
-
-  (** One to five logic parameter(s) *)
-  val one   : ('a logic ->                                                 state -> 'z) -> state -> 'z
-  val two   : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z
-  val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
-  val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
-  val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
-
-  (** One to five logic parameter(s), conventional names *)
-  val q     : ('a logic ->                                                 state -> 'z) -> state -> 'z
-  val qr    : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z
-  val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z
-  val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z
-  val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z
-
   (** [x === y] creates a goal, which performs a unifications of
       [x] and [y] *)
   val (===) : 'a logic -> 'a logic -> goal
@@ -219,7 +198,30 @@ module Make : functor (Logger: LOGGER) -> sig
     val p : (('a -> 'a) -> 'b) -> 'b
   end
 
+  type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list
+
+  (** [succ num f] increments the number of free logic variables in
+    a goal; can be used to get rid of ``fresh'' syntax extension *)
+  val succ : ('a -> state -> 'z) -> ('c logic -> 'a) -> state -> 'c reifier * 'z
+
+  (** Zero logic parameters *)
+  val zero : 'a -> 'a
+
+  (** One to five logic parameter(s) *)
+  val one   : ('a logic ->                                                 state -> 'z) -> state -> 'a reifier * 'z
+  val two   : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'a reifier * ('b reifier * 'z)
+  val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'a reifier * ('b reifier * ('c reifier * 'z))
+  (* val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z *)
+  (* val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z *)
+
+  (* (\** One to five logic parameter(s), conventional names *\) *)
+  (* val q     : ('a logic ->                                                 state -> 'z) -> state -> 'z *)
+  (* val qr    : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z *)
+  (* val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z *)
+  (* val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z *)
+  (* val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z *)
+
   module Convenience : sig
-    val run : ('a -> state -> 'b * ('b -> 'c) ) -> 'a -> 'c
+    val run : ('a -> state -> 'c) -> 'a -> 'c
   end
 end

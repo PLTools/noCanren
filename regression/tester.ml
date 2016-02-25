@@ -156,30 +156,30 @@ open M
 
 let () =
   (* some code to check that types are good. nothing is really executed there *)
-  let (goal3: 'a logic -> 'b logic -> 'c logic -> goal) = fun _ _ _ -> Obj.magic () in
-  let ans () = M.Convenience.run qrs (fun q r s st -> goal3 q r s st, (fun stream -> PolyPairs.((succ @@ succ one) id) stream q r s) ) in
-  let (_: unit -> 'c M.PolyPairs.xxx * ('d M.PolyPairs.xxx * 'e M.PolyPairs.xxx) ) = ans in
+  let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
+  let ans () = M.Convenience.run three (fun q r s st -> goal3 q r s st ) in
+  (* let (_: unit -> 'c M.PolyPairs.xxx * ('d M.PolyPairs.xxx * 'e M.PolyPairs.xxx) ) = ans in *)
   ()
 
 let run1 ~n (title, goal) =
-  let qf = M.Convenience.run q (fun q st -> goal q st, (fun stream -> PolyPairs.(one id) stream q) ) in
+  let (qf,_tl) = M.Convenience.run one goal in
 
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter (fun (q,_) ->
       printf "q=%s\n%!" (show_logic_naive q);
-    ) (qf n);
+    ) (qf _tl n);
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  let qf,rf = M.Convenience.run qr (fun q r st ->
-    let foo stream : 'a M.PolyPairs.xxx * 'b M.PolyPairs.xxx = PolyPairs.((succ one) id) stream q r in
-    goal q r st, foo
+  let qf,(rf,_tl) = M.Convenience.run two (fun q r st ->
+    (* let foo stream : 'a M.PolyPairs.xxx * 'b M.PolyPairs.xxx = PolyPairs.((succ one) id) stream q r in *)
+    goal q r st
   ) in
 
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter2 (fun (q,_) (r,_) ->
       printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
-    ) (qf n) (rf n);
+    ) (qf _tl n) (rf _tl n);
   printf "}\n%!"
 
 
