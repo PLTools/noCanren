@@ -34,7 +34,7 @@ module UnitLogger: LOGGER
 type 'a logic = 'a MiniKanrenImpl.logic = private Var of 'a var_desc | Value of 'a * ('a -> string)
 and  'a var_desc = 'a MiniKanrenImpl.var_desc =
   { index: int
-  ; mutable reifier: unit -> 'a logic
+  ; mutable reifier: unit -> 'a logic * ('a logic list)
   }
 
 
@@ -186,19 +186,19 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
-  module PolyPairs : sig
-    val id : 'a -> 'a
+  (* module PolyPairs : sig *)
+  (*   val id : 'a -> 'a *)
 
-    type 'a xxx = int -> ('a logic * diseq) list
+  (*   type 'a xxx = int -> ('a logic * diseq) list *)
 
-    val one : ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b
-    val succ : (('a -> 'b) -> state Stream.t -> 'c) ->
-               ('e xxx * 'a -> 'b) -> state Stream.t ->
-              'f -> 'c
-    val p : (('a -> 'a) -> 'b) -> 'b
-  end
+  (*   val one : ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b *)
+  (*   val succ : (('a -> 'b) -> state Stream.t -> 'c) -> *)
+  (*              ('e xxx * 'a -> 'b) -> state Stream.t -> *)
+  (*             'f -> 'c *)
+  (*   val p : (('a -> 'a) -> 'b) -> 'b *)
+  (* end *)
 
-  type 'a reifier = state Stream.t -> int -> ('a logic * 'a logic list) list
+  type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
 
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)

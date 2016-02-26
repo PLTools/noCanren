@@ -109,11 +109,11 @@ let (!!) = Obj.magic
 type 'a logic = Var of 'a var_desc | Value of 'a * ('a -> string)
 and 'a var_desc =
   { index: int
-  ; mutable reifier: unit -> 'a logic
+  ; mutable reifier: unit -> 'a logic * 'a logic list
   }
 
 let var_of_int index =
-  let rec ans = Var { index; reifier=fun () -> ans } in
+  let rec ans = Var { index; reifier=fun () -> (ans,[]) } in
   ans
 
 let (!) x = Value (x, (fun _ -> "<not implemented>"))
@@ -288,6 +288,8 @@ module Env :
     val var    : t -> 'a logic -> int option
     val vars   : t -> unit logic list
     val show   : t -> string
+
+    val iter   : t -> ('a logic -> unit) -> unit
   end =
   struct
     module H = Hashtbl.Make (
@@ -303,6 +305,8 @@ module Env :
 
     type t = unit H.t * int
 
+    let iter : t -> ('a logic -> unit) -> unit = fun (h,_) f -> H.iter (fun key _v -> f (!!key) ) h
+
     let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h []
 
     let show env =
@@ -316,7 +320,7 @@ module Env :
     let empty () = (H.create 1024, counter_start)
 
     let fresh (h, current) =
-      let rec v = Var {index=current; reifier=fun () -> v } in
+      let rec v = Var {index=current; reifier=fun () -> (v,[]) } in
       H.add h v ();
       assert (H.mem h v);
       (* assert (H.mem h !!(Var current)); *)
@@ -433,6 +437,9 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
+                print_endline (generic_show !!x);
+                printf "Value (5,  fun _ -> \"5\") is %s\n%!" (generic_show !!(Value (5, fun _ -> "5")) );
+                printf "Var   {index=11; reifier=...) is %s\n%!" (generic_show !!(Var {index=11; reifier=fun () -> assert false}));
                 let Value (xx,xprinter) = !!x in
                 let Value (yy,yprinter) = !!y in
                 let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in
@@ -656,7 +663,7 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
        List.fold_left
          (fun acc s ->
           match Subst.walk' env (!!v) s with
-          | Var yi when yi = xi -> acc
+          | Var yi when yi == xi -> acc
           | t -> t :: acc
          )
          []
@@ -668,32 +675,45 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
 
   let run_ = run
 
-  module PolyPairs = struct
-    let id x = x
+  (* module PolyPairs = struct *)
+  (*   let id x = x *)
 
-    let find_value var st = refine st var
-    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
+  (*   let find_value var st = refine st var *)
+  (*   let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream) *)
 
-    type 'a xxx = int -> ('a logic * diseq) list
+  (*   type 'a xxx = int -> ('a logic * diseq) list *)
 
-    let one: ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream)
-    let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
+  (*   let one: ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream) *)
+  (*   let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream *)
 
-    let (_: state Stream.t ->
-         'a logic ->
-         'b logic ->
-         ('a xxx) * ('b xxx) ) = (succ one) id
+  (*   let (_: state Stream.t -> *)
+  (*        'a logic -> *)
+  (*        'b logic -> *)
+  (*        ('a xxx) * ('b xxx) ) = (succ one) id *)
 
-    let p sel = sel id
-  end
+  (*   let p sel = sel id *)
+  (* end *)
 
   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
       fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x)
 
-  type 'a reifier = state Stream.t -> int -> ('a logic * 'a logic list) list
+  type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
 
   let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun st -> refine' (concrete st) x) (take ~n ans)
+      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
+
+  let fix_state: State.t -> unit = fun ((e, subs, constr) as state) ->
+    let () = print_endline "fix_state" in
+    Env.iter e (fun logic ->
+      match logic with
+      | Var desc ->
+          let old = Hashtbl.hash logic in
+          desc.reifier <- (fun () -> refine' state logic);
+          assert (old = Hashtbl.hash logic);
+      | Value _ -> ()
+    );
+    let () = print_endline "fix_state finsihed" in
+    ()
 
   let zero  f = f
 

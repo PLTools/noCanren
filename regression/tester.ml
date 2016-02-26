@@ -99,7 +99,7 @@ module GraphLogger = struct
     let div ?(attrs="") xs = tag ~attrs "div" xs in
 
     let head = tag "head"
-        [ style ~url:"web/main.css"
+        [ style  ~url:"web/main.css"
         ; script ~url:"web/runOnLoad.src.js"
         ; script ~url:"web/CollapsibleLists.compressed.js"
         ; script ~url:"web/jquery-1.11.3.min.js"
@@ -165,7 +165,7 @@ let run1 ~n (title, goal) =
   let (qf,_tl) = M.Convenience.run one goal in
 
   printf "'%s', asking for max %d results {\n%!" title n;
-  List.iter (fun (q,_) ->
+  List.iter (fun (loginfo,(q,_)) ->
       printf "q=%s\n%!" (show_logic_naive q);
     ) (qf _tl n);
   printf "}\n%!"
@@ -176,9 +176,34 @@ let run2 ~n (title,goal) =
     goal q r st
   ) in
 
+  let constraints_string logic =
+    match logic with
+    | Var {reifier;_} ->
+      let (_,xs) = reifier () in
+      sprintf "%s =/= all from [%s]" (show_logic_naive logic) (String.concat "," @@ List.map show_logic_naive xs)
+    | _ -> ""
+  in
+
+  let string_of_constraints cs =
+    match cs with
+    | [] -> None
+    | xs -> Some (String.concat ", " @@ List.map show_logic_naive xs)
+  in
+
   printf "'%s', asking for max %d results {\n%!" title n;
-  List.iter2 (fun (q,_) (r,_) ->
+  List.iter2 (fun (loginfo,(q,cs1)) (loginfo, (r,cs2)) ->
       printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+      let cs c name =
+        match string_of_constraints cs1 with
+        | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s
+        | None -> ()
+      in
+      cs cs1 "q";
+      cs cs2 "r";
+      M.Logger.output_plain loginfo ~filename:".plain";
+      M.Logger.output_html  [] loginfo ~filename:".html" ;
+
+      (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
     ) (qf _tl n) (rf _tl n);
   printf "}\n%!"
 
