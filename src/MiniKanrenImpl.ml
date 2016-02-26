@@ -715,29 +715,76 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
     let () = print_endline "fix_state finsihed" in
     ()
 
-  let zero  f = f
+  module Convenience = struct
+    let zero  f = f
 
-  let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) : state -> 'b =
-  (* let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a): state -> 'b = *)
-    call_fresh (fun logic st ->
+    let succ (prev: 'a -> state -> 'b) (f: 'c logic -> 'a) : state -> 'c reifier * 'b =
+      call_fresh (fun logic st ->
         (reifier logic, prev (f logic) st)
       )
 
-  let one   f = succ zero f
-  let two   f = succ one f
-  let three f = succ two f
-  let four  f = succ three f
-  let five  f = succ four f
+    (* let (one  : ('a logic -> state -> 'b) -> state -> 'a reifier * 'b) = succ zero *)
+    (* let two   = succ one *)
+    (* let three = succ two *)
+    (* let four  = succ three *)
+    (* let five  = succ four *)
 
-  (* let (_:int) = succ *)
-  (* let (_:int) = succ @@ succ @@ succ zero *)
-
-  module Convenience =
-  struct
     let run runner goalish =
       run_ (Logger.create ()) (fun st ->
           runner goalish st
-        )
+      )
+  end
+
+  module Convenience2 = struct
+    let zero  f = f
+
+    let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) : state -> 'b =
+      call_fresh (fun logic -> prev (f logic))
+
+    (* let one   = succ zero *)
+    (* let two   = succ one *)
+    (* let three = succ two *)
+    (* let four  = succ three *)
+    (* let five  = succ four *)
+
+    module PolyPairs = struct
+      let id x = x
+
+      let find_value var st = refine st var
+      let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
+
+      type 'a reifier = int -> ('a logic * diseq) list
+
+      let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream)
+      let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
+
+      let (_: state Stream.t ->
+           'a logic ->
+           'b logic ->
+           ('a reifier) * ('b reifier) ) = (succ one) id
+
+      let p sel = sel id
+    end
+
+(*
+    module PolyPairs = struct
+      let zero = fun k -> k ()
+
+      let one = fun k x -> k (x,())
+      let succ prev k x = prev (fun v -> k (x,v))
+      let p sel = sel (fun x -> x)
+
+      (* let two = (s one) id *)
+      (* let three = (s @@ s one) id *)
+    end
+ *)
+    let run runner goalish =
+      run_ (Logger.create ()) (fun st ->
+          let arg,g = runner goalish st in g arg
+      )
+
+    let (_: ('a -> state -> 'b * ('b -> 'c)) -> 'a -> 'c) = run
+  end
 
     (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
     (*   run_ (Logger.create ()) (fun st -> *)
@@ -815,46 +862,43 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
     (*   in *)
     (*   () *)
 
-  end
+  (* module WTF = struct *)
+  (*   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list = *)
+  (*     fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x) *)
+
+  (*   type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list *)
+
+  (*   let reifier : 'a logic -> 'a reifier = fun x ans n -> *)
+  (*     List.map (fun st -> refine' st x) (take ~n ans) *)
 
 
-  module WTF = struct
-    let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
-      fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x)
+  (*   let zero  f = f *)
 
-    type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list
+  (*   let succ (prev: 'a -> state -> ('c reifier * (state -> 'b) as 'b)) (f: 'c logic -> 'a) : state -> 'b = *)
+  (*     call_fresh (fun logic st -> (reifier logic, prev @@ f logic) ) *)
 
-    let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun st -> refine' st x) (take ~n ans)
+  (*   (\* let (_:int) = succ  zero *\) *)
+  (*   let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero *)
+  (* end *)
 
+  (* module WTF2 = struct *)
+  (*   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list = *)
+  (*     fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x) *)
 
-    let zero  f = f
+  (*   type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list *)
 
-    let succ (prev: 'a -> state -> ('c reifier * (state -> 'b) as 'b)) (f: 'c logic -> 'a) : state -> 'b =
-      call_fresh (fun logic st -> (reifier logic, prev @@ f logic) )
+  (*   let reifier : 'a logic -> 'a reifier = fun x ans n -> *)
+  (*     List.map (fun st -> refine' st x) (take ~n ans) *)
 
-    (* let (_:int) = succ  zero *)
-    let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero
-  end
+  (*   let zero  f = f *)
 
-  module WTF2 = struct
-    let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
-      fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x)
+  (*   let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) (g: 'c reifier -> 'd): state -> 'b = *)
+  (*     call_fresh (fun logic st -> *)
+  (*         let rarg = reifier logic in *)
+  (*         let (l,r) = prev (g @@ f logic) st in *)
+  (*         (l rarg st, r st) ) *)
 
-    type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list
-
-    let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun st -> refine' st x) (take ~n ans)
-
-    let zero  f = f
-
-    let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) (g: 'c reifier -> 'd): state -> 'b =
-      call_fresh (fun logic st ->
-          let rarg = reifier logic in
-          let (l,r) = prev (g @@ f logic) st in
-          (l rarg st, r st) )
-
-    (* let (_:int) = succ  zero *)
-    (* let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero *)
-  end
+  (*   (\* let (_:int) = succ  zero *\) *)
+  (*   (\* let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero *\) *)
+  (* end *)
 end

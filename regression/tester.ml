@@ -154,15 +154,20 @@ open MiniKanren
 open ImplicitPrinters
 open M
 
+
+
+(** Some functions that use Convenience module *)
+(** ****************************************** *)
+open M.Convenience
+
 let () =
   (* some code to check that types are good. nothing is really executed there *)
   let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
-  let ans () = M.Convenience.run three (fun q r s st -> goal3 q r s st ) in
-  (* let (_: unit -> 'c M.PolyPairs.xxx * ('d M.PolyPairs.xxx * 'e M.PolyPairs.xxx) ) = ans in *)
+  let ans () = run (succ @@ succ @@ succ zero) (fun q r s st -> goal3 q r s st) in
   ()
 
 let run1 ~n (title, goal) =
-  let (qf,_tl) = M.Convenience.run one goal in
+  let (qf,_tl) = run (succ zero) goal in
 
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter (fun (loginfo,(q,_)) ->
@@ -171,7 +176,7 @@ let run1 ~n (title, goal) =
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  let qf,(rf,_tl) = M.Convenience.run two (fun q r st ->
+  let qf,(rf,_tl) = M.Convenience.run (succ @@ succ zero) (fun q r st ->
     (* let foo stream : 'a M.PolyPairs.xxx * 'b M.PolyPairs.xxx = PolyPairs.((succ one) id) stream q r in *)
     goal q r st
   ) in
@@ -208,7 +213,47 @@ let run2 ~n (title,goal) =
   printf "}\n%!"
 
 
+(** Some functions that use scary Convenience2 module *)
+(** ****************************************** *)
+open M
 
+let run2 ~n (title,goal) =
+  let open M.Convenience2 in
+  let qf,(rf,_) = run (succ @@ succ zero) (fun q r st ->
+    let foo stream : 'a PolyPairs.reifier * ('b PolyPairs.reifier * state Stream.t) = PolyPairs.(p (succ @@ succ zero)) stream q r in
+    (goal q r st, foo)
+  ) in
+
+  (* let constraints_string logic = *)
+  (*   match logic with *)
+  (*   | Var {reifier;_} -> *)
+  (*     let (_,xs) = reifier () in *)
+  (*     sprintf "%s =/= all from [%s]" (show_logic_naive logic) (String.concat "," @@ List.map show_logic_naive xs) *)
+  (*   | _ -> "" *)
+  (* in *)
+
+  (* let string_of_constraints cs = *)
+  (*   match cs with *)
+  (*   | [] -> None *)
+  (*   | xs -> Some (String.concat ", " @@ List.map show_logic_naive xs) *)
+  (* in *)
+
+  printf "'%s', asking for max %d results {\n%!" title n;
+  List.iter2 (fun (q,cs1) (r,cs2) ->
+      printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+      (* let cs c name = *)
+      (*   match string_of_constraints cs1 with *)
+      (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
+      (*   | None -> () *)
+      (* in *)
+      (* cs cs1 "q"; *)
+      (* cs cs2 "r"; *)
+      (* M.Logger.output_plain loginfo ~filename:".plain"; *)
+      (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
+
+      (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
+    ) (qf n) (rf n);
+  printf "}\n%!"
 
 
 (* let run reifier n runner goal = *)
