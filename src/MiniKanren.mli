@@ -198,7 +198,7 @@ module Make : functor (Logger: LOGGER) -> sig
     val p : (('a -> 'a) -> 'b) -> 'b
   end
 
-  type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list
+  type 'a reifier = state Stream.t -> int -> ('a logic * 'a logic list) list
 
   (** [succ num f] increments the number of free logic variables in
     a goal; can be used to get rid of ``fresh'' syntax extension *)

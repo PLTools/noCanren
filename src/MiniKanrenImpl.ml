@@ -690,10 +690,10 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
       fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x)
 
-  type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list
+  type 'a reifier = state Stream.t -> int -> ('a logic * 'a logic list) list
 
   let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun st -> refine' st x) (take ~n ans)
+      List.map (fun st -> refine' (concrete st) x) (take ~n ans)
 
   let zero  f = f
 
