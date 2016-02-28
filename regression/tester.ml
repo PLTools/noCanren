@@ -148,6 +148,13 @@ function onGenerationSelected(level) {
     close_out ch
 end
 
+let list_iter3 ~f xs ys zs =
+  let rec helper  = function
+    | (x::xs,y::ys,z::zs) -> f x y z; helper (xs,ys,zs)
+    | _ -> failwith "bad arguments of list_iter3"
+  in
+  helper (xs,ys,zs)
+
 module M = MiniKanren.Make(GraphLogger)
 
 open MiniKanren
@@ -175,34 +182,25 @@ let run1 ~n (title, goal) =
     ) (qf _tl n);
   printf "}\n%!"
 
+let cs c name =
+  let string_of_constraints cs =
+    match cs with
+    | [] -> None
+    | xs -> Some (String.concat ", " @@ List.map show_logic_naive xs)
+  in
+  match string_of_constraints c with
+  | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s
+  | None -> ()
+
 let run2 ~n (title,goal) =
   let qf,(rf,_tl) = M.Convenience.run (succ @@ succ zero) (fun q r st ->
     (* let foo stream : 'a M.PolyPairs.xxx * 'b M.PolyPairs.xxx = PolyPairs.((succ one) id) stream q r in *)
     goal q r st
   ) in
 
-  let constraints_string logic =
-    match logic with
-    | Var {reifier;_} ->
-      let (_,xs) = reifier () in
-      sprintf "%s =/= all from [%s]" (show_logic_naive logic) (String.concat "," @@ List.map show_logic_naive xs)
-    | _ -> ""
-  in
-
-  let string_of_constraints cs =
-    match cs with
-    | [] -> None
-    | xs -> Some (String.concat ", " @@ List.map show_logic_naive xs)
-  in
-
   printf "'%s', asking for max %d results {\n%!" title n;
   List.iter2 (fun (loginfo,(q,cs1)) (loginfo, (r,cs2)) ->
       printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
-      let cs c name =
-        match string_of_constraints cs1 with
-        | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s
-        | None -> ()
-      in
       cs cs1 "q";
       cs cs2 "r";
       M.Logger.output_plain loginfo ~filename:".plain";
@@ -212,11 +210,29 @@ let run2 ~n (title,goal) =
     ) (qf _tl n) (rf _tl n);
   printf "}\n%!"
 
+let run3 ~n (title,goal) =
+  let qf,(rf,(sf,_tl)) = M.Convenience.run (succ @@ succ @@ succ zero) goal in
+
+  printf "'%s', asking for max %d results {\n%!" title n;
+  list_iter3 ~f:(fun (loginfo,(q,cs1)) (loginfo, (r,cs2))  (loginfo, (s,cs3)) ->
+      printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+      cs cs1 "q";
+      cs cs2 "r";
+      cs cs3 "s";
+
+      M.Logger.output_plain loginfo ~filename:".plain";
+      M.Logger.output_html  [] loginfo ~filename:".html" ;
+
+      (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
+    ) (qf _tl n) (rf _tl n) (sf _tl n);
+  printf "}\n%!"
+
 
 (** Some functions that use scary Convenience2 module *)
 (** ****************************************** *)
 open M
 
+(*
 let run2 ~n (title,goal) =
   let open M.Convenience2 in
   let qf,(rf,_) = run (succ @@ succ zero) (fun q r st ->
@@ -254,7 +270,7 @@ let run2 ~n (title,goal) =
       (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
     ) (qf n) (rf n);
   printf "}\n%!"
-
+ *)
 
 (* let run reifier n runner goal = *)
 (*   let graph = Logger.create () in *)

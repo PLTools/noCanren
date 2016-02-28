@@ -473,10 +473,11 @@ module State =
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
     let show  (env, subst, constr) =
-      sprintf "st {%s, %s, %s}"
+      sprintf "st {%s, %s, [%s]}"
               (Env.show env) (Subst.show subst)
               (* (GT.show(GT.list) Subst.show constr) *)
-              "<showing list of constraints should be implemented with implicits>"
+              (String.concat "; " @@ List.map Subst.show constr)
+              (* "<showing list of constraints should be implemented with implicits>" *)
   end
 
 let fst3 (x,_,_) = x
@@ -509,15 +510,15 @@ module Make (Logger: LOGGER) = struct
   let call_fresh: ('a logic -> state -> 'b) -> state -> 'b = fun f (((env,s,ss), _, _) as state) ->
     let x, env' = Env.fresh env in
     let new_st = (env',s,ss) in
-    ((sprintf "fresh variable '%s'" (generic_show !!x)) <=>
+    ((sprintf "fresh variable '%s'" (show_logic_naive x)) <=>
       (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
   let call_fresh_named name f (( (env,s,ss), _, _) as state) =
     let x, env' = Env.fresh env in
     let new_st = (env',s,ss) in
-    ((sprintf "fresh variable '%s' as '%s'" (generic_show !!x) name) <=>
-      (fun (_,l,dest) -> f x (new_st, l, dest) ))
+    ((sprintf "fresh variable '%s' as '%s'" (show_logic_naive x) name) <=>
+     (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 (*
 let zero f = f
@@ -556,7 +557,7 @@ let (===) x y st =
   (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
-                                  (show_logic_naive !!x) (show_logic_naive !!y)
+                                  (show_logic_naive x) (show_logic_naive y)
   in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
@@ -594,7 +595,12 @@ let (===) x y st =
     let () = make_leaf "Occurs check failed" state1 in
     Stream.nil
 
-let (=/=) x y (((env, subst, constr) as st),root,l) =
+let (=/=) x y state0 =
+  let ( ((env,subst,constr),root,l) as state1) =
+    adjust_state (sprintf "checking '%s' =/= '%s'"
+                    (show_logic_naive x) (show_logic_naive y)
+                 ) state0
+  in
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
     let prefix = List.split (List.map (fun (_, x, t) -> (x, t)) prefix) in
@@ -616,16 +622,27 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
     in
     traverse constr
   in
+  let string_of_prefixes xs =
+    String.concat "; " @@ List.map (fun (x,y,z) -> sprintf "(%d,'%s','%s')" x (generic_show !!y) (generic_show !!z) ) xs
+  in
   try
-    let prefix, subst' = Subst.unify env x y (Some subst) in
-    match subst' with
-    | None -> Stream.cons (st,root,l) Stream.nil
-    | Some s ->
+    match Subst.unify env x y (Some subst) with
+    | (_,None) ->
+        let () = make_leaf "Nothing added: can't unify" state1 in
+        Stream.cons state1 Stream.nil
+    | (prefix,Some s) ->
+        (* let (_:int) = prefix in *)
         (match prefix with
-        | [] -> Stream.nil
-        | _  -> Stream.cons ((env, subst, normalize_store prefix constr),root,l) Stream.nil
+         | [] ->
+             let () = make_leaf (sprintf "Unified but prefix is empty (subst: %s)" (Subst.show s) ) state1 in
+             Stream.nil
+         | _  ->
+             let () = make_leaf (sprintf "Adding new answer (%s) with constraints: [%s]" (Subst.show subst) (string_of_prefixes prefix)) state1 in
+             Stream.cons ((env, subst, normalize_store prefix constr),root,l) Stream.nil
         )
-  with Occurs_check -> Stream.cons (st,root,l) Stream.nil
+  with Occurs_check ->
+    let () = make_leaf (sprintf "Occurs_check failed") state1 in
+    Stream.cons state1 Stream.nil
 
   let conj f g = "conj" <=> (fun st -> Stream.bind (f st) g)
 
@@ -695,7 +712,9 @@ let (=/=) x y (((env, subst, constr) as st),root,l) =
   (* end *)
 
   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
-      fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x)
+    fun ((e, s, c)as st) x ->
+      (* printf "calling refine' for state %s\n%!" (State.show st); *)
+      (Subst.walk' e (!!x) s, reify (e, c) x)
 
   type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
 
