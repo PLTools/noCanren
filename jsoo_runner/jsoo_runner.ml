@@ -102,13 +102,12 @@ open M
 let run ?(varnames=[]) n runner (repr,goal) =
   let graph = Logger.create () in
   M.run graph (fun st ->
-    let stor = { storage=[] } in
-    let result = runner stor goal st in
+    let result = runner goal st in
 
     Printf.printf "%s answer%s {\n"
       (if n = (-1) then "all" else string_of_int n)
       (if n <>  1  then "s" else "");
-
+(*
     let vars' = make_var_pairs ~varnames stor in
     let answers =
       (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
@@ -132,15 +131,15 @@ let run ?(varnames=[]) n runner (repr,goal) =
            printf "%s\n%!" s;
            s
         )
-    in
+    in *)
 
     Printf.printf "}\n%!";
-    M.Logger.output_html ~filename:"" text_answers graph;
+    M.Logger.output_html ~filename:"" (* text_answers *) [] graph;
     result
   )
 
 open ImplicitPrinters
-
+(*
 let _ =
   let a_and_b a : M.goal =
     call_fresh
@@ -152,3 +151,4 @@ let _ =
   in
 
   fun () -> run 1 one ("descr",a_and_b)
+*)

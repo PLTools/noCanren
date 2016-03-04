@@ -232,14 +232,14 @@ let run3 ~n (title,goal) =
 (** ****************************************** *)
 open M
 
-(*
+
 let run2 ~n (title,goal) =
   let open M.Convenience2 in
   let qf,(rf,_) = run (succ @@ succ zero) (fun q r st ->
     let foo stream : 'a PolyPairs.reifier * ('b PolyPairs.reifier * state Stream.t) = PolyPairs.(p (succ @@ succ zero)) stream q r in
     (goal q r st, foo)
   ) in
-
+  let (_: int -> ('a logic * _) list ) = qf in
   (* let constraints_string logic = *)
   (*   match logic with *)
   (*   | Var {reifier;_} -> *)
@@ -270,7 +270,7 @@ let run2 ~n (title,goal) =
       (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
     ) (qf n) (rf n);
   printf "}\n%!"
- *)
+
 
 (* let run reifier n runner goal = *)
 (*   let graph = Logger.create () in *)
