@@ -29,3 +29,11 @@ true: rectypes, debug
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx,js_of_ocaml.tyxml)
 
 <src_test/*>: package(oUnit)
+
+# toplevel related stuff
+#<toplevel/toplevel.cppo.cmo>: package(js_of_ocaml.ppx,base64)
+<toplevel/toplevel.ml> or <toplevel/colorize.ml> or <toplevel/indent.ml>: package(js_of_ocaml.ppx,tyxml)
+<toplevel/toplevel.cmo>: cppo,package(js_of_ocaml.ppx,compiler-libs.common,base64), js_of_ocaml
+<toplevel/colorize.cm*>: package(js_of_ocaml.tyxml)
+<toplevel/indent.mli> or <toplevel/colorize.mli>: package(js_of_ocaml.tyxml)
+<toplevel/toplevel.byte>: cppo, pretty, package(js_of_ocaml.tyxml,js_of_ocaml.toplevel)

@@ -1,4 +1,4 @@
-OB=ocamlbuild -use-ocamlfind -classic-display
+OB=ocamlbuild -use-ocamlfind -classic-display -plugin-tag "package(str)" #-plugin-tag "package(js_of_ocaml.ocamlbuild)"
 TARGETS=src/MiniKanren.cmo
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native
 TESTS_ENVIRONMENT=./test.sh
@@ -6,7 +6,8 @@ TESTS_ENVIRONMENT=./test.sh
 #	regression/test003.native #regression/test004.native
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests toplevel jslib ppx minikanren_stuff
+.PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests\
+	only-toplevel toplevel jslib ppx minikanren_stuff
 
 all: minikanren_stuff
 
@@ -19,8 +20,10 @@ ppx:
 jslib: minikanren_stuff ppx
 	$(OB) -Is src,ppx $(JSOO_LIB)
 
-toplevel: ppx jslib
-	$(MAKE) -C toplevel
+only-toplevel:
+	$(OB) toplevel/toplevel.js
+
+toplevel: ppx jslib only-toplevel
 
 
 celan: clean

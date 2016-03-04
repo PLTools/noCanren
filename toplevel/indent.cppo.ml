@@ -28,7 +28,7 @@ let textarea textbox =
     | [] -> assert false
     | (i,(lo,up))::_ when up >= c -> c,i,lo,up
     | (_,(lo,up))::rem -> find rem c in
-  let v = textbox##value in
+  let v = textbox##.value in
   let pos =
     let c1 = (Obj.magic textbox)##selectionStart
     and c2 = (Obj.magic textbox)##selectionEnd in
@@ -42,7 +42,7 @@ let textarea textbox =
     | None -> (fun _ -> true)
     | Some ((c1,line1,lo1,up1),(c2,line2,lo2,up2)) -> (fun l -> l>=(line1+1) && l<=(line2+1)) in
   let v = indent (Js.to_string v) f in
-  textbox##value<-Js.string v;
+  textbox##.value := Js.string v;
   begin
     match pos with
     | Some ((c1,line1,lo1,up1),(c2,line2,lo2,up2)) ->
@@ -52,7 +52,7 @@ let textarea textbox =
        let n1 = max (c1 + up1'' - up1) lo1'' in
        let n2 = max (c2 + up2'' - up2) lo2'' in
        let () = (Obj.magic textbox)##setSelectionRange(n1,n2) in
-       textbox##focus();
+       textbox##focus;
        ()
     | None -> ()
   end

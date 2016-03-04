@@ -38,13 +38,13 @@ let highlight (`Pos from_) to_ e =
   ();;
 #else
 let highlight from_ to_ e =
-  match Js.Opt.to_option e##textContent with
+  match Js.Opt.to_option e##.textContent with
   | None -> assert false
   | Some x ->
      let x = Js.to_string x in
      let `Pos from_  = from_ in
      let to_ = match to_ with `Pos n -> n | `Last -> String.length x - 1 in
-     e##innerHTML <- Js.string "";
+     e##.innerHTML := Js.string "";
      let span kind s =
        if s <> ""
        then
