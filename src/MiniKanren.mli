@@ -186,9 +186,10 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
-  type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
 
   module Convenience : sig
+    type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
+
     (** [succ num f] increments the number of free logic variables in
         a goal; can be used to get rid of ``fresh'' syntax extension *)
     val succ : ('a -> state -> 'z) -> ('c logic -> 'a) -> state -> 'c reifier * 'z

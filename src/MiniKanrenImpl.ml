@@ -716,25 +716,26 @@ let (=/=) x y state0 =
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
 
-  type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
-
-  let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
-
-  let fix_state: State.t -> unit = fun ((e, subs, constr) as state) ->
-    let () = print_endline "fix_state" in
-    Env.iter e (fun logic ->
-      match logic with
-      | Var desc ->
-          let old = Hashtbl.hash logic in
-          desc.reifier <- (fun () -> refine' state logic);
-          assert (old = Hashtbl.hash logic);
-      | Value _ -> ()
-    );
-    let () = print_endline "fix_state finsihed" in
-    ()
 
   module Convenience = struct
+    type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
+
+    let reifier : 'a logic -> 'a reifier = fun x ans n ->
+      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
+
+    let fix_state: State.t -> unit = fun ((e, subs, constr) as state) ->
+      let () = print_endline "fix_state" in
+      Env.iter e (fun logic ->
+          match logic with
+          | Var desc ->
+            let old = Hashtbl.hash logic in
+            desc.reifier <- (fun () -> refine' state logic);
+            assert (old = Hashtbl.hash logic);
+          | Value _ -> ()
+        );
+      let () = print_endline "fix_state finsihed" in
+      ()
+
     let zero  f = f
 
     let succ (prev: 'a -> state -> 'b) (f: 'c logic -> 'a) : state -> 'c reifier * 'b =
