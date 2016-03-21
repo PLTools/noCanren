@@ -262,7 +262,7 @@ let run2 ~n (title,goal) =
       (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
       (*   | None -> () *)
       (* in *)
-      (* cs cs1 "q"; *)
+       (* cs cs1 "q"; *)
       (* cs cs2 "r"; *)
       (* M.Logger.output_plain loginfo ~filename:".plain"; *)
       (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
@@ -320,3 +320,65 @@ let run2 ~n (title,goal) =
 (*     if config.do_html *)
 (*     then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph; *)
 (*   ) *)
+
+let id x = x
+
+let test_run_latest () =
+  let module HardUncurry = struct
+    let app_succ n f g z = (n f) (g z)
+    let app1 f g x = f @@ g x
+    let app2 f g z = app_succ app1 f g z
+
+    let incr app n x = app (fun y -> (x,y)) n
+    let one = id
+    let two x y = (x,y)
+
+  end in
+
+  let comp f g = fun x -> f (g x) in
+  let (<*>) = comp in
+
+  let three = HardUncurry.(incr app2 two) in
+  let (_: (int * (int*int))) = three 1 2 3 in
+
+  let curry_succ k f x = k (f <*> (fun y -> (x,y))) in
+  let curry1 = (@@) in
+  let curry2 = curry_succ curry1 in
+  let curry3 = curry_succ curry2 in
+  (* let (_:int) = curry_succ in *)
+
+  (* let (_:string) = curry3 (fun (a,(b,c)) -> a +b+ c) 1 2 3 in *)
+  let uncurry_succ k f (x,y) = k (f x) y in
+  let uncurry1 = fun f x -> f x in
+  let uncurry2 = uncurry_succ uncurry1 in
+  let uncurry3 = uncurry_succ uncurry2 in
+
+ (* let (_:string) = curry3 (fun (a,(b,c)) -> a +b+ c) 1 2 3 in *)
+
+  let wrap x num f = num f x in
+  let (||>) x num f = num f x in
+  let open M.Convenience2 in
+  let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
+  (* let (_:_ -> int) = fun ans -> ans ||> uncurry1 (\* (fun _ _ _ -> 1.0) *\) in *)
+  let ans () =
+    wrap
+    (run
+      (succ @@ succ @@ succ zero)
+      (fun q r s st -> goal3 q r s st,
+                       (fun st -> PolyPairs.((succ @@ succ @@ succ zero) id st q r s)) ) )
+    uncurry3
+    (fun _q _ _ ->
+        (* let (_:int) = _q in *)
+        ())
+  in
+  let (_:int) = ans in
+
+
+
+
+  (* let qf,(rf,_) = run (succ @@ succ zero) (fun q r st -> *)
+  (*   let foo stream : 'a PolyPairs.reifier * ('b PolyPairs.reifier * state Stream.t) = PolyPairs.(p (succ @@ succ zero)) stream q r in *)
+  (*   (goal q r st, foo) *)
+  (* ) in *)
+
+  ()
