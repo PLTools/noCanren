@@ -36,4 +36,5 @@ true: rectypes, debug
 <toplevel/toplevel.cmo>: cppo,package(js_of_ocaml.ppx,compiler-libs.common,base64), js_of_ocaml
 <toplevel/colorize.cm*>: package(js_of_ocaml.tyxml)
 <toplevel/indent.mli> or <toplevel/colorize.mli>: package(js_of_ocaml.tyxml)
-<toplevel/toplevel.byte>: cppo, pretty, package(js_of_ocaml.tyxml,js_of_ocaml.toplevel)
+<toplevel/toplevel.byte>: cppo, pretty, package(js_of_ocaml.tyxml,js_of_ocaml.toplevel),export_package(lwt)
+<toplevel/toplevel.js>: package(compiler-libs.common)

@@ -12,7 +12,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 all: minikanren_stuff
 
 minikanren_stuff:
-	$(OB) $(TARGETS) $(TARGETS:.cmo=.cmx)
+	$(OB) -Is src $(TARGETS) $(TARGETS:.cmo=.cmx)
 
 ppx:
 	$(OB) $(TARGETS) $(PPX_TARGETS)

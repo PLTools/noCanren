@@ -1,5 +1,10 @@
+open Printf
 open Ocamlbuild_plugin;;
 module Pack = Ocamlbuild_pack
+
+let ends_with ~suffix s =
+  let slen = String.length suffix in
+  (String.length s >= slen) && (Str.last_chars s slen = suffix)
 
 let fold f =
   let l = ref [] in
@@ -38,24 +43,72 @@ let link_opts prod =
   let cmd = "-o-format" :: "-r" :: "-predicates" :: all_predicates :: all_pkgs in
   ocamlfind cmd (fun ic -> A (input_line ic))
 
+
+let library_index = Hashtbl.create 32
+let package_index = Hashtbl.create 32
+let hidden_packages: string list ref = ref []
+
+let hide_package_contents package = hidden_packages := package :: !hidden_packages
+
+module Ocaml_dependencies_input = struct
+  let fold_dependencies = Pack.Resource.Cache.fold_dependencies
+  let fold_libraries f = Hashtbl.fold f library_index
+  let fold_packages f = Hashtbl.fold f package_index
+end
+module Ocaml_dependencies = Pack.Ocaml_dependencies.Make(Ocaml_dependencies_input)
+
+let caml_transitive_closure = Ocaml_dependencies.caml_transitive_closure
+
 let init_js_of_ocaml () =
-  let dep = "%.byte" in
   let prod = "%.js" in
-  let f env _ =
+  let dep = "%.cmo" in
+
+  let f env (_:builder) =
+    let cmX = env "%.cmo" in
+    printf "cmX = %s\n%!" cmX;
     let dep = env dep in
+    printf "A\n%!";
     let prod = env prod in
+    printf "B\n%!";
     let link_opts = link_opts prod in
+    printf "C\n%!";
     let tags = tags_of_pathname prod ++ "js_of_ocaml" in
-    Cmd (S [A "js_of_ocaml"; A "--no-runtime"; T tags; S link_opts; A "-o"; Px prod; P dep])
+    printf "D\n%!";
+    let libs = [] in
+    let dyndeps = [] in
+    let hidden_packages = [] in
+    let deps =
+      caml_transitive_closure ~pack_mode:true
+        ~caml_obj_ext:"cmo" ~caml_lib_ext:"cma"
+        ~used_libraries:libs ~hidden_packages (cmX :: dyndeps) in
+    (* let deps = (List.filter (fun l -> not (List.mem l deps)) libs) @ deps in *)
+    printf "my deps [%s]\n%!" (String.concat "; " deps);
+    let deps = deps |> List.map (fun s ->
+      if ends_with s ~suffix:".cmi"
+      then
+        let s2 = String.copy s in
+        s2.[String.length s-1] <- 'o';
+        s2
+      else s
+    ) in
+    printf "my deps [%s]\n%!" (String.concat "; " deps);
+
+    Cmd (S ([A "jsoo_mktop"; (* T tags; *) (* S link_opts; *) A "-o"; P prod] @
+            (List.map (fun s -> P s) deps))
+        )
   in
-  rule "js_of_ocaml: .byte -> .js" ~dep ~prod f;
-  (* flag ["js_of_ocaml"; "debug"] (S [A "--pretty"; A "--debug-info"; A "--source-map"]); *)
+  rule "js_of_ocaml toplevel: *.cmo -> .js" ~dep ~prod
+    f
+     (* (Pack.Ocaml_compiler.byte_link "%.cmo" "%.byte") *)
+  ;
   flag ["js_of_ocaml"; "pretty"] (A "--pretty");
   flag ["js_of_ocaml"; "debuginfo"] (A "--debug-info");
   flag ["js_of_ocaml"; "noinline"] (A "--no-inline");
   flag ["js_of_ocaml"; "sourcemap"] (A "--source-map");
   pflag ["js_of_ocaml"] "opt" (fun n -> S [A "--opt"; A n]);
   pflag ["js_of_ocaml"] "set" (fun n -> S [A "--set"; A n]);
+  pflag ["js_of_ocaml"] "export_package"
+    (fun findlib_name -> S [A "-export-package"; A findlib_name]);
   ()
 ;;
 open Command;;
