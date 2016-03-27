@@ -163,11 +163,11 @@
         var fileref=document.createElement('script');
         fileref.setAttribute("type","text/javascript");
         fileref.setAttribute("src", prefix+(version==""?"":(version+"/"))+url);
-        document.getElementsByTagName("head")[0].appendChild(fileref);
+      document.getElementsByTagName("head")[0].appendChild(fileref);
       }
-      load_script("stdlib.cmis.js");
-      load_script("js_of_ocaml.cmis.js");
-      load_script("js_of_ocaml.toplevel.cmis.js");
+      load_script("../_build/stdlib.cmis.js");
+      load_script("../_build/js_of_ocaml.cmis.js");
+      load_script("../_build/js_of_ocaml.toplevel.cmis.js");
       //load_script("js_of_ocaml.deriving.cmis.js");
       //load_script("js_of_ocaml.tyxml.cmis.js");
       //load_script("js_of_ocaml.graphics.cmis.js");
@@ -175,12 +175,12 @@
       //load_script("react.cmis.js");
       //load_script("reactiveData.cmis.js");
       //load_script("dynlink.cmis.js");
-      load_script("toplevel.js");
+      load_script("../_build/toplevel/toplevel.js");
       load_script("strftime.js");
-      load_script("compiler-libs.common.cmis.js");
-      load_script("ppx_tools.cmis.js");
-      load_script("GT.cmis.js");
-      load_script("MiniKanren.js_of_ocaml.cmis.js");
+      //load_script("compiler-libs.common.cmis.js");
+      //load_script("ppx_tools.cmis.js");
+      //load_script("GT.cmis.js");
+      //load_script("../_build/MiniKanren.js_of_ocaml.cmis.js");
     </script>
 
     <!-- Collabsible lists stuff -->

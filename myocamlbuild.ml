@@ -66,14 +66,15 @@ let init_js_of_ocaml () =
   let f env (_:builder) =
     let cmX = env "%.cmo" in
     printf "cmX = %s\n%!" cmX;
-    let dep = env dep in
-    printf "A\n%!";
+    (* let dep = env dep in *)
     let prod = env prod in
-    printf "B\n%!";
-    let link_opts = link_opts prod in
-    printf "C\n%!";
+    (* let link_opts = link_opts prod in *)
     let tags = tags_of_pathname prod ++ "js_of_ocaml" in
+    (* printf "link_opts = %s\n%!" link_opts; *)
+    (* printf "tags      = %s\n%!" (String.concat " " tags); *)
+
     printf "D\n%!";
+
     let libs = [] in
     let dyndeps = [] in
     let hidden_packages = [] in
@@ -86,14 +87,28 @@ let init_js_of_ocaml () =
     let deps = deps |> List.map (fun s ->
       if ends_with s ~suffix:".cmi"
       then
-        let s2 = String.copy s in
-        s2.[String.length s-1] <- 'o';
+        let s2 = Bytes.copy s in
+        Bytes.set s2 (String.length s-1) 'o';
         s2
       else s
     ) in
     printf "my deps [%s]\n%!" (String.concat "; " deps);
 
-    Cmd (S ([A "jsoo_mktop"; (* T tags; *) (* S link_opts; *) A "-o"; P prod] @
+    Cmd (S ([A"jsoo_mktop"
+            ;A"-verbose"
+            ;A"-safe-string"
+            ;A"-dont-export-unit";A"gc"
+            ;A"-jsopt";A"--pretty --disable shortvar"
+            ;A"src/implicitPrinters.cmo"
+            ;A"src/MiniKanrenImpl.cmo"
+            ;A"ppx/smart_logger.cmo"
+            ;A"jsoo_runner/jsoo_runner.cmo"
+            ;T tags; A "-o"; P prod
+            (* ;A"-export-package";A"bigarray" *)
+            ;A"-export-package";A"js_of_ocaml.tyxml"
+            ;A"-export-package";A"ppx_tools"
+            (* ;A"-export-package";A"MiniKanren.js_of_ocaml" *)
+            ] @
             (List.map (fun s -> P s) deps))
         )
   in
@@ -105,8 +120,9 @@ let init_js_of_ocaml () =
   flag ["js_of_ocaml"; "debuginfo"] (A "--debug-info");
   flag ["js_of_ocaml"; "noinline"] (A "--no-inline");
   flag ["js_of_ocaml"; "sourcemap"] (A "--source-map");
-  pflag ["js_of_ocaml"] "opt" (fun n -> S [A "--opt"; A n]);
-  pflag ["js_of_ocaml"] "set" (fun n -> S [A "--set"; A n]);
+  pflag ["js_of_ocaml"] "jsopt" (fun n -> S [A "-jsopt"; A n]);
+  pflag ["js_of_ocaml"] "opt"   (fun n -> S [A "--opt"; A n]);
+  pflag ["js_of_ocaml"] "set"   (fun n -> S [A "--set"; A n]);
   pflag ["js_of_ocaml"] "export_package"
     (fun findlib_name -> S [A "-export-package"; A findlib_name]);
   ()
