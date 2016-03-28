@@ -1,4 +1,7 @@
-OB=ocamlbuild -use-ocamlfind -classic-display -plugin-tag "package(str)" #-plugin-tag "package(js_of_ocaml.ocamlbuild)"
+OB=ocamlbuild -use-ocamlfind -classic-display -plugin-tag "package(str)"
+ifdef OBV
+OB += -verbose 6
+endif
 TARGETS=src/MiniKanren.cmo
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native
 TESTS_ENVIRONMENT=./test.sh
@@ -24,6 +27,10 @@ only-toplevel:
 	$(OB) toplevel/toplevel.js
 
 toplevel: ppx jslib only-toplevel
+
+toplevel2: jslib
+	$(OB) toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
+	toplevel/toplevel.js
 
 
 celan: clean
