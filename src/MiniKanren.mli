@@ -186,6 +186,18 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
+  module ApplyLatest :
+  sig
+    val two : ('a -> ('a -> 'b) -> 'b) * ('c * 'd -> 'c * 'd)
+    val three :
+      ('a -> ('a -> 'b) * ('a -> 'c) -> 'b * 'c) *
+      ('d * ('e * 'f) -> ('d * 'e) * 'f)
+    val apply : ('a -> 'b -> 'c) * ('d -> 'b * 'a) -> 'd -> 'c
+    val succ :
+      ('a -> 'b -> 'c) * ('d -> 'e * 'f) ->
+      ('a -> ('a -> 'g) * 'b -> 'g * 'c) *
+      ('h * 'd -> ('h * 'e) * 'f)
+  end
 
   module Convenience : sig
     type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
@@ -233,4 +245,31 @@ module Make : functor (Logger: LOGGER) -> sig
     val run: ('a -> state -> 'b * ('b -> 'c)) -> 'a -> 'c
   end
 
+  module Convenience3 :
+  sig
+    type 'a reifier = int -> (Logger.t * ('a logic * 'a logic list)) list
+    type 'a almost_reifier = state Stream.t -> 'a reifier
+
+    module LogicAdder :
+    sig
+      val zero : 'a -> 'a
+      val succ :
+        ('a -> state -> 'b) ->
+        ('c logic -> 'a) -> state -> 'c almost_reifier * 'b
+    end
+    val one :
+         (('a logic -> state -> 'b) -> state -> 'a almost_reifier * 'b) *
+         (('c -> 'd) -> 'c -> 'd) *
+         (('e -> ('e -> 'f) -> 'f) * ('g * 'h -> 'g * 'h))
+
+    val succ :
+         ('a -> state -> 'b) * ('c -> 'd -> 'e) *
+         (('f -> 'g -> 'h) * ('i -> 'j * 'k)) ->
+         (('l logic -> 'a) -> state -> 'l almost_reifier * 'b) *
+         (('m -> 'c) -> 'm * 'd -> 'e) *
+         (('f -> ('f -> 'n) * 'g -> 'n * 'h) * ('o * 'i -> ('o * 'j) * 'k))
+    val run :
+         ('a -> state -> 'b) * ('c -> 'd -> 'e) *
+         (('f -> 'g -> 'd) * ('b -> 'g * 'f)) -> 'a -> 'c -> 'e
+  end
 end

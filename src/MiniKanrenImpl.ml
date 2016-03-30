@@ -711,10 +711,90 @@ let (=/=) x y state0 =
   (*   let p sel = sel id *)
   (* end *)
 
+
+
+
+
   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
     fun ((e, s, c)as st) x ->
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
+
+  module ExtractDeepest = struct
+    let ext2 (a, base) = (a,base)
+    let ext3 (a,(b,base)) = ((a,b),base)
+
+    let succ prev (a,z) =
+      let (foo,base) = prev z in
+      ((a,foo), base)
+
+    let ext4 x = succ ext3 x
+  end
+
+  module ApplyTuple = struct
+    let one arg x = x arg
+    let two arg (x,y) = (x arg,y arg)
+
+    let succ prev = fun arg (x,y) -> (x arg, prev arg y)
+  end
+
+  module ApplyLatest = struct
+    let two = (ApplyTuple.one, ExtractDeepest.ext2)
+    let three = (ApplyTuple.(fun x -> succ one x), ExtractDeepest.(fun x -> succ ext2 x))
+
+    let apply (appf, extf) tup =
+      let (x,base) = extf tup in
+      appf base x
+
+    let succ (appf, extf) = (ApplyTuple.(succ appf), ExtractDeepest.(succ extf) )
+  end
+
+  module MyCurry = struct
+    let succ k f x = k (fun y -> f (x,y))
+    let one       = (@@)
+    let two   x   = succ one x
+    let three x y = succ two x y
+  end
+
+  module MyUncurry = struct
+    let succ k f (x,y) = k (f x) y
+    let uncurry1 = (@@)
+    (* let uncurry2 = succ uncurry1 *)
+    (* let uncurry3 = succ uncurry2 *)
+  end
+
+  module Convenience3 = struct
+    type 'a reifier = int -> (Logger.t * ('a logic * 'a logic list)) list
+    type 'a almost_reifier = state Stream.t -> 'a reifier
+
+    let reifier : 'a logic -> 'a almost_reifier = fun x ans n ->
+      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
+
+    module LogicAdder = struct
+      (* allows to add new logic variables to function *)
+      let zero  f = f
+
+      let succ (prev: 'a -> state -> 'b) (f: 'c logic -> 'a)
+        : state -> 'c almost_reifier * 'b =
+        call_fresh (fun logic st ->
+            (reifier logic, prev (f logic) st)
+          )
+    end
+
+    let one = (fun x -> LogicAdder.(succ zero) x), MyCurry.one, ApplyLatest.two
+
+    let succ (adder,currier, app) = (LogicAdder.succ adder,
+                                     MyUncurry.succ currier,
+                                     ApplyLatest.succ app)
+
+    let run (adder,currier,app_num) goalish f =
+      run_ (Logger.create ()) (adder goalish) |> ApplyLatest.(apply app_num) |> (currier f)
+
+    (* let (goal2: 'a logic -> 'b logic -> goal) = fun _ _ _   -> Obj.magic () *)
+    (* let (_:float) = *)
+    (*   run (succ one) goal2 *)
+  end
+
 
 
   module Convenience = struct

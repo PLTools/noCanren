@@ -389,36 +389,6 @@ let test_run_latest () =
 
   ()
 
-module ExtractDeepest = struct
-  let ext2 (a, base) = (a,base)
-  let ext3 (a,(b,base)) = ((a,b),base)
-
-  let succ prev (a,z) =
-    let (foo,base) = prev z in
-    ((a,foo), base)
-
-  let ext4 x = succ ext3 x
-end
-
-module ApplyTuple = struct
-  let one arg x = x arg
-  let two arg (x,y) = (x arg,y arg)
-
-  let succ prev = fun arg (x,y) -> (x arg, prev arg y)
-
-end
-
-module ApplyLatest = struct
-  let two = (ApplyTuple.one, ExtractDeepest.ext2)
-  let three = (ApplyTuple.(fun x -> succ one x), ExtractDeepest.(fun x -> succ ext2 x))
-
-  let apply (appf, extf) tup =
-    let (x,base) = extf tup in
-    appf base x
-
-  let succ (appf, extf) = (ApplyTuple.(succ appf), ExtractDeepest.(succ extf) )
-end
-
 let () =
   (* *)
   (* let uncurry_succ k f (x,y) = k (f x) y in *)
@@ -429,7 +399,7 @@ let () =
   let open M.Convenience in
   let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
   let wrap x num f =
-    f ApplyLatest.(apply num x)
+    x |> ApplyLatest.(apply num) |> f
     (* x *)
   in
   let (@@>) = wrap in
@@ -440,6 +410,24 @@ let () =
     (*     1.0 *)
     (* ) *)
   in
+  let _ = ans in
   (* let (_:unit -> string ) = ans in *)
+
+  ()
+
+let () =
+  (* using Convenience3 module *)
+
+  let open M.Convenience3 in
+  let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
+  let ans () =
+    (run (succ one) goal2)
+    (* (fun _q _r _ -> *)
+    (*     (\* let (_: int -> (M.Logger.t * ('a logic * 'a logic list))) = _q in *\) *)
+    (*     1.0 *)
+    (* ) *)
+  in
+  let _ = ans in
+  let (_: ('a reifier -> 'b reifier -> 'c) -> 'c) = ans () in
 
   ()
