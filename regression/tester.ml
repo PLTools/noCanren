@@ -170,7 +170,7 @@ open M.Convenience
 let () =
   (* some code to check that types are good. nothing is really executed there *)
   let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
-  let ans () = run (succ @@ succ @@ succ zero) (fun q r s st -> goal3 q r s st) in
+  let _ = run (succ @@ succ @@ succ zero) (fun q r s st -> goal3 q r s st) in
   ()
 
 let run1 ~n (title, goal) =
@@ -214,7 +214,8 @@ let run3 ~n (title,goal) =
   let qf,(rf,(sf,_tl)) = M.Convenience.run (succ @@ succ @@ succ zero) goal in
 
   printf "'%s', asking for max %d results {\n%!" title n;
-  list_iter3 ~f:(fun (loginfo,(q,cs1)) (loginfo, (r,cs2))  (loginfo, (s,cs3)) ->
+  let () =
+    list_iter3 ~f:(fun (loginfo,(q,cs1)) (loginfo, (r,cs2))  (loginfo, (s,cs3)) ->
       printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
       cs cs1 "q";
       cs cs2 "r";
@@ -224,7 +225,8 @@ let run3 ~n (title,goal) =
       M.Logger.output_html  [] loginfo ~filename:".html" ;
 
       (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
-    ) (qf _tl n) (rf _tl n) (sf _tl n);
+    ) (qf _tl n) (rf _tl n) (sf _tl n)
+  in
   printf "}\n%!"
 
 
@@ -341,22 +343,14 @@ let (<*>) = comp
 module MyCurry = struct
   let curry_succ k f x = k (f <*> (fun y -> (x,y)))
   let curry1 = (@@)
-  let curry2 = curry_succ curry1
-  let curry3 = curry_succ curry2
-  let (_:int) = curry3
-
+  let curry2 x = curry_succ curry1 x
+  let curry3 x y = curry_succ curry2 x y
 end
 
 let test_run_latest () =
 
   let three = HardUncurry.(incr app2 two) in
   let (_: (int * (int*int))) = three 1 2 3 in
-
-  (* let curry_succ k f x = k (f <*> (fun y -> (x,y))) in *)
-  (* let curry1 = (@@) in *)
-  (* let curry2 = curry_succ curry1 in *)
-  (* let curry3 = curry_succ curry2 in *)
-  (* let (_:int) = curry_succ in *)
 
   (* let (_:string) = curry3 (fun (a,(b,c)) -> a +b+ c) 1 2 3 in *)
 
@@ -395,27 +389,57 @@ let test_run_latest () =
 
   ()
 
+module ExtractDeepest = struct
+  let ext2 (a, base) = (a,base)
+  let ext3 (a,(b,base)) = ((a,b),base)
+
+  let succ prev (a,z) =
+    let (foo,base) = prev z in
+    ((a,foo), base)
+
+  let ext4 x = succ ext3 x
+end
+
+module ApplyTuple = struct
+  let one arg x = x arg
+  let two arg (x,y) = (x arg,y arg)
+
+  let succ prev = fun arg (x,y) -> (x arg, prev arg y)
+
+end
+
+module ApplyLatest = struct
+  let two = (ApplyTuple.one, ExtractDeepest.ext2)
+  let three = (ApplyTuple.(fun x -> succ one x), ExtractDeepest.(fun x -> succ ext2 x))
+
+  let apply (appf, extf) tup =
+    let (x,base) = extf tup in
+    appf base x
+
+  let succ (appf, extf) = (ApplyTuple.(succ appf), ExtractDeepest.(succ extf) )
+end
 
 let () =
   (* *)
-  let uncurry_succ k f (x,y) = k (f x) y in
-  let uncurry1 = fun f x -> f x          in
-  let uncurry2 = uncurry_succ uncurry1 in
-  let uncurry3 = uncurry_succ uncurry2 in
+  (* let uncurry_succ k f (x,y) = k (f x) y in *)
+  (* let uncurry1 = fun f x -> f x          in *)
+  (* let uncurry2 = uncurry_succ uncurry1 in *)
+  (* let uncurry3 = uncurry_succ uncurry2 in *)
 
   let open M.Convenience in
-  let (goal3: 'a logic -> 'b logic -> 'c logic -> goal) = fun _ _ _ _ -> Obj.magic () in
-  let wrap x num f = num f x in
-  let ans () =
-    (* wrap *)
-    (run
-      (succ @@ succ @@ succ zero)
-      (fun q r s st -> goal3 q r s st) )
-    (* uncurry3 *)
-    (* (fun _q _ _ -> *)
-    (*     let (_: M.state MiniKanren.Stream.t -> int -> (M.Logger.t * ('a logic * 'a logic list)) list) = _q in *)
-    (*     1.0) *)
+  let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
+  let wrap x num f =
+    f ApplyLatest.(apply num x)
+    (* x *)
   in
-  let (_:unit -> float ) = ans in
+  let (@@>) = wrap in
+  let ans () =
+    ((run (succ @@ succ zero) goal2)  @@> ApplyLatest.three) (* |> MyCurry.curry2 *)
+    (* (fun _q _ -> *)
+    (*     (\* let (_: int -> (M.Logger.t * ('a logic * 'a logic list))) = _q in *\) *)
+    (*     1.0 *)
+    (* ) *)
+  in
+  (* let (_:unit -> string ) = ans in *)
 
   ()

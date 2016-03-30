@@ -10,7 +10,7 @@ TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests\
-	only-toplevel toplevel jslib ppx minikanren_stuff
+	only-toplevel toplevel jslib ppx minikanren_stuff tester
 
 all: minikanren_stuff
 
@@ -25,6 +25,9 @@ jslib: minikanren_stuff ppx
 
 only-toplevel:
 	$(OB) toplevel/toplevel.js
+
+tester:
+	$(OB) -Is src regression/tester.cmo
 
 toplevel: ppx jslib only-toplevel
 
