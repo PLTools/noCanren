@@ -31,7 +31,7 @@ tester:
 
 toplevel: ppx jslib only-toplevel
 
-toplevel2: jslib
+toplevel2: jslib ppx
 	$(OB) toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
 	toplevel/toplevel.js
 

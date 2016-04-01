@@ -83,7 +83,7 @@ let init_js_of_ocaml () =
         ~caml_obj_ext:"cmo" ~caml_lib_ext:"cma"
         ~used_libraries:libs ~hidden_packages (cmX :: dyndeps) in
     (* let deps = (List.filter (fun l -> not (List.mem l deps)) libs) @ deps in *)
-    printf "my deps [%s]\n%!" (String.concat "; " deps);
+    (* printf "my deps [%s]\n%!" (String.concat "; " deps); *)
     let deps = deps |> List.map (fun s ->
       if ends_with s ~suffix:".cmi"
       then
@@ -92,17 +92,23 @@ let init_js_of_ocaml () =
         s2
       else s
     ) in
-    printf "my deps [%s]\n%!" (String.concat "; " deps);
+    (* printf "my deps [%s]\n%!" (String.concat "; " deps); *)
 
     Cmd (S ([A"jsoo_mktop"
             ;A"-verbose"
             ;A"-safe-string"
             ;A"-dont-export-unit";A"gc"
+            ;A"-I";A"src"
+            ;A"-jsopt";A"-I";A"-jsopt";A"src"
+            ;A"-I";A"ppx"
+            ;A"-jsopt";A"-I";A"-jsopt";A"ppx"
+            ;A"-I";A"jsoo_runner"
+            ;A"-jsopt";A"-I";A"-jsopt";A"jsoo_runner"
             ;A"-jsopt";A"--pretty --disable shortvar"
-            ;A"src/implicitPrinters.cmo"
-            ;A"src/MiniKanrenImpl.cmo"
-            ;A"ppx/smart_logger.cmo"
-            ;A"jsoo_runner/jsoo_runner.cmo"
+            ;A"-export-unit";A"implicitPrinters"; A"src/implicitPrinters.cmo"
+            ;A"-export-unit";A"MiniKanrenImpl";A"src/MiniKanrenImpl.cmo"
+            ;A"-export-unit";A"smart_logger";A"ppx/smart_logger.cmo"
+            ;A"-export-unit";A"jsoo_runner";A"jsoo_runner/jsoo_runner.cmo"
             ;T tags; A "-o"; P prod
             (* ;A"-export-package";A"bigarray" *)
             ;A"-export-package";A"js_of_ocaml.tyxml"
