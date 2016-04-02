@@ -4,3 +4,8 @@
 /_build
 /*.html
 /*.plain
+
+toplevel/a.out
+/all.h*
+/all
+
