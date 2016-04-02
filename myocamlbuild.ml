@@ -114,6 +114,8 @@ let init_js_of_ocaml () =
             ;A"-export-package";A"js_of_ocaml.tyxml"
             ;A"-export-package";A"ppx_tools"
             (* ;A"-export-package";A"MiniKanren.js_of_ocaml" *)
+            ;A"-jsopt";A"-I";A"-jsopt";A"../toplevel/"
+            ;A"-jsopt";A"--file";A"-jsopt";A"examples.ml"
             ] @
             (List.map (fun s -> P s) deps))
         )
