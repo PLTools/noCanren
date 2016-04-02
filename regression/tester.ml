@@ -347,7 +347,7 @@ module MyCurry = struct
   let curry3 x y = curry_succ curry2 x y
 end
 
-let test_run_latest () =
+let _ () =
   let three = HardUncurry.(incr app2 two) in
   let (_: (int * (int*int))) = three 1 2 3 in
 
@@ -379,46 +379,15 @@ let test_run_latest () =
   ()
 
 let () =
-  (* *)
-  (* let uncurry_succ k f (x,y) = k (f x) y in *)
-  (* let uncurry1 = fun f x -> f x          in *)
-  (* let uncurry2 = uncurry_succ uncurry1 in *)
-  (* let uncurry3 = uncurry_succ uncurry2 in *)
-
-  let open M.Convenience in
-  let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
-  let wrap x num f =
-    x |> ApplyLatest.(apply num) |> f
-    (* x *)
-  in
-  let (@@>) = wrap in
-  let ans () =
-    ((run (succ @@ succ zero) goal2)  @@> ApplyLatest.three) (* |> MyCurry.curry2 *)
-    (* (fun _q _ -> *)
-    (*     (\* let (_: int -> (M.Logger.t * ('a logic * 'a logic list))) = _q in *\) *)
-    (*     1.0 *)
-    (* ) *)
-  in
-  let _ = ans in
-  (* let (_:unit -> string ) = ans in *)
-
-  ()
-
-let () =
   (* using Convenience3 module *)
 
   let open M.Convenience3 in
   let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
   let ans () =
     (run (succ one) goal2)
-    (* (fun _q _r _ -> *)
-    (*     (\* let (_: int -> (M.Logger.t * ('a logic * 'a logic list))) = _q in *\) *)
-    (*     1.0 *)
-    (* ) *)
   in
   let _ = ans in
   let (_: ('a reifier -> 'b reifier -> 'c) -> 'c) = ans () in
-
   ()
 
 let () =

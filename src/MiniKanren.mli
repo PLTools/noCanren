@@ -232,10 +232,10 @@ module Make : functor (Logger: LOGGER) -> sig
     val zero : 'a -> 'a
     val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
 
+    type 'a reifier = int -> ('a logic * 'a logic_diseq) list
     module PolyPairs : sig
       val id : 'a -> 'a
 
-      type 'a reifier = int -> ('a logic * diseq) list
 
       val one : ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b
       val succ : (('a -> 'b) -> state Stream.t -> 'c) ->

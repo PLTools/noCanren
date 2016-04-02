@@ -692,33 +692,34 @@ let (=/=) x y state0 =
 
   let run_ ?(logger=Logger.create()) = run logger
 
-  (* module PolyPairs = struct *)
-  (*   let id x = x *)
+  module PolyPairs = struct
+    let id x = x
 
-  (*   let find_value var st = refine st var *)
-  (*   let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream) *)
+    let find_value var st = refine st var
+    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
 
-  (*   type 'a xxx = int -> ('a logic * diseq) list *)
+    type 'a reifier = int -> ('a logic * diseq) list
 
-  (*   let one: ('a xxx -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream) *)
-  (*   let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream *)
+    let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b =
+      fun k stream var -> k (mapper var stream)
+    let succ prev k = fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
 
-  (*   let (_: state Stream.t -> *)
-  (*        'a logic -> *)
-  (*        'b logic -> *)
-  (*        ('a xxx) * ('b xxx) ) = (succ one) id *)
+    let (_: state Stream.t ->
+         'a logic ->
+         'b logic ->
+         ('a reifier) * ('b reifier) ) = (succ one) id
 
-  (*   let p sel = sel id *)
-  (* end *)
-
-
-
+    let p sel = sel id
+  end
 
   type 'a logic_diseq = 'a logic list
+
   let refine' : 'a . State.t -> 'a logic -> 'a logic * 'a logic_diseq =
     fun ((e, s, c)as st) x ->
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
+
+  let (dummy_goal2: int logic -> string logic -> goal) = fun _ _ _   -> Obj.magic ()
 
   module ExtractDeepest = struct
     let ext2 (a, base) = (a,base)
@@ -790,9 +791,8 @@ let (=/=) x y state0 =
     let run (adder,currier,app_num) goalish f =
       run_ (adder goalish) |> ApplyLatest.(apply app_num) |> (currier f)
 
-    (* let (goal2: 'a logic -> 'b logic -> goal) = fun _ _ _   -> Obj.magic () *)
-    (* let (_:float) = *)
-    (*   run (succ one) goal2 *)
+    let (_: ('a reifier -> 'b reifier -> 'c) -> 'c ) =
+      run (succ one) dummy_goal2
   end
 
   module Convenience4 = struct
@@ -810,22 +810,17 @@ let (=/=) x y state0 =
     end
 
     let one
-
        = (fun x -> LogicAdder.(succ zero) x), ExtractDeepest.ext2, Refine.one
 
     let succ (prev,extD,af) =
       (LogicAdder.succ prev, ExtractDeepest.succ extD, Refine.succ af)
 
-    (* let (_:string) = succ *)
-
     let run (adder,extD,appF) goalish =
       let tuple,stream = run_ (adder goalish) |> extD in
       Stream.map (fun (st: state) -> appF (fst3 st) tuple) stream
 
-    let (goal2: int logic -> string logic -> goal) = fun _ _ _   -> Obj.magic ()
-    let (_) = run (succ one) goal2
-
-    (* let (_: int) = run *)
+    let (_: ((int logic * int logic_diseq) * (string logic * string logic_diseq)) Stream.t)
+       = run (succ one) dummy_goal2
 
   end
 
@@ -864,6 +859,9 @@ let (=/=) x y state0 =
 
     let run runner goalish =
       run_ (fun st -> runner goalish st)
+
+    let (_: int reifier * (string reifier * state Stream.t)) =
+      run (succ @@ succ zero) dummy_goal2
   end
 
   module Convenience2 = struct
@@ -872,22 +870,18 @@ let (=/=) x y state0 =
     let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) : state -> 'b =
       call_fresh (fun logic -> prev (f logic))
 
-    (* let one   = succ zero *)
-    (* let two   = succ one *)
-    (* let three = succ two *)
-    (* let four  = succ three *)
-    (* let five  = succ four *)
+    type 'a reifier = int -> ('a logic * 'a logic_diseq) list
 
     module PolyPairs = struct
       let id x = x
 
-      let find_value var st = refine st var
+      let find_value var st = refine' st var
       let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
 
-      type 'a reifier = int -> ('a logic * diseq) list
-
-      let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b = fun k stream var -> k (mapper var stream)
-      let succ = fun prev k -> fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
+      let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b =
+        fun k stream var -> k (mapper var stream)
+      let succ prev k = fun stream var ->
+        prev  (fun v -> k (mapper var stream, v)) stream
 
       let (_: state Stream.t ->
            'a logic ->
@@ -897,24 +891,17 @@ let (=/=) x y state0 =
       let p sel = sel id
     end
 
-(*
-    module PolyPairs = struct
-      let zero = fun k -> k ()
-
-      let one = fun k x -> k (x,())
-      let succ prev k x = prev (fun v -> k (x,v))
-      let p sel = sel (fun x -> x)
-
-      (* let two = (s one) id *)
-      (* let three = (s @@ s one) id *)
-    end
- *)
     let run runner goalish =
       run_ (fun st ->
           let arg,g = runner goalish st in g arg
       )
 
     let (_: ('a -> state -> 'b * ('b -> 'c)) -> 'a -> 'c) = run
+
+    let (_: int reifier * string reifier) =
+      run (succ @@ succ zero)
+          (fun q r st -> dummy_goal2 q r st, (fun st -> PolyPairs.(p @@ succ one) st q r))
+
   end
 
     (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
