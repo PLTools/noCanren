@@ -186,6 +186,8 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
+  type 'a logic_diseq = 'a logic list
+
   module ApplyLatest :
   sig
     val two : ('a -> ('a -> 'b) -> 'b) * ('c * 'd -> 'c * 'd)
@@ -272,4 +274,33 @@ module Make : functor (Logger: LOGGER) -> sig
          ('a -> state -> 'b) * ('c -> 'd -> 'e) *
          (('f -> 'g -> 'd) * ('b -> 'g * 'f)) -> 'a -> 'c -> 'e
   end
+
+  module Convenience4 : sig
+    module LogicAdder : sig
+      val zero : 'a -> 'a
+      val succ :
+        ('a -> state -> 'b) ->
+        ('c logic -> 'a) -> state -> 'c logic * 'b
+      end
+   module Refine : sig
+      val one : State.t -> 'a logic -> 'a logic * 'a logic_diseq
+      val succ :
+        (State.t -> 'a -> 'b) ->
+        State.t -> 'c logic * 'a -> ('c logic * 'c logic_diseq) * 'b
+   end
+
+   val one :
+         (('a logic -> state -> 'b) -> state -> 'a logic * 'b) *
+         ('c * 'd -> 'c * 'd) *
+         (State.t -> 'e logic -> 'e logic * 'e logic_diseq)
+   val succ :
+         ('a -> state -> 'b) * ('c -> 'd * 'e) * (State.t -> 'f -> 'g) ->
+         (('h logic -> 'a) -> state -> 'h logic * 'b) *
+         ('i * 'c -> ('i * 'd) * 'e) *
+         (State.t -> 'j logic * 'f -> ('j logic * 'j logic_diseq) * 'g)
+   val run :
+       ('a -> state -> 'b) * ('b -> 'c * state Stream.t) *
+       (State.t -> 'c -> 'g) -> 'a -> 'g Stream.t
+   end
+
 end

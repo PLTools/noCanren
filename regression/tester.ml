@@ -420,3 +420,30 @@ let () =
   let (_: ('a reifier -> 'b reifier -> 'c) -> 'c) = ans () in
 
   ()
+
+let () =
+  (* using Convenience4 module *)
+
+  let open M.Convenience4 in
+  (* let (_:int) = succ one in *)
+
+  let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
+  let (goal3: 'a logic -> 'b logic -> 'c logic -> goal) = fun _ _ _ _ -> Obj.magic () in
+
+  let ans f = (run (succ one) goal2) |> f
+    (* (fun _q _r _ -> *)
+    (*     (\* let (_: int -> (M.Logger.t * ('a logic * 'a logic list))) = _q in *\) *)
+    (*     1.0 *)
+    (* ) *)
+  in
+  let _ = ans in
+  let (_:
+     ((('a logic * 'a logic_diseq) * ('b logic * 'b logic_diseq)) Stream.t -> 'c) -> 'c)
+     = ans
+  in
+  let (_:
+     ((('a logic * 'a logic_diseq) *
+         (('b logic * 'b logic_diseq) * ('c logic * 'c logic_diseq))) Stream.t -> 'z) -> 'z)
+     = (|>) (run (succ @@ succ one) goal3)
+  in
+  ()

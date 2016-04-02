@@ -690,7 +690,7 @@ let (=/=) x y state0 =
   let take = Stream.take
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
-  let run_ = run
+  let run_ ?(logger=Logger.create()) = run logger
 
   (* module PolyPairs = struct *)
   (*   let id x = x *)
@@ -714,8 +714,8 @@ let (=/=) x y state0 =
 
 
 
-
-  let refine' : State.t -> 'a logic -> 'a logic * 'a logic list =
+  type 'a logic_diseq = 'a logic list
+  let refine' : 'a . State.t -> 'a logic -> 'a logic * 'a logic_diseq =
     fun ((e, s, c)as st) x ->
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
@@ -788,13 +788,46 @@ let (=/=) x y state0 =
                                      ApplyLatest.succ app)
 
     let run (adder,currier,app_num) goalish f =
-      run_ (Logger.create ()) (adder goalish) |> ApplyLatest.(apply app_num) |> (currier f)
+      run_ (adder goalish) |> ApplyLatest.(apply app_num) |> (currier f)
 
     (* let (goal2: 'a logic -> 'b logic -> goal) = fun _ _ _   -> Obj.magic () *)
     (* let (_:float) = *)
     (*   run (succ one) goal2 *)
   end
 
+  module Convenience4 = struct
+
+    module LogicAdder = struct
+      (* allows to add new logic variables to function *)
+      let zero  f = f
+
+      let succ (prev: 'a -> state -> 'b) (f: 'c logic -> 'a) : state -> 'c logic * 'b =
+        call_fresh (fun logic st -> (logic, prev (f logic) st) )
+    end
+    module Refine = struct
+      let one state x = refine' state x
+      let succ prev = fun state (x,y) -> (refine' state x, prev state y)
+    end
+
+    let one
+
+       = (fun x -> LogicAdder.(succ zero) x), ExtractDeepest.ext2, Refine.one
+
+    let succ (prev,extD,af) =
+      (LogicAdder.succ prev, ExtractDeepest.succ extD, Refine.succ af)
+
+    (* let (_:string) = succ *)
+
+    let run (adder,extD,appF) goalish =
+      let tuple,stream = run_ (adder goalish) |> extD in
+      Stream.map (fun (st: state) -> appF (fst3 st) tuple) stream
+
+    let (goal2: int logic -> string logic -> goal) = fun _ _ _   -> Obj.magic ()
+    let (_) = run (succ one) goal2
+
+    (* let (_: int) = run *)
+
+  end
 
 
   module Convenience = struct
@@ -830,9 +863,7 @@ let (=/=) x y state0 =
     (* let five  = succ four *)
 
     let run runner goalish =
-      run_ (Logger.create ()) (fun st ->
-          runner goalish st
-      )
+      run_ (fun st -> runner goalish st)
   end
 
   module Convenience2 = struct
@@ -879,7 +910,7 @@ let (=/=) x y state0 =
     end
  *)
     let run runner goalish =
-      run_ (Logger.create ()) (fun st ->
+      run_ (fun st ->
           let arg,g = runner goalish st in g arg
       )
 
