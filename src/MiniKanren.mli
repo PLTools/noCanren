@@ -238,9 +238,10 @@ module Make : functor (Logger: LOGGER) -> sig
 
 
       val one : ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b
-      val succ : (('a -> 'b) -> state Stream.t -> 'c) ->
-        ('e reifier * 'a -> 'b) -> state Stream.t ->
-        'f -> 'c
+      val succ :
+         (('a -> 'b) -> state Stream.t -> 'c) ->
+         ((int -> ('d logic * 'd logic_diseq) list) * 'a -> 'b) ->
+         state Stream.t -> 'd logic -> 'c
       val p : (('a -> 'a) -> 'b) -> 'b
     end
 

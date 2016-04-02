@@ -875,12 +875,13 @@ let (=/=) x y state0 =
     module PolyPairs = struct
       let id x = x
 
-      let find_value var st = refine' st var
-      let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
+      (* let find_value var ((st,_,_) : state) = refine' st var *)
+      let mapper var = fun stream n ->
+        List.map (fun state -> refine' state var) (take' ~n stream)
 
       let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b =
         fun k stream var -> k (mapper var stream)
-      let succ prev k = fun stream var ->
+      let succ prev k = fun (stream: state Stream.t) var ->
         prev  (fun v -> k (mapper var stream, v)) stream
 
       let (_: state Stream.t ->
