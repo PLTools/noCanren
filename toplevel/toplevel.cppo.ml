@@ -80,12 +80,13 @@ let setup_toplevel () =
   Sys.interactive := true;
   exec' "#rectypes;;";
   exec' "open ImplicitPrinters;;";
-  (* exec' "open MiniKanren;;";      (\* for mkshow *\) *)
+  exec' "open MiniKanrenImpl;;";  (* for embed *)
   exec' "open Jsoo_runner;;";     (* count variables *)
   exec' "open M;;";
-  exec' "let run = Jsoo_runner.run;;";
+  (* exec' "let run = Jsoo_runner.run;;"; *)
   exec' "#ppx2 Jsoo_runner.pa_minikanren_ppx;;";
   exec' "#ppx2 Jsoo_runner.smart_ppx;;";
+  exec' "#ppx2 Jsoo_runner.repr_ppx;;";
   ()
 
 let resize ~container ~textbox ()  =

@@ -58,9 +58,7 @@ ifneq ($(YOJSON),)
 PACKAGES += yojson
 endif
 
-#ifneq ($(MINIKANREN),)
-PACKAGES += compiler-libs.common ppx_tools MiniKanren.js_of_ocaml
-#endif
+PACKAGES += compiler-libs.common ppx_tools
 
 ifeq ($(METAOCAML),1)
 BER_EXPORT=trx runcode print_code
@@ -72,11 +70,20 @@ CPPO_OPT+= -D metaocaml
 endif
 
 #-jsopt "--pretty --disable shortvar"
-MKTOP=jsoo_mktop -verbose $(SAFESTRING) \
+MKTOP=jsoo_mktop -verbose -g $(SAFESTRING) \
 	${addprefix -top-syntax , ${SYNTAXES}} \
 	-dont-export-unit gc \
 	-jsopt "--pretty --disable shortvar" \
 	${addprefix -export-package , ${PACKAGES}} \
+	-jsopt -I -jsopt ../_build/src \
+	-jsopt -I -jsopt ../_build/ppx \
+	-jsopt -I -jsopt ../_build/jsoo_runner \
+	-export-unit implicitPrinters ../_build/src/implicitPrinters.cmo \
+	-export-unit MiniKanrenImpl ../_build/src/MiniKanrenImpl.cmo \
+	-export-unit MiniKanren ../_build/src/MiniKanren.cmo \
+	-export-unit smart_logger ../_build/ppx/smart_logger.cmo \
+	-export-unit ppx_repr ../_build/ppx/ppx_repr.cmo \
+	-export-unit jsoo_runner ../_build/jsoo_runner/jsoo_runner.cmo \
 	${addprefix -export-unit , html5_types html5_sigs xml_wrap } \
 
 TOPLEVEL_NAME=toplevel

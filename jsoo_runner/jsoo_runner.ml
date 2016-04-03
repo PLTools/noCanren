@@ -93,15 +93,53 @@ end
 
 let smart_ppx = Smart_logger.smart_logger [| |]
 let pa_minikanren_ppx = Smart_logger.pa_minikanren [| |]
+let repr_ppx = Ppx_repr.mapper
+
 let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
 
 open MiniKanrenImpl
 module M = Make(GraphLogger)
 open M
+open M.Convenience4
 
-let run ?(varnames=[]) n runner (repr,goal) =
-  let graph = Logger.create () in
-  M.run graph (fun st ->
+let run1 ~n (title, goal) =
+  let open M.Convenience4 in
+  printf "'%s', asking for max %d results {\n%!" title n;
+  run one goal
+    |> (fun stream -> Stream.take ~n stream |> List.iter
+          (fun (q,_constr) ->
+            printf "q=%s\n%!" (show_logic_naive q);
+          )
+       );
+  printf "}\n%!"
+
+let run2 ~n (title,goal) =
+  let open M.Convenience4 in
+  printf "'%s', asking for max %d results {\n%!" title n;
+  run (succ one) goal |>
+    begin fun stream ->
+     Stream.take ~n stream |> List.iter
+        (fun ((q,cs1),(r,cs2)) ->
+           printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+           (* let cs c name = *)
+           (*   match string_of_constraints cs1 with *)
+           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
+           (*   | None -> () *)
+           (* in *)
+           (* cs cs1 "q"; *)
+           (* cs cs2 "r"; *)
+           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
+           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
+
+           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
+
+        )
+    end;
+  printf "}\n%!"
+(*
+let run ?(varnames=[]) n num (repr,goal) =
+  let open M.Convenience4 in
+  run (fun st ->
     let result = runner goal st in
 
     Printf.printf "%s answer%s {\n"
@@ -151,4 +189,5 @@ let _ =
   in
 
   fun () -> run 1 one ("descr",a_and_b)
+*)
 *)

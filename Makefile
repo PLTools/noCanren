@@ -26,8 +26,8 @@ jslib: minikanren_stuff ppx
 only-toplevel:
 	$(OB) toplevel/toplevel.js
 
-tester:
-	$(OB) -Is src regression/tester.cmo
+tester: jslib
+	$(OB) -Is src,jsoo_runner regression/tester.cmo
 
 toplevel: ppx jslib only-toplevel
 
@@ -51,7 +51,7 @@ define TESTRULES
 .PHONY: test_$(1) test$(1).native
 test$(1).native: regression/test$(1).native
 regression/test$(1).native: regression/test$(1).ml
-	$(OB) -Is src $$@
+	$(OB) -Is src,jsoo_runner,ppx $$@
 
 compile_tests: regression/test$(1).native
 

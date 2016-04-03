@@ -91,6 +91,8 @@ module Stream :
 
     (** Lazy constructor *)
     val from_fun : (unit -> 'a t) -> 'a t
+
+    val take: ?n:int -> 'a t -> 'a list
   end
 
 (** State (needed to perform calculations) *)
