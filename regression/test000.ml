@@ -58,9 +58,9 @@ let wtfo xs n = conj (nilo xs) (seveno n)
 open Tester
 
 let _ =
-  run1 ~n:5 (REPR fives);
+  run1 ~n:1 (REPR fives);
   run1 ~n:1 (REPR a_and_b);
-  run1 ~n:1 (REPR a_and_b');
+  run1 ~n:2 (REPR a_and_b');
 
   run1 ~n:1 (REPR(fun q -> appendo q (of_list [3;4]) (of_list [1;2;3;4]) ) );
   run2 ~n:4 (REPR(fun q r -> appendo q (of_list ([]: int list)) r) );

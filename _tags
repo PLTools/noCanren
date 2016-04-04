@@ -13,7 +13,7 @@ true: rectypes, debug
 <regression/test003.ml>: use_pa_minikanren
 
 <regression/testDiseq*> or <regression/test0*.*>: ppx(ppx/smart_logger_bin.native), ppx(ppx/ppx_repr_bin.native)
-<regression/test004.ml>: use_pa_minikanren
+<regression/test004.ml>: ppx(ppx/pa_minikanren_bin.native)
 #<regression/test005.ml>: package(GT.syntax.show), use_pa_minikanren
 #<regression/test006.ml>: package(GT.syntax.show), use_pa_minikanren
 #<regression/test007.ml>: package(GT.syntax.show), use_pa_minikanren

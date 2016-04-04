@@ -3,7 +3,7 @@ ifdef OBV
 OB += -verbose 6
 endif
 TARGETS=src/MiniKanren.cmo
-PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native
+PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
 #TESTS=regression/test000.native #regression/test001.native regression/test002.native \
 #	regression/test003.native #regression/test004.native
@@ -62,7 +62,7 @@ $(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
 promote:
 	$(MAKE) -C regression promote TEST=$(TEST)
 
-tests: compile_tests run_tests
+tests: ppx compile_tests run_tests
 regression: tests
 test: tests
 

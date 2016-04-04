@@ -399,18 +399,18 @@ open M.Convenience4
 
 let run1 ~n (title, goal) =
   let open M.Convenience4 in
-  printf "'%s', asking for max %d results {\n%!" title n;
+  printf "`%s`, %d answer {\n%!" title n;
   run one goal
     |> (fun stream -> Stream.take ~n stream |> List.iter
           (fun (q,_constr) ->
-            printf "q=%s\n%!" (show_logic_naive q);
+            printf "q=%s;\n%!" (show_logic_naive q);
           )
        );
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
   let open M.Convenience4 in
-  printf "'%s', asking for max %d results {\n%!" title n;
+  printf "`%s`, %d answers {\n%!" title n;
   run (succ one) goal |>
     begin fun stream ->
      Stream.take ~n stream |> List.iter

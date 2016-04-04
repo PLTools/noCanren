@@ -443,9 +443,9 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
-                print_endline (generic_show !!x);
-                printf "Value (5,  fun _ -> \"5\") is %s\n%!" (generic_show !!(Value (5, fun _ -> "5")) );
-                printf "Var   {index=11; reifier=...) is %s\n%!" (generic_show !!(Var {index=11; reifier=fun () -> assert false}));
+                (* print_endline (generic_show !!x); *)
+                (* printf "Value (5,  fun _ -> \"5\") is %s\n%!" (generic_show !!(Value (5, fun _ -> "5")) ); *)
+                (* printf "Var   {index=11; reifier=...) is %s\n%!" (generic_show !!(Var {index=11; reifier=fun () -> assert false})); *)
                 let Value (xx,xprinter) = !!x in
                 let Value (yy,yprinter) = !!y in
                 let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in

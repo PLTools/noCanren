@@ -18,6 +18,7 @@ let is_defer e =
   | _ -> false
 
 let is_fresh e =
+  (* print_endline "is_fresh"; *)
   match e.pexp_desc with
   | Pexp_ident i when i.txt = Longident.Lident "fresh" -> true
   | _ -> false
@@ -103,10 +104,27 @@ let reconstruct_args e =
      Some [arg1]
   | _ -> None
 
+let list_fold ~f xs =
+  match xs with
+  | [] -> failwith "bad argument"
+  | (_,init)::xs -> List.fold_left ~init ~f xs
+
 let rec pamk_e mapper e : expression =
+  (* Printast.expression 0 Format.std_formatter e; *)
   match e.pexp_desc with
-  | Pexp_apply (e1,[(_,args); (_,body)]) when is_fresh e1 -> begin
-      let new_body : expression = pamk_e mapper body in
+  | Pexp_apply (_,[]) -> e
+  | Pexp_apply (e1,[args]) when is_fresh e1 ->
+      (* bad syntax -- no body*)
+     e
+  | Pexp_apply (e1, (_,args) :: body) when is_fresh e1 -> begin
+      (* List.iter body ~f:(fun (_,e) -> Printast.expression 0 Format.std_formatter e); *)
+      let new_body : expression =
+        match body with
+        | [(_,body)] -> pamk_e mapper body
+        | ____ -> list_fold (List.rev body)
+                     ~f:(fun acc (_,x) -> [%expr [%e (pamk_e mapper x)] ||| [%e acc]])
+
+      in
       match reconstruct_args args with
       | Some xs ->
          let (_: string list) = xs in
@@ -128,6 +146,14 @@ let rec pamk_e mapper e : expression =
                                    List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) }
   | Pexp_fun (l,opt,pat,e) ->
      { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
+
+  | Pexp_apply (e1, es) ->
+      { e with pexp_desc = Pexp_apply (mapper.expr mapper e1,
+                                       List.map (fun (l,e) -> (l, mapper.expr mapper e)) es) }
+  | Pexp_construct (_, None) -> e
+  | Pexp_construct (id, Some e1) -> { e with pexp_desc = Pexp_construct (id, Some (mapper.expr mapper e1)) }
+
+  | Pexp_tuple es -> {e with pexp_desc=Pexp_tuple (List.map (mapper.expr mapper) es) }
 
   (* TODO: support all cases *)
   | _ -> e
