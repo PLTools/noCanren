@@ -42,9 +42,9 @@ clean:
 	rm -fr _build *.log  *.native *.byte
 	$(MAKE) -C regression clean
 
-REGRES_CASES=$(shell seq -s " " -f %03g 0 0)
+REGRES_CASES=$(shell seq -s " " -f %03g 0 11)
 #REGRES_CASES:=$(REGRES_CASES) bad000
-REGRES_CASES:=$(REGRES_CASES) Diseq000
+#REGRES_CASES:=$(REGRES_CASES) Diseq000
 
 #$(warning $(REGRES_CASES))
 define TESTRULES

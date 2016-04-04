@@ -108,6 +108,7 @@ let init_js_of_ocaml () =
             ;A"-export-unit";A"implicitPrinters"; A"src/implicitPrinters.cmo"
             ;A"-export-unit";A"MiniKanrenImpl";A"src/MiniKanrenImpl.cmo"
             ;A"-export-unit";A"smart_logger";A"ppx/smart_logger.cmo"
+            ;A"-export-unit";A"ppx_repr";A"ppx/ppx_repr.cmo"
             ;A"-export-unit";A"jsoo_runner";A"jsoo_runner/jsoo_runner.cmo"
             ;T tags; A "-o"; P prod
             (* ;A"-export-package";A"bigarray" *)

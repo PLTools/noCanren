@@ -395,8 +395,44 @@ let () =
   ()
 
 
-let run1 = Jsoo_runner.run1
-let run2 = Jsoo_runner.run2
+open M.Convenience4
+
+let run1 ~n (title, goal) =
+  let open M.Convenience4 in
+  printf "'%s', asking for max %d results {\n%!" title n;
+  run one goal
+    |> (fun stream -> Stream.take ~n stream |> List.iter
+          (fun (q,_constr) ->
+            printf "q=%s\n%!" (show_logic_naive q);
+          )
+       );
+  printf "}\n%!"
+
+let run2 ~n (title,goal) =
+  let open M.Convenience4 in
+  printf "'%s', asking for max %d results {\n%!" title n;
+  run (succ one) goal |>
+    begin fun stream ->
+     Stream.take ~n stream |> List.iter
+        (fun ((q,cs1),(r,cs2)) ->
+           printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+           (* let cs c name = *)
+           (*   match string_of_constraints cs1 with *)
+           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
+           (*   | None -> () *)
+           (* in *)
+           (* cs cs1 "q"; *)
+           (* cs cs2 "r"; *)
+           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
+           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
+
+           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
+
+        )
+    end;
+  printf "}\n%!"
+
+
              (*
 let run1 ~n (title, goal) =
   let open M.Convenience4 in
