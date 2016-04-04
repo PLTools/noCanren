@@ -97,7 +97,7 @@ let repr_ppx = Ppx_repr.mapper
 
 let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
 
-open MiniKanrenImpl
+open MiniKanren
 module M = Make(GraphLogger)
 open M
 open M.Convenience4

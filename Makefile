@@ -24,17 +24,13 @@ jslib: minikanren_stuff ppx
 	$(OB) -Is src,ppx $(JSOO_LIB)
 
 only-toplevel:
-	$(OB) toplevel/toplevel.js
-
-tester: jslib
-	$(OB) -Is src,jsoo_runner regression/tester.cmo
-
-toplevel: ppx jslib only-toplevel
-
-toplevel2: jslib ppx
 	$(OB) toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
 	toplevel/toplevel.js
 
+toplevel: ppx jslib only-toplevel
+
+tester: jslib
+	$(OB) -Is src,jsoo_runner regression/tester.cmo
 
 celan: clean
 

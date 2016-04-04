@@ -106,7 +106,7 @@ let init_js_of_ocaml () =
             ;A"-jsopt";A"-I";A"-jsopt";A"jsoo_runner"
             ;A"-jsopt";A"--pretty --disable shortvar"
             ;A"-export-unit";A"implicitPrinters"; A"src/implicitPrinters.cmo"
-            ;A"-export-unit";A"MiniKanrenImpl";A"src/MiniKanrenImpl.cmo"
+            ;A"-export-unit";A"MiniKanren";A"src/MiniKanren.cmo"
             ;A"-export-unit";A"smart_logger";A"ppx/smart_logger.cmo"
             ;A"-export-unit";A"ppx_repr";A"ppx/ppx_repr.cmo"
             ;A"-export-unit";A"jsoo_runner";A"jsoo_runner/jsoo_runner.cmo"
@@ -115,7 +115,6 @@ let init_js_of_ocaml () =
             ;A"-export-package";A"js_of_ocaml.tyxml"
             ;A"-export-package";A"ppx_tools"
             ;A"-export-package";A"lwt"
-            (* ;A"-export-package";A"MiniKanren.js_of_ocaml" *)
             ;A"-jsopt";A"-I";A"-jsopt";A"../toplevel/"
             ;A"-jsopt";A"--file";A"-jsopt";A"examples.ml"
             ] @

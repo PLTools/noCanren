@@ -80,7 +80,7 @@ let setup_toplevel () =
   Sys.interactive := true;
   exec' "#rectypes;;";
   exec' "open ImplicitPrinters;;";
-  exec' "open MiniKanrenImpl;;";  (* for embed *)
+  exec' "open MiniKanren;;";      (* for embed *)
   exec' "open Jsoo_runner;;";     (* count variables *)
   exec' "open M;;";
   (* exec' "let run = Jsoo_runner.run;;"; *)
