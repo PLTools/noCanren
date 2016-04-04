@@ -119,7 +119,7 @@ let var_of_int index =
 let (!) x = Value (x, (fun _ -> "<not implemented>"))
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
 
-module Show_logic_impl {X : ImplicitPrinters.SHOW} = struct
+module Show_logic_explicit (X : ImplicitPrinters.SHOW) = struct
     type t = X.t logic
     let show l =
       match l with
@@ -127,7 +127,13 @@ module Show_logic_impl {X : ImplicitPrinters.SHOW} = struct
       | Value (x,_) -> X.show x
 end
 
-implicit module Show_logic = Show_logic_impl
+implicit module Show_logic {X : ImplicitPrinters.SHOW} = struct
+    type t = X.t logic
+    let show l =
+      match l with
+      | Var {index; _} -> sprintf "_.%d" index
+      | Value (x,_) -> X.show x
+end
 
 let show_logic_naive =
   function

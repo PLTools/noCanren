@@ -43,6 +43,11 @@ val (!) : 'a -> 'a logic
 
 val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
 
+module Show_logic_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
+                        type t = X.t logic
+                        val show : X.t logic -> string
+end
+
 module Show_logic : functor {X : ImplicitPrinters.SHOW} -> sig
                         type t = X.t logic
                         val show : X.t logic -> string

@@ -1,7 +1,16 @@
 open MiniKanren
+open ImplicitPrinters
 
-@type nat = O | S of nat logic with show
+type nat = O | S of nat logic
 
+module rec Show_nat' : SHOW with type t = nat = struct
+  type t = nat
+  let show = function
+  | O -> "O"
+  | S x ->
+     let module S = Show_logic_explicit(Show_nat') in
+     "S" ^ (S.show x)
+end
 open Tester.M
 
 let rec addo x y z =
@@ -25,6 +34,7 @@ let rec mulo x y z =
 let show_nat = GT.( show logic (show nat) )
 
 open Tester
+open ImplicitPrinters
 
 let _ =
   run show_nat empty_reifier   1    q  (fun q     st -> REPR (addo !O !(S !O) q                     st), ["q", q]);
