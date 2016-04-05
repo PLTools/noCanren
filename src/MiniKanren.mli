@@ -42,6 +42,7 @@ and  'a var_desc =
 val (!) : 'a -> 'a logic
 
 val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+val embed_explicit: ('a -> string) -> 'a -> 'a logic
 
 module Show_logic_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
                         type t = X.t logic

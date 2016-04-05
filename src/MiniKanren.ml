@@ -119,6 +119,8 @@ let var_of_int index =
 let (!) x = Value (x, (fun _ -> "<not implemented>"))
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
 
+let embed_explicit printer x = Value (x, printer)
+
 module Show_logic_explicit (X : ImplicitPrinters.SHOW) = struct
     type t = X.t logic
     let show l =
