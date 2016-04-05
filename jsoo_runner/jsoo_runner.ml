@@ -100,10 +100,9 @@ let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Print
 open MiniKanren
 module M = Make(GraphLogger)
 open M
-open M.Convenience4
+open M.ConvenienceStream
 
 let run1 ~n (title, goal) =
-  let open M.Convenience4 in
   printf "'%s', asking for max %d results {\n%!" title n;
   run one goal
     |> (fun stream -> Stream.take ~n stream |> List.iter
@@ -114,7 +113,6 @@ let run1 ~n (title, goal) =
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  let open M.Convenience4 in
   printf "'%s', asking for max %d results {\n%!" title n;
   run (succ one) goal |>
     begin fun stream ->

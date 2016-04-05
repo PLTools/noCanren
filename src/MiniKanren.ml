@@ -544,16 +544,6 @@ let qrs   = three
 let qrst  = four
 let pqrst = five
 *)
-(* module PolyPairs = struct *)
-(*   let zero = fun k -> k () *)
-
-(*   let one = fun k x -> k (x,()) *)
-(*   let s prev k x = prev (fun v -> k (x,v)) *)
-(*   let p sel = sel (fun x -> x) *)
-
-(*   (\* let two = (s one) id *\) *)
-(*   (\* let three = (s @@ s one) id *\) *)
-(* end;; *)
 
 exception Disequality_violated
 
@@ -719,8 +709,9 @@ let (=/=) x y state0 =
   end
 
   type 'a logic_diseq = 'a logic list
+  type 'a result = 'a logic * 'a logic_diseq
 
-  let refine' : 'a . State.t -> 'a logic -> 'a logic * 'a logic_diseq =
+  let refine' : 'a . State.t -> 'a logic -> 'a result =
     fun ((e, s, c)as st) x ->
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
@@ -770,8 +761,8 @@ let (=/=) x y state0 =
     (* let uncurry3 = succ uncurry2 *)
   end
 
-  module Convenience3 = struct
-    type 'a reifier = int -> (Logger.t * ('a logic * 'a logic list)) list
+  module ConvenienceCurried = struct
+    type 'a reifier = int -> (Logger.t * 'a result) list
     type 'a almost_reifier = state Stream.t -> 'a reifier
 
     let reifier : 'a logic -> 'a almost_reifier = fun x ans n ->
@@ -801,7 +792,7 @@ let (=/=) x y state0 =
       run (succ one) dummy_goal2
   end
 
-  module Convenience4 = struct
+  module ConvenienceStream = struct
 
     module LogicAdder = struct
       (* allows to add new logic variables to function *)
@@ -830,86 +821,6 @@ let (=/=) x y state0 =
 
   end
 
-
-  module Convenience = struct
-    type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
-
-    let reifier : 'a logic -> 'a reifier = fun x ans n ->
-      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
-
-    let fix_state: State.t -> unit = fun ((e, subs, constr) as state) ->
-      let () = print_endline "fix_state" in
-      Env.iter e (fun logic ->
-          match logic with
-          | Var desc ->
-            let old = Hashtbl.hash logic in
-            desc.reifier <- (fun () -> refine' state logic);
-            assert (old = Hashtbl.hash logic);
-          | Value _ -> ()
-        );
-      let () = print_endline "fix_state finsihed" in
-      ()
-
-    let zero  f = f
-
-    let succ (prev: 'a -> state -> 'b) (f: 'c logic -> 'a) : state -> 'c reifier * 'b =
-      call_fresh (fun logic st ->
-        (reifier logic, prev (f logic) st)
-      )
-
-    (* let (one  : ('a logic -> state -> 'b) -> state -> 'a reifier * 'b) = succ zero *)
-    (* let two   = succ one *)
-    (* let three = succ two *)
-    (* let four  = succ three *)
-    (* let five  = succ four *)
-
-    let run runner goalish =
-      run_ (fun st -> runner goalish st)
-
-    let (_: int reifier * (string reifier * state Stream.t)) =
-      run (succ @@ succ zero) dummy_goal2
-  end
-
-  module Convenience2 = struct
-    let zero  f = f
-
-    let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) : state -> 'b =
-      call_fresh (fun logic -> prev (f logic))
-
-    type 'a reifier = int -> ('a logic * 'a logic_diseq) list
-
-    module PolyPairs = struct
-      let id x = x
-
-      (* let find_value var ((st,_,_) : state) = refine' st var *)
-      let mapper var = fun stream n ->
-        List.map (fun state -> refine' state var) (take' ~n stream)
-
-      let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b =
-        fun k stream var -> k (mapper var stream)
-      let succ prev k = fun (stream: state Stream.t) var ->
-        prev  (fun v -> k (mapper var stream, v)) stream
-
-      let (_: state Stream.t ->
-           'a logic ->
-           'b logic ->
-           ('a reifier) * ('b reifier) ) = (succ one) id
-
-      let p sel = sel id
-    end
-
-    let run runner goalish =
-      run_ (fun st ->
-          let arg,g = runner goalish st in g arg
-      )
-
-    let (_: ('a -> state -> 'b * ('b -> 'c)) -> 'a -> 'c) = run
-
-    let (_: int reifier * string reifier) =
-      run (succ @@ succ zero)
-          (fun q r st -> dummy_goal2 q r st, (fun st -> PolyPairs.(p @@ succ one) st q r))
-
-  end
 
     (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
     (*   run_ (Logger.create ()) (fun st -> *)

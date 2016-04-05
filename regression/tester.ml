@@ -166,24 +166,6 @@ open M
 (** Some functions that use Convenience module *)
 (** ****************************************** *)
 
-let () =
-  let open M.Convenience in
-  (* some code to check that types are good. nothing is really executed there *)
-  let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
-  let _ = run (succ @@ succ @@ succ zero) (fun q r s st -> goal3 q r s st) in
-  ()
-
-let run1 ~n (title, goal) =
-  let open M.Convenience4 in
-  printf "'%s', asking for max %d results {\n%!" title n;
-  run one goal
-    |> (fun stream -> Stream.take ~n stream |> List.iter
-          (fun (q,_constr) ->
-            printf "q=%s\n%!" (show_logic_naive q);
-          )
-       );
-  printf "}\n%!"
-
 let cs c name =
   let string_of_constraints cs =
     match cs with
@@ -300,65 +282,9 @@ let run3 ~n (title,goal) =
 (*     then Logger.output_html  ~filename:(out_file_prefix^".html") text_answers graph; *)
 (*   ) *)
 
-let id x = x
-
-module HardUncurry = struct
-  let app_succ n f g z = (n f) (g z)
-  let app1 f g x = f @@ g x
-  let app2 f g z = app_succ app1 f g z
-
-  let incr app n x = app (fun y -> (x,y)) n
-  let one = id
-  let two x y = (x,y)
-
-  let three: 'a -> 'b -> 'c -> 'a * ('b*'c) = fun a b c -> incr app2 two a b c
-end
-
-let comp f g = fun x -> f (g x)
-let (<*>) = comp
-
-module MyCurry = struct
-  let curry_succ k f x = k (f <*> (fun y -> (x,y)))
-  let curry1 = (@@)
-  let curry2 x = curry_succ curry1 x
-  let curry3 x y = curry_succ curry2 x y
-end
-
-let _f () =
-  let three = HardUncurry.(incr app2 two) in
-  let (_: (int * (int*int))) = three 1 2 3 in
-
-  (* let (_:string) = curry3 (fun (a,(b,c)) -> a +b+ c) 1 2 3 in *)
-
- (* let (_:string) = curry3 (fun (a,(b,c)) -> a +b+ c) 1 2 3 in *)
-  let uncurry_succ k f (x,y) = k (f x) y in
-  let uncurry1 = fun f x -> f x          in
-  let uncurry2 = uncurry_succ uncurry1 in
-  let uncurry3 = uncurry_succ uncurry2 in
-
-
-  let wrap x num f = num f x in
-  let open M.Convenience2 in
-  let (goal3: 'a logic -> 'b logic -> 'c logic -> state -> _) = fun _ _ _ _ -> Obj.magic () in
-  (* let (_:_ -> int) = fun ans -> ans ||> uncurry1 (\* (fun _ _ _ -> 1.0) *\) in *)
-  let ans () =
-    wrap
-    (run
-      (succ @@ succ @@ succ zero)
-      (fun q r s st -> goal3 q r s st,
-                       (fun st -> PolyPairs.((succ @@ succ @@ succ zero) id st q r s)) ) )
-    uncurry3
-    (fun _q _ _ ->
-        (* let (_:int -> ('a logic * M.diseq) list) = _q in *)
-        1.0)
-  in
-  let (_:unit -> float ) = ans in
-  ()
 
 let () =
-  (* using Convenience3 module *)
-
-  let open M.Convenience3 in
+  let open M.ConvenienceCurried in
   let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
   let ans () =
     (run (succ one) goal2)
@@ -369,9 +295,7 @@ let () =
 
 let () =
   (* using Convenience4 module *)
-
-  let open M.Convenience4 in
-  (* let (_:int) = succ one in *)
+  let open M.ConvenienceStream in
 
   let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
   let (goal3: 'a logic -> 'b logic -> 'c logic -> goal) = fun _ _ _ _ -> Obj.magic () in
@@ -395,11 +319,10 @@ let () =
   ()
 
 
-open M.Convenience4
+open M.ConvenienceStream
 
 let run1 ~n (title, goal) =
-  let open M.Convenience4 in
-  printf "`%s`, %d answer {\n%!" title n;
+  printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
   run one goal
     |> (fun stream -> Stream.take ~n stream |> List.iter
           (fun (q,_constr) ->
@@ -409,8 +332,7 @@ let run1 ~n (title, goal) =
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  let open M.Convenience4 in
-  printf "`%s`, %d answers {\n%!" title n;
+  printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
   run (succ one) goal |>
     begin fun stream ->
      Stream.take ~n stream |> List.iter
@@ -431,44 +353,3 @@ let run2 ~n (title,goal) =
         )
     end;
   printf "}\n%!"
-
-
-             (*
-let run1 ~n (title, goal) =
-  let open M.Convenience4 in
-  printf "'%s', asking for max %d results {\n%!" title n;
-  run one goal
-    |> (fun stream -> Stream.take ~n stream |> List.iter
-          (fun (q,_constr) ->
-            printf "q=%s\n%!" (show_logic_naive q);
-          )
-       );
-  printf "}\n%!"
-
-let run2 ~n (title,goal) =
-  let open M.Convenience4 in
-  printf "'%s', asking for max %d results {\n%!" title n;
-  run (succ one) goal |>
-    begin fun stream ->
-     Stream.take ~n stream |> List.iter
-        (fun ((q,cs1),(r,cs2)) ->
-           printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
-           (* let cs c name = *)
-           (*   match string_of_constraints cs1 with *)
-           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
-           (*   | None -> () *)
-           (* in *)
-           (* cs cs1 "q"; *)
-           (* cs cs2 "r"; *)
-           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
-           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
-
-           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
-
-        )
-    end;
-  printf "}\n%!"
-
-let one   = M.Convenience4.one
-let succ  = M.Convenience4.succ
-              *)

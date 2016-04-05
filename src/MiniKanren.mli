@@ -208,54 +208,11 @@ module Make : functor (Logger: LOGGER) -> sig
       ('h * 'd -> ('h * 'e) * 'f)
   end
 
-  module Convenience : sig
-    type 'a reifier = state Stream.t -> int -> (Logger.t * ('a logic * 'a logic list)) list
-
-    (** [succ num f] increments the number of free logic variables in
-        a goal; can be used to get rid of ``fresh'' syntax extension *)
-    val succ : ('a -> state -> 'z) -> ('c logic -> 'a) -> state -> 'c reifier * 'z
-
-    (** Zero logic parameters *)
-    val zero : 'a -> 'a
-
-    (* (\** One to five logic parameter(s) *\) *)
-    (* val one   : ('a logic ->                                                 state -> 'z) -> state -> 'a reifier * 'z *)
-    (* val two   : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'a reifier * ('b reifier * 'z) *)
-    (* val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'a reifier * ('b reifier * ('c reifier * 'z)) *)
-    (* val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z *)
-    (* val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z *)
-
-    (* (\** One to five logic parameter(s), conventional names *\) *)
-    (* val q     : ('a logic ->                                                 state -> 'z) -> state -> 'z *)
-    (* val qr    : ('a logic -> 'b logic ->                                     state -> 'z) -> state -> 'z *)
-    (* val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'z) -> state -> 'z *)
-    (* val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'z) -> state -> 'z *)
-    (* val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'z) -> state -> 'z *)
-
-    val run : ('a -> state -> 'c) -> 'a -> 'c
-  end
-
-  module Convenience2 : sig
-    val zero : 'a -> 'a
-    val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
-
-    type 'a reifier = int -> ('a logic * 'a logic_diseq) list
-    module PolyPairs : sig
-      val id : 'a -> 'a
-
-
-      val one : ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b
-      val succ :
-         (('a -> 'b) -> state Stream.t -> 'c) ->
-         ((int -> ('d logic * 'd logic_diseq) list) * 'a -> 'b) ->
-         state Stream.t -> 'd logic -> 'c
-      val p : (('a -> 'a) -> 'b) -> 'b
-    end
-
-    val run: ('a -> state -> 'b * ('b -> 'c)) -> 'a -> 'c
-  end
-
-  module Convenience3 :
+  (** Allows to run goals and get stream of deep pairs as an answer. For example
+   *  run (succ one) (fun q r s -> goal q r s)
+   *   : ( ('a result  -> 'b result -> 'c result -> 'z) -> 'z)
+   *)
+  module ConvenienceCurried :
   sig
     type 'a reifier = int -> (Logger.t * ('a logic * 'a logic list)) list
     type 'a almost_reifier = state Stream.t -> 'a reifier
@@ -283,7 +240,11 @@ module Make : functor (Logger: LOGGER) -> sig
          (('f -> 'g -> 'd) * ('b -> 'g * 'f)) -> 'a -> 'c -> 'e
   end
 
-  module Convenience4 : sig
+  (** Allows to run goals and get stream of deep pairs as an answer. For example
+   *  run (succ one) (fun q r s -> goal q r s)
+   *   : ( ('a result * ('b result * 'c result)) Stream.t )
+   *)
+  module ConvenienceStream : sig
     module LogicAdder : sig
       val zero : 'a -> 'a
       val succ :

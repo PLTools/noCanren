@@ -5,8 +5,6 @@ endif
 TARGETS=src/MiniKanren.cmo
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
-#TESTS=regression/test000.native #regression/test001.native regression/test002.native \
-#	regression/test003.native #regression/test004.native
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests\
@@ -29,7 +27,7 @@ only-toplevel:
 
 toplevel: ppx jslib only-toplevel
 
-tester: jslib
+tester:
 	$(OB) -Is src,jsoo_runner regression/tester.cmo
 
 celan: clean

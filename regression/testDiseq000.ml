@@ -23,5 +23,5 @@ open Tester
 let _ =
   run2 ~n:2 (REPR diseq1);
   (* run3 ~n:2 (REPR diseq3); *)
-  (* run2 ~n:1 (REPR diseq2); *)
+  run2 ~n:1 (REPR diseq2);
   ()
