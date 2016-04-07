@@ -311,7 +311,8 @@ module Env :
           (* | _ -> a == b *)
       end)
 
-    type t = unit H.t * int
+    type latest_counter = int
+    type t = unit H.t * latest_counter
 
     let iter : t -> ('a logic -> unit) -> unit = fun (h,_) f -> H.iter (fun key _v -> f (!!key) ) h
 
@@ -360,11 +361,13 @@ module Subst :
   struct
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
 
+    (* substitutions are stored as map of pairs (from, to) *)
     type t = (Obj.t * Obj.t) M.t
+
 
     let show m =
       let b = Buffer.create 40 in
-      let open ImplicitPrinters in
+      (* let open ImplicitPrinters in *)
       bprintf b "subst {";
       M.iter (fun ikey (_, x) ->
           (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
@@ -381,13 +384,18 @@ module Subst :
 
     let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
 
+    (* [walk e x subs] returns variable which should be substituted according to [x] in substitution [subs] *)
     let rec walk env var subst =
+      printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst);
       match Env.var env var with
       | None   -> var
       | Some i ->
-          try walk env (snd (M.find i (!! subst))) subst with Not_found -> var
+          try walk env (snd (M.find i (!! subst))) subst
+          with Not_found -> var
 
     let rec occurs env xi term subst =
+      printf "occurs?%!";
+      printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) (show subst);
       let y = walk env term subst in
       match Env.var env y with
       | Some yi -> xi = yi
@@ -428,8 +436,13 @@ module Subst :
            with Not_found -> !!var
           )
 
-
+    let show_option f = function Some x -> "Some "^(f x) | None -> "None"
     let unify env x y subst =
+      printf "_.11 = '%s'\n%!" (generic_show !!(var_of_int 11));
+      printf "unify: env ~x:'%s' ~y:'%s' ~subst:'%s'\n%!" (generic_show !!x) (generic_show !!y) (show_option show subst);
+      printf ".....      ~x:'%s' ~y:'%s'\n%!" (show_logic_naive x) (show_logic_naive y);
+      if (generic_show !![var_of_int 11]) = generic_show !!x then failwith "ASS";
+      Printexc.get_backtrace () |> print_endline;
       let rec unify x y (delta, subst) =
         let extend xi x term delta subst =
           (* if occurs env xi term subst then raise Occurs_check *)
@@ -528,31 +541,13 @@ module Make (Logger: LOGGER) = struct
     ((sprintf "fresh variable '%s' as '%s'" (show_logic_naive x) name) <=>
      (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
-(*
-let zero f = f
-
-let succ (prev: 'a -> state -> 'z) (f: 'c logic -> 'a) : state -> 'z =
-  call_fresh (fun logic -> prev @@ f logic)
-
-let one   f  = succ zero f
-let two   f  = succ one f
-let three f  = succ two f
-let four  f  = succ three f
-let five  f  = succ four f
-
-let q     = one
-let qr    = two
-let qrs   = three
-let qrst  = four
-let pqrst = five
-*)
 
 exception Disequality_violated
 
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
+  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -566,9 +561,15 @@ let (===) x y st =
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
+          print_endline "folding constraints";
           let constr' =
             List.fold_left (fun css' cs ->
-              let x, t  = Subst.split cs in
+              let (x, t) : Obj.t list * Obj.t list  = Subst.split cs in
+              printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs);
+              printf "x = [%s], t=[%s]\n%!"
+                (String.concat "; " @@ List.map (fun x -> generic_show !!x) x)
+                (String.concat "; " @@ List.map (fun x -> generic_show !!x) t);
+
               try
                 let p, s' = Subst.unify env (!!x) (!!t) subst' in
                 match s' with
