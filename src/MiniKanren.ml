@@ -386,7 +386,7 @@ module Subst :
 
     (* [walk e x subs] returns variable which should be substituted according to [x] in substitution [subs] *)
     let rec walk env var subst =
-      printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst);
+      (* printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst); *)
       match Env.var env var with
       | None   -> var
       | Some i ->
@@ -394,8 +394,8 @@ module Subst :
           with Not_found -> var
 
     let rec occurs env xi term subst =
-      printf "occurs?%!";
-      printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) (show subst);
+      (* printf "occurs?%!"; *)
+      (* printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) (show subst); *)
       let y = walk env term subst in
       match Env.var env y with
       | Some yi -> xi = yi
@@ -403,6 +403,7 @@ module Subst :
          let wy = wrap (Obj.repr y) in
          match wy with
          | Unboxed _ -> false
+         | Invalid 247 -> false
          | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
          | Boxed (_, s, f) ->
             let rec inner i =
@@ -412,6 +413,7 @@ module Subst :
             inner 0
 
     let rec walk' env var subst =
+      (* printf "walk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst); *)
       match Env.var env var with
       | None ->
           let Value (v, printer) = !! var in
@@ -438,15 +440,16 @@ module Subst :
 
     let show_option f = function Some x -> "Some "^(f x) | None -> "None"
     let unify env x y subst =
-      printf "_.11 = '%s'\n%!" (generic_show !!(var_of_int 11));
-      printf "unify: env ~x:'%s' ~y:'%s' ~subst:'%s'\n%!" (generic_show !!x) (generic_show !!y) (show_option show subst);
-      printf ".....      ~x:'%s' ~y:'%s'\n%!" (show_logic_naive x) (show_logic_naive y);
-      if (generic_show !![var_of_int 11]) = generic_show !!x then failwith "ASS";
-      Printexc.get_backtrace () |> print_endline;
+      (* printf "_.11 = '%s'\n%!" (generic_show !!(var_of_int 11)); *)
+      (* printf "unify: env ~x:'%s' ~y:'%s' ~subst:'%s'\n%!" (generic_show !!x) (generic_show !!y) (show_option show subst); *)
+      (* printf ".....      ~x:'%s' ~y:'%s'\n%!" (show_logic_naive x) (show_logic_naive y); *)
+      (* if (generic_show !![var_of_int 11]) = generic_show !!x then failwith "ASS"; *)
+      (* Printexc.get_backtrace () |> print_endline; *)
+
       let rec unify x y (delta, subst) =
         let extend xi x term delta subst =
-          (* if occurs env xi term subst then raise Occurs_check *)
-          (* else  *)
+          if occurs env xi term subst then raise Occurs_check
+          else
             (xi, !!x, !!term)::delta, Some (!! (M.add xi (!!x, term) (!! subst)))
         in
         match subst with
@@ -461,11 +464,13 @@ module Subst :
                 (* print_endline (generic_show !!x); *)
                 (* printf "Value (5,  fun _ -> \"5\") is %s\n%!" (generic_show !!(Value (5, fun _ -> "5")) ); *)
                 (* printf "Var   {index=11; reifier=...) is %s\n%!" (generic_show !!(Var {index=11; reifier=fun () -> assert false})); *)
-                let Value (xx,xprinter) = !!x in
-                let Value (yy,yprinter) = !!y in
-                let wx, wy = wrap (Obj.repr xx), wrap (Obj.repr yy) in
+                (* let Value (xx,xprinter) = !!x in *)
+                (* let Value (yy,yprinter) = !!y in *)
+                let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
+                 | Invalid 247, Invalid 247 when x==y -> delta, s
+
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
                     then
@@ -547,7 +552,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
+  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -561,14 +566,14 @@ let (===) x y st =
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
-          print_endline "folding constraints";
+          (* print_endline "folding constraints"; *)
           let constr' =
             List.fold_left (fun css' cs ->
               let (x, t) : Obj.t list * Obj.t list  = Subst.split cs in
-              printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs);
-              printf "x = [%s], t=[%s]\n%!"
-                (String.concat "; " @@ List.map (fun x -> generic_show !!x) x)
-                (String.concat "; " @@ List.map (fun x -> generic_show !!x) t);
+              (* printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs); *)
+              (* printf "x = [%s], t=[%s]\n%!" *)
+              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) x) *)
+              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) t); *)
 
               try
                 let p, s' = Subst.unify env (!!x) (!!t) subst' in

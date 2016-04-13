@@ -13,7 +13,7 @@ let diseq1 a b =
   ((a === (embed 3)) &&& (a =/= b))
 
 let diseq2 a b =
-   ((a === (embed 3)) &&& (a =/= b)) &&& ( (b=== embed 3)  )
+   ((a === (embed 3)) &&& (a =/= b)) &&& ( (b=== embed 4)  )
 
 let diseq3 a b c =
   ((a === (embed 3)) &&& (a =/= b) &&& (c =/= b))
