@@ -361,7 +361,7 @@ module Subst :
   struct
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
 
-    (* substitutions are stored as map of pairs (from, to) *)
+    (* substitutions are stored as map of pairs key -> (_, to) *)
     type t = (Obj.t * Obj.t) M.t
 
 
