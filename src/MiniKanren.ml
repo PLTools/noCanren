@@ -552,7 +552,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
+  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -655,7 +655,8 @@ let (=/=) x y state0 =
   let disj f g =
     (* When call mplus the 1st argument is evaluated earlier, so it will gives answers
        easrlier too *)
-    "disj" <=> (fun st -> Stream.mplus (f st) (g st) )
+    (fun st ->
+     Stream.mplus (f st) Stream.(from_fun (fun () -> g st) ) )
 
   let (|||) = disj
 
