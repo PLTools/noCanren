@@ -27,16 +27,6 @@ let rec addo x y z =
        (addo x' y z')
   ]
 
-(* let rec addo x y z = *)
-(*   print_endline "addo"; *)
-(*   (|||) *)
-(*     (fun st -> print_endline "LEFT"; *)
-(*       (&&&) (x === !O) (z === y) st) *)
-(*     (call_fresh (fun x' -> call_fresh (fun z' -> *)
-(*        print_endline "RIGHT"; *)
-(*        (x === (!(S x'))) ||| ((z === (!(S z'))) ||| (addo x' y z')))) ) *)
-
-
 (* let rec mulo x y z = *)
 (*   conde [ *)
 (*     (x === !O) &&& (z === !O); *)
@@ -51,14 +41,16 @@ open Tester
 
 
 let _ =
-  run1 ~n:1  (REPR (fun q  -> addo !O !(S !O) q                 ) );
-  (* run1 ~n:1  (REPR (fun q st -> addo !(S !O) !(S !O) q st       ) ); *)
-  (* run1 ~n:2  (REPR (fun q  -> addo !O !(S !O) q                 ) ); *)
-  (* run1 ~n:2  (REPR (fun q  -> addo !(S !O) !(S !O) q            ) ); *)
-  (* run1 ~n:1  (REPR (fun q  -> addo q !(S !O) !(S !O)            ) ); *)
-  (* run1 ~n:1  (REPR (fun q  -> addo !(S !O) q !(S !O)            ) ); *)
-  (* run1 ~n:2  (REPR (fun q  -> addo q !(S !O) !(S !O)            ) ); *)
-  (* run1 ~n:2  (REPR (fun q  -> addo !(S !O) q !(S !O)            ) ); *)
+  (* run1 ~n:1  (REPR (addo !O      !(S !O) ) ); *)
+  run1 ~n:1  (REPR (addo !(S !O) !(S !O) ) );
+  (* run1 ~n:2  (REPR (addo !O      !(S !O) ) ); *)
+  (* run1 ~n:2  (REPR (addo !(S !O) !(S !O) ) ); *)
+
+  (* run1 ~n:1  (REPR (fun q -> addo q !(S !O) !(S !O)            ) ); *)
+  (* run1 ~n:1  (REPR (fun q -> addo !(S !O) q !(S !O)            ) ); *)
+  (* run1 ~n:2  (REPR (fun q -> addo q !(S !O) !(S !O)            ) ); *)
+  (* run1 ~n:2  (REPR (fun q -> addo !(S !O) q !(S !O)            ) ); *)
+
 (*   run show_nat empty_reifier (-1)  qr  (fun q r   st -> REPR (addo q r !(S !(S !(S !(S !O))))       st), ["q", q; "r", r]); *)
 
 (*   run1 ~n:1  (REPR (fun q     st -> REPR (mulo !O !(S !O) q                     st) ); *)

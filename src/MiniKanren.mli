@@ -270,7 +270,7 @@ module Make : functor (Logger: LOGGER) -> sig
          (State.t -> 'j logic * 'f -> ('j logic * 'j logic_diseq) * 'g)
    val run :
        ('a -> state -> 'b) * ('b -> 'c * state Stream.t) *
-       (State.t -> 'c -> 'g) -> 'a -> 'g Stream.t
+       (State.t -> 'c -> 'g) -> 'a -> (Logger.t * 'g) Stream.t
    end
 
 end

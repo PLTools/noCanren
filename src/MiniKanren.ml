@@ -552,7 +552,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
+  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -823,9 +823,9 @@ let (=/=) x y state0 =
 
     let run (adder,extD,appF) goalish =
       let tuple,stream = run_ (adder goalish) |> extD in
-      Stream.map (fun (st: state) -> appF (fst3 st) tuple) stream
+      Stream.map (fun (st: state) -> (snd3 st, appF (fst3 st) tuple) ) stream
 
-    let (_: ((int logic * int logic_diseq) * (string logic * string logic_diseq)) Stream.t)
+    let (_: (Logger.t * ((int logic * int logic_diseq) * (string logic * string logic_diseq))) Stream.t)
        = run (succ one) dummy_goal2
 
   end

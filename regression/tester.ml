@@ -292,9 +292,8 @@ let () =
   let _ = ans in
   let (_: ('a reifier -> 'b reifier -> 'c) -> 'c) = ans () in
   ()
-
+(*
 let () =
-  (* using Convenience4 module *)
   let open M.ConvenienceStream in
 
   let (goal2: 'a logic -> 'b logic ->             goal) = fun _ _ _   -> Obj.magic () in
@@ -308,7 +307,7 @@ let () =
   in
   let _ = ans in
   let (_:
-     ((('a logic * 'a logic_diseq) * ('b logic * 'b logic_diseq)) Stream.t -> 'c) -> 'c)
+     ((M.Logger.t * (('a logic * 'a logic_diseq) * ('b logic * 'b logic_diseq))) Stream.t -> 'c) -> 'c)
      = ans
   in
   let (_:
@@ -317,26 +316,45 @@ let () =
      = (|>) (run (succ @@ succ one) goal3)
   in
   ()
+ *)
 
+let rec list_last_exn = function
+  | [x] -> x
+  | [] -> failwith "bad argument"
+  | _::xs -> list_last_exn xs
 
 open M.ConvenienceStream
 
 let run1 ~n (title, goal) =
   printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
-  run one goal
-    |> (fun stream -> Stream.take ~n stream |> List.iter
-          (fun (q,_constr) ->
-            printf "q=%s;\n%!" (show_logic_naive q);
-          )
-       );
+  run one goal |> (fun stream ->
+    let answers = Stream.take ~n stream in
+    answers |> List.iter
+      (fun (_logger, (q,_constr)) ->
+         printf "q=%s;\n%!" (show_logic_naive q);
+      );
+    list_last_exn answers |> (fun (graph,_) ->
+      if config.do_plain then
+        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
+        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
+        ();
+      if config.do_html
+      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+
+        print_endline "dumping graph";
+        GraphLogger.dump_graph (Obj.magic graph) stdout;
+    )
+
+  );
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
   printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
   run (succ one) goal |>
     begin fun stream ->
-     Stream.take ~n stream |> List.iter
-        (fun ((q,cs1),(r,cs2)) ->
+      let answers = Stream.take ~n stream in
+      answers |> List.iter
+        (fun (logger, ((q,cs1),(r,cs2))) ->
            printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
            (* let cs c name = *)
            (*   match string_of_constraints cs1 with *)
@@ -350,6 +368,15 @@ let run2 ~n (title,goal) =
 
            (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
 
-        )
+        );
+     list_last_exn answers |> (fun (graph,_) ->
+      if config.do_plain then
+        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
+        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
+        ();
+      if config.do_html
+      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+    )
+
     end;
   printf "}\n%!"
