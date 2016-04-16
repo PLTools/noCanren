@@ -116,7 +116,8 @@ let var_of_int index =
   let rec ans = Var { index; reifier=fun () -> (ans,[]) } in
   ans
 
-let (!) x = Value (x, (fun _ -> "<not implemented>"))
+let const_not_implemented _ =   "<not implemented>"
+let (!) x = Value (x, const_not_implemented)
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
 
 let embed_explicit printer x = Value (x, printer)
@@ -145,30 +146,11 @@ let show_logic_naive =
     (* but fix js_of_ocaml before doing that *)
     printer x
 
-(* let logic = { *)
-(*   logic with plugins = *)
-(*     object *)
-(*       method html    = logic.plugins#html *)
-(*       method eq      = logic.plugins#eq *)
-(*       method compare = logic.plugins#compare *)
-(*       method foldr   = logic.plugins#foldr *)
-(*       method foldl   = logic.plugins#foldl *)
-(*       method map     = logic.plugins#map *)
-(*       method show fa x = *)
-(*         GT.transform(logic) *)
-(*            (GT.lift fa) *)
-(*            (object inherit ['a] @logic[show] *)
-(*               method c_Var   _ _ i = Printf.sprintf "_.%d" i *)
-(*               method c_Value _ _ x = x.GT.fx () *)
-(*             end) *)
-(*            () *)
-(*            x *)
-(*     end *)
-(* };; *)
-
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
-let llist_nil = Value(Nil, fun _ -> "[]")
+let const_empty_list_str _ = "[]"
+let llist_nil = Value(Nil, const_empty_list_str)
+
 let llist_printer v =
   let b = Buffer.create 49 in
   let rec helper = function
@@ -193,11 +175,17 @@ let (%<) x y =
   ans
 
 let (!<) x   =
-  let printer = function
-    | Cons (v, Value (Nil,_)) -> sprintf "[%s]" (show_logic_naive v)
-    | _ -> assert false
-  in
-  Value (Cons (x, llist_nil), printer)
+  (* let printer = function *)
+  (*   | Cons (v, Value (Nil,_)) -> sprintf "[%s]" (show_logic_naive v) *)
+  (*   | _ -> assert false *)
+  (* in *)
+
+  (* WTF!
+   * we can't use custom print function there, because it will not pass
+   * unification (two values with tag 247 but not physically equal -> no comparable
+   * I'm not really sure which workaround exists except using the same function everywhere
+   *)
+  Value (Cons (x, llist_nil), llist_printer)
 
 let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
@@ -441,12 +429,14 @@ module Subst :
     let show_option f = function Some x -> "Some "^(f x) | None -> "None"
     let unify env x y subst =
       (* printf "_.11 = '%s'\n%!" (generic_show !!(var_of_int 11)); *)
-      (* printf "unify: env ~x:'%s' ~y:'%s' ~subst:'%s'\n%!" (generic_show !!x) (generic_show !!y) (show_option show subst); *)
+      (* printf "unify: env ~x:'%s' ~subst:'%s'\n%!" (generic_show !!x) *)
+      (*        (show_option show subst); *)
+      (* printf "_____:     ~y:'%s'\n%!" (generic_show !!y) ; *)
       (* printf ".....      ~x:'%s' ~y:'%s'\n%!" (show_logic_naive x) (show_logic_naive y); *)
-      (* if (generic_show !![var_of_int 11]) = generic_show !!x then failwith "ASS"; *)
-      (* Printexc.get_backtrace () |> print_endline; *)
 
       let rec unify x y (delta, subst) =
+        (* printf "UNIFY x = '%s'\n%!" (generic_show !!x); *)
+        (* printf "      y = '%s'\n%!" (generic_show !!y); *)
         let extend xi x term delta subst =
           if occurs env xi term subst then raise Occurs_check
           else
@@ -461,11 +451,7 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
-                (* print_endline (generic_show !!x); *)
-                (* printf "Value (5,  fun _ -> \"5\") is %s\n%!" (generic_show !!(Value (5, fun _ -> "5")) ); *)
-                (* printf "Var   {index=11; reifier=...) is %s\n%!" (generic_show !!(Var {index=11; reifier=fun () -> assert false})); *)
-                (* let Value (xx,xprinter) = !!x in *)
-                (* let Value (yy,yprinter) = !!y in *)
+                if x==y then (delta,s) else
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
