@@ -122,7 +122,7 @@ let rec pamk_e mapper e : expression =
         match body with
         | [(_,body)] -> pamk_e mapper body
         | ____ -> list_fold (List.rev body)
-                     ~f:(fun acc (_,x) -> [%expr [%e (pamk_e mapper x)] ||| [%e acc]])
+                     ~f:(fun acc (_,x) -> [%expr [%e (pamk_e mapper x)] &&& [%e acc]])
 
       in
       match reconstruct_args args with
