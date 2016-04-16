@@ -154,6 +154,10 @@ let rec pamk_e mapper e : expression =
   | Pexp_construct (id, Some e1) -> { e with pexp_desc = Pexp_construct (id, Some (mapper.expr mapper e1)) }
 
   | Pexp_tuple es -> {e with pexp_desc=Pexp_tuple (List.map (mapper.expr mapper) es) }
+  | Pexp_let   (_recflag, vbs,where_expr) ->
+     let vbs_new = List.map (fun vb -> {vb with pvb_expr=mapper.expr mapper vb.pvb_expr}) vbs
+     in
+     {e with pexp_desc=Pexp_let(_recflag, vbs_new, mapper.expr mapper where_expr) }
 
   (* TODO: support all cases *)
   | _ -> e

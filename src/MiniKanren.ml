@@ -166,6 +166,21 @@ let llist_printer v =
   helper v;
   Buffer.contents b
 
+module Show_llist_explicit (X: ImplicitPrinters.SHOW) = struct
+  type t = X.t llist
+  let show = llist_printer
+end
+
+implicit module Show_llist {X: ImplicitPrinters.SHOW} = struct
+  type t = X.t llist
+  let show = llist_printer
+end
+
+let () =
+  let open ImplicitPrinters in
+  let (_) = embed (Nil: int llist) in
+  ()
+
 let (%)  x y =
   Value (Cons (x, y), llist_printer)
 
@@ -206,27 +221,6 @@ let rec to_listk k = function
 
 let to_list l = to_listk (fun _ -> raise Not_a_value) l
 
-(* let llist = { *)
-(*   llist with plugins = *)
-(*     object *)
-(*       method html    = llist.plugins#html *)
-(*       method eq      = llist.plugins#eq *)
-(*       method compare = llist.plugins#compare *)
-(*       method foldr   = llist.plugins#foldr *)
-(*       method foldl   = llist.plugins#foldl *)
-(*       method map     = llist.plugins#map *)
-(*       method show fa x = "[" ^ *)
-(*         (GT.transform(llist) *)
-(*            (GT.lift fa) *)
-(*            (object inherit ['a] @llist[show] *)
-(*               method c_Nil   _ _      = "" *)
-(*               method c_Cons  i s x xs = GT.show(logic) fa x ^ (match xs with Value Nil -> "" | _ -> "; " ^ GT.show(logic) (s.GT.f i) xs) *)
-(*             end) *)
-(*            () *)
-(*            x *)
-(*         ) ^ "]" *)
-(*     end *)
-(* } *)
 
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 

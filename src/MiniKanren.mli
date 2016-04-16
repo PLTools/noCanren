@@ -59,6 +59,16 @@ val show_logic_naive : 'a logic -> string
 (** Type of ligic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
+module Show_llist_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
+                       type t = X.t llist
+                       val show : X.t llist -> string
+end
+
+module Show_llist : functor {X : ImplicitPrinters.SHOW} -> sig
+                       type t = X.t llist
+                       val show : X.t llist -> string
+end
+
 val llist_nil : 'a llist logic
 (** Infix synonym for [Cons] *)
 val (%) : 'a logic -> 'a llist logic -> 'a llist logic
