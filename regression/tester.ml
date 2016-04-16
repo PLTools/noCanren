@@ -1,5 +1,10 @@
 open Printf
 
+let option_iter ~f = function
+  | Some x -> f x
+  | None -> ()
+
+
 type config = { mutable do_html: bool   (* html output of deduction tree *)
               ; mutable do_plain: bool  (* plain text output of deduction tree *)
               }
@@ -336,17 +341,30 @@ let rec list_last_exn = function
   | [] -> failwith "bad argument"
   | _::xs -> list_last_exn xs
 
+let rec list_last = function
+  | [x] -> Some x
+  | [] -> None
+  | _::xs -> list_last xs
+
 open M.ConvenienceStream
 
+let print_title title n =
+  (match n with
+   | _ when n<0  -> fun f -> f "all" "s"
+   | _ when n<>1 -> fun f -> f (string_of_int n)     "s"
+   | _           -> fun f -> f (string_of_int n) ""
+  ) @@
+  printf "`%s`, %s answer%s {\n%!" title
+
 let run1 ~n (title, goal) =
-  printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
+  print_title title n;
   run one goal |> (fun stream ->
     let answers = Stream.take ~n stream in
     answers |> List.iter
       (fun (_logger, (q,_constr)) ->
          printf "q=%s;\n%!" (show_logic_naive q);
       );
-    list_last_exn answers |> (fun (graph,_) ->
+    option_iter (list_last answers) ~f:(fun (graph,_) ->
       if config.do_plain then
         let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
         let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
@@ -362,13 +380,13 @@ let run1 ~n (title, goal) =
   printf "}\n%!"
 
 let run2 ~n (title,goal) =
-  printf "`%s`, %d answer%s {\n%!" title n (if n <> 1 then "s" else "");
+  print_title title n;
   run (succ one) goal |>
     begin fun stream ->
       let answers = Stream.take ~n stream in
       answers |> List.iter
         (fun (logger, ((q,cs1),(r,cs2))) ->
-           printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
+           printf "q=%s; r=%s;\n%!" (show_logic_naive q) (show_logic_naive r);
            (* let cs c name = *)
            (*   match string_of_constraints cs1 with *)
            (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
@@ -382,7 +400,41 @@ let run2 ~n (title,goal) =
            (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
 
         );
-     list_last_exn answers |> (fun (graph,_) ->
+     option_iter (list_last answers) ~f:(fun (graph,_) ->
+      if config.do_plain then
+        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
+        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
+        ();
+      if config.do_html
+      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+    )
+
+    end;
+  printf "}\n%!"
+
+let run3 ~n (title,goal) =
+  print_title title n;
+  run (succ @@ succ one) goal |>
+    begin fun stream ->
+      let answers = Stream.take ~n stream in
+      answers |> List.iter
+        (fun (logger, ((q,cs1), ((r,cs2), (s,cs3))) ) ->
+           printf "q=%s; r=%s; s=%s;\n%!" (show_logic_naive q) (show_logic_naive r)
+             (show_logic_naive s);
+           (* let cs c name = *)
+           (*   match string_of_constraints cs1 with *)
+           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
+           (*   | None -> () *)
+           (* in *)
+           (* cs cs1 "q"; *)
+           (* cs cs2 "r"; *)
+           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
+           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
+
+           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
+
+        );
+     option_iter (list_last answers) ~f:(fun (graph,_) ->
       if config.do_plain then
         let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
         let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in

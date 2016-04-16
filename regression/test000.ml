@@ -66,7 +66,8 @@ let _ =
   run2 ~n:4 (REPR(fun q r -> appendo q (of_list ([]: int list)) r) );
   (* run2 ~n:4 (REPR(fun q r -> appendo (of_list [1]) q r) ); *)
 
-  run1 ~n:1  (REPR(fun q -> reverso q (of_list [1; 2; 3; 4]) ) );
+  run1 ~n:1  (REPR(fun q -> reverso q (of_list [1;2;3;4]) ) );
+  (* run1 ~n:1  (REPR(fun q -> (q % llist_nil) === (of_list [1]) ) ); *)
   run1 ~n:1  (REPR(fun q -> reverso (of_list [1; 2; 3; 4]) q ) );
   run1 ~n:1  (REPR(fun q -> reverso (of_list ([]: int list)) (of_list ([]: int list))));
   run1 ~n:1  (REPR(fun q -> reverso q q) );
@@ -76,17 +77,4 @@ let _ =
   run1 ~n:2  (REPR(fun q -> reverso q (of_list [1]) ) );
   run1 ~n:1  (REPR(fun q -> reverso (of_list [1]) q ) );
 
-  (* run 1   q ~varnames:["q"]     (REPR a_and_b); *)
-  (* run 2   q ~varnames:["q"]     (REPR a_and_b'); *)
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) ); *)
-  (* run 4  qr ~varnames:["q"]     (REPR (fun q r -> appendo q (of_list ([]:int list)) r) ); *)
-
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1; 2; 3; 4])) ); *)
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1; 2; 3; 4]) q) ); *)
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list ([]: int list)) (of_list ([]: int list)) )); *)
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
-  (* run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
-  (* run 10  q ~varnames:["q"]     (REPR (fun q   -> reverso q q                   )); *)
-  (* run 2   q ~varnames:["q"]     (REPR (fun q   -> reverso q (of_list [1])       )); *)
-  (* run 1   q ~varnames:["q"]     (REPR (fun q   -> reverso (of_list [1]) q       )); *)
   ()
