@@ -52,10 +52,13 @@ module GraphLogger = struct
   let dump_graph g ch =
     print_endline "dumping graph";
     let f k v =
-      fprintf ch "%d: [" k;
+      fprintf ch "%03d: [" k;
       List.iteri (fun n (dest,name,_level) ->
                   if n<>0 then fprintf ch ",";
-                  fprintf ch "(%d,'%s',%d)" dest name _level) v;
+                  (* fprintf ch "(%d,'%s',%d)" dest name _level *)
+                  fprintf ch "(dest=%d, '%s')" dest name
+                 ) v;
+
       fprintf ch " ]\n"
     in
     G.iter f g.l_graph;
@@ -97,23 +100,22 @@ module GraphLogger = struct
     let style ~url = tag "link" ~attrs:(sprintf "rel='stylesheet' type='text/css' href='%s' media='screen'" url) [] in
     let script_inline text = tag "script" ~attrs:"type='text/javascript'" [P.raw text] in
     let div ?(attrs="") xs = tag ~attrs "div" xs in
+    let a ?(attrs="") text = tag ~attrs "a" [P.raw text] in
+    let br = tag ~attrs:"" "br" [] in
 
-    let head = tag "head"
+    let head =
+      tag "head"
         [ style  ~url:"web/main.css"
+        ; style  ~url:"web/expandable-list/expandable-list.css"
         ; script ~url:"web/runOnLoad.src.js"
-        ; script ~url:"web/CollapsibleLists.compressed.js"
         ; script ~url:"web/jquery-1.11.3.min.js"
+        ; script ~url:"web/expList.js"
+        ; script ~url:"web/expListButtons.js"
         ; script_inline "
-runOnLoad(function(){
-  console.log('1');
-  CollapsibleLists.apply();
-});
-
-function onGenerationSelected(level) {
-  console.log(level);
-}
-                         "]
-
+           $(document).ready(function() {
+             $('#expandList').delay(500).trigger('click');
+           });"
+        ]
     in
 
     let answers_div =
@@ -140,8 +142,19 @@ function onGenerationSelected(level) {
         [HTMLView.string (sprintf "<No such node '%s'>" (string_of_node node))]
     in
     let p = HTMLView.seq (helper 0) in
-    let p = HTMLView.ul ~attrs:"class='collapsibleList' id='roottree'" p in
-    let p = HTMLView.(html (seq [head; body (seq [answers_div; p])])) in
+    let p = HTMLView.ul ~attrs:"id='expList'" p in
+    let p =
+      let xxx =
+        [ div ~attrs:"class='listControl'"
+              [ a ~attrs:"id='expandList'"   "Expand   All"
+              ; a ~attrs:"id='collapseList'" "Collapse All"
+              ]
+        ; br
+        ; div ~attrs:"id='listContainer'" [p]
+        ]
+      in
+      HTMLView.(html @@ seq [head; body (seq xxx)])
+    in
     let ch = open_out filename in
     output_string ch (HTMLView.toHTML p);
     fprintf ch "\n%!" ;

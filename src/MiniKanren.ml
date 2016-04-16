@@ -652,11 +652,11 @@ let (=/=) x y state0 =
 
   let (&&&) = conj
 
-  let disj f g =
+  let disj f g st0 =
+    let st = adjust_state "|||" st0 in
     (* When call mplus the 1st argument is evaluated earlier, so it will gives answers
        easrlier too *)
-    (fun st ->
-     Stream.mplus (f st) Stream.(from_fun (fun () -> g st) ) )
+    Stream.mplus (f st) Stream.(from_fun (fun () -> g st) )
 
   let (|||) = disj
 

@@ -201,42 +201,9 @@
     <!-- http://jasalguero.com/ledld/development/web/expandable-list/ -->
     <link rel="stylesheet" type="text/css" href="web/expandable-list/expandable-list.css" media="screen"></link>
 
-    <script type="text/javascript">
-      function prepareList() {
-        $('#expList').find('li:has(ul)')
-          .click( function(event) {
-            if (this == event.target) {
-              $(this).toggleClass('expanded');
-              $(this).children('ul').toggle('medium');
-            }
-            return false;
-          })
-        .addClass('collapsed')
-        .children('ul').hide();
-      };
 
-      $(document).ready( function() {
-        prepareList();
-      });
-    </script>
-
-    <script type="text/javascript">
-      //Create the button funtionality
-      $(document).ready(function() {
-        $('#expandList')
-          .unbind('click')
-          .click( function() {
-            $('.collapsed').addClass('expanded');
-            $('.collapsed').children().show('medium');
-        });
-        $('#collapseList')
-          .unbind('click')
-          .click( function() {
-            $('.collapsed').removeClass('expanded');
-            $('.collapsed').children().hide('medium');
-        });
-      });
-    </script>
+    <script type="text/javascript" src="web/expList.js"></script>
+    <script type="text/javascript" src="web/expListButtons.js"></script>
 
   </head>
   <body>

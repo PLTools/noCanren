@@ -27,6 +27,15 @@ let rec addo x y z =
        (addo x' y z')
   ]
 
+let rec addo x y z =
+  (|||)
+    ((x === (!O)) &&& (z === y))
+    (call_fresh (fun x'  -> call_fresh
+       (fun z'  ->
+         (x === !(S x')) |||
+           ((z === !(S z')) ||| (addo x' y z'))
+       )))
+
 (* let rec mulo x y z = *)
 (*   conde [ *)
 (*     (x === !O) &&& (z === !O); *)
