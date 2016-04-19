@@ -166,8 +166,8 @@ let var_of_int index =
 
 let const_not_implemented _ =   "<not implemented>"
 let (!) x = Value (x, const_not_implemented)
-(* let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show) *)
-let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show)
+let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
+(* let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show) *)
 
 let embed_explicit printer x = Value (x, printer)
 
@@ -254,7 +254,7 @@ let (!<) x   =
 let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
     | [] -> llist_nil
-    | x::xs -> (Value (x, generic_show)) % (helper xs)
+    | x::xs -> (Value (x, S.show)) % (helper xs)
   in
   helper xs
 
@@ -454,7 +454,7 @@ module Subst :
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
-                 | Invalid 247, Invalid 247 when x==y -> delta, s
+                 | Invalid 247, Invalid 247 (* when x==y *) -> delta, s
 
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy

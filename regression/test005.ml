@@ -88,37 +88,27 @@ let infero (expr: Show_lam_logic.t) (typ: Show_typ_logic.t) =
   infero !(Nil: (string logic * typ logic) llist) expr typ
   (* infero !(Nil: int llist) expr typ *)
 
-
-(* let (_:int) = (!) *)
-
-(* let show_env    = GT.( show logic (show llist (show pair (show logic (show string)) (show logic (show typ)))) ) *)
-(* let show_typ    = GT.( show logic (show typ) ) *)
-(* let show_lam    = GT.( show logic (show lam) ) *)
-(* let show_string = GT.( show logic (show string) ) *)
-
 module Show_string_logic = MiniKanren.Show_logic_explicit(Show_string)
 module Show_env_explicit = Show_logic_explicit( MiniKanren.Show_llist_explicit(Show_pair_explicit(Show_string_logic)(Show_typ_logic)) )
 open Tester
 
 let _ =
-  (* run1 ~n:1    (REPR (lookupo (!"x") (of_list ([]: (string logic * typ logic) list)) ) ); *)
-  (* run3 ~n:1    (REPR (fun q r s -> (of_list [!"x", !(V !"x")]) === of_list [ (q,r) ] ) ); *)
-  (* run2 ~n:1    (REPR (fun q r -> !(!"x", !(V !"x")) === !(q,r) ) ); *)
-  (* run2 ~n:1    (REPR (fun q r -> !(!1, !3) === !(q,r) ) ); *)
-  (* run2 ~n:1    (REPR (fun q r ->  !(V !"x") === ( r) ) ); (\* OK *\) *)
-  (* run1 ~printer:Show_typ_logic.show ~n:1 *)
-  (*      (REPR (lookupo !"x" (of_list [!"x", !(V !"x")])            ) ); *)
-  run1 ~printer:Show_typ_logic.show ~n:1
+  run1 ~n:1    (REPR (lookupo (!"x") (of_list ([]: (string logic * typ logic) list)) ) );
+  (* run2 ~n:1    (REPR (fun q r -> (of_list [!"x", !(V !"x")]) === of_list [ (q,r) ] ) ); *)
+
+  run1 (* ~printer:Show_typ_logic.show *) ~n:1
+       (REPR (lookupo !"x" (of_list [!"x", !(V !"x")])            ) );
+  run1 (* ~printer:Show_typ_logic.show *) ~n:1
        (REPR (fun q -> lookupo !"x" (of_list [!"y", !(V !"y"); !"x", !(V !"x")]) q) );
 
-  run1 ~printer:Show_string_logic.show ~n:1
+  run1 (* ~printer:Show_string_logic.show *) ~n:1
        (REPR (fun q -> lookupo q (of_list [!"y", !(V !"y"); !"x", !(V !"x")]) !(V !"x")     ) );
-  run1 ~printer:Show_env_explicit.show ~n:1
+  run1 (* ~printer:Show_env_explicit.show *) ~n:1
        (REPR(fun q -> lookupo !"x" q !(V !"y")                                             ) );
-  (* run show_env    empty_reifier 5 (fun q -> lookupo !"x" q !(V !"y")                                             ) ); *)
-  (* run1 1 (fun q -> infero !(Abs (!"x", !(X !"x"))) q                                    ) ); *)
-  (* run1 1 (fun q -> infero !(Abs (!"f", !(Abs (!"x", !(App (!(X !"f"), !(X !"x"))))))) q ) ); *)
-  (* run1 1 (fun q -> infero !(Abs (!"x", !(Abs (!"f", !(App (!(X !"f"), !(X !"x"))))))) q ) ); *)
-  (* run show_lam    empty_reifier 1 (fun q -> infero q !(Arr (!(V !"x"), !(V !"x")))                               ) ); *)
-  (* run1 1 (fun q -> infero !(Abs (!"x", !(App (!(X !"x"), !(X !"x")))))                q ) ); *)
+
+  run1 ~n:1 (REPR(infero !(Abs (!"x", !(X !"x")))                                    ) );
+  run1 ~n:1 (REPR(infero !(Abs (!"f", !(Abs (!"x", !(App (!(X !"f"), !(X !"x"))))))) ) );
+  run1 ~n:1 (REPR(infero !(Abs (!"x", !(Abs (!"f", !(App (!(X !"f"), !(X !"x"))))))) ) );
+  run1 ~n:2 (REPR(fun q -> infero q !(Arr (!(V !"x"), !(V !"x")))                               ) );
+  run1 ~n:1 (REPR(infero !(Abs (!"x", !(App (!(X !"x"), !(X !"x")))))                ) );
   ()
