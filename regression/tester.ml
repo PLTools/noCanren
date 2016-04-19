@@ -356,13 +356,14 @@ let print_title title n =
   ) @@
   printf "`%s`, %s answer%s {\n%!" title
 
-let run1 ~n (title, goal) =
+let run1 ?printer ~n (title, goal) =
   print_title title n;
+  let pp = match printer with Some f -> f | None -> show_logic_naive in
   run one goal |> (fun stream ->
     let answers = Stream.take ~n stream in
     answers |> List.iter
       (fun (_logger, (q,_constr)) ->
-         printf "q=%s;\n%!" (show_logic_naive q);
+         printf "q=%s;\n%!" (pp q);
       );
     option_iter (list_last answers) ~f:(fun (graph,_) ->
       if config.do_plain then
@@ -379,14 +380,15 @@ let run1 ~n (title, goal) =
   );
   printf "}\n%!"
 
-let run2 ~n (title,goal) =
+let run2 ?printer ~n (title,goal) =
   print_title title n;
+  let pp = match printer with Some f -> f | None -> show_logic_naive in
   run (succ one) goal |>
     begin fun stream ->
       let answers = Stream.take ~n stream in
       answers |> List.iter
         (fun (logger, ((q,cs1),(r,cs2))) ->
-           printf "q=%s; r=%s;\n%!" (show_logic_naive q) (show_logic_naive r);
+           printf "q=%s; r=%s;\n%!" (pp q) (pp r);
            (* let cs c name = *)
            (*   match string_of_constraints cs1 with *)
            (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)

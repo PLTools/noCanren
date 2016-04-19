@@ -49,7 +49,7 @@ module Show_logic_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
                         val show : X.t logic -> string
 end
 
-module Show_logic : functor {X : ImplicitPrinters.SHOW} -> sig
+implicit module Show_logic : functor {X : ImplicitPrinters.SHOW} -> sig
                         type t = X.t logic
                         val show : X.t logic -> string
 end
@@ -64,7 +64,7 @@ module Show_llist_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
                        val show : X.t llist -> string
 end
 
-module Show_llist : functor {X : ImplicitPrinters.SHOW} -> sig
+implicit module Show_llist : functor {X : ImplicitPrinters.SHOW} -> sig
                        type t = X.t llist
                        val show : X.t llist -> string
 end
@@ -85,7 +85,9 @@ val of_list : {S : ImplicitPrinters.SHOW} -> S.t list -> S.t llist logic
 (** [to_value x] converts logic into value; raises [Not_a_value] on a
     non-value case
 *)
-val to_value : 'a logic -> 'a
+val to_value_exn : 'a logic -> 'a
+
+val is_value : 'a logic -> bool
 
 (** [to_listk k l] converts logic list [l] into a regular one, calling [k] to
     convert elements, which are not a value *)

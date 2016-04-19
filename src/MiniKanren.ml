@@ -53,6 +53,54 @@ struct
     )
 end
 
+type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
+
+let rec wrap (x : Obj.t) =
+  Obj.(
+    let is_valid_tag =
+      List.fold_left
+        (fun f t tag -> tag <> t && f tag)
+        (fun _ -> true)
+        [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
+         forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
+         custom_tag ; unaligned_tag; out_of_heap_tag
+        ]
+    in
+    let is_unboxed obj =
+      is_int obj ||
+      (fun t -> t = string_tag || t = double_tag) (tag obj)
+    in
+    if is_unboxed x
+    then Unboxed x
+    else
+      let t = tag x in
+      if is_valid_tag t
+      then
+        let f = if t = double_array_tag then Obj.magic double_field else field in
+        Boxed (t, size x, f x)
+      else Invalid t
+  )
+
+let generic_show x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner o =
+    match wrap o with
+    | Invalid n                     -> bprintf b "<invalid %d>" n
+    | Unboxed n when Obj.magic n=0  -> Buffer.add_string b "[]"
+    | Unboxed n                     -> bprintf b "int<%d>" (Obj.magic n)
+    | Boxed (t,l,f) when t=0 && l=1 &&
+        (match wrap (f 0) with Unboxed i when Obj.magic i >=10 -> true | _ -> false) ->
+       bprintf b "var%d"
+               (match wrap (f 0) with Unboxed i -> Obj.magic i | _ -> failwith "shit")
+
+    | Boxed   (t, l, f) ->
+      bprintf b "boxed %d <" t;
+      for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
+      Buffer.add_string b ">"
+  in
+  inner x;
+  Buffer.contents b
 
 module type LOGGER = sig
   type t
@@ -118,7 +166,8 @@ let var_of_int index =
 
 let const_not_implemented _ =   "<not implemented>"
 let (!) x = Value (x, const_not_implemented)
-let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
+(* let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show) *)
+let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show)
 
 let embed_explicit printer x = Value (x, printer)
 
@@ -176,10 +225,10 @@ implicit module Show_llist {X: ImplicitPrinters.SHOW} = struct
   let show = llist_printer
 end
 
-let () =
-  let open ImplicitPrinters in
-  let (_) = embed (Nil: int llist) in
-  ()
+(* let () = *)
+(*   let open ImplicitPrinters in *)
+(*   let (_) = embed (Nil: int llist) in *)
+(*   () *)
 
 let (%)  x y =
   Value (Cons (x, y), llist_printer)
@@ -205,14 +254,15 @@ let (!<) x   =
 let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
     | [] -> llist_nil
-    | x::xs -> (Value (x, S.show)) % (helper xs)
+    | x::xs -> (Value (x, generic_show)) % (helper xs)
   in
   helper xs
 
 exception Not_a_value
 exception Occurs_check
 
-let to_value = function Var _ -> raise Not_a_value | Value (x,_) -> x
+let is_value = function Value _ -> true | Var _ -> false
+let to_value_exn = function Var _ -> raise Not_a_value | Value (x,_) -> x
 
 let rec to_listk k = function
 | Value (Nil,_) -> []
@@ -221,53 +271,6 @@ let rec to_listk k = function
 
 let to_list l = to_listk (fun _ -> raise Not_a_value) l
 
-
-type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
-
-let rec wrap (x : Obj.t) =
-  Obj.(
-    let is_valid_tag =
-      List.fold_left
-        (fun f t tag -> tag <> t && f tag)
-        (fun _ -> true)
-        [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
-         forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-         custom_tag ; unaligned_tag; out_of_heap_tag
-        ]
-    in
-    let is_unboxed obj =
-      is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
-    in
-    if is_unboxed x
-    then Unboxed x
-    else
-      let t = tag x in
-      if is_valid_tag t
-      then
-        let f = if t = double_array_tag then !! double_field else field in
-        Boxed (t, size x, f x)
-      else Invalid t
-  )
-
-let generic_show x =
-  let x = Obj.repr x in
-  let b = Buffer.create 1024 in
-  let rec inner o =
-    match wrap o with
-    | Invalid n             -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
-    | Unboxed n when !!n=0  -> Buffer.add_string b "[]"
-    | Unboxed n             -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!n))
-    | Boxed (t,l,f) when t=0 && l=1 && (match wrap (f 0) with Unboxed i when !!i >=10 -> true | _ -> false) ->
-      Printf.bprintf b "var%d" (match wrap (f 0) with Unboxed i -> !!i | _ -> failwith "shit")
-
-    | Boxed   (t, l, f) ->
-      Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-      for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
-      Buffer.add_string b ">"
-  in
-  inner x;
-  Buffer.contents b
 
 module Env :
   sig
@@ -445,7 +448,9 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
-                if x==y then (delta,s) else
+               if x==y
+               then (* let () = printf "ptrs are equal\n%!" in *) (delta,s)
+               else
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None

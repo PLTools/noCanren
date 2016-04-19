@@ -158,6 +158,8 @@ let rec pamk_e mapper e : expression =
      let vbs_new = List.map (fun vb -> {vb with pvb_expr=mapper.expr mapper vb.pvb_expr}) vbs
      in
      {e with pexp_desc=Pexp_let(_recflag, vbs_new, mapper.expr mapper where_expr) }
+  | Pexp_sequence (e1, e2) ->
+     {e with pexp_desc=Pexp_sequence(mapper.expr mapper e1,mapper.expr mapper e2) }
 
   (* TODO: support all cases *)
   | _ -> e
