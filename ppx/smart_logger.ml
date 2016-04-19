@@ -107,21 +107,23 @@ let reconstruct_args e =
 let list_fold ~f xs =
   match xs with
   | [] -> failwith "bad argument"
-  | (_,init)::xs -> List.fold_left ~init ~f xs
+  | (_,start)::xs -> List.fold_left ~init:(f start) ~f xs
 
 let rec pamk_e mapper e : expression =
-  (* Printast.expression 0 Format.std_formatter e; *)
+  Printast.expression 0 Format.std_formatter e;
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
   | Pexp_apply (e1, (_,args) :: body) when is_fresh e1 -> begin
-      (* List.iter body ~f:(fun (_,e) -> Printast.expression 0 Format.std_formatter e); *)
+      List.iter body ~f:(fun (_,e) -> Printast.expression 0 Format.std_formatter e);
       let new_body : expression =
         match body with
         | [(_,body)] -> pamk_e mapper body
-        | ____ -> list_fold (List.rev body)
+        | ____ ->
+           printf "JERRR. body.len=%d\n%!" (List.length body);
+           list_fold (List.rev body)
                      ~f:(fun acc (_,x) -> [%expr [%e (pamk_e mapper x)] &&& [%e acc]])
 
       in
