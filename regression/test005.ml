@@ -74,29 +74,29 @@ and Show_typ_logic: SHOW with type t = typ logic = Show_logic_explicit(Show_typ)
 implicit module Show_typ_implicit = Show_typ
 
 
-(* let infero (expr: Show_lam_logic.t) (typ: Show_typ_logic.t) = *)
-(*   let rec infero gamma expr typ = *)
-(*     conde [ *)
-(*       fresh (x) *)
-(*         (expr === !(X x)) *)
-(*         (lookupo x gamma typ); *)
-(*       fresh (m n t) *)
-(*         (expr === !(App (m, n))) *)
-(*         (infero gamma m !(Arr (t, typ))) *)
-(*         (infero gamma n t); *)
-(*       fresh (x l t t') *)
-(*         (expr === !(Abs (x, l))) *)
-(*         (typ  === !(Arr (t, t'))) *)
-(*         (infero (!(x, t)%gamma) l t') *)
-(*     ] *)
-(*   in *)
-(*   infero !(Nil: (string logic * typ logic) llist) expr typ *)
-(*   (\* infero !(Nil: int llist) expr typ *\) *)
+let infero (expr: Show_lam_logic.t) (typ: Show_typ_logic.t) =
+  let rec infero gamma expr typ =
+    conde [
+      fresh (x)
+        (expr === !(X x))
+        (lookupo x gamma typ);
+      fresh (m n t)
+        (expr === !(App (m, n)))
+        (infero gamma m !(Arr (t, typ)))
+        (infero gamma n t);
+      fresh (x l t t')
+        (expr === !(Abs (x, l)))
+        (typ  === !(Arr (t, t')))
+        (infero (!(x, t)%gamma) l t')
+    ]
+  in
+  infero !(Nil: (string logic * typ logic) llist) expr typ
+  (* infero !(Nil: int llist) expr typ *)
 
-(* module Show_string_logic = MiniKanren.Show_logic_explicit(Show_string) *)
-(* module Show_env_explicit = Show_logic_explicit( *)
-(*           MiniKanren.Show_llist_explicit(Show_pair_explicit(Show_string_logic)(Show_typ_logic)) ) *)
-(* open Tester *)
+module Show_string_logic = MiniKanren.Show_logic_explicit(Show_string)
+module Show_env_explicit = Show_logic_explicit(
+          MiniKanren.Show_llist_explicit(Show_pair_explicit(Show_string_logic)(Show_typ_logic)) )
+open Tester
 
 let _ =
   (* run1 ~n:1    (REPR (lookupo (!"x") (of_list ([]: (string logic * typ logic) list)) ) ); *)
@@ -127,7 +127,7 @@ let rec substo l x a l' =
          fresh (b') (l' === b')
        ])
     *)
-(*
+
 let rec substo l x a l' =
   conde [
     fresh (y) (l === !(X y))(y === x)(l' === a);
@@ -165,4 +165,16 @@ let rec evalo m n =
       (evalo f f')
       (evalo a a')
   ]
-  *)
+
+let () =
+  run1 ~n:1  (REPR (substo !(X !"x") !"x" !(X !"y") ) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(Abs (!"x", !(X !"x"))) q                    ) );
+  run1 ~n:2  (REPR(fun q   -> evalo !(Abs (!"x", !(X !"x"))) q                    ) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(App (!(Abs (!"x", !(X !"x"))), !(X !"y"))) q) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(App (!(Abs (!"x", !(X !"x"))), q)) !(X !"y")) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(App (!(Abs (!"x", q)), !(X !"y"))) !(X !"y")) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(App (q, !(X !"x"))) !(X !"x")               ) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(App (!(X !"x"), !(X !"x"))) q               ) );
+  run1 ~n:1  (REPR(fun q   -> evalo !(X !"x") q                                   ) );
+  run2 ~n:1  (REPR(fun q r -> evalo !(App (r, q)) !(X !"x")                       ) );
+  ()

@@ -1,4 +1,4 @@
-true: rectypes, debug
+true: debug
 <toplevel/*>:  not_hygienic
 
 #<src/MiniKanren.mli> or <src/MiniKanrenImpl.ml>: syntax(camlp5o), package(typeutil,GT.syntax.all)
