@@ -1,35 +1,30 @@
-`lookupo (!"x") (of_list ([] : (string logic* typ logic) list))`, 1 answer {
+`substo (!(X (!"x"))) (!"x") (!(X (!"y")))`, 1 answer {
+q=X (y);
 }
-`lookupo (!"x") (of_list [((!"x"), (!(V (!"x"))))])`, 1 answer {
-q=V (x);
+`fun q  -> evalo (!(Abs ((!"x"), (!(X (!"x")))))) q`, 1 answer {
+q=Abs (x, X (x));
 }
-`fun q  ->
-  lookupo (!"x") (of_list [((!"y"), (!(V (!"y")))); ((!"x"), (!(V (!"x"))))])
-    q`, 1 answer {
-q=V (x);
+`fun q  -> evalo (!(Abs ((!"x"), (!(X (!"x")))))) q`, 2 answers {
+q=Abs (x, X (x));
 }
-`fun q  ->
-  lookupo q (of_list [((!"y"), (!(V (!"y")))); ((!"x"), (!(V (!"x"))))])
-    (!(V (!"x")))`, 1 answer {
-q=x;
+`fun q  -> evalo (!(App ((!(Abs ((!"x"), (!(X (!"x")))))), (!(X (!"y")))))) q`, 1 answer {
+q=X (y);
 }
-`fun q  -> lookupo (!"x") q (!(V (!"y")))`, 1 answer {
-q=(x,V (y)) :: _.13;
+`fun q  -> evalo (!(App ((!(Abs ((!"x"), (!(X (!"x")))))), q))) (!(X (!"y")))`, 1 answer {
+q=X (y);
 }
-`infero (!(Abs ((!"x"), (!(X (!"x"))))))`, 1 answer {
-q=Arr (_.14, _.14);
+`fun q  -> evalo (!(App ((!(Abs ((!"x"), q))), (!(X (!"y")))))) (!(X (!"y")))`, 1 answer {
+q=X (x);
 }
-`infero
-  (!(Abs ((!"f"), (!(Abs ((!"x"), (!(App ((!(X (!"f"))), (!(X (!"x"))))))))))))`, 1 answer {
-q=Arr (Arr (_.21, _.18), Arr (_.21, _.18));
+`fun q  -> evalo (!(App (q, (!(X (!"x")))))) (!(X (!"x")))`, 1 answer {
+q=Abs (_.20, X (_.20));
 }
-`infero
-  (!(Abs ((!"x"), (!(Abs ((!"f"), (!(App ((!(X (!"f"))), (!(X (!"x"))))))))))))`, 1 answer {
-q=Arr (_.21, Arr (Arr (_.21, _.18), _.18));
+`fun q  -> evalo (!(App ((!(X (!"x"))), (!(X (!"x")))))) q`, 1 answer {
+q=App (X (x), X (x));
 }
-`fun q  -> infero q (!(Arr ((!(V (!"x"))), (!(V (!"x"))))))`, 2 answers {
-q=Abs (_.15, X (_.15));
-q=Abs (_.26, App (Abs (_.22, X (_.22)), X (_.26)));
+`fun q  -> evalo (!(X (!"x"))) q`, 1 answer {
+q=X (x);
 }
-`infero (!(Abs ((!"x"), (!(App ((!(X (!"x"))), (!(X (!"x")))))))))`, 1 answer {
+`fun q  -> fun r  -> evalo (!(App (r, q))) (!(X (!"x")))`, 1 answer {
+q=X (x); r=Abs (_.21, X (_.21));
 }

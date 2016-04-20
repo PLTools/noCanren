@@ -2,26 +2,8 @@ open Printf
 open MiniKanren
 open Tester.M
 open ImplicitPrinters
-(*
-let rec substo l x a l' =
-    fresh (b)
-      (1)
-      (conde [
-         (* (x  === v) ; *)
-         fresh (b') (l' === b')
-       ])
- *)
 
 let (!) : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic = embed
-(*
-let lookupo {Key: SHOW} {Value: SHOW}  g  =
-  printf "lookupo ~a:'%s' ~g:'%s' ~t:'%s'\n%!" (show_logic_naive a) "?" (show_logic_naive t);
-  let rec helper  g  =
-    fresh (x y)
-          (g === y)
-  in
-  helper g
- *)
 
 let lookupo {Key: SHOW} {Value: SHOW} (a: Key.t logic) g (t: Value.t logic) =
   (* printf "=== lookupo ~a:'%s' ~g:'%s' ~t:'%s'\n%!" *)
@@ -29,9 +11,6 @@ let lookupo {Key: SHOW} {Value: SHOW} (a: Key.t logic) g (t: Value.t logic) =
   let rec helper a g t =
     fresh (a' t' tl)
           (g ===
-             (* (embed_explicit (fun (x,y) -> sprintf "(%s,%s)" *)
-             (*                                       (show_logic_naive x) (show_logic_naive y)) *)
-             (*                 (a', t')) *)
              ! ( (a' : Key.t logic), (t': Value.t logic) )
              % tl)
           (conde [
