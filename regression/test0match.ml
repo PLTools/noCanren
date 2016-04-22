@@ -106,21 +106,45 @@ struct
 end
 
 (* let () = print_endline @@ show MiniLambda.(!(Const_int 11)) *)
+let is_positive lam =
+  fresh (n)
+        (lam === !Lconst !n)
+        (fun st ->)
 
+exception No_var_in_env
 let eval_lambda
-    (env: Ident.t logic -> MiniLambda.structured_constant logic)
+    (env: Ident.t logic -> MiniLambda.structured_constant)
     (lam_ast: MiniLambda.lambda) =
   let open MiniLambda in
   let open Tester.M in
   let rec evalo l ans =
+    printf "evalo '%s' '%s'\n%!" (show l) (show ans);
     conde
       [ fresh (id1)
           (l   === !(Lvar id1))
-          (ans === (env id1))
-      ; (l === !(Lconst ans))
+          (ans === !(Lconst !(env id1)) )
+      ; fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
       ; fresh (cond ifb elseb)
           ( l === !(Lifthenelse (cond, ifb, elseb)) )
-          (* omitted *)
+          (* evaluating condition *)
+          (fresh (rez)
+                 (evalo cond rez)
+                 (* (conde *)
+                 (*    [ fresh _d1 *)
+                 (*        (rez === !(Lvar _d1)) *)
+                 (*        (fun _ -> raise No_var_in_env) *)
+                 (*    ; fresh c1 *)
+                 (*        (rez === !(Lconst c1)) *)
+                 (*        (fun st -> if c1>=0 then (ifb == ans) st else (elseb === ans) st) *)
+                 (*    ; (fun _st -> assert false) *)
+                 (* ])) *)
+                 (fun st ->
+                  if not (is_value rez) then failwith "can't evaluate if condition"
+                  else
+                    match to_value_exn rez with
+                    | Lconst (Value (x,_)) ->
+                       if x>=0 then (ifb === ans) st else (elseb === ans) st
+                    | _ -> failwith "can't evaluate if condition to constant") )
       ]
   in
   let open Tester.M.ConvenienceStream in
@@ -134,13 +158,15 @@ let eval_lambda
 
 
 let () =
-  let env : Ident.t logic -> MiniLambda.structured_constant logic =
-    fun x -> Obj.magic x
+  let open MiniLambda in
+  let env : Ident.t logic -> structured_constant  =
+    fun x -> 1
   in
 
-  let lam1 = MiniLambda.(Lifthenelse (!(Lconst !1), !(Lconst !2), !(Lconst !3))) in
-  let lam2 = MiniLambda.(Lconst !1) in
+  let lam1 = Lifthenelse (!(Lconst !1), !(Lconst !2), !(Lconst !3)) in
+  let lam2 = Lconst !1 in
   let () = eval_lambda env lam2 in
+  let () = eval_lambda env lam1 in
   ()
 
 (* let eval_lambda (l: Lambda.lambda) =      *)
