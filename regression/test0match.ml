@@ -51,9 +51,38 @@ let () =
   f [%pat? _::_ ];
   f [%pat? 1::2::[] ];
   ()
-  *)
+ *)
+module Nat = struct
+  type nat = O | S of nat logic
+  let show = function
+    | O -> "O"
+    | S n -> sprintf "S (%s)" (show_logic_naive n)
+  end
+implicit module Show_nat : (SHOW with type t = Nat.t) = Nat
+
+let is_positive_nat n = fresh (_zero) (n === !(S _zero))
+let is_nonnegative_nat n = fresh (_zero) (conde [(n === !(S _zero));  (n === !O) ])
+
+module Peano_int = struct
+    type t = bool * Nat.t
+    let show (p,n) =
+      if p then show n
+      else "-" ^ (show n)
+  end
+implicit module Show_peano_int: (SHOW with type t = Peano_int.t) = Peano_int
+
+let is_positive_const lam =
+  fresh (n)
+        (lam === !Lconst n)
+        (is_positive_nat n)
+
+let is_nonnegative_const lam =
+  fresh n
+    (lam === !Lconst n)
+    (is_nonnegative_nat n)
+
 module MiniLambda = struct
-  type structured_constant = (* Const_int  *)int
+  type structured_constant = (* Const_int  *) Peano_int.t
   type lambda_switch =
     { sw_numconsts: int;                  (* Number of integer cases *)
       sw_consts: (int * lambda) list;     (* Integer cases *)
@@ -106,10 +135,6 @@ struct
 end
 
 (* let () = print_endline @@ show MiniLambda.(!(Const_int 11)) *)
-let is_positive lam =
-  fresh (n)
-        (lam === !Lconst !n)
-        (fun st ->)
 
 exception No_var_in_env
 let eval_lambda
@@ -129,6 +154,9 @@ let eval_lambda
           (* evaluating condition *)
           (fresh (rez)
                  (evalo cond rez)
+                 (conde
+                    [ (is_positive_const rez) &&& (ifb === ans)
+                    ; (is_negative_const
                  (* (conde *)
                  (*    [ fresh _d1 *)
                  (*        (rez === !(Lvar _d1)) *)
@@ -160,7 +188,7 @@ let eval_lambda
 let () =
   let open MiniLambda in
   let env : Ident.t logic -> structured_constant  =
-    fun x -> 1
+    fun x -> Nat.(S O)
   in
 
   let lam1 = Lifthenelse (!(Lconst !1), !(Lconst !2), !(Lconst !3)) in
