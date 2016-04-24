@@ -1,6 +1,7 @@
 open Printf
 open MiniKanren
 open ImplicitPrinters
+open Tester.M
 (*
 type pat = Pany
          | Pvar of string
@@ -53,33 +54,49 @@ let () =
   ()
  *)
 module Nat = struct
-  type nat = O | S of nat logic
+  type t = O | S of t logic
   let show = function
     | O -> "O"
     | S n -> sprintf "S (%s)" (show_logic_naive n)
-  end
+  let of_int n : t =
+    if n<0 then failwith "bad argument"
+    else
+      let rec helper acc n =
+        if n=0 then acc
+        else helper (S !acc) (n-1)
+      in
+      helper O n
+end
 implicit module Show_nat : (SHOW with type t = Nat.t) = Nat
 
-let is_positive_nat n = fresh (_zero) (n === !(S _zero))
-let is_nonnegative_nat n = fresh (_zero) (conde [(n === !(S _zero));  (n === !O) ])
+let is_positive_nat n = fresh (_zero) (n === !(Nat.S _zero))
+let is_nonnegative_nat n = fresh (_zero) (conde [(n === !(Nat.S _zero));  (n === !Nat.O) ])
 
 module Peano_int = struct
-    type t = bool * Nat.t
-    let show (p,n) =
+    type t = bool * Nat.t logic
+    let show : t -> string = fun (p,n) ->
       if p then show n
       else "-" ^ (show n)
-  end
+    let of_int n =
+      if n>=0 then (true, !(Nat.of_int n) )
+      else (false, !(Nat.of_int (-n)) )
+end
 implicit module Show_peano_int: (SHOW with type t = Peano_int.t) = Peano_int
 
-let is_positive_const lam =
-  fresh (n)
-        (lam === !Lconst n)
-        (is_positive_nat n)
+let is_positive_peano p =
+  let open Nat in
+  fresh (_zero) (p === !(true, !(S _zero)) )
 
-let is_nonnegative_const lam =
-  fresh n
-    (lam === !Lconst n)
-    (is_nonnegative_nat n)
+let is_negative_peano p =
+  let open Nat in
+  fresh (_zero) (p === !(false, !(S _zero)) )
+
+let is_nonnegative_peano p =
+  let open Nat in
+  conde [ p === !(true, !O)
+        ; p === !(false, !O)
+        ; is_positive_peano p
+        ]
 
 module MiniLambda = struct
   type structured_constant = (* Const_int  *) Peano_int.t
@@ -134,6 +151,24 @@ struct
     helper
 end
 
+let is_positive_const lam =
+  let open MiniLambda in
+  fresh (n)
+        (lam === !(Lconst n))
+        (is_positive_peano n)
+
+let is_nonnegative_const lam =
+  let open MiniLambda in
+  fresh n
+    (lam === !(Lconst n))
+    (is_nonnegative_peano n)
+
+let is_negative_const lam =
+  let open MiniLambda in
+  fresh n
+    (lam === !(Lconst n))
+    (is_negative_peano n)
+
 (* let () = print_endline @@ show MiniLambda.(!(Const_int 11)) *)
 
 exception No_var_in_env
@@ -156,7 +191,8 @@ let eval_lambda
                  (evalo cond rez)
                  (conde
                     [ (is_positive_const rez) &&& (ifb === ans)
-                    ; (is_negative_const
+                    ; (is_negative_const rez) &&& (elseb === ans)
+                    ]
                  (* (conde *)
                  (*    [ fresh _d1 *)
                  (*        (rez === !(Lvar _d1)) *)
@@ -166,14 +202,14 @@ let eval_lambda
                  (*        (fun st -> if c1>=0 then (ifb == ans) st else (elseb === ans) st) *)
                  (*    ; (fun _st -> assert false) *)
                  (* ])) *)
-                 (fun st ->
-                  if not (is_value rez) then failwith "can't evaluate if condition"
-                  else
-                    match to_value_exn rez with
-                    | Lconst (Value (x,_)) ->
-                       if x>=0 then (ifb === ans) st else (elseb === ans) st
-                    | _ -> failwith "can't evaluate if condition to constant") )
-      ]
+                 (* (fun st -> *)
+                 (*  if not (is_value rez) then failwith "can't evaluate if condition" *)
+                 (*  else *)
+                 (*    match to_value_exn rez with *)
+                 (*    | Lconst (Value (x,_)) -> *)
+                 (*       if x>=0 then (ifb === ans) st else (elseb === ans) st *)
+                 (*    | _ -> failwith "can't evaluate if condition to constant") ) *)
+      ))]
   in
   let open Tester.M.ConvenienceStream in
   let open ImplicitPrinters in
@@ -188,7 +224,7 @@ let eval_lambda
 let () =
   let open MiniLambda in
   let env : Ident.t logic -> structured_constant  =
-    fun x -> Nat.(S O)
+    fun x -> Peano_int.of_int 1
   in
 
   let lam1 = Lifthenelse (!(Lconst !1), !(Lconst !2), !(Lconst !3)) in
