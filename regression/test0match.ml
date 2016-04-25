@@ -145,8 +145,11 @@ implicit module Show_MiniLambda : (SHOW with type t = MiniLambda.lambda) =
 struct
   type t = MiniLambda.lambda
   let show =
+    let open MiniLambda in
     let rec helper = function
-      | _ -> "not implemented"
+      | Lconst ((Var _) as l) -> show_logic_naive l
+      | Lifthenelse (cond,ifb,elseb) -> sprintf "if %s then %s else %s fi" (show_logic_naive cond) (show_logic_naive ifb) (show_logic_naive elseb)
+      | _ -> "<not implemented>"
     in
     helper
 end
@@ -220,17 +223,36 @@ let eval_lambda
   printf "answers: %d\n%!" (List.length xs);
   List.iter (fun x -> print_endline @@ show x) xs
 
+module type INTABLE = sig
+    type t
+    val of_int : t -> Peano_int.t
+end
+implicit module Int_as_intable : (INTABLE with type t = int) = struct
+  type t = int
+  let of_int = Peano_int.of_int
+end
+implicit module Peano_as_intable : (INTABLE with type t = Peano_int.t) = struct
+  type t = Peano_int.t
+  let of_int n = n
+end
+
+let make_const {X: INTABLE} (n:X.t) : MiniLambda.structured_constant = X.of_int n
 
 let () =
   let open MiniLambda in
   let env : Ident.t logic -> structured_constant  =
-    fun x -> Peano_int.of_int 1
+    fun x ->
+      print_endline "A";
+      Peano_int.of_int 1
   in
 
-  let lam1 = Lifthenelse (!(Lconst !1), !(Lconst !2), !(Lconst !3)) in
-  let lam2 = Lconst !1 in
+  let lam1 = Lifthenelse ( !(Lconst !(make_const 1))
+                         , !(Lconst !(make_const (Peano_int.of_int 2)) )
+                         , !(Lconst !(make_const 3))
+                         ) in
+  let lam2 = Lconst !(make_const 1) in
   let () = eval_lambda env lam2 in
-  let () = eval_lambda env lam1 in
+  (* let () = eval_lambda env lam1 in *)
   ()
 
 (* let eval_lambda (l: Lambda.lambda) =      *)
