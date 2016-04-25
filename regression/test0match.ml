@@ -53,21 +53,24 @@ let () =
   f [%pat? 1::2::[] ];
   ()
  *)
+let (!) = embed
+
 module Nat = struct
   type t = O | S of t logic
   let show = function
     | O -> "O"
     | S n -> sprintf "S (%s)" (show_logic_naive n)
-  let of_int n : t =
-    if n<0 then failwith "bad argument"
-    else
-      let rec helper acc n =
-        if n=0 then acc
-        else helper (S !acc) (n-1)
-      in
-      helper O n
 end
 implicit module Show_nat : (SHOW with type t = Nat.t) = Nat
+
+let nat_of_int n : Nat.t =
+  if n<0 then failwith "bad argument"
+  else
+    let rec helper acc n =
+      if n=0 then acc
+      else helper (Nat.S !acc) (n-1)
+    in
+    helper Nat.O n
 
 let is_positive_nat n = fresh (_zero) (n === !(Nat.S _zero))
 let is_nonnegative_nat n = fresh (_zero) (conde [(n === !(Nat.S _zero));  (n === !Nat.O) ])
@@ -78,10 +81,10 @@ module Peano_int = struct
       if p then show n
       else "-" ^ (show n)
     let of_int n =
-      if n>=0 then (true, !(Nat.of_int n) )
-      else (false, !(Nat.of_int (-n)) )
+      if n>=0 then (true, !(nat_of_int n) )
+      else (false, !(nat_of_int (-n)) )
 end
-implicit module Show_peano_int: (SHOW with type t = Peano_int.t) = Peano_int
+(*implicit module Show_peano_int: (SHOW with type t = Peano_int.t) = Peano_int*)
 
 let is_positive_peano p =
   let open Nat in
@@ -107,25 +110,25 @@ module MiniLambda = struct
       sw_blocks: (int * lambda) list;     (* Tag block cases *)
       sw_failaction : lambda option}      (* Action to take if failure *)
   and lambda =
-    | Lvar of Ident.t logic
+    (* | Lvar of Ident.t logic *)
     | Lconst of structured_constant logic
-    | Lapply of lambda logic * lambda logic llist
+    (* | Lapply of lambda logic * lambda logic llist *)
     (* | Lfunction of function_kind * Ident.t list * lambda *)
-    | Llet of Lambda.let_kind * Ident.t * lambda logic * lambda logic
+    (* | Llet of Lambda.let_kind * Ident.t * lambda logic * lambda logic *)
     (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
     (* | Lprim of Lambda.primitive * Lambda.lambda list *)
-    | Lswitch of lambda * lambda_switch
+    (* | Lswitch of lambda * lambda_switch *)
     (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
     (*                    Lambda.lambda option *)
-    | Lstaticraise of int * Lambda.lambda list
-    | Lstaticcatch of lambda * (int * Ident.t list) * lambda
-    | Ltrywith of lambda * Ident.t * Lambda.lambda
-    | Lifthenelse of lambda logic * lambda logic * lambda logic
-    | Lsequence of lambda * lambda
+    (* | Lstaticraise of int * Lambda.lambda list *)
+    (* | Lstaticcatch of lambda * (int * Ident.t list) * lambda *)
+    (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
+    | Lifthenelse of (lambda logic * lambda logic * lambda logic)
+    (* | Lsequence of lambda * lambda *)
     (* | Lwhile of Lambda.lambda * Lambda.lambda *)
     (* | Lfor of Ident.t * Lambda.lambda * Lambda.lambda * *)
     (*         Asttypes.direction_flag * Lambda.lambda *)
-    | Lassign of Ident.t * lambda
+    (* | Lassign of Ident.t * lambda *)
     (* | Lsend of Lambda.meth_kind * Lambda.lambda * Lambda.lambda * *)
     (*   Lambda.lambda list * Location.t *)
     (* | Levent of Lambda.lambda * Lambda.lambda_event *)
@@ -148,8 +151,9 @@ struct
     let open MiniLambda in
     let rec helper = function
       | Lconst ((Var _) as l) -> show_logic_naive l
+      | Lconst v -> show_logic_naive v
       | Lifthenelse (cond,ifb,elseb) -> sprintf "if %s then %s else %s fi" (show_logic_naive cond) (show_logic_naive ifb) (show_logic_naive elseb)
-      | _ -> "<not implemented>"
+      | _ -> "<not implemented XXX>"
     in
     helper
 end
@@ -183,36 +187,19 @@ let eval_lambda
   let rec evalo l ans =
     printf "evalo '%s' '%s'\n%!" (show l) (show ans);
     conde
-      [ fresh (id1)
-          (l   === !(Lvar id1))
-          (ans === !(Lconst !(env id1)) )
-      ; fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
-      ; fresh (cond ifb elseb)
-          ( l === !(Lifthenelse (cond, ifb, elseb)) )
+      [(*  fresh (id1) *)
+      (*     (l   === !(Lvar id1)) *)
+      (*     (ans === !(Lconst !(env id1)) ) *)
+      (* ; *) fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
+      ; fresh (cond ifb elseb) (
+          ( l === !(Lifthenelse (cond, ifb, elseb)) ) &&&
           (* evaluating condition *)
           (fresh (rez)
                  (evalo cond rez)
                  (conde
                     [ (is_positive_const rez) &&& (ifb === ans)
                     ; (is_negative_const rez) &&& (elseb === ans)
-                    ]
-                 (* (conde *)
-                 (*    [ fresh _d1 *)
-                 (*        (rez === !(Lvar _d1)) *)
-                 (*        (fun _ -> raise No_var_in_env) *)
-                 (*    ; fresh c1 *)
-                 (*        (rez === !(Lconst c1)) *)
-                 (*        (fun st -> if c1>=0 then (ifb == ans) st else (elseb === ans) st) *)
-                 (*    ; (fun _st -> assert false) *)
-                 (* ])) *)
-                 (* (fun st -> *)
-                 (*  if not (is_value rez) then failwith "can't evaluate if condition" *)
-                 (*  else *)
-                 (*    match to_value_exn rez with *)
-                 (*    | Lconst (Value (x,_)) -> *)
-                 (*       if x>=0 then (ifb === ans) st else (elseb === ans) st *)
-                 (*    | _ -> failwith "can't evaluate if condition to constant") ) *)
-      ))]
+                    ])) ) ]
   in
   let open Tester.M.ConvenienceStream in
   let open ImplicitPrinters in

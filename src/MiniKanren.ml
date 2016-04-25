@@ -164,7 +164,7 @@ let var_of_int index =
   let rec ans = Var { index; reifier=fun () -> (ans,[]) } in
   ans
 
-let const_not_implemented _ =   "<not implemented>"
+let const_not_implemented _ =   "<printer not implemented>"
 let (!) x = Value (x, const_not_implemented)
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
 (* let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show) *)
@@ -519,6 +519,7 @@ module Make (Logger: LOGGER) = struct
     = fun msg f st -> f (adjust_state msg st)
 
   let call_fresh: ('a logic -> state -> 'b) -> state -> 'b = fun f (((env,s,ss), _, _) as state) ->
+    print_endline "call_fresh";
     let x, env' = Env.fresh env in
     let new_st = (env',s,ss) in
     ((sprintf "fresh variable '%s'" (show_logic_naive x)) <=>
