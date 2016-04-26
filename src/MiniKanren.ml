@@ -1,58 +1,5 @@
 open Printf
 
-module Stream =
-struct
-
-  type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
-
-  let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
-
-  let nil = Nil
-
-  let cons h t = Cons (h, t)
-
-  let rec take ?(n=(-1)) s =
-    if n = 0
-    then []
-    else match s with
-      | Nil          -> []
-      | Cons (x, xs) -> x :: take ~n:(n-1) xs
-      | Lazy  z      -> take ~n:n (Lazy.force z)
-
-  let rec mplus fs gs =
-    (* LOG[trace1] (logn "mplus"); *)
-    from_fun (fun () ->
-        match fs with
-        | Nil           -> gs
-        | Cons (hd, tl) -> cons hd (mplus gs tl)
-        | Lazy z        -> mplus gs (Lazy.force z)
-      )
-
-  let rec bind xs f =
-    from_fun (fun () ->
-        match xs with
-        | Cons (x, xs) -> mplus (f x) (bind xs f)
-        | Nil          -> nil
-        | Lazy z       -> bind (Lazy.force z) f
-      )
-
-  let rec map f xs =
-    from_fun (fun () ->
-      match xs with
-      | Nil -> Nil
-      | Lazy z -> map f (Lazy.force z)
-      | Cons (x,xs) -> cons (f x) (map f xs)
-    )
-
-  let rec concat xs ys =
-    from_fun (fun () ->
-      match xs with
-      | Nil -> ys
-      | Lazy z -> concat (Lazy.force z) ys
-      | Cons (x,xs) -> cons x (concat xs ys)
-    )
-end
-
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
 let rec wrap (x : Obj.t) =
@@ -101,6 +48,67 @@ let generic_show x =
   in
   inner x;
   Buffer.contents b
+
+module Stream =
+struct
+
+  type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
+
+  let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
+
+  let nil = Nil
+
+  let cons h t =
+    printf "calling cons of '%s' '%s'\n%!" (generic_show h) (generic_show t);
+    Cons (h, t)
+
+  let rec take ?(n=(-1)) s =
+    printf "Stream.take: %s +%d\n%!" __FILE__ __LINE__;
+    if n = 0
+    then []
+    else
+      let () = printf "s = '%s'\n%!" (generic_show s) in
+      match s with
+      | Nil          -> []
+      | Cons (x, xs) -> x :: take ~n:(n-1) xs
+      | Lazy  z      ->
+         printf "%s +%d\n%!" __FILE__ __LINE__;
+         printf "%s\n%!" (generic_show @@ Lazy.force z);
+        take ~n:n (Lazy.force z)
+
+  let rec mplus fs gs =
+    (* LOG[trace1] (logn "mplus"); *)
+    from_fun (fun () ->
+        match fs with
+        | Nil           -> gs
+        | Cons (hd, tl) -> cons hd (mplus gs tl)
+        | Lazy z        -> mplus gs (Lazy.force z)
+      )
+
+  let rec bind xs f =
+    from_fun (fun () ->
+        match xs with
+        | Cons (x, xs) -> mplus (f x) (bind xs f)
+        | Nil          -> nil
+        | Lazy z       -> bind (Lazy.force z) f
+      )
+
+  let rec map f xs =
+    from_fun (fun () ->
+      match xs with
+      | Nil -> Nil
+      | Lazy z -> map f (Lazy.force z)
+      | Cons (x,xs) -> cons (f x) (map f xs)
+    )
+
+  let rec concat xs ys =
+    from_fun (fun () ->
+      match xs with
+      | Nil -> ys
+      | Lazy z -> concat (Lazy.force z) ys
+      | Cons (x,xs) -> cons x (concat xs ys)
+    )
+end
 
 module type LOGGER = sig
   type t
@@ -255,8 +263,7 @@ let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
     | [] -> llist_nil
     | x::xs -> (Value (x, S.show)) % (helper xs)
-  in
-  helper xs
+  in  helper xs
 
 exception Not_a_value
 exception Occurs_check
@@ -552,14 +559,15 @@ let (===) x y st =
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
-          (* print_endline "folding constraints"; *)
+          print_endline "folding constraints";
+          printf "constr = '%s'\n%!" (generic_show constr);
           let constr' =
             List.fold_left (fun css' cs ->
               let (x, t) : Obj.t list * Obj.t list  = Subst.split cs in
-              (* printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs); *)
-              (* printf "x = [%s], t=[%s]\n%!" *)
-              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) x) *)
-              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) t); *)
+              printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs);
+              printf "x = [%s], t=[%s]\n%!"
+                (String.concat "; " @@ List.map (fun x -> generic_show !!x) x)
+                (String.concat "; " @@ List.map (fun x -> generic_show !!x) t);
 
               try
                 let p, s' = Subst.unify env (!!x) (!!t) subst' in
@@ -576,7 +584,10 @@ let (===) x y st =
           in
           let (_,root,_) =
             state1 |> adjust_state @@ sprintf "Success: subs=%s" (Subst.show s) in
-          Stream.cons ((env, s, constr'),root,l) Stream.nil
+
+          let ans = Stream.cons ((env, s, constr'),root,l) Stream.nil in
+          printf "%s +%d\n%!" __FILE__ __LINE__;
+          ans
         with Disequality_violated ->
           let () = make_leaf "Disequality violated" state1 in
           Stream.nil
@@ -809,7 +820,10 @@ let (=/=) x y state0 =
 
     let run (adder,extD,appF) goalish =
       let tuple,stream = run_ (adder goalish) |> extD in
-      Stream.map (fun (st: state) -> (snd3 st, appF (fst3 st) tuple) ) stream
+      printf "%s +%d\n%!" __FILE__ __LINE__;
+      let ans = Stream.map (fun (st: state) -> (snd3 st, appF (fst3 st) tuple) ) stream in
+      printf "%s +%d\n%!" __FILE__ __LINE__;
+      ans
 
     let (_: (Logger.t * ((int logic * int logic_diseq) * (string logic * string logic_diseq))) Stream.t)
        = run (succ one) dummy_goal2

@@ -150,8 +150,8 @@ struct
   let show =
     let open MiniLambda in
     let rec helper = function
-      | Lconst ((Var _) as l) -> show_logic_naive l
-      | Lconst v -> show_logic_naive v
+      (* | Lconst ((Var _) as l) -> sprintf "Lconst %s" (show_logic_naive l) *)
+      | Lconst l -> sprintf "Lconst %s" (show_logic_naive l)
       | Lifthenelse (cond,ifb,elseb) -> sprintf "if %s then %s else %s fi" (show_logic_naive cond) (show_logic_naive ifb) (show_logic_naive elseb)
       | _ -> "<not implemented XXX>"
     in
@@ -184,26 +184,33 @@ let eval_lambda
     (lam_ast: MiniLambda.lambda) =
   let open MiniLambda in
   let open Tester.M in
-  let rec evalo l ans =
+  let rec evalo l (ans: MiniLambda.lambda logic) =
     printf "evalo '%s' '%s'\n%!" (show l) (show ans);
+    (* (l === ans) *)
+      (ans === l)
+      (*
     conde
       [(*  fresh (id1) *)
       (*     (l   === !(Lvar id1)) *)
       (*     (ans === !(Lconst !(env id1)) ) *)
       (* ; *) fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
-      ; fresh (cond ifb elseb) (
-          ( l === !(Lifthenelse (cond, ifb, elseb)) ) &&&
-          (* evaluating condition *)
-          (fresh (rez)
-                 (evalo cond rez)
-                 (conde
-                    [ (is_positive_const rez) &&& (ifb === ans)
-                    ; (is_negative_const rez) &&& (elseb === ans)
-                    ])) ) ]
+      (* ; fresh (cond ifb elseb) ( *)
+      (*     ( l === !(Lifthenelse (cond, ifb, elseb)) ) &&& *)
+      (*     (\* evaluating condition *\) *)
+      (*     (fresh (rez) *)
+      (*            (evalo cond rez) *)
+      (*            (conde *)
+      (*               [ (is_positive_const rez) &&& (ifb === ans) *)
+      (*               ; (is_negative_const rez) &&& (elseb === ans) *)
+      (*               ])) ) *)
+      ]
+       *)
   in
   let open Tester.M.ConvenienceStream in
   let open ImplicitPrinters in
-  let xs = run one (evalo !lam_ast) |> MiniKanren.Stream.take ~n:(-1)
+  let stream = run one (evalo !lam_ast) in
+  printf "stream = '%s'\n%!" (MiniKanren.generic_show stream);
+  let xs = stream|> MiniKanren.Stream.take ~n:1
            |> List.map (fun (_logger, (_q,_constraints)) -> _q)
   in
   (* let (_:int list) = xs in *)
@@ -238,6 +245,7 @@ let () =
                          , !(Lconst !(make_const 3))
                          ) in
   let lam2 = Lconst !(make_const 1) in
+
   let () = eval_lambda env lam2 in
   (* let () = eval_lambda env lam1 in *)
   ()

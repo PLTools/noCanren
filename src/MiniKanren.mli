@@ -15,6 +15,8 @@
  * (enclosed in the file COPYING).
  *)
 
+val generic_show : 'a -> string
+
 (** {1 Implementation of miniKanren primitives} *)
 
 (** {2 Basic modules and types} *)
