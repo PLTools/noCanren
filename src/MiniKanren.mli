@@ -190,7 +190,7 @@ module Make : functor (Logger: LOGGER) -> sig
 
   (** [run s] runs a state transformer [s] (not necessarily a goal) in
       initial state *)
-  val run : Logger.t -> (state -> 'a) -> 'a
+  val run : ?logger:Logger.t -> (state -> 'a) -> 'a
 
   (** [diseq] is a type for disequality constraint *)
   type diseq

@@ -54,12 +54,17 @@ struct
 
   type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
 
-  let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
+  let from_fun (f: unit -> 'a t) : 'a t =
+    let l = Lazy.from_fun f in
+    print_endline "forcing";
+    let _ = Lazy.force l in
+    Lazy l
+    (* Lazy (Lazy.from_fun f) *)
 
   let nil = Nil
 
   let cons h t =
-    printf "calling cons of '%s' '%s'\n%!" (generic_show h) (generic_show t);
+    (* printf "calling cons of '%s' '%s'\n%!" (generic_show h) (generic_show t); *)
     Cons (h, t)
 
   let rec take ?(n=(-1)) s =
@@ -67,13 +72,13 @@ struct
     if n = 0
     then []
     else
-      let () = printf "s = '%s'\n%!" (generic_show s) in
+      (* let () = printf "s = '%s'\n%!" (generic_show s) in *)
       match s with
       | Nil          -> []
       | Cons (x, xs) -> x :: take ~n:(n-1) xs
       | Lazy  z      ->
-         printf "%s +%d\n%!" __FILE__ __LINE__;
-         printf "%s\n%!" (generic_show @@ Lazy.force z);
+         (* printf "%s +%d\n%!" __FILE__ __LINE__; *)
+         (* printf "%s\n%!" (generic_show @@ Lazy.force z); *)
         take ~n:n (Lazy.force z)
 
   let rec mplus fs gs =
@@ -98,7 +103,14 @@ struct
       match xs with
       | Nil -> Nil
       | Lazy z -> map f (Lazy.force z)
-      | Cons (x,xs) -> cons (f x) (map f xs)
+      | Cons (x,xs) ->
+         printf "going to call map on head\n%!";
+         printf "calling f x\n%!";
+         let h = f x in
+         printf "calling map recursively\n%!";
+         let tl = map f xs in
+         cons h tl
+         (* cons (f x) (map f xs) *)
     )
 
   let rec concat xs ys =
@@ -328,11 +340,15 @@ module Env :
       (!!v, (h, current+1))
 
     let var (h, _) x =
+      printf "calling Env.var when x='%s'\n%!" (generic_show x);
       if H.mem h (!! x)
-      then match !!x with
+      then
+        let () = print_endline "a member" in
+        match !!x with
            | Var {index;_} -> Some index
            | Value _ -> failwith "Value _ should not get to the environment"
       else
+        let () = print_endline "None" in
         None
 
   end
@@ -405,10 +421,12 @@ module Subst :
             inner 0
 
     let rec walk' env var subst =
-      (* printf "walk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst); *)
+      printf "walk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst);
       match Env.var env var with
       | None ->
-          let Value (v, printer) = !! var in
+         let Value (v, printer) = !! var in
+         printf "tag of printer is %d\n%!" (Obj.tag !!printer);
+         printf "printer v = '%s'\n%!" (printer v);
           (match wrap (Obj.repr v) with
            | Unboxed _ -> !!var
            | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
@@ -426,7 +444,12 @@ module Subst :
           )
 
       | Some i ->
-          (try walk' env (snd (M.find i (!! subst))) subst
+         let () = print_endline @@ generic_show i in
+         let () = printf "%s +%d: subst = '%s'\n%!" __FILE__ __LINE__ (show subst) in
+         let () = print_endline @@ generic_show @@ (M.find i (!! subst)) in
+         let () = print_endline @@ generic_show (snd (M.find i (!! subst)) ) in
+         let () = flush stdout in
+         (try walk' env (snd (M.find i (!! subst))) subst
            with Not_found -> !!var
           )
 
@@ -545,7 +568,7 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y);
+  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s'"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -587,6 +610,7 @@ let (===) x y st =
 
           let ans = Stream.cons ((env, s, constr'),root,l) Stream.nil in
           printf "%s +%d\n%!" __FILE__ __LINE__;
+          (* printf "ans = '%s'\n%!" (generic_show ans); *)
           ans
         with Disequality_violated ->
           let () = make_leaf "Disequality violated" state1 in
@@ -669,9 +693,9 @@ let (=/=) x y state0 =
 
   let conde = (?|)
 
-  let run l (g: state -> _) =
-    let root_node = Logger.make_node l in
-    g (State.empty (), l, root_node)
+  let run ?(logger=Logger.create()) (g: state -> _) =
+    let root_node = Logger.make_node logger in
+    g (State.empty (), logger, root_node)
 
   type diseq = Env.t * Subst.t list
 
@@ -692,7 +716,8 @@ let (=/=) x y state0 =
   let take = Stream.take
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
-  let run_ ?(logger=Logger.create()) = run logger
+  let run_ ?(logger=Logger.create()) = run ~logger
+
 
   module PolyPairs = struct
     let id x = x
@@ -820,9 +845,22 @@ let (=/=) x y state0 =
 
     let run (adder,extD,appF) goalish =
       let tuple,stream = run_ (adder goalish) |> extD in
-      printf "%s +%d\n%!" __FILE__ __LINE__;
-      let ans = Stream.map (fun (st: state) -> (snd3 st, appF (fst3 st) tuple) ) stream in
-      printf "%s +%d\n%!" __FILE__ __LINE__;
+      printf "run %s +%d\n%!" __FILE__ __LINE__;
+      printf "stream = '%s'\n%!" (generic_show stream);
+      let ans =
+        Stream.map (fun (st: state) ->
+          print_endline "inside mapper function";
+          let a1 = snd3 st in
+          printf "a1 ready %s +%d\n%!" __FILE__ __LINE__;
+          print_endline @@ generic_show @@ fst3 st;
+          let b1 = appF (fst3 st) tuple in
+          let rez = a1,b1 in
+          printf "rez ready\n%!";
+          rez
+        ) stream
+      in
+      let _ = Stream.take ~n:1 ans in
+      printf "run finishes %s +%d\n%!" __FILE__ __LINE__;
       ans
 
     let (_: (Logger.t * ((int logic * int logic_diseq) * (string logic * string logic_diseq))) Stream.t)
