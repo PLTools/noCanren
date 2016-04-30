@@ -223,17 +223,17 @@ let eval_lambda
   in
   let open Tester.M.ConvenienceCurried in
   let open ImplicitPrinters in
-  (* let stream = run one @@ evalo !(Lconst !(make_const 1)) in *)
-  (* printf "stream    %s %d\n%!" __FILE__ __LINE__; *)
-  (* (\* printf "stream = '%s'\n%!" (MiniKanren.generic_show stream); *\) *)
-  (* (\* let xs = stream|> MiniKanren.Stream.take ~n:1 *\) *)
-  (* (\*          |> List.map (fun (_logger, (_q,_constraints)) -> _q) *\) *)
-  (* (\* in *\) *)
-  (* let xs = stream (fun var1 -> var1 1 |> List.map (fun (_logger, (_q,_constraints)) -> _q) ) *)
+  let stream = run one @@ evalo !(Lconst !(make_const 1)) in
+  printf "stream    %s %d\n%!" __FILE__ __LINE__;
+  (* printf "stream = '%s'\n%!" (MiniKanren.generic_show stream); *)
+  (* let xs = stream|> MiniKanren.Stream.take ~n:1 *)
+  (*          |> List.map (fun (_logger, (_q,_constraints)) -> _q) *)
   (* in *)
-  (* (\* let (_:int list) = xs in *\) *)
-  let (_q,stream) = Tester.M.run (call_fresh (fun q st ->  evalo !(Lconst !(make_const 1)) q st,q) ) in
-  let _ = Stream.take ~n:1 stream in
+  let xs = stream (fun var1 -> var1 1 |> List.map (fun (_logger, (_q,_constraints)) -> _q) )
+  in
+  (* let (_:int list) = xs in *)
+  (* let (_q,stream) = Tester.M.run (call_fresh (fun q st ->  evalo !(Lconst !(make_const 1)) q st,q) ) in *)
+  (* let _ = Stream.take ~n:1 stream in *)
   printf "answers: %d\n%!" (List.length xs);
   List.iter (fun x -> print_endline @@ show x) xs
 

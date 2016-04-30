@@ -444,7 +444,7 @@ module Subst :
           )
 
       | Some i ->
-         let () = print_endline @@ generic_show i in
+         let () = printf "index = %d\n%!" i in
          let () = printf "%s +%d: subst = '%s'\n%!" __FILE__ __LINE__ (show subst) in
          let () = print_endline @@ generic_show @@ (M.find i (!! subst)) in
          let () = print_endline @@ generic_show (snd (M.find i (!! subst)) ) in
@@ -867,121 +867,151 @@ let (=/=) x y state0 =
        = run (succ one) dummy_goal2
 
   end
-
-
-    (* let run ?(varnames=[]) n (runner: var_storage -> 'b -> state -> 'r) ( (repr,goal): string * 'b) (pwrap: state -> 'b -> 'c) = *)
-    (*   run_ (Logger.create ()) (fun st -> *)
-    (*     let stor = { storage=[] } in *)
-    (*     let result = runner stor goal st in *)
-    (*     let (_: state Stream.t) = result in *)
-    (*     printf "`%s`, %s answer%s {\n" *)
-    (*       repr *)
-    (*       (if n = (-1) then "all" else string_of_int n) *)
-    (*       (if n <>  1  then "s" else ""); *)
-
-    (*     let vars' = make_var_pairs ~varnames stor in *)
-
-    (*     let text_answers = *)
-    (*       let answers = take' ~n result in *)
-    (*       answers |> List.map (fun (st: State.t) -> *)
-    (*           let s = List.map *)
-    (*               (fun (var,varname) -> *)
-    (*                  let rez, _dc = refine st var in *)
-    (*                  sprintf "%s=%s;" varname (show_logic_naive rez) *)
-    (*               ) *)
-    (*               vars' |> String.concat " " *)
-    (*           in *)
-    (*           printf "%s\n%!" s; *)
-    (*           s *)
-    (*         ) *)
-    (*     in *)
-
-    (*     let () = printf "}\n%!" in *)
-    (*     Stream.nil *)
-    (*   ) |> ignore *)
-
-    (* let run1 n (goal: 'a logic -> string*goal) = *)
-    (*   let _ : _ Stream.t = *)
-    (*     run_ (Logger.create () ) (fun st -> *)
-    (*       let q,st = *)
-    (*         match st with *)
-    (*         | ((env,subs,restr),l1,l2) -> *)
-    (*           let x,env' = Env.fresh env in *)
-    (*           let new_state = ((env',subs,restr),l1,l2) in *)
-    (*           x,new_state *)
-    (*       in *)
-    (*       let repr,result = *)
-    (*         let (repr,f) = goal q in *)
-    (*         (repr, f st) *)
-    (*       in *)
-    (*       let vars = ["q", q] in *)
-    (*       let (_: state Stream.t) = result in *)
-    (*       Printf.printf "%s, %s answer%s {\n" *)
-    (*         repr *)
-    (*         (if n = (-1) then "all" else string_of_int n) *)
-    (*         (if n <>  1  then "s" else ""); *)
-
-    (*       let answers = take' ~n result in *)
-
-    (*       let text_answers = *)
-    (*         answers |> List.map (fun (st: State.t) -> *)
-    (*             let s = List.map *)
-    (*                 (fun (s, x) -> *)
-    (*                    let v, dc = refine st x in *)
-    (*                    (\* match reifier dc v with *\) *)
-    (*                    (\* | "" -> *\) sprintf "%s=%s;" s (show_logic_naive v) *)
-    (*                    (\* | r  -> sprintf "%s=%s (%s);" s (show_logic_naive v) r *\) *)
-    (*                 ) *)
-    (*                 vars |> String.concat " " *)
-    (*             in *)
-    (*             Printf.printf "%s\n%!" s; *)
-    (*             s *)
-    (*           ) *)
-    (*       in *)
-
-    (*       ignore (Printf.printf "}\n%!"); *)
-    (*       Stream.nil *)
-    (*     ) *)
-    (*   in *)
-    (*   () *)
-
-  (* module WTF = struct *)
-  (*   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list = *)
-  (*     fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x) *)
-
-  (*   type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list *)
-
-  (*   let reifier : 'a logic -> 'a reifier = fun x ans n -> *)
-  (*     List.map (fun st -> refine' st x) (take ~n ans) *)
-
-
-  (*   let zero  f = f *)
-
-  (*   let succ (prev: 'a -> state -> ('c reifier * (state -> 'b) as 'b)) (f: 'c logic -> 'a) : state -> 'b = *)
-  (*     call_fresh (fun logic st -> (reifier logic, prev @@ f logic) ) *)
-
-  (*   (\* let (_:int) = succ  zero *\) *)
-  (*   let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero *)
-  (* end *)
-
-  (* module WTF2 = struct *)
-  (*   let refine' : State.t -> 'a logic -> 'a logic * 'a logic list = *)
-  (*     fun (e, s, c) x -> (Subst.walk' e (!!x) s, reify (e, c) x) *)
-
-  (*   type 'a reifier = State.t Stream.t -> int -> ('a logic * 'a logic list) list *)
-
-  (*   let reifier : 'a logic -> 'a reifier = fun x ans n -> *)
-  (*     List.map (fun st -> refine' st x) (take ~n ans) *)
-
-  (*   let zero  f = f *)
-
-  (*   let succ (prev: 'a -> state -> _) (f: 'c logic -> 'a) (g: 'c reifier -> 'd): state -> 'b = *)
-  (*     call_fresh (fun logic st -> *)
-  (*         let rarg = reifier logic in *)
-  (*         let (l,r) = prev (g @@ f logic) st in *)
-  (*         (l rarg st, r st) ) *)
-
-  (*   (\* let (_:int) = succ  zero *\) *)
-  (*   (\* let (_: ('a logic -> state -> ('a reifier * (state -> 'b) as 'b)) -> state -> 'b) = succ zero *\) *)
-  (* end *)
 end
+
+
+
+
+module Test1 = struct
+  open Printf
+  open ImplicitPrinters
+
+  module M = Make(UnitLogger)
+  open M
+
+  let (!) = embed
+
+  module Nat = struct
+    type t = O | S of t logic
+    let show = function
+      | O -> "O"
+      | S n -> sprintf "S (%s)" (show_logic_naive n)
+  end
+  implicit module Show_nat : (SHOW with type t = Nat.t) = Nat
+
+  let nat_of_int n : Nat.t =
+    if n<0 then failwith "bad argument"
+    else
+    let rec helper acc n =
+      if n=0 then acc
+      else helper (Nat.S !acc) (n-1)
+    in
+    helper Nat.O n
+
+  let is_positive_nat n = call_fresh (fun _zero -> n === !(Nat.S _zero))
+  let is_nonnegative_nat n =
+    call_fresh (fun _zero -> (n === !(Nat.S _zero)) ||| (n === !Nat.O) )
+
+  module Peano_int = struct
+    type t = bool * Nat.t logic
+    let show : t -> string = fun (p,n) ->
+      if p then show n
+      else "-" ^ (show n)
+    let of_int n =
+      if n>=0 then (true, !(nat_of_int n) )
+      else (false, !(nat_of_int (-n)) )
+  end
+(*
+let is_positive_peano p =
+  let open Nat in
+  call_fresh (fun _zero -> p === !(true, !(S _zero)) )
+
+let is_negative_peano p =
+  let open Nat in
+  fresh (_zero) (p === !(false, !(S _zero)) )
+
+let is_nonnegative_peano p =
+  let open Nat in
+  conde [ p === !(true, !O)
+        ; p === !(false, !O)
+        ; is_positive_peano p
+        ]
+ *)
+module MiniLambda = struct
+  type structured_constant = Peano_int.t
+  and lambda =
+    | Lconst of structured_constant logic
+end
+
+implicit module Show_MiniLambda : (SHOW with type t = MiniLambda.lambda) =
+struct
+  type t = MiniLambda.lambda
+  let show =
+    let open MiniLambda in
+    let rec helper = function
+      | Lconst l -> sprintf "Lconst %s" (show_logic_naive l)
+    in
+    helper
+end
+
+let eval_lambda (lam_ast: MiniLambda.lambda) =
+  let open MiniLambda in
+  let rec evalo l (ans: MiniLambda.lambda logic) st =
+    printf "evalo '%s' '%s'\n%!" (show l) (show ans);
+    (ans === l) st
+  in
+  (* let open M.ConvenienceCurried in *)
+  (* let open ImplicitPrinters in *)
+
+  let naive () =
+
+    let ans =
+      run_ (call_fresh (fun q st -> (evalo !(Lconst !(Peano_int.of_int 1))) q st,q) )
+    in
+    (* let (stream, q) = ans in *)
+    (* let _ = Stream.take ~n:1 stream in *)
+    (* let xs = Stream.take ~n:1 stream *)
+    (*          |> List.map (fun ((e,_st,constr),_,_) -> reify (e,constr) q) *)
+    (* in *)
+    (* printf "answers: %d\n%!" (List.length xs); *)
+    (* List.iter (fun x -> print_endline @@ show x) xs *)
+    ()
+  in
+  let streams () =
+    let open ConvenienceStream in
+    let adder,extD,af = one in
+
+    let ans =
+      adder (fun q st -> (evalo !(Lconst !(Peano_int.of_int 1))) q st)
+    in
+    let (q,stream) = run_ ans in
+    let _ = Stream.take ~n:1 stream in
+    (* let (_:int) = q in *)
+    let xs = Stream.take ~n:1 stream
+             (* |> List.map (fun (st,_,_) -> refine st q |> fst) *)
+             |> List.map (fun (st,_,_) ->
+                 printf "=== %s\n%!" (State.show st);
+                 refine st q
+               )
+    in
+    (* let (__: MiniLambda.lambda logic list) = xs in *)
+    (* printf "***************** answers: %d\n%!" (List.length xs); *)
+    (* List.iter (fun x -> print_endline @@ show x) xs; *)
+    ()
+  in
+  (* let stream = run one @@ evalo !(Lconst !(Peano_int.of_int 1)) in *)
+  (* printf "stream    %s %d\n%!" __FILE__ __LINE__; *)
+  (* printf "stream = '%s'\n%!" (MiniKanren.generic_show stream); *)
+  (* let xs = stream |> MiniKanren.Stream.take ~n:1 *)
+  (*          |> List.map (fun (_logger, (_q,_constraints)) -> _q) *)
+  (* in *)
+  (* let xs = stream (fun var1 -> var1 1 |> List.map (fun (_logger, (_q,_constraints)) -> _q) ) *)
+  (* in *)
+  (* let (_:int list) = xs in *)
+  (* let (_q,stream) = Tester.M.run (call_fresh (fun q st ->  evalo !(Lconst !(make_const 1)) q st,q) ) in *)
+  (* let _ = Stream.take ~n:1 stream in *)
+  (* printf "answers: %d\n%!" (List.length xs); *)
+  (* List.iter (fun x -> print_endline @@ show x) xs; *)
+  let () = streams () in
+  ()
+
+let main () =
+  let open MiniLambda in
+  let lam2 = Lconst !(Peano_int.of_int 1) in
+  let () = eval_lambda lam2 in
+  ()
+
+  end
+
+
+let () = Test1.main ()
