@@ -53,6 +53,13 @@ let () =
   f [%pat? 1::2::[] ];
   ()
  *)
+
+module Value = struct
+  type t = Vint of int
+         | Vtuple of t list
+         | Vconstructor of string * t list
+end
+
 let (!) = embed
 
 module Nat = struct
@@ -94,11 +101,18 @@ let is_negative_peano p =
   let open Nat in
   fresh (_zero) (p === !(false, !(S _zero)) )
 
-let is_nonnegative_peano p =
+let is_non_negative_peano p =
   let open Nat in
   conde [ p === !(true, !O)
         ; p === !(false, !O)
         ; is_positive_peano p
+        ]
+
+let is_non_positive_peano p =
+  let open Nat in
+  conde [ p === !(true, !O)
+        ; p === !(false, !O)
+        ; is_negative_peano p
         ]
 
 module MiniLambda = struct
@@ -110,7 +124,7 @@ module MiniLambda = struct
       sw_blocks: (int * lambda) list;     (* Tag block cases *)
       sw_failaction : lambda option}      (* Action to take if failure *)
   and lambda =
-    (* | Lvar of Ident.t logic *)
+    | Lvar of Ident.t logic
     | Lconst of structured_constant logic
     (* | Lapply of lambda logic * lambda logic llist *)
     (* | Lfunction of function_kind * Ident.t list * lambda *)
@@ -183,13 +197,19 @@ let is_nonnegative_const lam =
   let open MiniLambda in
   fresh n
     (lam === !(Lconst n))
-    (is_nonnegative_peano n)
+    (is_non_negative_peano n)
 
 let is_negative_const lam =
   let open MiniLambda in
   fresh n
     (lam === !(Lconst n))
     (is_negative_peano n)
+
+let is_non_positive_const lam =
+  let open MiniLambda in
+  fresh n
+    (lam === !(Lconst n))
+    (is_non_positive_peano n)
 
 (* let () = print_endline @@ show MiniLambda.(!(Const_int 11)) *)
 
@@ -201,36 +221,36 @@ let eval_lambda
   let open Tester.M in
   let rec evalo l (ans: MiniLambda.lambda logic) =
     printf "evalo '%s' '%s'\n%!" (show l) (show ans);
-    (* (l === ans) *)
-      (ans === l)
-      (*
+
     conde
-      [(*  fresh (id1) *)
-      (*     (l   === !(Lvar id1)) *)
-      (*     (ans === !(Lconst !(env id1)) ) *)
-      (* ; *) fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
-      (* ; fresh (cond ifb elseb) ( *)
-      (*     ( l === !(Lifthenelse (cond, ifb, elseb)) ) &&& *)
-      (*     (\* evaluating condition *\) *)
-      (*     (fresh (rez) *)
-      (*            (evalo cond rez) *)
-      (*            (conde *)
-      (*               [ (is_positive_const rez) &&& (ifb === ans) *)
-      (*               ; (is_negative_const rez) &&& (elseb === ans) *)
-      (*               ])) ) *)
+      [ fresh (id1)
+          (l   === !(Lvar id1))
+          (ans === !(Lconst !(env id1)) )
+      ; fresh (_c1) (l === !(Lconst _c1)) &&& (l === ans)
+      ; fresh (cond ifb elseb) (
+          ( l === !(Lifthenelse (cond, ifb, elseb)) ) &&&
+          (* evaluating condition *)
+          (fresh (rez)
+                 (evalo cond rez)
+                 (conde
+                    [ (is_positive_const rez) &&& (ifb === ans)
+                    ; (is_negative_const rez) &&& (elseb === ans)
+                    ])) )
       ]
-       *)
   in
-  let open Tester.M.ConvenienceCurried in
+  let open Tester.M.ConvenienceStream in
   let open ImplicitPrinters in
-  let stream = run one @@ evalo !(Lconst !(make_const 1)) in
-  printf "stream    %s %d\n%!" __FILE__ __LINE__;
+  (* let stream = run one @@ evalo !(Lconst !(make_const 1)) in *)
+  let stream = run one @@ evalo !lam_ast in
   (* printf "stream = '%s'\n%!" (MiniKanren.generic_show stream); *)
-  (* let xs = stream|> MiniKanren.Stream.take ~n:1 *)
-  (*          |> List.map (fun (_logger, (_q,_constraints)) -> _q) *)
-  (* in *)
-  let xs = stream (fun var1 -> var1 1 |> List.map (fun (_logger, (_q,_constraints)) -> _q) )
+  let _ = MiniKanren.Stream.take ~n:1 stream in
+
+  let xs = stream
+           |> MiniKanren.Stream.take ~n:1
+           |> List.map (fun (_logger, (_q,_constraints)) -> _q)
   in
+  (* let xs = stream (fun var1 -> var1 1 |> List.map (fun (_logger, (_q,_constraints)) -> _q) ) *)
+  (* in *)
   (* let (_:int list) = xs in *)
   (* let (_q,stream) = Tester.M.run (call_fresh (fun q st ->  evalo !(Lconst !(make_const 1)) q st,q) ) in *)
   (* let _ = Stream.take ~n:1 stream in *)
@@ -241,7 +261,6 @@ let () =
   let open MiniLambda in
   let env : Ident.t logic -> structured_constant  =
     fun x ->
-      print_endline "A";
       Peano_int.of_int 1
   in
 
@@ -251,9 +270,14 @@ let () =
                          ) in
   let lam2 = Lconst !(make_const 1) in
 
-  let () = eval_lambda env lam2 in
-  (* let () = eval_lambda env lam1 in *)
+  (* let () = eval_lambda env lam2 in *)
+  let () = eval_lambda env lam1 in
   ()
+
+let eval_match what pats ans =
+  (* `what` should be tuple with no free variables *)
+
+
 
 (* let eval_lambda (l: Lambda.lambda) =      *)
 (* type right_expr = int *)

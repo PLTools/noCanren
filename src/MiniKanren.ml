@@ -56,8 +56,8 @@ struct
 
   let from_fun (f: unit -> 'a t) : 'a t =
     let l = Lazy.from_fun f in
-    print_endline "forcing";
-    let _ = Lazy.force l in
+    (* print_endline "forcing"; *)
+    (* let _ = Lazy.force l in *)
     Lazy l
     (* Lazy (Lazy.from_fun f) *)
 
@@ -68,7 +68,7 @@ struct
     Cons (h, t)
 
   let rec take ?(n=(-1)) s =
-    printf "Stream.take: %s +%d\n%!" __FILE__ __LINE__;
+    (* printf "Stream.take: %s +%d\n%!" __FILE__ __LINE__; *)
     if n = 0
     then []
     else
@@ -99,15 +99,15 @@ struct
       )
 
   let rec map f xs =
+    (* printf "calling map recursively\n%!"; *)
     from_fun (fun () ->
       match xs with
-      | Nil -> Nil
+      | Nil -> (* print_endline "got Nil";  *)Nil
       | Lazy z -> map f (Lazy.force z)
       | Cons (x,xs) ->
-         printf "going to call map on head\n%!";
-         printf "calling f x\n%!";
+         (* printf "going to call map on head\n%!"; *)
+         (* printf "calling f x\n%!"; *)
          let h = f x in
-         printf "calling map recursively\n%!";
          let tl = map f xs in
          cons h tl
          (* cons (f x) (map f xs) *)
@@ -340,15 +340,15 @@ module Env :
       (!!v, (h, current+1))
 
     let var (h, _) x =
-      printf "calling Env.var when x='%s'\n%!" (generic_show x);
+      (* printf "calling Env.var when x='%s'\n%!" (generic_show x); *)
       if H.mem h (!! x)
       then
-        let () = print_endline "a member" in
+        (* let () = print_endline "a member" in *)
         match !!x with
            | Var {index;_} -> Some index
            | Value _ -> failwith "Value _ should not get to the environment"
       else
-        let () = print_endline "None" in
+        (* let () = print_endline "None" in *)
         None
 
   end
@@ -412,7 +412,7 @@ module Subst :
          match wy with
          | Unboxed _ -> false
          | Invalid 247 -> false
-         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
+         | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
          | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
@@ -421,15 +421,14 @@ module Subst :
             inner 0
 
     let rec walk' env var subst =
-      printf "walk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst);
+      (* printf "\nwalk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst); *)
       match Env.var env var with
       | None ->
-         let Value (v, printer) = !! var in
-         printf "tag of printer is %d\n%!" (Obj.tag !!printer);
-         printf "printer v = '%s'\n%!" (printer v);
-          (match wrap (Obj.repr v) with
-           | Unboxed _ -> !!var
-           | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
+           let v = var in
+           (match wrap (Obj.repr v) with
+           | Invalid n when n = Obj.closure_tag -> !!var
+           | Unboxed _                          -> !!var
+           | Invalid n    -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
            | Boxed (t, s, f) ->
                let var = Obj.dup (Obj.repr v) in
                let sf =
@@ -440,15 +439,15 @@ module Subst :
                for i = 0 to s - 1 do
                  sf var i (!!(walk' env (!!(f i)) subst))
                done;
-               Value(!!var, printer)
+               !!var
           )
 
       | Some i ->
-         let () = printf "index = %d\n%!" i in
-         let () = printf "%s +%d: subst = '%s'\n%!" __FILE__ __LINE__ (show subst) in
-         let () = print_endline @@ generic_show @@ (M.find i (!! subst)) in
-         let () = print_endline @@ generic_show (snd (M.find i (!! subst)) ) in
-         let () = flush stdout in
+         (* let () = printf "index = %d\n%!" i in *)
+         (* let () = printf "%s +%d: subst = '%s'\n%!" __FILE__ __LINE__ (show subst) in *)
+         (* let () = print_endline @@ generic_show @@ (M.find i (!! subst)) in *)
+         (* let () = print_endline @@ generic_show (snd (M.find i (!! subst)) ) in *)
+         (* let () = flush stdout in *)
          (try walk' env (snd (M.find i (!! subst))) subst
            with Not_found -> !!var
           )
@@ -549,7 +548,7 @@ module Make (Logger: LOGGER) = struct
     = fun msg f st -> f (adjust_state msg st)
 
   let call_fresh: ('a logic -> state -> 'b) -> state -> 'b = fun f (((env,s,ss), _, _) as state) ->
-    print_endline "call_fresh";
+    (* print_endline "call_fresh"; *)
     let x, env' = Env.fresh env in
     let new_st = (env',s,ss) in
     ((sprintf "fresh variable '%s'" (show_logic_naive x)) <=>
@@ -582,15 +581,15 @@ let (===) x y st =
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
-          print_endline "folding constraints";
-          printf "constr = '%s'\n%!" (generic_show constr);
+          (* print_endline "folding constraints"; *)
+          (* printf "constr = '%s'\n%!" (generic_show constr); *)
           let constr' =
             List.fold_left (fun css' cs ->
               let (x, t) : Obj.t list * Obj.t list  = Subst.split cs in
-              printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs);
-              printf "x = [%s], t=[%s]\n%!"
-                (String.concat "; " @@ List.map (fun x -> generic_show !!x) x)
-                (String.concat "; " @@ List.map (fun x -> generic_show !!x) t);
+              (* printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs); *)
+              (* printf "x = [%s], t=[%s]\n%!" *)
+              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) x) *)
+              (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) t); *)
 
               try
                 let p, s' = Subst.unify env (!!x) (!!t) subst' in
@@ -609,7 +608,7 @@ let (===) x y st =
             state1 |> adjust_state @@ sprintf "Success: subs=%s" (Subst.show s) in
 
           let ans = Stream.cons ((env, s, constr'),root,l) Stream.nil in
-          printf "%s +%d\n%!" __FILE__ __LINE__;
+          (* printf "%s +%d\n%!" __FILE__ __LINE__; *)
           (* printf "ans = '%s'\n%!" (generic_show ans); *)
           ans
         with Disequality_violated ->
@@ -845,22 +844,22 @@ let (=/=) x y state0 =
 
     let run (adder,extD,appF) goalish =
       let tuple,stream = run_ (adder goalish) |> extD in
-      printf "run %s +%d\n%!" __FILE__ __LINE__;
-      printf "stream = '%s'\n%!" (generic_show stream);
+      (* printf "run %s +%d\n%!" __FILE__ __LINE__; *)
+      (* printf "stream = '%s'\n%!" (generic_show stream); *)
       let ans =
         Stream.map (fun (st: state) ->
-          print_endline "inside mapper function";
+          (* print_endline "inside mapper function"; *)
           let a1 = snd3 st in
-          printf "a1 ready %s +%d\n%!" __FILE__ __LINE__;
-          print_endline @@ generic_show @@ fst3 st;
+          (* printf "a1 ready %s +%d\n%!" __FILE__ __LINE__; *)
+          (* print_endline @@ generic_show @@ fst3 st; *)
           let b1 = appF (fst3 st) tuple in
           let rez = a1,b1 in
-          printf "rez ready\n%!";
+          (* printf "rez ready\n%!"; *)
           rez
         ) stream
       in
       let _ = Stream.take ~n:1 ans in
-      printf "run finishes %s +%d\n%!" __FILE__ __LINE__;
+      (* printf "run finishes %s +%d\n%!" __FILE__ __LINE__; *)
       ans
 
     let (_: (Logger.t * ((int logic * int logic_diseq) * (string logic * string logic_diseq))) Stream.t)
@@ -871,7 +870,7 @@ end
 
 
 
-
+(*
 module Test1 = struct
   open Printf
   open ImplicitPrinters
@@ -980,7 +979,7 @@ let eval_lambda (lam_ast: MiniLambda.lambda) =
     let xs = Stream.take ~n:1 stream
              (* |> List.map (fun (st,_,_) -> refine st q |> fst) *)
              |> List.map (fun (st,_,_) ->
-                 printf "=== %s\n%!" (State.show st);
+                 (* printf "=== %s\n%!" (State.show st); *)
                  refine st q
                )
     in
@@ -1015,3 +1014,4 @@ let main () =
 
 
 let () = Test1.main ()
+         *)
