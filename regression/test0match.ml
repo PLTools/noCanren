@@ -2,13 +2,19 @@ open Printf
 open MiniKanren
 open ImplicitPrinters
 open Tester.M
-(*
+
+module Value = struct
+  type t = Vint of int
+         | Vtuple of t list
+         | Vconstructor of string * t list
+end
+type varname = string
 type pat = Pany
-         | Pvar of string
+         | Pvar of varname
          | Pconstant of int
          | Ptuple of pat list
-         | Pconstruct of string * pat option
-         | Por of pat * pat
+         | Pconstructor of string * pat option
+         (* | Por of pat * pat *)
 
 implicit module Show_pat : (SHOW with type t = pat) = struct
     type t = pat
@@ -17,11 +23,11 @@ implicit module Show_pat : (SHOW with type t = pat) = struct
       | Pvar s -> s
       | Pconstant x -> string_of_int x
       | Ptuple ps -> sprintf "(%s)" @@ String.concat "," @@ List.map show ps
-      | Pconstruct (name,None) -> name
-      | Pconstruct (name,Some p) -> sprintf "%s %s" name (show p)
-      | Por (p1,p2) -> sprintf "%s | %s" (show p1) (show p2)
+      | Pconstructor (name,None) -> name
+      | Pconstructor (name,Some p) -> sprintf "%s %s" name (show p)
+      (* | Por (p1,p2) -> sprintf "%s | %s" (show p1) (show p2) *)
 end
-
+(*
 let pat_of_parsetree root =
   let open Longident in
   let open Asttypes in
@@ -31,9 +37,9 @@ let pat_of_parsetree root =
     | Ppat_any -> Pany
     | Ppat_var {txt; _} -> Pvar txt
     | Ppat_constant (Const_int n) -> Pconstant n
-    | Ppat_or (x,y) -> Por (helper x, helper y)
-    | Ppat_construct ({txt=Lident name;_},None)   -> Pconstruct (name, None)
-    | Ppat_construct ({txt=Lident name;_},Some x) -> Pconstruct (name, Some (helper x))
+    (* | Ppat_or (x,y) -> Por (helper x, helper y) *)
+    | Ppat_construct ({txt=Lident name;_},None)   -> Pconstructor (name, None)
+    | Ppat_construct ({txt=Lident name;_},Some x) -> Pconstructor (name, Some (helper x))
     | Ppat_or (p1,p2) -> Por (helper p1, helper p2)
     | Ppat_tuple ps -> Ptuple (List.map helper ps)
     | _ ->
@@ -54,11 +60,6 @@ let () =
   ()
  *)
 
-module Value = struct
-  type t = Vint of int
-         | Vtuple of t list
-         | Vconstructor of string * t list
-end
 
 let (!) = embed
 
@@ -274,11 +275,88 @@ let () =
   let () = eval_lambda env lam1 in
   ()
 
-let eval_match what pats ans =
+let eval_match (what: Value.t) pats  =
+  let distinct_sets : 'a list -> 'a list -> bool = fun xs ys ->
+    let rec helper = function
+    | [] -> true
+    | x::xs when List.mem x ys -> false
+    | _::xs -> helper xs
+    in
+    helper xs
+  in
+  let merge_subs xs ys =
+    if distinct_sets xs ys then List.append xs ys
+    else failwith "not distinct sets"
+  in
   (* `what` should be tuple with no free variables *)
+  let rec match_one what patt =
+    let open Value in
+    match what,patt with
+    (* | _ , Por _ -> failwith "or pattern not implemented" *)
+    | Vint _, Pany -> Some []
+    | Vint n, Pvar name -> Some [ (name,Vint n) ]
+    | Vint n, Pconstant m when n=m -> Some []
+    | Vint _, Pconstant _ -> None
+    | Vint _, Ptuple _
+    | Vint _, Pconstructor _ -> None
+    | Vtuple xs, Ptuple ys when List.length xs <> List.length ys -> None
+    | Vtuple xs, Ptuple ys ->
+       List.combine xs ys
+       |> ListLabels.fold_left
+            ~init:(Some [])
+            ~f:(fun acc (x,y) ->
+                                   match acc with
+                                   | Some subs -> begin
+                                       match match_one x y with
+                                       | Some subs2 when distinct_sets subs subs2 ->
+                                          Some (merge_subs subs subs2)
+                                       | _ -> failwith "can't merge subs  in matching tuple"
+                                     end
+                                   | None -> None)
+    | Vtuple _,_ -> None
+    | Vconstructor (name,_), Pconstructor (name2,_) when name<>name2 ->
+       None
+    | Vconstructor (_,[x]), Pconstructor(_,Some p) -> match_one x p
+    | Vconstructor (_,[x]), Pconstructor(_,None)   -> None
+    | Vconstructor (_,xs),  Pconstructor(_,Some (Ptuple ys)) ->
+       match_one (Vtuple xs) (Ptuple ys)
+    | Vconstructor _, Pconstructor _ -> None
+    | Vconstructor _, _ -> None
+
+  in
+  let module S = struct
+      type subs = (string * Value.t) list
+      exception Answer of subs * Value.t
+  end in
+  try List.iter (fun (pat, right) ->
+                match match_one what pat with
+                | Some subs -> raise (S.Answer (subs,right))
+                | None -> ()) pats;
+      None
+ with S.Answer (subs, right) -> Some right
 
 
 
+let test_eval_match () =
+  let open Value in
+  let v1 = Vint 1 in
+
+  assert (eval_match (Vint 1) [ (Pany, Vint 1) ] = Some (Vint 1) );
+  assert (eval_match (Vint 1) [ (Pvar "x", Vint 1) ] = Some (Vint 1) );
+  assert (eval_match (Vint 1) [ (Pvar "x", Vint 1) ] = Some (Vint 1) );
+  assert (eval_match (Vtuple [Vint 1;Vint 2]) [ (Pvar "x", Vint 1) ] = None );
+  assert (eval_match (Vtuple [Vint 1;Vint 2])
+                     [ (Ptuple [Pvar "x"; Pconstant 2], Vint 3) ] = Some (Vint 3) );
+  assert (eval_match  (Vtuple [Vconstructor("Some", [Vint 1]); Vint 2])
+                     [(Ptuple [Pconstructor("Some", Some Pany); Pconstant 2], Vint 3) ] = Some (Vint 3) );
+  assert (eval_match  (Vconstructor("Some", [Vint 1]))
+                     [ Pconstructor("Some", None)     , Vint 666
+                     ; Pconstructor("Some", Some Pany), Vint 777
+                     ]
+         = Some (Vint 777) );
+  ()
+
+let () = test_eval_match ()
 (* let eval_lambda (l: Lambda.lambda) =      *)
 (* type right_expr = int *)
 (* type match_expr = Pexp_match of (string list * (pat * right_expr) list) *)
