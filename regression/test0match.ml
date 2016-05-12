@@ -437,3 +437,60 @@ let () = test_eval_match ()
 (*   run1 ~n:1 (REPR(pExpr (of_list [Id; Add; Id; Add; Id]) ) ); *)
 (*   run1 ~n:1 (REPR(fun q -> pExpr q !(M (!I, !I))         ) ); *)
 (*   () *)
+
+module MiniLambda_Nologic = struct
+  type structured_constant = int
+  type lambda_switch =
+    { sw_numconsts: int;                  (* Number of integer cases *)
+      sw_consts: (int * lambda) list;     (* Integer cases *)
+      sw_numblocks: int;                  (* Number of tag block cases *)
+      sw_blocks: (int * lambda) list;     (* Tag block cases *)
+      sw_failaction : lambda option}      (* Action to take if failure *)
+  and lambda =
+    | Lvar of Ident.t
+    | Lconst of structured_constant
+    (* | Lapply of lambda logic * lambda logic llist *)
+    (* | Lfunction of function_kind * Ident.t list * lambda *)
+    (* | Llet of Lambda.let_kind * Ident.t * lambda logic * lambda logic *)
+    (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
+    (* | Lprim of Lambda.primitive * Lambda.lambda list *)
+    (* | Lswitch of lambda * lambda_switch *)
+    (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
+    (*                    Lambda.lambda option *)
+    | Lstaticraise of int (* * Lambda.lambda list *)
+    | Lstaticcatch of lambda * (int (* * Ident.t list *)) * lambda
+    (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
+    | Lifthenelse of (lambda * lambda * lambda)
+    (* | Lsequence of lambda * lambda *)
+    (* | Lwhile of Lambda.lambda * Lambda.lambda *)
+    (* | Lfor of Ident.t * Lambda.lambda * Lambda.lambda * *)
+    (*         Asttypes.direction_flag * Lambda.lambda *)
+    (* | Lassign of Ident.t * lambda *)
+    (* | Lsend of Lambda.meth_kind * Lambda.lambda * Lambda.lambda * *)
+    (*   Lambda.lambda list * Location.t *)
+    (* | Levent of Lambda.lambda * Lambda.lambda_event *)
+    (* | Lifused of Ident.t * Lambda.lambda *)
+
+
+  let eval root =
+    let rec helper = function
+      | Lconst n -> `Ok (Lconst n)
+      | Lvar ident -> failwith "Not implemented"
+      | Lifthenelse (cond,trueb,falseb) -> begin
+          match helper cond with
+          | `Raise n -> `Raise n
+          | `Ok (Lconst n) when n > 0 -> helper trueb
+          | `Ok (Lconst n)  -> helper falseb
+          | _ -> failwith "how to evaluate this?"
+        end
+      | Lstaticraise n -> `Raise n
+      | Lstaticcatch (lam, n, handler) -> begin
+          match helper lam with
+          | `Ok x -> `Ok x
+          | `Raise m when m=n -> helper handler
+          | `Raise m -> `Raise m
+        end
+  in
+  helper root
+
+end
