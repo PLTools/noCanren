@@ -438,6 +438,23 @@ let () = test_eval_match ()
 (*   run1 ~n:1 (REPR(fun q -> pExpr q !(M (!I, !I))         ) ); *)
 (*   () *)
 
+module CompiledValue = struct
+    type t = Unboxed of int
+           | Constructor of string * block
+           | Tuple of block
+    and block = t list
+
+    let is_constructor name = function
+      | Constructor (n,_) when n = name -> true
+      | _ -> false
+
+    let field_exn n = function
+      | Unboxed x when n=0 -> Unboxed x
+      | Unboxed _ -> failwith "Bad argument of field_exn"
+      | Constructor (_,xs) -> List.nth xs n
+      | Tuple xs -> List.length xs n
+end
+
 module MiniLambda_Nologic = struct
   type structured_constant = int
   type lambda_switch =
@@ -493,4 +510,9 @@ module MiniLambda_Nologic = struct
   in
   helper root
 
+end
+
+
+module NaiveCompilation = struct
+    (* straightforward compilation to MiniLambda_Nologic*)
 end
