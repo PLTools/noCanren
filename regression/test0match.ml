@@ -7,13 +7,24 @@ module Value = struct
   type t = Vint of int
          | Vtuple of t list
          | Vconstructor of string * t list
+
+  let is_constructor name = function
+    | Vconstructor (n,_) when n = name -> true
+    | _ -> false
+
+  let field_exn n : t -> t = function
+    | Vint x when n=0 -> Vint x
+    | Vint _ -> failwith "Bad argument of field_exn"
+    | Vconstructor (_,xs) -> List.nth xs n
+    | Vtuple xs -> List.nth xs n
 end
+
 type varname = string
 type pat = Pany
          | Pvar of varname
          | Pconstant of int
          | Ptuple of pat list
-         | Pconstructor of string * pat option
+         | Pconstructor of string * pat list
          (* | Por of pat * pat *)
 
 implicit module Show_pat : (SHOW with type t = pat) = struct
@@ -23,10 +34,11 @@ implicit module Show_pat : (SHOW with type t = pat) = struct
       | Pvar s -> s
       | Pconstant x -> string_of_int x
       | Ptuple ps -> sprintf "(%s)" @@ String.concat "," @@ List.map show ps
-      | Pconstructor (name,None) -> name
-      | Pconstructor (name,Some p) -> sprintf "%s %s" name (show p)
+      | Pconstructor (name,xs) -> sprintf "%s %s" name (show (Ptuple xs))
       (* | Por (p1,p2) -> sprintf "%s | %s" (show p1) (show p2) *)
 end
+
+type source_program = Value.t * (pat * Value.t) list
 (*
 let pat_of_parsetree root =
   let open Longident in
@@ -60,7 +72,7 @@ let () =
   ()
  *)
 
-
+(*
 let (!) = embed
 
 module Nat = struct
@@ -115,7 +127,8 @@ let is_non_positive_peano p =
         ; p === !(false, !O)
         ; is_negative_peano p
         ]
-
+ *)
+(*
 module MiniLambda = struct
   type structured_constant = (* Const_int  *) Peano_int.t
   type lambda_switch =
@@ -274,6 +287,7 @@ let () =
   (* let () = eval_lambda env lam2 in *)
   let () = eval_lambda env lam1 in
   ()
+  *)
 
 let eval_match (what: Value.t) pats  =
   let distinct_sets : 'a list -> 'a list -> bool = fun xs ys ->
@@ -316,13 +330,12 @@ let eval_match (what: Value.t) pats  =
     | Vtuple _,_ -> None
     | Vconstructor (name,_), Pconstructor (name2,_) when name<>name2 ->
        None
-    | Vconstructor (_,[x]), Pconstructor(_,Some p) -> match_one x p
-    | Vconstructor (_,[x]), Pconstructor(_,None)   -> None
-    | Vconstructor (_,xs),  Pconstructor(_,Some (Ptuple ys)) ->
+    (* | Vconstructor (_,[x]), Pconstructor(_,Some p) -> match_one x p *)
+    (* | Vconstructor (_,[x]), Pconstructor(_,None)   -> None *)
+    | Vconstructor (_,xs),  Pconstructor(_, ys) ->
        match_one (Vtuple xs) (Ptuple ys)
-    | Vconstructor _, Pconstructor _ -> None
+    (* | Vconstructor _, Pconstructor _ -> None *)
     | Vconstructor _, _ -> None
-
   in
   let module S = struct
       type subs = (string * Value.t) list
@@ -339,7 +352,6 @@ let eval_match (what: Value.t) pats  =
 
 let test_eval_match () =
   let open Value in
-  let v1 = Vint 1 in
 
   assert (eval_match (Vint 1) [ (Pany, Vint 1) ] = Some (Vint 1) );
   assert (eval_match (Vint 1) [ (Pvar "x", Vint 1) ] = Some (Vint 1) );
@@ -348,115 +360,19 @@ let test_eval_match () =
   assert (eval_match (Vtuple [Vint 1;Vint 2])
                      [ (Ptuple [Pvar "x"; Pconstant 2], Vint 3) ] = Some (Vint 3) );
   assert (eval_match  (Vtuple [Vconstructor("Some", [Vint 1]); Vint 2])
-                     [(Ptuple [Pconstructor("Some", Some Pany); Pconstant 2], Vint 3) ] = Some (Vint 3) );
+                     [(Ptuple [Pconstructor("Some", [Pany]); Pconstant 2], Vint 3) ] = Some (Vint 3) );
   assert (eval_match  (Vconstructor("Some", [Vint 1]))
-                     [ Pconstructor("Some", None)     , Vint 666
-                     ; Pconstructor("Some", Some Pany), Vint 777
+                     [ Pconstructor("Some", [])    , Vint 666
+                     ; Pconstructor("Some", [Pany]), Vint 777
                      ]
          = Some (Vint 777) );
   ()
 
 let () = test_eval_match ()
-(* let eval_lambda (l: Lambda.lambda) =      *)
-(* type right_expr = int *)
-(* type match_expr = Pexp_match of (string list * (pat * right_expr) list) *)
-
-(* type token = Id | Add | Mul *)
-
-(* module Show_token_explicit: (SHOW with type t = token) = struct *)
-(*   type t = token *)
-(*   let show = function *)
-(*     | Id -> "Id" *)
-(*     | Add -> "Add" *)
-(*     | Mul -> "Mul" *)
-(* end *)
-(* implicit module Show_token = Show_token_explicit *)
-
-(* type expr  = I | A of expr logic * expr logic | M of expr logic * expr logic *)
-(* module rec Show_expr_explicit: (SHOW with type t = expr) = struct *)
-(*   type t = expr *)
-(*   let show = function *)
-(*     | I -> "I" *)
-(*     | A (l,r) -> *)
-(*        sprintf "A (%s, %s)" (Show_expr_logic.show l) (Show_expr_logic.show r) *)
-(*     | M (l,r) -> *)
-(*        sprintf "M (%s, %s)" (Show_expr_logic.show l) (Show_expr_logic.show r) *)
-(* end *)
-(* and Show_expr_logic: (SHOW with type t = expr logic) = Show_logic_explicit(Show_expr_explicit) *)
-(* implicit module Show_expr = Show_expr_explicit *)
-
-(* open Tester.M *)
-
-(* let (!) = embed *)
-
-(* let sym t i i' = *)
-(*   fresh (x xs) *)
-(*     (i === x%xs) (t === x) (i' === xs) *)
-
-(* let eof i = i === !(Nil : token llist) *)
-
-(* let (|>) x y = fun i i'' r'' -> *)
-(*   fresh (i' r') *)
-(*     (x i  i' r') *)
-(*     (y r' i' i'' r'') *)
-
-(* let (<|>) x y = fun i i' r -> *)
-(*   conde [x i i' r; y i i' r] *)
-
-(* let rec pId i i' r = (sym !Id i i') &&& (r === !I) *)
-(* and pAdd i i' r = (pMulPlusAdd <|> pMul) i i' r *)
-(* and pMulPlusAdd i i' r = ( *)
-(*       pMul |> *)
-(*       (fun r i i'' r'' -> *)
-(*          fresh (r' i') *)
-(*            (sym !Add i i') *)
-(*            (r'' === !(A (r, r'))) *)
-(*            (pAdd i' i'' r') *)
-(*       )) i i' r *)
-(* and pMul i i' r = (pIdAstMul <|> pId) i i' r *)
-(* and pIdAstMul i i' r= ( *)
-(*       pId |> *)
-(*       (fun r i i'' r'' -> *)
-(*          fresh (r' i') *)
-(*            (sym !Mul i i') *)
-(*            (r'' === !(M (r, r'))) *)
-(*            (pMul i' i'' r') *)
-(*       )) i i' r *)
-(* and pTop i i' r = pAdd i i' r *)
-
-(* let pExpr i r = fresh (i') (pTop i i' r) (eof i') *)
-
-(* open Tester *)
-
-(* let _ = *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id])                   ) ); *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id; Mul; Id])          ) ); *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id; Mul; Id; Mul; Id]) ) ); *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id; Mul; Id; Add; Id]) ) ); *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id; Add; Id; Mul; Id]) ) ); *)
-(*   run1 ~n:1 (REPR(pExpr (of_list [Id; Add; Id; Add; Id]) ) ); *)
-(*   run1 ~n:1 (REPR(fun q -> pExpr q !(M (!I, !I))         ) ); *)
-(*   () *)
-
-module CompiledValue = struct
-    type t = Unboxed of int
-           | Constructor of string * block
-           | Tuple of block
-    and block = t list
-
-    let is_constructor name = function
-      | Constructor (n,_) when n = name -> true
-      | _ -> false
-
-    let field_exn n = function
-      | Unboxed x when n=0 -> Unboxed x
-      | Unboxed _ -> failwith "Bad argument of field_exn"
-      | Constructor (_,xs) -> List.nth xs n
-      | Tuple xs -> List.length xs n
-end
 
 module MiniLambda_Nologic = struct
   type structured_constant = int
+  type ident = string
   type lambda_switch =
     { sw_numconsts: int;                  (* Number of integer cases *)
       sw_consts: (int * lambda) list;     (* Integer cases *)
@@ -464,11 +380,13 @@ module MiniLambda_Nologic = struct
       sw_blocks: (int * lambda) list;     (* Tag block cases *)
       sw_failaction : lambda option}      (* Action to take if failure *)
   and lambda =
-    | Lvar of Ident.t
-    | Lconst of structured_constant
+    | Lvar of ident
+    | Lconst of Value.t
+    | Lfield of int * ident
+    | Lneq of ident * Value.t
     (* | Lapply of lambda logic * lambda logic llist *)
     (* | Lfunction of function_kind * Ident.t list * lambda *)
-    (* | Llet of Lambda.let_kind * Ident.t * lambda logic * lambda logic *)
+    | Llet of ident * lambda * lambda
     (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
     (* | Lprim of Lambda.primitive * Lambda.lambda list *)
     (* | Lswitch of lambda * lambda_switch *)
@@ -489,30 +407,134 @@ module MiniLambda_Nologic = struct
     (* | Lifused of Ident.t * Lambda.lambda *)
 
 
+  module RezMonad = struct
+    type t = [`Ok of Value.t | `Raise of int ]
+    let (>>=) x f = match x with
+      | `Ok v -> f v
+      | `Raise n -> `Raise n
+    let map x f = match x with
+      | `Ok v -> `Ok (f v)
+      | `Raise n -> `Raise n
+  end
+
   let eval root =
-    let rec helper = function
-      | Lconst n -> `Ok (Lconst n)
-      | Lvar ident -> failwith "Not implemented"
+    let open RezMonad in
+    let extend_env ~env name val_ = function
+      | s when s = name -> val_
+      | s -> env s
+    in
+    let rec helper env = function
+      | Lconst v -> `Ok v
+      | Lvar name -> `Ok (env name)
+      | Lfield (n, name) -> `Ok (Value.field_exn n @@ env name)
+      | Lneq (name, v) -> `Ok (if env name <> v then Vint 1 else Vint 0)
+      | Llet (ident, what, where_) ->
+         (helper env what) >>= fun bnd -> helper (extend_env ~env ident bnd) where_
+
       | Lifthenelse (cond,trueb,falseb) -> begin
-          match helper cond with
+          match helper env cond with
           | `Raise n -> `Raise n
-          | `Ok (Lconst n) when n > 0 -> helper trueb
-          | `Ok (Lconst n)  -> helper falseb
+          | `Ok (Vint n) when n > 0 -> helper env trueb
+          | `Ok (Vint n)  -> helper env falseb
           | _ -> failwith "how to evaluate this?"
         end
       | Lstaticraise n -> `Raise n
       | Lstaticcatch (lam, n, handler) -> begin
-          match helper lam with
+          match helper env lam with
           | `Ok x -> `Ok x
-          | `Raise m when m=n -> helper handler
+          | `Raise m when m=n -> helper env handler
           | `Raise m -> `Raise m
         end
   in
-  helper root
+  let env_exn name = failwith (sprintf "variable %s is not in env" name) in
+  helper env_exn root
 
+  let eval_exn root =
+    match eval root with
+    | `Ok x -> x
+    | _ -> failwith "can't evaluate"
 end
+
+let test_eval_minilambda_nologic () =
+  let open Value in
+  let open MiniLambda_Nologic in
+  assert (eval_exn (Lconst (Vint 5)) = Vint 5);
+  assert (eval_exn (Llet ("x", Lconst (Vint 5), Lconst (Vint 6))) = Vint 6);
+  assert (eval_exn (Llet ("x", Lconst (Vint 5), Lvar "x")) = Vint 5);
+  ()
+
+let () = test_eval_minilambda_nologic ()
 
 
 module NaiveCompilation = struct
+    open MiniLambda_Nologic
+    open Value
+    exception Cant_compile
+
+    module Env = struct
+      type t = (string * Value.t) list
+      let lookup_exn name t = List.assoc name t
+      let extend name value_ env = (name, value_) :: env
+      let empty : t = []
+    end
+
     (* straightforward compilation to MiniLambda_Nologic*)
+    let compile: source_program -> MiniLambda_Nologic.lambda = fun (what,patts) ->
+      let open Value in
+      let next_varname =
+        let counter = ref 0 in
+        fun () -> incr counter; sprintf "x%d" counter.contents
+      in
+      let root_varname = "rootVar" in
+      (*
+      let rec match_one_patt env varname patt right elseb =
+        match Env.lookup_exn varname env, patt with
+        | Vint _, Pany -> right
+        | Vint _, Pvar _ -> right
+        | Vint n, Pconstant m when m=n -> right
+        | Vint _, Pconstant _
+        | Vint _, Ptuple _
+        | Vint _, Pconstructor _ -> raise Cant_compile
+
+        | Vconstructor (name1,_), Pconstructor(name2,_) when name1<>name2 ->
+           raise Cant_compile
+        | Vconstructor (_,xs), Pconstructor(_,ys) when List.length xs <> List.length ys ->
+           raise Cant_compile
+        | Vconstructor (_,xs), Pconstructor (_,ys) ->
+           let new_var = next_varname () in
+           let new_val = Vtuple xs in
+           let new_env = Env.extend new_var new_val env in
+           Llet (new_var, Lconst new_val,
+                 match_one_patt new_env new_var (Ptuple ys) right elseb)
+        (* | Vtuple xs, Ptuple ys -> *)
+        (*    List.map2 (fun x y -> (x,y)) xs ys |> *)
+        (*    List.mapi (fun n (x,y) -> (i,x,y)) xs ys |> *)
+        (*    ListLabels.fold_right *)
+        (*      ~init:elseb *)
+        (*      ~f:(fun (n,v,pat) acc -> *)
+        (*          let new_var = next_varname () in *)
+        (*          let new_val = Lfield (n,varname) in *)
+        (*          Llet (new_var, new_val, match *)
+
+                (*           match_one_patt env *)
+        (*         ) *)
+        (* | _ ->  Lconst 0 *)
+      in
+      *)
+      let rec match_one_patt varname patt right elseb =
+        match patt with
+        | Pany -> right
+        | Pconstant c -> Lifthenelse (Lneq (varname,Vint c),  elseb, right)
+        (* | _ -> Lconst (Vint 0) *)
+      in
+      (* let start_env = Env.(extend root_varname what empty) in *)
+      (* List.fold_right (fun (pat,r) acc -> match_one_patt start_env root_varname pat r acc) *)
+      (*                 (List.map (fun (p,r) -> (p,Lconst r)) patts) *)
+      (*                 (Lstaticraise 666) *)
+      List.fold_right (fun (pat,r) acc -> match_one_patt root_varname pat r acc)
+                      (List.map (fun (p,r) -> (p,Lconst r)) patts)
+                      (Lstaticraise 666)
+
+
+
 end
