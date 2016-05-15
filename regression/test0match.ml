@@ -17,6 +17,9 @@ module Value = struct
     | Vint _ -> failwith "Bad argument of field_exn"
     | Vconstructor (_,xs) -> List.nth xs n
     | Vtuple xs -> List.nth xs n
+
+  let vpair x y = Vtuple [x;y]
+  let vconstructor name xs = Vconstructor (name, xs)
 end
 
 type varname = string
@@ -26,6 +29,7 @@ type pat = Pany
          | Ptuple of pat list
          | Pconstructor of string * pat list
          (* | Por of pat * pat *)
+
 
 implicit module Show_pat : (SHOW with type t = pat) = struct
     type t = pat
@@ -37,6 +41,9 @@ implicit module Show_pat : (SHOW with type t = pat) = struct
       | Pconstructor (name,xs) -> sprintf "%s %s" name (show (Ptuple xs))
       (* | Por (p1,p2) -> sprintf "%s | %s" (show p1) (show p2) *)
 end
+
+
+let ppair x y = Ptuple [x;y]
 
 type source_program = Value.t * (pat * Value.t) list
 (*
@@ -383,6 +390,7 @@ module MiniLambda_Nologic = struct
     | Lvar of ident
     | Lconst of Value.t
     | Lfield of int * ident
+    | Lcheckconstr of string * varname
     | Lneq of ident * Value.t
     (* | Lapply of lambda logic * lambda logic llist *)
     (* | Lfunction of function_kind * Ident.t list * lambda *)
@@ -405,6 +413,9 @@ module MiniLambda_Nologic = struct
     (*   Lambda.lambda list * Location.t *)
     (* | Levent of Lambda.lambda * Lambda.lambda_event *)
     (* | Lifused of Ident.t * Lambda.lambda *)
+
+  let lstaticcatch try_block n handler = Lstaticcatch(try_block, n, handler)
+  let lifthenelse cond trueb elseb = Liftheelse (cond, trueb, elseb)
 
 
   module RezMonad = struct
@@ -445,6 +456,8 @@ module MiniLambda_Nologic = struct
           | `Raise m when m=n -> helper env handler
           | `Raise m -> `Raise m
         end
+      | Lcheckconstr (constr, varname) ->
+         `Ok Value.(if is_constructor constr @@ env varname then Vint 1 else Vint 0)
   in
   let env_exn name = failwith (sprintf "variable %s is not in env" name) in
   helper env_exn root
@@ -521,20 +534,50 @@ module NaiveCompilation = struct
         (* | _ ->  Lconst 0 *)
       in
       *)
+      let next_exit_counter =
+        let exit_counter = ref 0 in
+        fun () -> incr exit_counter; exit_counter.contents
+      in
       let rec match_one_patt varname patt right elseb =
         match patt with
         | Pany -> right
+        | Pvar newname -> Llet (newname, Lvar varname, right)
         | Pconstant c -> Lifthenelse (Lneq (varname,Vint c),  elseb, right)
+        | Pconstructor (name,xs) ->
+           let exit_code = next_exit_counter () in
+           Lstaticcatch(
+             Lifthenelse (Lcheckconstr (name, varname),
+                          match_one_patt varname (Ptuple xs) right (Lstaticraise exit_code),
+                          (Lstaticraise exit_code)),
+             exit_code,
+             elseb)
+        | Ptuple [a;b] ->
+           assert false
+        | Ptuple _ -> failwith "not implemented"
         (* | _ -> Lconst (Vint 0) *)
       in
       (* let start_env = Env.(extend root_varname what empty) in *)
       (* List.fold_right (fun (pat,r) acc -> match_one_patt start_env root_varname pat r acc) *)
       (*                 (List.map (fun (p,r) -> (p,Lconst r)) patts) *)
       (*                 (Lstaticraise 666) *)
-      List.fold_right (fun (pat,r) acc -> match_one_patt root_varname pat r acc)
-                      (List.map (fun (p,r) -> (p,Lconst r)) patts)
-                      (Lstaticraise 666)
-
+      let body =
+        List.fold_right (fun (pat,r) acc -> match_one_patt root_varname pat r acc)
+          (List.map (fun (p,r) -> (p,Lconst r)) patts)
+          (Lstaticraise 666)
+      in
+      Llet (root_varname, Lconst what, body)
 
 
 end
+
+
+let () =
+  let open Value in
+  let open MiniLambda_Nologic in
+  let foo what patts rez =
+    assert (eval @@ NaiveCompilation.compile (what,patts) = `Ok rez)
+  in
+  foo (Vint 5) [Pany, Vint 1] (Vint 1);
+  foo (Vint 5) [Pvar "x", Vint 1] (Vint 1);
+  foo (vpair (Vint 5)(Vint 6)) [ppair (Pvar "x") (Pvar "y"), Vint 1] (Vint 1);
+  ()
