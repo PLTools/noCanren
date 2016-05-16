@@ -1,10 +1,11 @@
 open Printf
-open MiniKanren
+(* open MiniKanren *)
 open ImplicitPrinters
-open Tester.M
+(* open Tester.M *)
 
 module Value = struct
   type t = Vint of int
+         | Vvar of string
          | Vtuple of t list
          | Vconstructor of string * t list
 
@@ -14,13 +15,40 @@ module Value = struct
 
   let field_exn n : t -> t = function
     | Vint x when n=0 -> Vint x
+    | Vvar _
     | Vint _ -> failwith "Bad argument of field_exn"
     | Vconstructor (_,xs) -> List.nth xs n
     | Vtuple xs -> List.nth xs n
 
   let vpair x y = Vtuple [x;y]
   let vconstructor name xs = Vconstructor (name, xs)
+
+  let print ppf v =
+    let open Format in
+    let rec helper = function
+      | Vvar s -> fprintf ppf "%s" s
+      | Vint n -> fprintf ppf "%d" n
+      | Vtuple xs ->
+         let nocomma = ref true in
+         fprintf ppf "(";
+         List.iter (fun p ->
+                    if !nocomma then nocomma := false else fprintf ppf "@,,@ ";
+                    helper p
+                   ) xs;
+         fprintf ppf ")"
+      | Vconstructor (name, []) -> fprintf ppf "%s" name
+      | Vconstructor (name, xs) ->
+         fprintf ppf "@[@,%s@ " name;
+         helper (Vtuple xs);
+         fprintf ppf "@]"
+    in
+    helper v
+
+  let nil = Vconstructor ("[]",[])
+  let cons h tl = Vconstructor ("::",[h;tl])
 end
+
+let vpair a b = Value.Vtuple [a;b]
 
 type varname = string
 type pat = Pany
@@ -44,6 +72,7 @@ end
 
 
 let ppair x y = Ptuple [x;y]
+let pconstructor name xs = Pconstructor (name,xs)
 
 type source_program = Value.t * (pat * Value.t) list
 (*
@@ -343,6 +372,7 @@ let eval_match (what: Value.t) pats  =
        match_one (Vtuple xs) (Ptuple ys)
     (* | Vconstructor _, Pconstructor _ -> None *)
     | Vconstructor _, _ -> None
+    | Vvar _,_ -> failwith "TODO: not implemented"
   in
   let module S = struct
       type subs = (string * Value.t) list
@@ -414,9 +444,48 @@ module MiniLambda_Nologic = struct
     (* | Levent of Lambda.lambda * Lambda.lambda_event *)
     (* | Lifused of Ident.t * Lambda.lambda *)
 
+  let () = ()
+  let lfield n ident = Lfield(n, ident)
+  let lcheckconstr str varname = Lcheckconstr (str, varname)
+  let lneq ident value_ = Lneq (ident, value_)
+  let llet name bnd where_ = Llet (name, bnd, where_)
   let lstaticcatch try_block n handler = Lstaticcatch(try_block, n, handler)
-  let lifthenelse cond trueb elseb = Liftheelse (cond, trueb, elseb)
+  let lifthenelse cond trueb elseb = Lifthenelse (cond, trueb, elseb)
 
+  open Format
+
+  let print ppf root =
+    let pr fmt = fprintf ppf fmt in
+    let rec helper = function
+    | Lvar s   -> fprintf ppf "%s" s
+    | Lconst c -> Value.print ppf c
+    | Lfield (n, ident) -> fprintf ppf "@[get_field@ %d@ %s@ @]" n ident
+    | Lcheckconstr (cname, vname) -> fprintf ppf "@[check_constr@ \"%s\"@ %s@ @]" cname vname
+    | Lneq (varname, val_) -> pr "@[%s@ <>@ %a@,@]" varname Value.print val_
+    | Llet (ident, lam1, lam2) ->
+       pr "@[let %s =@ " ident;
+       helper lam1;
+       pr "@ in @,";
+       helper lam2;
+       pr "@ @]"
+    | Lstaticraise n -> pr "@[exit %d@]" n
+    | Lstaticcatch (what, n, handler) ->
+       pr "@[try@ ";
+       helper what;
+       pr "with@ %d ->@ " n;
+       helper handler;
+       pr "@]"
+    | Lifthenelse (cond,trueb,elseb) ->
+       pr "@[if@ ";
+       helper cond;
+       pr "@ then@ ";
+       helper trueb;
+       pr "@ else@ ";
+       helper elseb;
+       pr "@]"
+    in
+    helper root;
+    fprintf ppf "@."
 
   module RezMonad = struct
     type t = [`Ok of Value.t | `Raise of int ]
@@ -429,16 +498,27 @@ module MiniLambda_Nologic = struct
   end
 
   let eval root =
+    let open Value in
     let open RezMonad in
     let extend_env ~env name val_ = function
       | s when s = name -> val_
       | s -> env s
     in
+
+    let lookup_env env name=
+      let rec helper name env =
+        match env name with
+        | Vvar s when s = name -> failwith "cycle in variable bindings"
+        | Vvar n -> helper n env
+        | x -> x
+      in
+      helper name env
+    in
     let rec helper env = function
       | Lconst v -> `Ok v
       | Lvar name -> `Ok (env name)
-      | Lfield (n, name) -> `Ok (Value.field_exn n @@ env name)
-      | Lneq (name, v) -> `Ok (if env name <> v then Vint 1 else Vint 0)
+      | Lfield (n, name) -> `Ok (Value.field_exn n @@ lookup_env env name)
+      | Lneq (name, v) -> `Ok (if lookup_env env name <> v then Vint 1 else Vint 0)
       | Llet (ident, what, where_) ->
          (helper env what) >>= fun bnd -> helper (extend_env ~env ident bnd) where_
 
@@ -457,7 +537,8 @@ module MiniLambda_Nologic = struct
           | `Raise m -> `Raise m
         end
       | Lcheckconstr (constr, varname) ->
-         `Ok Value.(if is_constructor constr @@ env varname then Vint 1 else Vint 0)
+         `Ok Value.(if is_constructor constr @@ lookup_env env varname
+                    then Vint 1 else Vint 0)
   in
   let env_exn name = failwith (sprintf "variable %s is not in env" name) in
   helper env_exn root
@@ -543,6 +624,8 @@ module NaiveCompilation = struct
         | Pany -> right
         | Pvar newname -> Llet (newname, Lvar varname, right)
         | Pconstant c -> Lifthenelse (Lneq (varname,Vint c),  elseb, right)
+        | Pconstructor (name,[]) ->
+           lifthenelse (lcheckconstr name varname) right elseb
         | Pconstructor (name,xs) ->
            let exit_code = next_exit_counter () in
            Lstaticcatch(
@@ -551,9 +634,25 @@ module NaiveCompilation = struct
                           (Lstaticraise exit_code)),
              exit_code,
              elseb)
+        | Ptuple [a] ->
+           let var_a = next_varname () in
+           llet var_a (lfield 0 varname) @@
+             match_one_patt var_a a right elseb
         | Ptuple [a;b] ->
-           assert false
-        | Ptuple _ -> failwith "not implemented"
+           let var_a = next_varname () in
+           let var_b = next_varname () in
+           let exit_code = next_exit_counter () in
+
+           llet var_a (lfield 0 varname) @@
+             llet var_b (lfield 1 varname) @@
+               lstaticcatch (match_one_patt
+                               var_a a
+                               (match_one_patt var_b b right (Lstaticraise exit_code))
+                               (Lstaticraise exit_code))
+                             exit_code
+                             elseb
+
+        | Ptuple _ -> failwith "Ptuple not implemented"
         (* | _ -> Lconst (Vint 0) *)
       in
       (* let start_env = Env.(extend root_varname what empty) in *)
@@ -570,14 +669,35 @@ module NaiveCompilation = struct
 
 end
 
-
+exception BadResult of Value.t (* MiniLambda_Nologic.lambda *)
 let () =
   let open Value in
   let open MiniLambda_Nologic in
-  let foo what patts rez =
-    assert (eval @@ NaiveCompilation.compile (what,patts) = `Ok rez)
+  let foo ?heading  what patts rez =
+    let lam = NaiveCompilation.compile (what,patts) in
+    let lam =
+      match heading with
+      | Some h -> h lam
+      | None -> lam
+    in
+    MiniLambda_Nologic.print Format.std_formatter lam;
+    print_endline "";
+    match eval lam with
+    | `Ok r when r=rez -> ()
+    | `Ok r -> raise (BadResult r)
+    | `Raise n -> failwith (sprintf "unexpected raise %d" n)
+    (* assert (eval lam = `Ok rez) *)
   in
+
   foo (Vint 5) [Pany, Vint 1] (Vint 1);
   foo (Vint 5) [Pvar "x", Vint 1] (Vint 1);
   foo (vpair (Vint 5)(Vint 6)) [ppair (Pvar "x") (Pvar "y"), Vint 1] (Vint 1);
+
+  foo (vpair (Vvar "lx") (Vvar "ly"))
+      [ ppair (pconstructor "[]" []) Pany, Vint 1
+      ; ppair Pany (pconstructor "[]" []), Vint 2
+      ; ppair (pconstructor "::" [Pvar "x"; Pvar "xs"]) (pconstructor "::" [Pvar "y"; Pvar "ys"]), Vint 3
+      ] (Vint 1) ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
+
+
   ()
