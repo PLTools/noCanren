@@ -2,6 +2,7 @@ open Printf
 (* open MiniKanren *)
 open ImplicitPrinters
 (* open Tester.M *)
+
 module Option = struct
   type 'a t = 'a option
   let (>>=) x f = match x with Some x -> f x | None -> None
@@ -10,6 +11,22 @@ module Option = struct
   let iter ~f = function Some x -> f x; () | None -> ()
   let map ~f ~default = function Some x -> f x | None -> default
 end
+
+module List = struct
+  include List
+
+  let all_same ~f = function
+    |[] -> true
+    | x::xs ->
+       let first = f x in
+       List.for_all (fun y -> f y = first) xs
+
+  let take ~n xs = ExtList.List.take n xs
+  let split_nth ~n xs = ExtList.List.split_nth n xs
+
+end
+
+let fst3 (x,_,_) = x
 
 module Value = struct
   type t = Vint of int
@@ -73,6 +90,20 @@ module Pat = struct
          (* | Por of pat * pat *)
   let is_variable = function Pvar _ -> true | _ -> false
   let get_varname_exn = function Pvar name -> name | _ -> failwith "bad argument"
+
+  let is_constructor = function Pconstructor _ -> true | _ -> false
+  let get_const_info_exn = function
+    | Pconstructor (name,xs) -> name,xs
+    | _ -> failwith "bad argument"
+
+  type kind = Kany | Kvar | Kconst | Ktuple | Kconstructor
+  let get_kind = function
+    | Pany -> Kany
+    | Pvar _ -> Kvar
+    | Pconstant _ -> Kconst
+    | Ptuple _ -> Ktuple
+    | Pconstructor _ -> Kconstructor
+
 end
 
 type pat = Pat.t
@@ -442,15 +473,8 @@ module MiniLambda_Nologic = struct
     | Lfield of int * ident
     | Lcheckconstr of string * varname
     | Lneq of ident * Value.t
-    (* | Lapply of lambda logic * lambda logic llist *)
-    (* | Lfunction of function_kind * Ident.t list * lambda *)
     | Llet of ident * lambda * lambda
-    (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
-    (* | Lprim of Lambda.primitive * Lambda.lambda list *)
-    (* | Lswitch of lambda * lambda_switch *)
-    (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
-    (*                    Lambda.lambda option *)
-
+    | Lifthenelse of lambda * lambda * lambda
     | Lswitchconstr of lambda * (string * lambda) list * lambda option
     | Lstaticraise of int (* * Lambda.lambda list *)
     | Lstaticcatch of lambda * (int option) * lambda
@@ -460,8 +484,14 @@ module MiniLambda_Nologic = struct
          catch lam1 width n -> l2
     *)
     (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
-    | Lifthenelse of (lambda * lambda * lambda)
     (* | MatchFailure *)
+    (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
+    (* | Lprim of Lambda.primitive * Lambda.lambda list *)
+    (* | Lswitch of lambda * lambda_switch *)
+    (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
+    (*                    Lambda.lambda option *)
+    (* | Lapply of lambda logic * lambda logic llist *)
+    (* | Lfunction of function_kind * Ident.t list * lambda *)
     (* | Lsequence of lambda * lambda *)
     (* | Lwhile of Lambda.lambda * Lambda.lambda *)
     (* | Lfor of Ident.t * Lambda.lambda * Lambda.lambda * *)
@@ -775,8 +805,9 @@ module NaiveCompilationWithMatrixes = struct
   open Value
 
   module Matrix = struct
-    type t = pat list list
+    type t = (pat list * lambda) list
 
+    let iter ~f m = List.iter (fun (pats,right) -> f (List.hd pats) (List.tl pats) right) m
     let check_matrix m =
       let lens = List.map List.length m in
       match lens with
@@ -785,23 +816,66 @@ module NaiveCompilationWithMatrixes = struct
 
     let width = function
       | [] -> 0
-      | x::_ -> List.length x
+      | (ps,r) :: _ -> List.length ps
+    let height = List.length
 
-    let is_empty m = List.for_all (fun x -> x=[]) m
+    let is_empty m = List.for_all (fun (x,_) -> x=[]) m
+    let first_column m = List.map (fun (xs,_lambda) -> List.hd xs) m
+
     let check_1st_column cond m =
-      List.(for_all cond @@ map hd m)
+      List.(for_all cond @@ first_column m)
 
+    let eval_prefix_len cond m =
+      let rec helper n = function
+        | [] -> n
+        | x:: xs when cond x -> helper (n+1) xs
+        | _ -> n
+      in
+      helper n @@ first_column m
+
+
+    let cut_horizontally n m =
+      assert (height m = List.length rs);
+      assert (n >0 && n < height m);
+      (List.take ~n m, List.skip ~n rs)
 
   end
 
-  let check_first_variables m : (string list * Matrix.t) option  =
-    if Matrix.check_1st_column Pat.is_variable m && not (Matrix.is_empty m)
+
+  let group_constrs_in_matrix matrix r =
+    let open Pat in
+    let module M = Map.Make(String) in
+    let map = ref M.empty in
+    List.iter2 (fun ps r ->
+                match ps with
+                | (Pconstructor (name,args))::xs ->
+                   let new_data =
+                     try let ys = M.find name map.contents in
+                         (args, xs, r) :: ys
+                     with Not_found -> (args, xs, r) :: []
+                   in
+                   map := M.add name new_data map.contents
+               | _ -> failwith "bad argument"
+               ) matrix r;
+    M.bindings map.contents
+    (* |> List.map (fun (name,moreinfo) *)
+    (* () *)
+
+
+  let check_1st_column_wrap checker getter m =
+    if Matrix.check_1st_column checker m && not (Matrix.is_empty m)
     then
-      let temp = m |> List.map (function x::xs -> (Pat.get_varname_exn x, xs)
+      let temp = m |> List.map (function x::xs -> (getter x, xs)
                                        | [] -> failwith "bad argument")
       in
       Some (List.split temp)
     else None
+
+  let check_first_variables m : (varname list * Matrix.t) option =
+    check_1st_column_wrap Pat.is_variable Pat.get_varname_exn m
+
+  let check_first_constructors m : ((string * Pat.t list) list * Matrix.t) option =
+    check_1st_column_wrap Pat.is_constructor Pat.get_const_info_exn m
 
   type input_data = Value.t list * Matrix.t * lambda list
   type state = input_data * input_data option
@@ -812,13 +886,77 @@ module NaiveCompilationWithMatrixes = struct
 
   (* let (_:int)  = (++) *)
 
-  let rec compile : tuple:Value.t list -> matrix: Matrix.t -> right:lambda list -> lambda
-    = fun ~tuple ~matrix ~right ->
+  let rec compile : tuple:Value.t list -> matrix: Matrix.t  -> lambda
+    = fun tuple matrix ->
     (* 1st column of matrix is List.map List.hd_exn matrix *)
     assert (List.length tuple = Matrix.width matrix);
+    let open Option in
+    let open Matrix in
 
-    let variable_rule x = None in
-    let constructor_rule x = None in
+
+    let rec main tuple (m:Matrix.t) (cps: lambda -> unit) =
+      if
+
+
+    in
+    main tuple matrix (fun () -> ())
+
+
+    let matr_height = Matrix.height matrix in
+    (* let vars_length    = eval_prefix_len Pat.is_variable matrix in *)
+    (* let constrs_length = eval_prefix_len Pat.is_constructor matrix in *)
+
+    let base_kind  = Matrix.first_column matrix |> List.hd |> Pat.get_kind in
+    let cur_kind_count =  eval_prefix_len (fun p -> Pat.get_kind p = base_kind) matrix in
+
+    let cur_kind = ref base_kind in
+
+    Matrix.iter
+      m
+      ~f:(fun left pats right ->
+          if cur_kind.contents = Pat.get_kind left
+          then
+
+         );
+
+
+
+
+
+
+
+
+
+
+
+
+    let variable_rule ((tuple,m,right) as start) =
+      match check_first_variables m with
+      | Some (names, m2) ->
+         assert List.(length names = length right);
+         let new_right =
+           List.map2 (fun name lam -> Llet (name, Lconst (List.hd tuple), lam))
+                     names right
+         in
+         (start, Some (List.tl tuple, m2, new_right) )
+      | None -> (start, None)
+    in
+    let constructor_rule ((tuple, m, right) as start) =
+      if not (Matrix.check_1st_column Pat.is_constructor m) then None
+      else
+        (* need to group constructors with same names together and don't fuck up the order *)
+        let ans = group_constrs_in_matrix m r in
+        let ans =
+          List.map (fun (name, info) ->
+                    (* check all constructor args has same length *)
+                    assert (info <> []);
+                    assert (List.all_same ~f:(fun (args,_,_) -> List.length args) info);
+                    let cargs_count = List.hd info |> fst3 |> List.length in
+                    name,
+
+
+
+    in
     let mixture_rule x = None in
     let final_rule x = None in
 
