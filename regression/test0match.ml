@@ -24,6 +24,7 @@ module Value = struct
   let vconstructor name xs = Vconstructor (name, xs)
 
   let print ppf v =
+    let wrap_cname = function "::" -> "(::)" | other -> other in
     let open Format in
     let rec helper = function
       | Vvar s -> fprintf ppf "%s" s
@@ -36,7 +37,7 @@ module Value = struct
                     helper p
                    ) xs;
          fprintf ppf ")"
-      | Vconstructor (name, []) -> fprintf ppf "%s" name
+      | Vconstructor (name, []) -> fprintf ppf "%s" (wrap_cname name)
       | Vconstructor (name, xs) ->
          fprintf ppf "@[@,%s@ " name;
          helper (Vtuple xs);
@@ -430,10 +431,13 @@ module MiniLambda_Nologic = struct
     (* | Lswitch of lambda * lambda_switch *)
     (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
     (*                    Lambda.lambda option *)
+
+    | Lswitchconstr of lambda * (string * lambda) list * lambda option
     | Lstaticraise of int (* * Lambda.lambda list *)
     | Lstaticcatch of lambda * (int (* * Ident.t list *)) * lambda
     (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
     | Lifthenelse of (lambda * lambda * lambda)
+    (* | MatchFailure *)
     (* | Lsequence of lambda * lambda *)
     (* | Lwhile of Lambda.lambda * Lambda.lambda *)
     (* | Lfor of Ident.t * Lambda.lambda * Lambda.lambda * *)
@@ -451,10 +455,11 @@ module MiniLambda_Nologic = struct
   let llet name bnd where_ = Llet (name, bnd, where_)
   let lstaticcatch try_block n handler = Lstaticcatch(try_block, n, handler)
   let lifthenelse cond trueb elseb = Lifthenelse (cond, trueb, elseb)
+  let lswitchconstr what cases ?default = Lswitchconstr(what, cases, default)
 
   open Format
 
-  let print ppf root =
+  let rec print ppf root =
     let pr fmt = fprintf ppf fmt in
     let rec helper = function
     | Lvar s   -> fprintf ppf "%s" s
@@ -482,6 +487,16 @@ module MiniLambda_Nologic = struct
        helper trueb;
        pr "@ else@ ";
        helper elseb;
+       pr "@]"
+    | Lswitchconstr (expr, cases, else_case) ->
+       pr "@[sw_constr ";
+       helper expr;
+       pr " with@ ";
+       List.iter (fun (cname,lam) -> pr "@[case %s :@ %a@]" cname print lam) cases;
+       let () = match else_case with
+         | Some lam -> pr "_ -> %a" print lam;
+         | None -> ()
+       in
        pr "@]"
     in
     helper root;
@@ -516,7 +531,7 @@ module MiniLambda_Nologic = struct
     in
     let rec helper env = function
       | Lconst v -> `Ok v
-      | Lvar name -> `Ok (env name)
+      | Lvar name -> `Ok (lookup_env env name)
       | Lfield (n, name) -> `Ok (Value.field_exn n @@ lookup_env env name)
       | Lneq (name, v) -> `Ok (if lookup_env env name <> v then Vint 1 else Vint 0)
       | Llet (ident, what, where_) ->
@@ -539,6 +554,16 @@ module MiniLambda_Nologic = struct
       | Lcheckconstr (constr, varname) ->
          `Ok Value.(if is_constructor constr @@ lookup_env env varname
                     then Vint 1 else Vint 0)
+      | Lswitchconstr (lam, [], default) ->
+         (helper env lam) >>= fun what -> begin
+           match default with
+           | None -> `Raise 666
+           | Some lam -> helper env lam (* >>= fun ans -> `Ok (ans) *)
+         end
+      | Lswitchconstr (lam, (cname,right)::cs, default) ->
+         (helper env lam) >>= fun what ->
+         if is_constructor cname what then helper env right
+         else helper env (Lswitchconstr (lam, cs, default))
   in
   let env_exn name = failwith (sprintf "variable %s is not in env" name) in
   helper env_exn root
@@ -624,9 +649,24 @@ module NaiveCompilation = struct
         | Pany -> right
         | Pvar newname -> Llet (newname, Lvar varname, right)
         | Pconstant c -> Lifthenelse (Lneq (varname,Vint c),  elseb, right)
+        | Pconstructor (cname,[]) ->
+           lswitchconstr (Lvar varname) [ cname, right ] ~default: elseb
+        | Pconstructor (cname,xs) ->
+           let exit_code = next_exit_counter () in
+           let myexit = Lstaticraise exit_code in
+           lstaticcatch
+             (lswitchconstr
+                (Lvar varname)
+                [ (cname, match_one_patt varname (Ptuple xs) right myexit) ]
+                ~default:myexit)
+             exit_code
+             elseb
+
+(*  (* naive code generation *)
         | Pconstructor (name,[]) ->
            lifthenelse (lcheckconstr name varname) right elseb
         | Pconstructor (name,xs) ->
+           (* naive, with if statement*)
            let exit_code = next_exit_counter () in
            Lstaticcatch(
              Lifthenelse (Lcheckconstr (name, varname),
@@ -634,6 +674,7 @@ module NaiveCompilation = struct
                           (Lstaticraise exit_code)),
              exit_code,
              elseb)
+ *)
         | Ptuple [a] ->
            let var_a = next_varname () in
            llet var_a (lfield 0 varname) @@
@@ -670,7 +711,7 @@ module NaiveCompilation = struct
 end
 
 exception BadResult of Value.t (* MiniLambda_Nologic.lambda *)
-let () =
+let ___ () =
   let open Value in
   let open MiniLambda_Nologic in
   let foo ?heading  what patts rez =
@@ -697,7 +738,9 @@ let () =
       [ ppair (pconstructor "[]" []) Pany, Vint 1
       ; ppair Pany (pconstructor "[]" []), Vint 2
       ; ppair (pconstructor "::" [Pvar "x"; Pvar "xs"]) (pconstructor "::" [Pvar "y"; Pvar "ys"]), Vint 3
-      ] (Vint 1) ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
+      ]
+      (Vint 1)
+      ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
 
 
   ()
