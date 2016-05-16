@@ -13,6 +13,9 @@ module Value = struct
     | Vconstructor (n,_) when n = name -> true
     | _ -> false
 
+  (* let is_variable = function Vvar _ -> true | _ -> false *)
+  (* let get_varname_exn = function Vvar v -> v | _ -> failwith "bad argument" *)
+
   let field_exn n : t -> t = function
     | Vint x when n=0 -> Vint x
     | Vvar _
@@ -52,15 +55,22 @@ end
 let vpair a b = Value.Vtuple [a;b]
 
 type varname = string
-type pat = Pany
+
+module Pat = struct
+  type t = Pany
          | Pvar of varname
          | Pconstant of int
-         | Ptuple of pat list
-         | Pconstructor of string * pat list
+         | Ptuple of t list
+         | Pconstructor of string * t list
          (* | Por of pat * pat *)
+  let is_variable = function Pvar _ -> true | _ -> false
+  let get_varname_exn = function Pvar name -> name | _ -> failwith "bad argument"
+end
 
+type pat = Pat.t
 
-implicit module Show_pat : (SHOW with type t = pat) = struct
+implicit module Show_pat : (SHOW with type t = Pat.t) = struct
+    open Pat
     type t = pat
     let rec show = function
       | Pany -> "_"
@@ -72,10 +82,10 @@ implicit module Show_pat : (SHOW with type t = pat) = struct
 end
 
 
-let ppair x y = Ptuple [x;y]
-let pconstructor name xs = Pconstructor (name,xs)
+let ppair x y = Pat.Ptuple [x;y]
+let pconstructor name xs = Pat.Pconstructor (name,xs)
 
-type source_program = Value.t * (pat * Value.t) list
+type source_program = Value.t * (Pat.t * Value.t) list
 (*
 let pat_of_parsetree root =
   let open Longident in
@@ -327,6 +337,7 @@ let () =
   *)
 
 let eval_match (what: Value.t) pats  =
+  let open Pat in
   let distinct_sets : 'a list -> 'a list -> bool = fun xs ys ->
     let rec helper = function
     | [] -> true
@@ -455,7 +466,7 @@ module MiniLambda_Nologic = struct
   let llet name bnd where_ = Llet (name, bnd, where_)
   let lstaticcatch try_block n handler = Lstaticcatch(try_block, n, handler)
   let lifthenelse cond trueb elseb = Lifthenelse (cond, trueb, elseb)
-  let lswitchconstr what cases ?default = Lswitchconstr(what, cases, default)
+  let lswitchconstr ?default what cases = Lswitchconstr(what, cases, default)
 
   open Format
 
@@ -600,6 +611,7 @@ module NaiveCompilation = struct
     (* straightforward compilation to MiniLambda_Nologic*)
     let compile: source_program -> MiniLambda_Nologic.lambda = fun (what,patts) ->
       let open Value in
+      let open Pat in
       let next_varname =
         let counter = ref 0 in
         fun () -> incr counter; sprintf "x%d" counter.contents
@@ -742,5 +754,69 @@ let ___ () =
       (Vint 1)
       ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
 
-
   ()
+
+module NaiveCompilationWithMatrixes = struct
+  open MiniLambda_Nologic
+  open Value
+
+  module Matrix = struct
+    type t = pat list list
+
+    let check_matrix m =
+      let lens = List.map List.length m in
+      match lens with
+      | [] -> ()
+      | x::xs -> assert (List.for_all ((=)x) xs)
+
+    let width = function
+      | [] -> 0
+      | x::_ -> List.length x
+
+    let is_empty m = List.for_all (fun x -> x=[]) m
+    let check_1st_column cond m =
+      List.(for_all cond @@ map hd m)
+
+
+  end
+
+  let check_first_variables m : (string list * Matrix.t) option  =
+    if Matrix.check_1st_column Pat.is_variable m && not (Matrix.is_empty m)
+    then
+      let temp = m |> List.map (function x::xs -> (Pat.get_varname_exn x, xs)
+                                       | [] -> failwith "bad argument")
+      in
+      Some (List.split temp)
+    else None
+
+  type input_data = Value.t list * Matrix.t * lambda list
+  type state = input_data * input_data option
+  let (++) (start,rez) f =
+    match rez with
+    | Some _ -> (start,rez)
+    | None -> (start, f rez)
+
+  let rec compile : tuple:Value.t list -> matrix: Matrix.t -> right:lambda list -> lambda
+    = fun ~tuple ~matrix ~right ->
+    (* 1st column of matrix is List.map List.hd_exn matrix *)
+    assert (List.length tuple = Matrix.width matrix);
+
+    let variable_rule x = x in
+    let constructor_rule x = x in
+    let mixture_rule x = x in
+    let final_rule x = x in
+
+
+    let ans =
+      variable_rule ((tuple,matrix,right),None) ++
+        constructor_rule ++
+        mixture_rule ++
+        final_rule
+    in
+    match snd ans with
+    | None -> failwith "can't apply any compilation rule"
+    | Some (tuple,matrix,right) -> compile ~tuple ~matrix ~right
+
+
+
+end
