@@ -2,6 +2,14 @@ open Printf
 (* open MiniKanren *)
 open ImplicitPrinters
 (* open Tester.M *)
+module Option = struct
+  type 'a t = 'a option
+  let (>>=) x f = match x with Some x -> f x | None -> None
+  let return x = Some x
+
+  let iter ~f = function Some x -> f x; () | None -> ()
+  let map ~f ~default = function Some x -> f x | None -> default
+end
 
 module Value = struct
   type t = Vint of int
@@ -445,7 +453,12 @@ module MiniLambda_Nologic = struct
 
     | Lswitchconstr of lambda * (string * lambda) list * lambda option
     | Lstaticraise of int (* * Lambda.lambda list *)
-    | Lstaticcatch of lambda * (int (* * Ident.t list *)) * lambda
+    | Lstaticcatch of lambda * (int option) * lambda
+    (* Lstaticcatch (l1, None, l2) stands for
+         catch lam1 with lam2
+       and Lstaticcatch (l1, Some n, l2) ---
+         catch lam1 width n -> l2
+    *)
     (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
     | Lifthenelse of (lambda * lambda * lambda)
     (* | MatchFailure *)
@@ -488,7 +501,7 @@ module MiniLambda_Nologic = struct
     | Lstaticcatch (what, n, handler) ->
        pr "@[try@ ";
        helper what;
-       pr "with@ %d ->@ " n;
+       pr "with@%s ->@ " (Option.map ~f:(sprintf " %d") ~default:"" n);
        helper handler;
        pr "@]"
     | Lifthenelse (cond,trueb,elseb) ->
@@ -559,7 +572,8 @@ module MiniLambda_Nologic = struct
       | Lstaticcatch (lam, n, handler) -> begin
           match helper env lam with
           | `Ok x -> `Ok x
-          | `Raise m when m=n -> helper env handler
+          | `Raise m when n=None   -> helper env handler
+          | `Raise m when n=Some m -> helper env handler
           | `Raise m -> `Raise m
         end
       | Lcheckconstr (constr, varname) ->
@@ -671,7 +685,7 @@ module NaiveCompilation = struct
                 (Lvar varname)
                 [ (cname, match_one_patt varname (Ptuple xs) right myexit) ]
                 ~default:myexit)
-             exit_code
+             (Some exit_code)
              elseb
 
 (*  (* naive code generation *)
@@ -702,7 +716,7 @@ module NaiveCompilation = struct
                                var_a a
                                (match_one_patt var_b b right (Lstaticraise exit_code))
                                (Lstaticraise exit_code))
-                             exit_code
+                             (Some exit_code)
                              elseb
 
         | Ptuple _ -> failwith "Ptuple not implemented"
@@ -794,21 +808,24 @@ module NaiveCompilationWithMatrixes = struct
   let (++) (start,rez) f =
     match rez with
     | Some _ -> (start,rez)
-    | None -> (start, f rez)
+    | None -> (start, f start)
+
+  (* let (_:int)  = (++) *)
 
   let rec compile : tuple:Value.t list -> matrix: Matrix.t -> right:lambda list -> lambda
     = fun ~tuple ~matrix ~right ->
     (* 1st column of matrix is List.map List.hd_exn matrix *)
     assert (List.length tuple = Matrix.width matrix);
 
-    let variable_rule x = x in
-    let constructor_rule x = x in
-    let mixture_rule x = x in
-    let final_rule x = x in
+    let variable_rule x = None in
+    let constructor_rule x = None in
+    let mixture_rule x = None in
+    let final_rule x = None in
 
 
     let ans =
-      variable_rule ((tuple,matrix,right),None) ++
+      ((tuple,matrix,right),None) ++
+        variable_rule ++
         constructor_rule ++
         mixture_rule ++
         final_rule
