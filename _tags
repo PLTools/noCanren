@@ -11,7 +11,7 @@ true: debug
 #<regression/test0*.ml>: syntax(camlp5o), package(logger.syntax,GT)
 <regression/test*.native> or <regression/test*.byte>: package(str,typeutil)
 <regression/test003.ml>: use_pa_minikanren
-<regression/test0match.ml>: warn(-40), package(extlib)
+<regression/test0match.ml>: warn(-40), package(extlib), short_paths
 <regression/test0match.native>: package(extlib)
 
 <regression/test02match.ml> or <regression/test0match.ml> or <regression/testDiseq*> or <regression/test0*.*>: ppx(ppx/smart_logger_bin.native), ppx(ppx/ppx_repr_bin.native)

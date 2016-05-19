@@ -577,6 +577,13 @@ module MiniLambda_Nologic = struct
     helper root;
     fprintf ppf "@."
 
+  let show lam =
+    let b = Buffer.create 10 in
+    let fmt = Format.formatter_of_buffer b in
+    print fmt lam;
+    pp_print_flush fmt ();
+    Buffer.contents b
+
   module RezMonad = struct
     type t = [`Ok of Value.t | `Raise of int ]
     let (>>=) x f = match x with
@@ -1120,6 +1127,12 @@ implicit module Show_pat_kind : (SHOW with type t = Pat.kind) =
   end
 
 
+implicit module Show_lambda_nologic : (SHOW with type t = MiniLambda_Nologic.lambda)  =
+  struct
+    type t = MiniLambda_Nologic.lambda
+    let show = MiniLambda_Nologic.show
+  end
+
 module MiniCompile = struct
   open Pat
   open PatLogic
@@ -1138,6 +1151,8 @@ module MiniCompile = struct
   (*                     ; of_list [constructor "[]" llist_nil; Pany] *)
   (*                     ] *)
 
+  open ImplicitPrinters
+  open MiniLambda_Nologic
   let rec classify_prefix_helper expected_kind patts top bot =
     fresh (pat_h pat_tl kind2)
           (patts === pat_h % pat_tl)
@@ -1151,11 +1166,53 @@ module MiniCompile = struct
 
                  ; (kind2 =/= expected_kind) &&& (top === llist_nil) &&& (bot === patts)
                  ])
+(*  (* In this code it can't find implicit for some reason *)
+  let rec classify_prefix_helper expected_kind patts top bot =
+    call_fresh @@ fun (right: lambda logic) ->
+    fresh (pat_h pat_tl kind2)
+          (patts === ( let (_:lambda logic) = right in !(pat_h, right)  ) % pat_tl)
+          (classify_line pat_h kind2)
+
+          (conde [ fresh (top2 bot2)
+                         (kind2 === expected_kind)
+                         (classify_prefix_helper expected_kind pat_tl top2 bot2)
+                         (top === !(pat_h,right) % top2)
+                         (bot === bot2)
+
+                 ; (kind2 =/= expected_kind) &&& (top === llist_nil) &&& (bot === patts)
+                 ])
+
+ *)
 (*
   let (_:Pat.kind logic ->
          PatLogic.t llist llist logic ->
          PatLogic.t llist llist logic ->
          _ logic -> _) = classify_prefix_helper *)
+
+  let lambda_hack arg out =
+    conde [ (arg === !(Lconst (Vint 1))) &&& (arg === out)
+          ; (arg === out)
+          ]
+
+  let rec classify_handlers handlers top_patts top_handlers bot_handlers =
+    fresh (phd ptl)
+          (top_patts === phd % ptl)
+          (conde
+             [ fresh (x x_lambda_hack)
+                     (ptl === llist_nil)
+                     (handlers === x % bot_handlers)
+                     (lambda_hack x x_lambda_hack)
+                     (top_handlers === (!< x) )
+             ; fresh (x hs top_h2 bot_h2 x_lambda_hack)
+                     (ptl =/= llist_nil)
+                     (handlers === x % hs)
+                     (lambda_hack x x_lambda_hack)
+                     (classify_handlers hs ptl top_h2 bot_h2)
+                     (top_handlers === x % top_h2)
+                     (bot_handlers === bot_h2)
+             ])
+
+  (* let (_:int) = classify_handlers *)
 
   let classify_prefix patts ans top bot =
     fresh (_1stline t kind)
@@ -1166,8 +1223,13 @@ module MiniCompile = struct
 
 
 
-  let compile tuple patts ans =
-    (ans === llist_nil)
+  let compile tuple patts handlers ans =
+    fresh (new_kind top_pats bot_pats top_handlers bot_handlers)
+          (classify_prefix patts new_kind top_pats bot_pats)
+          (classify_handlers handlers top_pats top_handlers bot_handlers)
+          (ans === llist_nil)
+
+  (* let (_:int) = compile *)
 end
 
 let just_a a = a === (embed 5)
@@ -1186,7 +1248,12 @@ let _ =
   in
 
 
-  run3 ~n:1 (REPR compile);
+  let pats1 = of_list_hack
+                      [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
+                      ; of_list_hack [constructor "[]" llist_nil; Pany]
+                      ]
+  in
+
   (* run1 ~n:1 (REPR classify_prefix); *)
   run1 ~n:1 (REPR (classify_line @@ of_list
                    [constructor "[]" llist_nil; Pany]) );
@@ -1194,10 +1261,7 @@ let _ =
                    [Pvar (!"x"); constructor "[]" llist_nil]) );
 
   run2 ~n:1 (REPR (classify_prefix_helper !Pat.Kvar
-                   !(of_list_hack
-                      [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
-                      ; of_list_hack [constructor "[]" llist_nil; Pany]
-                      ])) );
+                   !pats1) );
 (*
   run3 ~n:1 (REPR
                (classify_prefix @@ embed (
@@ -1206,5 +1270,10 @@ let _ =
                     ; of_list_hack [constructor "[]" llist_nil; Pany]
                     ])) );
 
-  *)
+ *)
+  let open MiniLambda_Nologic in
+  run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1
+                           (of_list [Lconst (Vint 1); Lconst (Vint 2)]) ) );
+  (* run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1 ![] ) ); *)
+
   ()

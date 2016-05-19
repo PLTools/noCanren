@@ -186,6 +186,8 @@ let () = dispatch (function
      pflag ["cppo"] "cppo_V" (fun s -> S [A "-V"; A s]);
      flag ["cppo"; "cppo_V_OCAML"] & S [A "-V"; A ("OCAML:" ^ Sys.ocaml_version)];
 
+     flag ["short-paths"] & S [A "-short_paths"];
+
    (* flag ["compile";  "ocaml"; "use_ostap_lib1"] (S[A "-I"; A"lib"; A"bNF3.cmo"]);  *)
    (* flag ["compile";  "ocaml"; "use_ostap_lib"] (S[A"ostap.cmo"]);  *)
    (* flag ["ocamldep"; "ocaml"; "use_pa_log"]  *)
