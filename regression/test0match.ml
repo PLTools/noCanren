@@ -108,12 +108,12 @@ module Pat = struct
     | Ptuple _ -> Ktuple
     | Pconstructor _ -> Kconstructor
 
-  let get_kind = function
-    | Pany -> Kany
-    | Pvar _ -> Kvar
-    | Pconstant _ -> Kconst
-    | Ptuple _ -> Ktuple
-    | Pconstructor _ -> Kconstructor
+  let show_kind = function
+    | Kany -> "Kany"
+    | Kvar -> "Kvar"
+    | Kconst -> "Kconst"
+    | Kconstructor -> "Kconstructor"
+    | Ktuple -> failwith "tuples should be removed"
 
   let show p =
     let rec helper = function
@@ -1046,7 +1046,7 @@ module SimplifyMiniLambda = struct
 
 end
 
-let  () =
+let ___ () =
   let open Value in
   let open MiniLambda_Nologic in
   let foo ?heading  what patts rez =
@@ -1076,4 +1076,135 @@ let  () =
       (Vint 1)
       ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
 
+  ()
+
+
+open MiniKanren
+open Tester.M
+
+let (!) = embed
+
+module PatLogic = struct
+  (* понадобился для classify line *)
+  type t = Pany
+         | Pvar of varname logic
+         | Pconstant of int
+         | Pconstructor of string logic * (t llist) logic
+
+  let show p =
+    let rec helper = function
+      (* | Ptuple xs -> failwith "tuples should be removed from code base" *)
+      | Pany -> "Pany"
+      | Pvar s -> sprintf "(Pvar %a)" (fun () -> show_logic_naive) s
+      | Pconstant n -> string_of_int n
+      | Pconstructor (name, xs) when llist_is_empty_logic xs ->
+         sprintf "Pconstructor(\"%a\",[])" sprintf_logic name
+      | Pconstructor(name,xs) ->
+         sprintf "Pconstructor(\"%a\",%a)" sprintf_logic name sprintf_logic xs
+    in
+    helper p
+
+  let constructor name xs = Pconstructor (!name, xs)
+end
+
+implicit module Show_pat_logic : (SHOW with type t = PatLogic.t) =
+  struct
+    type t = PatLogic.t
+    let show = PatLogic.show
+  end
+
+implicit module Show_pat_kind : (SHOW with type t = Pat.kind) =
+  struct
+    type t = Pat.kind
+    let show = Pat.show_kind
+  end
+
+
+module MiniCompile = struct
+  open Pat
+  open PatLogic
+
+  let classify_line line kind =
+    fresh (h t)
+          (line === h%t)
+          (conde [ (h === !Pany) &&& (kind === !Kany)
+                 ; fresh v        ((h === !(Pvar v)) &&& (kind === !Kvar))
+                 ; fresh (n args) ((h === !(Pconstructor (n, args))) &&& (kind === !Kconstructor))
+                 ])
+
+  let (_:PatLogic.t llist logic -> Pat.kind logic -> Tester.M.goal) = classify_line
+  (* let (_:int) = of_list *)
+  (*                     [ of_list [Pvar (!"x"); constructor "[]" llist_nil] *)
+  (*                     ; of_list [constructor "[]" llist_nil; Pany] *)
+  (*                     ] *)
+
+  let rec classify_prefix_helper expected_kind patts top bot =
+    fresh (pat_h pat_tl kind2)
+          (patts === pat_h % pat_tl)
+          (classify_line pat_h kind2)
+
+          (conde [ fresh (top2 bot2)
+                         (kind2 === expected_kind)
+                         (classify_prefix_helper expected_kind pat_tl top2 bot2)
+                         (top === pat_h % top2)
+                         (bot === bot2)
+
+                 ; (kind2 =/= expected_kind) &&& (top === llist_nil) &&& (bot === patts)
+                 ])
+(*
+  let (_:Pat.kind logic ->
+         PatLogic.t llist llist logic ->
+         PatLogic.t llist llist logic ->
+         _ logic -> _) = classify_prefix_helper *)
+
+  let classify_prefix patts ans top bot =
+    fresh (_1stline t kind)
+          (patts === _1stline % t)
+          (classify_line _1stline kind)
+          (ans === kind)
+          (classify_prefix_helper kind patts top bot)
+
+
+
+  let compile tuple patts ans =
+    (ans === llist_nil)
+end
+
+let just_a a = a === (embed 5)
+
+open Tester
+
+let _ =
+  let open MiniCompile in
+  let open PatLogic in
+  let (_: PatLogic.t llist logic llist logic) =
+
+                    of_list
+                    [ of_list [Pvar (!"x"); constructor "[]" llist_nil]
+                    ; of_list [constructor "[]" llist_nil; Pany]
+                    ]
+  in
+
+
+  run3 ~n:1 (REPR compile);
+  (* run1 ~n:1 (REPR classify_prefix); *)
+  run1 ~n:1 (REPR (classify_line @@ of_list
+                   [constructor "[]" llist_nil; Pany]) );
+  run1 ~n:1 (REPR (classify_line @@ of_list
+                   [Pvar (!"x"); constructor "[]" llist_nil]) );
+
+  run2 ~n:1 (REPR (classify_prefix_helper !Pat.Kvar
+                   !(of_list_hack
+                      [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
+                      ; of_list_hack [constructor "[]" llist_nil; Pany]
+                      ])) );
+(*
+  run3 ~n:1 (REPR
+               (classify_prefix @@ embed (
+                  of_list_hack
+                    [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
+                    ; of_list_hack [constructor "[]" llist_nil; Pany]
+                    ])) );
+
+  *)
   ()

@@ -215,14 +215,26 @@ let show_logic_naive =
     (* but fix js_of_ocaml before doing that *)
     printer x
 
+let sprintf_logic () x = show_logic_naive x
+
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
 let const_empty_list_str _ = "[]"
 let llist_nil = Value(Nil, const_empty_list_str)
 
+let llist_is_empty x = (x=Nil)
+
+let llist_is_empty_logic = function
+  | Value (Nil,_) -> true
+  | _ -> false
+
 let llist_printer v =
   let b = Buffer.create 49 in
   let rec helper = function
+    | Cons (h, tl) when llist_is_empty_logic tl ->
+       Buffer.add_string b "[";
+       Buffer.add_string b (show_logic_naive h);
+       Buffer.add_string b "]"
     | Cons (h,tl) -> begin
         Buffer.add_string b (show_logic_naive h);
         Buffer.add_string b " :: ";
@@ -275,6 +287,12 @@ let of_list {S : ImplicitPrinters.SHOW} xs =
   let rec helper = function
     | [] -> llist_nil
     | x::xs -> (Value (x, S.show)) % (helper xs)
+  in  helper xs
+
+let of_list_hack {S : ImplicitPrinters.SHOW} xs =
+  let rec helper = function
+    | [] -> Nil
+    | x::xs -> Cons (Value(x, S.show), embed (helper xs) )
   in  helper xs
 
 exception Not_a_value

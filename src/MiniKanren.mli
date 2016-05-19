@@ -58,6 +58,8 @@ end
 
 val show_logic_naive : 'a logic -> string
 
+val sprintf_logic : unit -> 'a logic -> string
+
 (** Type of ligic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
@@ -72,6 +74,10 @@ implicit module Show_llist : functor {X : ImplicitPrinters.SHOW} -> sig
 end
 
 val llist_nil : 'a llist logic
+
+val llist_is_empty : 'a llist -> bool
+val llist_is_empty_logic : 'a llist logic -> bool
+
 (** Infix synonym for [Cons] *)
 val (%) : 'a logic -> 'a llist logic -> 'a llist logic
 
@@ -83,6 +89,8 @@ val (!<) : 'a logic -> 'a llist logic
 
 (** [of_list l] converts a regular list into logic one *)
 val of_list : {S : ImplicitPrinters.SHOW} -> S.t list -> S.t llist logic
+
+val of_list_hack : {S : ImplicitPrinters.SHOW} -> S.t list -> S.t llist
 
 (** [to_value x] converts logic into value; raises [Not_a_value] on a
     non-value case
