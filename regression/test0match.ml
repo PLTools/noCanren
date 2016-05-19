@@ -23,7 +23,11 @@ module List = struct
 
   let take ~n xs = ExtList.List.take n xs
   let split_nth ~n xs = ExtList.List.split_nth n xs
-
+  let skip ~n = ExtList.List.drop n
+  let fold_left ~f ~init xs = List.fold_left f init xs
+  let hd_exn = List.hd
+  let init = ExtList.List.init
+  let map = ListLabels.map
 end
 
 let fst3 (x,_,_) = x
@@ -104,6 +108,23 @@ module Pat = struct
     | Ptuple _ -> Ktuple
     | Pconstructor _ -> Kconstructor
 
+  let get_kind = function
+    | Pany -> Kany
+    | Pvar _ -> Kvar
+    | Pconstant _ -> Kconst
+    | Ptuple _ -> Ktuple
+    | Pconstructor _ -> Kconstructor
+
+  let show p =
+    let rec helper = function
+      | Pany -> "Pany"
+      | Pvar s -> sprintf "(Pvar %s)" s
+      | Pconstant n -> string_of_int n
+      | Ptuple xs -> sprintf "(%s)" (String.concat "," @@ List.map helper xs)
+      | Pconstructor(name,xs) ->
+         sprintf "%s(%s)" name (String.concat "," @@ List.map helper xs)
+    in
+    helper p
 end
 
 type pat = Pat.t
@@ -661,41 +682,7 @@ module NaiveCompilation = struct
         fun () -> incr counter; sprintf "x%d" counter.contents
       in
       let root_varname = "rootVar" in
-      (*
-      let rec match_one_patt env varname patt right elseb =
-        match Env.lookup_exn varname env, patt with
-        | Vint _, Pany -> right
-        | Vint _, Pvar _ -> right
-        | Vint n, Pconstant m when m=n -> right
-        | Vint _, Pconstant _
-        | Vint _, Ptuple _
-        | Vint _, Pconstructor _ -> raise Cant_compile
 
-        | Vconstructor (name1,_), Pconstructor(name2,_) when name1<>name2 ->
-           raise Cant_compile
-        | Vconstructor (_,xs), Pconstructor(_,ys) when List.length xs <> List.length ys ->
-           raise Cant_compile
-        | Vconstructor (_,xs), Pconstructor (_,ys) ->
-           let new_var = next_varname () in
-           let new_val = Vtuple xs in
-           let new_env = Env.extend new_var new_val env in
-           Llet (new_var, Lconst new_val,
-                 match_one_patt new_env new_var (Ptuple ys) right elseb)
-        (* | Vtuple xs, Ptuple ys -> *)
-        (*    List.map2 (fun x y -> (x,y)) xs ys |> *)
-        (*    List.mapi (fun n (x,y) -> (i,x,y)) xs ys |> *)
-        (*    ListLabels.fold_right *)
-        (*      ~init:elseb *)
-        (*      ~f:(fun (n,v,pat) acc -> *)
-        (*          let new_var = next_varname () in *)
-        (*          let new_val = Lfield (n,varname) in *)
-        (*          Llet (new_var, new_val, match *)
-
-                (*           match_one_patt env *)
-        (*         ) *)
-        (* | _ ->  Lconst 0 *)
-      in
-      *)
       let next_exit_counter =
         let exit_counter = ref 0 in
         fun () -> incr exit_counter; exit_counter.contents
@@ -804,6 +791,20 @@ module NaiveCompilationWithMatrixes = struct
   open MiniLambda_Nologic
   open Value
 
+  module StringMultiMap (* : (Map.S with type 'a t = ('a list) t) *) = struct
+    module M = Map.Make(String)
+    include M
+
+    let add key (v: 'a) (map: ('a list) M.t)  =
+      try let xs = M.find key map in
+          M.add key (v::xs) map
+      with Not_found -> M.add key [v] map
+
+    let find_exn = M.find
+    let bindings m = List.map ~f:(fun (key, xs) -> (key, List.rev xs)) @@ M.bindings m
+
+  end
+
   module Matrix = struct
     type t = (pat list * lambda) list
 
@@ -831,13 +832,37 @@ module NaiveCompilationWithMatrixes = struct
         | x:: xs when cond x -> helper (n+1) xs
         | _ -> n
       in
-      helper n @@ first_column m
+      helper 0 @@ first_column m
 
+    let top_left_pat m = m |> List.hd |> fst |> List.hd
+
+    let print m =
+      List.iter (fun (xs, r) ->
+                 printf "(%s) -> ???\n%!" (String.concat "," @@ List.map Pat.show xs))
+                m
 
     let cut_horizontally n m =
-      assert (height m = List.length rs);
-      assert (n >0 && n < height m);
-      (List.take ~n m, List.skip ~n rs)
+      printf "n = %d\n%!" n;
+      print m;
+      if n = height m then failwith "This cut will provide empty matrix";
+      (* assert (height m = List.length rs); *)
+      assert (n>0 && n < height m);
+      (List.take ~n m, List.skip ~n m)
+
+    let cut_first_column m =
+      List.map ~f:(fun (xs, r) -> (List.tl xs, r)) m
+
+    let classify_prefix (m: t) =
+      assert (not (is_empty m));
+      let basic_kind = (List.hd @@ fst @@ List.hd m) |>  Pat.get_kind in
+      let n = eval_prefix_len (fun pat -> Pat.get_kind pat = basic_kind) m in
+      assert (n>=1);
+      if n = height m then (basic_kind, m, None)
+      else
+        let top,bot = cut_horizontally n m in
+        (basic_kind, top, Some bot)
+
+    let fold ~f acc x = List.fold_left ~f ~init:acc x
 
   end
 
@@ -861,7 +886,7 @@ module NaiveCompilationWithMatrixes = struct
     (* |> List.map (fun (name,moreinfo) *)
     (* () *)
 
-
+(*
   let check_1st_column_wrap checker getter m =
     if Matrix.check_1st_column checker m && not (Matrix.is_empty m)
     then
@@ -876,7 +901,7 @@ module NaiveCompilationWithMatrixes = struct
 
   let check_first_constructors m : ((string * Pat.t list) list * Matrix.t) option =
     check_1st_column_wrap Pat.is_constructor Pat.get_const_info_exn m
-
+    *)
   type input_data = Value.t list * Matrix.t * lambda list
   type state = input_data * input_data option
   let (++) (start,rez) f =
@@ -886,92 +911,169 @@ module NaiveCompilationWithMatrixes = struct
 
   (* let (_:int)  = (++) *)
 
-  let rec compile : tuple:Value.t list -> matrix: Matrix.t  -> lambda
-    = fun tuple matrix ->
+  let rec compile : tuple:string list -> matrix: Matrix.t  -> lambda
+    = fun ~tuple ~matrix ->
     (* 1st column of matrix is List.map List.hd_exn matrix *)
     assert (List.length tuple = Matrix.width matrix);
     let open Option in
     let open Matrix in
 
-
-    let rec main tuple (m:Matrix.t) (cps: lambda -> unit) =
-      if
-
-
+    let next_varname =
+      let counter = ref 0 in
+      fun () -> incr counter; sprintf "x%d" counter.contents
     in
-    main tuple matrix (fun () -> ())
+    (* let next_exit_counter = *)
+    (*   let exit_counter = ref 0 in *)
+    (*   fun () -> incr exit_counter; exit_counter.contents *)
+    (* in *)
 
-
-    let matr_height = Matrix.height matrix in
-    (* let vars_length    = eval_prefix_len Pat.is_variable matrix in *)
-    (* let constrs_length = eval_prefix_len Pat.is_constructor matrix in *)
-
-    let base_kind  = Matrix.first_column matrix |> List.hd |> Pat.get_kind in
-    let cur_kind_count =  eval_prefix_len (fun p -> Pat.get_kind p = base_kind) matrix in
-
-    let cur_kind = ref base_kind in
-
-    Matrix.iter
-      m
-      ~f:(fun left pats right ->
-          if cur_kind.contents = Pat.get_kind left
-          then
-
-         );
-
-
-
-
-
-
-
-
-
-
-
-
-    let variable_rule ((tuple,m,right) as start) =
-      match check_first_variables m with
-      | Some (names, m2) ->
-         assert List.(length names = length right);
-         let new_right =
-           List.map2 (fun name lam -> Llet (name, Lconst (List.hd tuple), lam))
-                     names right
-         in
-         (start, Some (List.tl tuple, m2, new_right) )
-      | None -> (start, None)
-    in
-    let constructor_rule ((tuple, m, right) as start) =
-      if not (Matrix.check_1st_column Pat.is_constructor m) then None
+    let rec main tuple matrix onfail =
+      (* print_endline "calling main for matrix"; *)
+      (* Matrix.print matrix; *)
+      if Matrix.width matrix = 0 && Matrix.height matrix = 1
+      then snd @@ List.hd matrix
       else
-        (* need to group constructors with same names together and don't fuck up the order *)
-        let ans = group_constrs_in_matrix m r in
-        let ans =
-          List.map (fun (name, info) ->
-                    (* check all constructor args has same length *)
-                    assert (info <> []);
-                    assert (List.all_same ~f:(fun (args,_,_) -> List.length args) info);
-                    let cargs_count = List.hd info |> fst3 |> List.length in
-                    name,
+      match Matrix.classify_prefix matrix with
+      | (Pat.Kconstructor, top, None)  ->
+         (* print_endline "only constructors"; *)
+         (* assert false *)
+         only_constructors tuple top onfail
+      | (Pat.Kconstructor, top, Some bot) ->
+         only_constructors tuple top (main tuple bot onfail)
+         (* assert false *)
+      | (Pat.Kvar, top, None)
+      | (Pat.Kany, top, None)  ->
+         main (List.tl tuple) (Matrix.cut_first_column top) onfail
+      | (Pat.Kvar, top, Some bot)
+      | (Pat.Kany, top, Some bot)  ->
+         main (List.tl tuple) (Matrix.cut_first_column top)
+           @@ main tuple bot onfail
 
+      | (pat,_,_) -> failwith
+                       (sprintf "some cases in `main` are not done: %s"
+                                (Pat.show @@ Matrix.top_left_pat matrix))
 
+    and only_constructors tuple matrix (tail: lambda) =
+      let splitted =
+      Matrix.fold StringMultiMap.empty matrix
+                  ~f:(fun acc -> function
+                              | (Pat.Pconstructor(name,args)) :: ps, right ->
+                                 StringMultiMap.add name (args, ps, right) acc
+                              | _ -> assert false)
+
+      in
+      let other_vars = List.tl tuple in
+      let main_var = List.hd tuple in
+      let splitted = StringMultiMap.bindings splitted in
+      List.fold_left ~init:tail splitted
+                     ~f:(fun acc (name, lst) ->
+                         lifthenelse
+                           (lcheckconstr name main_var)
+                           (let args_count = List.hd_exn lst |> fst3 |> List.length in
+                            let new_vars = List.init args_count (fun _ -> next_varname ()) in
+
+                            let with_vars init =
+                              let indexed = List.mapi (fun n x -> (n,x)) new_vars in
+                              List.fold_left indexed ~init
+                                ~f:(fun acc (n,vname) -> llet vname (lfield n main_var) acc)
+                            in
+
+                            let new_matrix : Matrix.t =
+                              List.map lst ~f:(fun (args,ps,right) -> (args@ps, right))
+                            in
+                            let new_tuple = new_vars @ other_vars in
+                            with_vars @@ main new_tuple new_matrix acc
+                           )
+                           acc
+                        )
+    in
+    main tuple matrix (Lconst (Vint 666))
+
+(*
+ *)
+end
+
+module SimplifyMiniLambda = struct
+  open MiniLambda_Nologic
+  module StringSet = Set.Make(String)
+
+  let kill_variables lam =
+    let module SS = StringSet in
+    let rec helper what =
+      match what with
+      | Lvar name
+      | Lfield (_,name)
+      | Lcheckconstr (_,name)
+      | Lneq (name,_)
+      | Lconst (Vvar name) -> (SS.add name SS.empty, what)
+      | Lconst _ -> (SS.empty, what)
+      | Llet (name, what, where_) ->
+         let (s1, what') = helper what in
+         let s2, where' = helper where_ in
+         if SS.mem name s2 then (SS.union s1 s2, Llet (name, what', where'))
+         else (s2, where')
+      | Lifthenelse (cond, trueb, elseb) ->
+         let s1,cond' = helper cond in
+         let s2,trueb' = helper trueb in
+         let s3,elseb' = helper elseb in
+         (SS.union s1 (SS.union s2 s3), Lifthenelse(cond', trueb', elseb') )
+      | Lswitchconstr (lam, cases, default) ->
+         let s1,lam' = helper lam in
+         let s2,cases' =
+           List.fold_left ~init:(SS.empty, []) cases
+                          ~f:(fun (set,ls) (name,action) ->
+                              let set1,action' = helper action in
+                              (SS.union set set1, (name,action') :: ls) )
+         in
+         let cases' = List.rev cases' in
+         let s3,default' = match default with
+           | None -> SS.empty, None
+           | Some l -> let (s,l') = helper l in (s, Some l')
+         in
+         (SS.(union (union s1 s2) s3), Lswitchconstr (lam', cases', default'))
+      | Lstaticraise n -> (SS.empty, what)
+      | Lstaticcatch (lam, exc, handler) ->
+         let s1,lam' = helper lam in
+         let s2,handler' = helper handler in
+         (SS.union s1 s2, lstaticcatch lam' exc handler')
 
     in
-    let mixture_rule x = None in
-    let final_rule x = None in
+    snd @@ helper lam
 
 
-    let ans =
-      ((tuple,matrix,right),None) ++
-        variable_rule ++
-        constructor_rule ++
-        mixture_rule ++
-        final_rule
-    in
-    match snd ans with
-    | None -> failwith "can't apply any compilation rule"
-    | Some (tuple,matrix,right) -> compile ~tuple ~matrix ~right
 
 
 
 end
+
+let  () =
+  let open Value in
+  let open MiniLambda_Nologic in
+  let foo ?heading  what patts rez =
+    let lam = NaiveCompilationWithMatrixes.compile ~tuple:what ~matrix:patts in
+    let lam =
+      match heading with
+      | Some h -> h lam
+      | None -> lam
+    in
+    let lam = SimplifyMiniLambda.kill_variables lam in
+    MiniLambda_Nologic.print Format.std_formatter lam;
+    print_endline "";
+    match eval lam with
+    | `Ok r when r=rez -> ()
+    | `Ok r -> raise (BadResult r)
+    | `Raise n -> failwith (sprintf "unexpected raise %d" n)
+    (* assert (eval lam = `Ok rez) *)
+  in
+
+  foo [ "lx"; "ly"]
+      [ [pconstructor "[]" []; Pany], Lconst (Vint 1)
+      ; [Pany; pconstructor "[]" []], Lconst (Vint 2)
+      ; [ pconstructor "::" [Pvar "x"; Pvar "xs"]
+        ; pconstructor "::" [Pvar "y"; Pvar "ys"]
+        ], Lconst (Vint 3)
+      ]
+      (Vint 1)
+      ~heading:(fun l -> llet "lx" (Lconst nil) @@ llet "ly" (Lconst nil) l) ;
+
+  ()
