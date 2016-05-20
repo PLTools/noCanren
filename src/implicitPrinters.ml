@@ -51,3 +51,18 @@ module Show_pair_explicit (X : SHOW) (Y : SHOW): (SHOW with type t = X.t * Y.t) 
     type t = X.t * Y.t
     let show (x,y) = sprintf "(%s,%s)" (X.show x) (Y.show y)
 end
+
+
+implicit module Show_tiplet {X : SHOW} {Y : SHOW} {Z : SHOW}:
+   (SHOW with type t = X.t * Y.t * Z.t) =
+struct
+    type t = X.t * Y.t * Z.t
+    let show (x,y,z) = sprintf "(%s,%s,%s)" (X.show x) (Y.show y) (Z.show z)
+end
+
+module Show_tiplet_explicit (X : SHOW) (Y : SHOW) (Z : SHOW):
+   (SHOW with type t = X.t * Y.t * Z.t) =
+struct
+    type t = X.t * Y.t * Z.t
+    let show (x,y,z) = sprintf "(%s,%s,%s)" (X.show x) (Y.show y) (Z.show z)
+end

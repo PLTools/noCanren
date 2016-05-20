@@ -1189,6 +1189,13 @@ module MiniCompile = struct
          PatLogic.t llist llist logic ->
          _ logic -> _) = classify_prefix_helper *)
 
+  type line_t = PatLogic.t llist logic * lambda logic
+  type matrix_t = line_t llist
+  type vars_tuple = string llist
+
+
+
+  (* let (_:int) = !(PatLogic.Pconstructor (!"asdf", llist_nil)) *)
   let lambda_hack arg out =
     conde [ (arg === !(Lconst (Vint 1))) &&& (arg === out)
           ; (arg === out)
@@ -1214,37 +1221,103 @@ module MiniCompile = struct
 
   (* let (_:int) = classify_handlers *)
 
-  let classify_prefix patts ans top bot =
-    fresh (_1stline t kind)
-          (patts === _1stline % t)
+
+(*
+  let classify_prefix (patts: matrix logic) ans top bot =
+    fresh (_1stline right bot kind)
+          (patts === !(_1stline,right) % bot)
           (classify_line _1stline kind)
           (ans === kind)
           (classify_prefix_helper kind patts top bot)
-
-  (* classify single line *)
-  let classify_constructor  pats ans =
-    fresh (left others)
+    *)
+  let get_line_constr_name (line: line_t logic) ans =
+    fresh (pats right left others)
+          (line === !(pats , right) )
           (pats === left % others)
           (fresh (name args)
-                     (left === !Pconstructor (name, args))
-                     (ans === !(name, args, others))
+                 (left === PatLogic.(embed_explicit show
+                                                    (Pconstructor (name, args))) )
+                 (ans === (name: string logic))
           )
+(*
+  (* classify single line *)
+  let classify_line_t (line: line_t logic) ans =
+    fresh (pats right left others)
+          (line === !(pats, right) )
+          (pats === left % others)
+          (fresh (name args)
+                 (left === PatLogic.(embed_explicit show
+                                                    (Pconstructor (name, args))) )
+                 (ans === !( (name: string logic),
+                             (args:(PatLogic.t llist) logic),
+                             others))
+          )
+ *)
+  let rec split_constrs_by_name name matrix good bad =
+    conde [ (matrix === llist_nil) &&& (good === llist_nil) &&& (bad === llist_nil)
+          ; fresh (line1 matrix2 name1 good2 bad2)
+                  (matrix === line1 % matrix2)
+                  (get_line_constr_name line1 name1)
+                  (split_constrs_by_name name matrix2 good2 bad2)
+                  (conde [ (name1 === name) &&& (good === line1%good2) &&& (bad === bad2)
+                         ; (name1 =/= name) &&& (good === good2) &&& (bad === line1%bad2)
+                         ])
+          ]
+
   (* let eval_constructor_group cname  *)
+(*
   let classify_constructors matrix ans =
     fresh (phd ptl)
           (matrix === phd % ptl)
           (cond
              [fresh (x)
                     (ptl === llist_nil)
+ *)
 
+  let top_lineis_constr (matrix: matrix_t logic) name =
+    fresh (h tl pats right p1 pothers)
+          (matrix === h%tl)
+          (h === !(pats, right))
+          (pats === p1 % pothers)
+          (fresh (name1 args)
+                 (p1 === !(PatLogic.Pconstructor (name1, args)) )
+                 (name === name1))
+
+  (* let (_:int) = top_lineis_constr *)
 
   (* let compile_constructors patts handlers0            *)
+  let empty_matrix m = (m === llist_nil)
 
-  let compile tuple patts handlers ans =
-    fresh (new_kind top_pats bot_pats top_handlers bot_handlers)
-          (classify_prefix patts new_kind top_pats bot_pats)
-          (classify_handlers handlers top_pats top_handlers bot_handlers)
-          (ans === llist_nil)
+  let matrix_zero_width (m: matrix_t logic) ans =
+    fresh (h tl right)
+          (m === h % tl)
+          (h === !(llist_nil, right))
+          (ans === !1)
+
+  let top_right_handler (m: matrix_t logic) handler =
+    fresh (h tl pats)
+          (m === h%tl)
+          (h === !(pats, handler) )
+
+  let rec compile tuple (m: matrix_t logic) onfail ans =
+    conde
+      [ (empty_matrix m) &&& (ans === onfail)
+(*      ; fresh (temp)
+              (matrix_zero_width m temp)
+              (top_right_handler m ans)
+
+      ; fresh (name)
+              (top_lineis_constr m name)
+              (ans === !(Lconst (Vint 1)) )
+      ; (ans === !(Lconst (Vint 1234)) ) *)
+      ]
+
+          (* conde *)
+          (* [ (split_constrs_by_name) *)
+
+          (* (classify_prefix patts new_kind top_pats bot_pats) *)
+          (* (classify_handlers handlers top_pats top_handlers bot_handlers) *)
+          (* (ans === llist_nil) *)
 
   (* let (_:int) = compile *)
 end
@@ -1263,7 +1336,7 @@ let _ =
                     ]
   in
 
-
+  let open MiniLambda_Nologic in
   let pats1 = of_list_hack
                       [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
                       ; of_list_hack [constructor "[]" llist_nil; Pany]
@@ -1287,9 +1360,29 @@ let _ =
                     ])) );
 
  *)
-  let open MiniLambda_Nologic in
-  run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1
-                           (of_list [Lconst (Vint 1); Lconst (Vint 2)]) ) );
-  (* run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1 ![] ) ); *)
+  (* let () = run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1 *)
+  (*                                   (of_list [Lconst (Vint 1); Lconst (Vint 2)]) ) ) *)
+  (* in *)
+
+  let pats2 = of_list
+                      [ of_list [constructor "::" llist_nil; Pany], !(Lconst (Vint 1))
+                      ; of_list [constructor "[]" llist_nil; Pany], !(Lconst (Vint 2))
+                      ; of_list [constructor "::" llist_nil; Pany], !(Lconst (Vint 3))
+                      ]
+  in
+  let the_empty_matrix : matrix_t logic = llist_nil in
+  let z_width_matrix : matrix_t logic =
+    of_list [ (llist_nil, !(Lconst (Vint 3)) )
+            ; (llist_nil, !(Lconst (Vint 4)) )
+            ]
+  in
+
+  let () = run2 ~n:1 (REPR (split_constrs_by_name (!"::") (pats2)
+                                     ) )
+  in
+
+  let () = run1 ~n:1 (REPR (top_lineis_constr pats2  ) ) in
+  let () = run1 ~n:1 (REPR (compile ![""] the_empty_matrix !(Lconst (Vint 666)))) in
+  let () = run1 ~n:2 (REPR (compile ![""] z_width_matrix   !(Lconst (Vint 666)))) in
 
   ()
