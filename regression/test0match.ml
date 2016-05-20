@@ -1221,7 +1221,24 @@ module MiniCompile = struct
           (ans === kind)
           (classify_prefix_helper kind patts top bot)
 
+  (* classify single line *)
+  let classify_constructor  pats ans =
+    fresh (left others)
+          (pats === left % others)
+          (fresh (name args)
+                     (left === !Pconstructor (name, args))
+                     (ans === !(name, args, others))
+          )
+  (* let eval_constructor_group cname  *)
+  let classify_constructors matrix ans =
+    fresh (phd ptl)
+          (matrix === phd % ptl)
+          (cond
+             [fresh (x)
+                    (ptl === llist_nil)
 
+
+  (* let compile_constructors patts handlers0            *)
 
   let compile tuple patts handlers ans =
     fresh (new_kind top_pats bot_pats top_handlers bot_handlers)
@@ -1240,7 +1257,6 @@ let _ =
   let open MiniCompile in
   let open PatLogic in
   let (_: PatLogic.t llist logic llist logic) =
-
                     of_list
                     [ of_list [Pvar (!"x"); constructor "[]" llist_nil]
                     ; of_list [constructor "[]" llist_nil; Pany]
