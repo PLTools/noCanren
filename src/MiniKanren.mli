@@ -59,6 +59,7 @@ end
 val show_logic_naive : 'a logic -> string
 
 val sprintf_logic : unit -> 'a logic -> string
+val fprintf_logic : Format.formatter -> 'a logic -> unit
 
 (** Type of ligic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
@@ -189,6 +190,10 @@ module Make : functor (Logger: LOGGER) -> sig
 
   (** [conde] is a synonym for [?|] *)
   val conde : goal list -> goal
+
+  (** [first_of] find first element which can be evaluated to non-empty stream
+     and returns this stream.If no one return result of evaluation of last element  *)
+  val first_of : goal list -> goal
 
   (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a
       non-empty list of goals *)

@@ -1,7 +1,5 @@
 open Printf
-(* open MiniKanren *)
 open ImplicitPrinters
-(* open Tester.M *)
 
 module Option = struct
   type 'a t = 'a option
@@ -87,7 +85,7 @@ type varname = string
 
 module Pat = struct
   type t = Pany
-         | Pvar of varname
+         | Pvar of string
          | Pconstant of int
          | Ptuple of t list
          | Pconstructor of string * t list
@@ -482,12 +480,6 @@ let () = test_eval_match ()
 module MiniLambda_Nologic = struct
   type structured_constant = int
   type ident = string
-  type lambda_switch =
-    { sw_numconsts: int;                  (* Number of integer cases *)
-      sw_consts: (int * lambda) list;     (* Integer cases *)
-      sw_numblocks: int;                  (* Number of tag block cases *)
-      sw_blocks: (int * lambda) list;     (* Tag block cases *)
-      sw_failaction : lambda option}      (* Action to take if failure *)
   and lambda =
     | Lvar of ident
     | Lconst of Value.t
@@ -1095,7 +1087,7 @@ module PatLogic = struct
   (* понадобился для classify line *)
   type t = Pany
          | Pvar of varname logic
-         | Pconstant of int
+         | Pconstant of int logic
          | Pconstructor of string logic * (t llist) logic
 
   let show p =
@@ -1103,7 +1095,7 @@ module PatLogic = struct
       (* | Ptuple xs -> failwith "tuples should be removed from code base" *)
       | Pany -> "Pany"
       | Pvar s -> sprintf "(Pvar %a)" (fun () -> show_logic_naive) s
-      | Pconstant n -> string_of_int n
+      | Pconstant n -> show_logic_naive n
       | Pconstructor (name, xs) when llist_is_empty_logic xs ->
          sprintf "Pconstructor(\"%a\",[])" sprintf_logic name
       | Pconstructor(name,xs) ->
@@ -1133,6 +1125,69 @@ implicit module Show_lambda_nologic : (SHOW with type t = MiniLambda_Nologic.lam
     let show = MiniLambda_Nologic.show
   end
 
+module MiniLambda = struct
+  type lambda =
+    | Lvar of string
+    | Lconst of Value.t logic
+    | Lfield of int * string
+    | Lcheckconstr of string * varname
+    | Lneq of string logic * Value.t logic
+    | Llet of string * lambda * lambda
+    | Lifthenelse of lambda * lambda * lambda
+    | Lswitchconstr of lambda * (string * lambda) list * lambda option
+    | Lstaticraise of int (* * Lambda.lambda list *)
+    | Lstaticcatch of lambda * (int option) * lambda
+
+  open Format
+
+  let rec print ppf root =
+    let pr fmt = fprintf ppf fmt in
+    let rec helper = function
+    | Lvar s   -> fprintf ppf "%s" s
+    | Lconst c -> pr "%a" fprintf_logic c
+    (* | Lfield (n, ident) -> fprintf ppf "@[get_field@ %d@ %s@ @]" n ident *)
+    (* | Lcheckconstr (cname, vname) -> fprintf ppf "@[check_constr@ \"%s\"@ %s@ @]" cname vname *)
+    | Lneq (varname, val_) -> pr "@[%a@ <>@ %a@,@]" fprintf_logic varname fprintf_logic val_
+    | _ -> pr "<not implemented>"
+    in
+    helper root
+
+  let show lam =
+    let b = Buffer.create 10 in
+    let fmt = Format.formatter_of_buffer b in
+    print fmt lam;
+    pp_print_flush fmt ();
+    Buffer.contents b
+
+end
+
+implicit module Show_lambda : (SHOW with type t = MiniLambda.lambda)  =
+  struct
+    type t = MiniLambda.lambda
+    let show = MiniLambda.show
+  end
+
+implicit module Show_value : (SHOW with type t = Value.t)  =
+  struct
+    open Format
+
+    type t = Value.t
+    let show v =
+      let b = Buffer.create 10 in
+      let fmt = Format.formatter_of_buffer b in
+      Value.print fmt v;
+      pp_print_flush fmt ();
+      Buffer.contents b
+
+  end
+
+module MiniLambdaHelpers = struct
+  open MiniLambda
+  let extract_from_const c rez = (c === !(Lconst rez))
+  let make_neq ident val_ rez  = (rez === !(Lneq (ident, val_)) )
+  let make_lconst c rez = rez === !(Lconst c)
+end
+
 module MiniCompile = struct
   open Pat
   open PatLogic
@@ -1152,7 +1207,10 @@ module MiniCompile = struct
   (*                     ] *)
 
   open ImplicitPrinters
-  open MiniLambda_Nologic
+  open MiniLambda
+  open MiniLambdaHelpers
+  open Value
+
   let rec classify_prefix_helper expected_kind patts top bot =
     fresh (pat_h pat_tl kind2)
           (patts === pat_h % pat_tl)
@@ -1194,10 +1252,10 @@ module MiniCompile = struct
   type vars_tuple = string llist
 
 
-
+(*
   (* let (_:int) = !(PatLogic.Pconstructor (!"asdf", llist_nil)) *)
-  let lambda_hack arg out =
-    conde [ (arg === !(Lconst (Vint 1))) &&& (arg === out)
+  let lambda_hack (arg: MiniLambda.lambda logic) out =
+    conde [ (make_lconst !(Vint 1) arg) &&& (arg === out)
           ; (arg === out)
           ]
 
@@ -1218,7 +1276,7 @@ module MiniCompile = struct
                      (top_handlers === x % top_h2)
                      (bot_handlers === bot_h2)
              ])
-
+    *)
   (* let (_:int) = classify_handlers *)
 
 
@@ -1264,6 +1322,26 @@ module MiniCompile = struct
                          ])
           ]
 
+  let pat_is_var p = fresh (name) (p === !(PatLogic.Pvar name))
+  let pat_is_any p = p === !PatLogic.Pany
+  let rec cut_someth (cond: PatLogic.t logic -> goal) (matrix: matrix_t logic) top
+                     (bot: matrix_t logic) =
+    first_of
+      [ (matrix === llist_nil) &&& (top === llist_nil) &&& (bot === llist_nil)
+      ; fresh (bot0 pats right p1 pothers)
+              (matrix === !(pats, right) % bot0)
+              (pats === p1 % pothers)
+              (cond p1)
+              (fresh (top1 bot cutted_line)
+                     (cut_someth cond bot0 top1 bot)
+                     (cutted_line === !(pothers, right))
+                     (top === cutted_line % top1))
+      ]
+
+  let cut_vars = cut_someth pat_is_var
+  let cut_anys = cut_someth pat_is_any
+  let cut_vars_or_anys = cut_someth (fun x -> (pat_is_any x) ||| (pat_is_var x))
+
   (* let eval_constructor_group cname  *)
 (*
   let classify_constructors matrix ans =
@@ -1283,9 +1361,32 @@ module MiniCompile = struct
                  (p1 === !(PatLogic.Pconstructor (name1, args)) )
                  (name === name1))
 
+  let top_line_is_var (matrix: matrix_t logic) dummy =
+    fresh (h tl pats right p1 pothers)
+          (matrix === h%tl)
+          (h === !(pats, right))
+          (pats === p1 % pothers)
+          (conde
+             [ fresh (name1)
+                     (p1 === !(PatLogic.Pvar name1))
+                     (dummy === !1)
+             (* For simplicity we treat vars as _ *)
+             ; (p1 === !PatLogic.Pany) &&& (dummy === !1)
+             ])
+
+
+
+  let top_line_is_constant (matrix: matrix_t logic) =
+    fresh (h tl pats right p1 pothers)
+          (matrix === h%tl)
+          (h === !(pats, right))
+          (pats === p1 % pothers)
+          (fresh (c)
+                 (p1 === !(PatLogic.Pconstant c)) )
+
+
   (* let (_:int) = top_lineis_constr *)
 
-  (* let compile_constructors patts handlers0            *)
   let empty_matrix m = (m === llist_nil)
 
   let matrix_zero_width (m: matrix_t logic) ans =
@@ -1299,30 +1400,52 @@ module MiniCompile = struct
           (m === h%tl)
           (h === !(pats, handler) )
 
-  let rec compile tuple (m: matrix_t logic) onfail ans =
-    conde
+(*
+  (* by some reason I can't write generic list tail because some type error. WTF.
+   Error: This expression has type varname list logic
+       but an expression was expected of type 'a llist logic
+       Type varname list is not compatible with type 'a llist*)
+  let list_tail what ans = fresh (h) (what === h % ans)
+ *)
+  let list_tail what ans = fresh (h) (what === h % ans)
+  let tuple_tail_wtf (what: string llist logic) ans = fresh (h) (what === h % ans)
+
+  open MiniLambdaHelpers
+  let rec compile (tuple: string llist logic) (m: matrix_t logic) onfail ans =
+    (* let () = print_endline @@ *)
+    (*            sprintf "compile tuple '%a' m '%a' onfail '%a'\n%!" *)
+    (*              sprintf_logic tuple *)
+    (*              sprintf_logic m *)
+    (*              sprintf_logic onfail *)
+    (* in *)
+
+    first_of
       [ (empty_matrix m) &&& (ans === onfail)
-(*      ; fresh (temp)
+      ; fresh (temp)
               (matrix_zero_width m temp)
               (top_right_handler m ans)
 
+      ; fresh (temp top_m bot_m tuple_tail onfail2 dummy )
+              (top_line_is_var m dummy)
+              (cut_vars_or_anys m top_m bot_m)
+              (* (list_tail tuple tuple_tail) *)
+              ( tuple === tuple_tail)
+              (compile tuple bot_m onfail onfail2)
+              (compile tuple_tail top_m onfail2 ans)
+              (* (ans === !(Lconst (Vint 7777)) *)
+
+
+      ; fresh (x)
+              (top_line_is_constant m)
+              (make_lconst !(Vint 99999) ans)
+
       ; fresh (name)
               (top_lineis_constr m name)
-              (ans === !(Lconst (Vint 1)) )
-      ; (ans === !(Lconst (Vint 1234)) ) *)
+              (make_lconst !(Vint 1) ans)
+      ; (make_lconst !(Vint 1234) ans)
       ]
 
-          (* conde *)
-          (* [ (split_constrs_by_name) *)
-
-          (* (classify_prefix patts new_kind top_pats bot_pats) *)
-          (* (classify_handlers handlers top_pats top_handlers bot_handlers) *)
-          (* (ans === llist_nil) *)
-
-  (* let (_:int) = compile *)
 end
-
-let just_a a = a === (embed 5)
 
 open Tester
 
@@ -1336,44 +1459,35 @@ let _ =
                     ]
   in
 
-  let open MiniLambda_Nologic in
-  let pats1 = of_list_hack
-                      [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
-                      ; of_list_hack [constructor "[]" llist_nil; Pany]
-                      ]
+  let open MiniLambda in
+  let open Value in
+  let pats1 = of_list
+                [ of_list [Pvar (!"x"); constructor "[]" llist_nil], !(Lconst !(Vint 1))
+                ; of_list [constructor "[]" llist_nil;        Pany], !(Lconst !(Vint 2))
+                ]
   in
 
-  (* run1 ~n:1 (REPR classify_prefix); *)
+  let pats0 = of_list
+                [ of_list [(*Pvar (!"x") ;*) Pany  ], !(Lconst !(Vint 1))
+                (* ; of_list [Pany], !(Lconst !(Vint 2)) *)
+                ]
+  in
+
   run1 ~n:1 (REPR (classify_line @@ of_list
                    [constructor "[]" llist_nil; Pany]) );
   run1 ~n:1 (REPR (classify_line @@ of_list
                    [Pvar (!"x"); constructor "[]" llist_nil]) );
 
-  run2 ~n:1 (REPR (classify_prefix_helper !Pat.Kvar
-                   !pats1) );
-(*
-  run3 ~n:1 (REPR
-               (classify_prefix @@ embed (
-                  of_list_hack
-                    [ of_list_hack [Pvar (!"x"); constructor "[]" llist_nil]
-                    ; of_list_hack [constructor "[]" llist_nil; Pany]
-                    ])) );
-
- *)
-  (* let () = run1 ~n:1 (REPR (compile !["lx";"ly"] !pats1 *)
-  (*                                   (of_list [Lconst (Vint 1); Lconst (Vint 2)]) ) ) *)
-  (* in *)
-
   let pats2 = of_list
-                      [ of_list [constructor "::" llist_nil; Pany], !(Lconst (Vint 1))
-                      ; of_list [constructor "[]" llist_nil; Pany], !(Lconst (Vint 2))
-                      ; of_list [constructor "::" llist_nil; Pany], !(Lconst (Vint 3))
+                      [ of_list [constructor "::" llist_nil; Pany], !(Lconst !(Vint 1))
+                      ; of_list [constructor "[]" llist_nil; Pany], !(Lconst !(Vint 2))
+                      ; of_list [constructor "::" llist_nil; Pany], !(Lconst !(Vint 3))
                       ]
   in
   let the_empty_matrix : matrix_t logic = llist_nil in
   let z_width_matrix : matrix_t logic =
-    of_list [ (llist_nil, !(Lconst (Vint 3)) )
-            ; (llist_nil, !(Lconst (Vint 4)) )
+    of_list [ (llist_nil, !(Lconst !(Vint 3)) )
+            ; (llist_nil, !(Lconst !(Vint 4)) )
             ]
   in
 
@@ -1382,7 +1496,14 @@ let _ =
   in
 
   let () = run1 ~n:1 (REPR (top_lineis_constr pats2  ) ) in
-  let () = run1 ~n:1 (REPR (compile ![""] the_empty_matrix !(Lconst (Vint 666)))) in
-  let () = run1 ~n:2 (REPR (compile ![""] z_width_matrix   !(Lconst (Vint 666)))) in
+  let () = run1 ~n:1 (REPR (compile (of_list [""]) the_empty_matrix !(Lconst !(Vint 666))))
+  in
+  let () = run1 ~n:1 (REPR (compile (of_list [""]) z_width_matrix  !(Lconst !(Vint 666))))
+  in
+  let () = run1 ~n:1 (REPR (compile (of_list ["lx";"ly"]) pats1    !(Lconst !(Vint 666))))
+  in
+
+  let () = run1 ~n:1 (REPR (compile (of_list ["lx"]) pats0    !(Lconst !(Vint 666))))
+  in
 
   ()

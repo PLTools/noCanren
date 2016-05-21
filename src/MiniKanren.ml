@@ -120,6 +120,12 @@ struct
       | Lazy z -> concat (Lazy.force z) ys
       | Cons (x,xs) -> cons x (concat xs ys)
     )
+
+  let force_once = function
+    | Nil -> Nil
+    | (Cons _) as y -> y
+    | Lazy z -> Lazy.force z
+
 end
 
 module type LOGGER = sig
@@ -216,6 +222,7 @@ let show_logic_naive =
     printer x
 
 let sprintf_logic () x = show_logic_naive x
+let fprintf_logic fmt l = Format.fprintf fmt "%s" (sprintf_logic () l)
 
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
@@ -709,6 +716,22 @@ let (=/=) x y state0 =
     | h::t -> h &&& ?& t
 
   let conde = (?|)
+
+  let first_of : goal list -> goal = fun xs st0 ->
+    let open Stream in
+    let rec helper xs = function
+      | Nil        -> helper2 xs
+      | Lazy l     -> helper xs (Lazy.force l)
+      | Cons (x,y) -> Cons (x,y)
+    and helper2 = function
+      | [] -> assert false
+      | [f] -> Stream.from_fun (fun () -> f st0)
+      | f::fs -> helper fs (f st0)
+    in
+    match xs with
+    | [] -> failwith "first_of can't take empty list"
+    | [f] -> helper2 [f]
+    | x::xs -> helper xs (x st0)
 
   let run ?(logger=Logger.create()) (g: state -> _) =
     let root_node = Logger.make_node logger in
