@@ -1210,7 +1210,7 @@ module MiniCompile = struct
   open MiniLambda
   open MiniLambdaHelpers
   open Value
-
+(*
   let rec classify_prefix_helper expected_kind patts top bot =
     fresh (pat_h pat_tl kind2)
           (patts === pat_h % pat_tl)
@@ -1224,7 +1224,9 @@ module MiniCompile = struct
 
                  ; (kind2 =/= expected_kind) &&& (top === llist_nil) &&& (bot === patts)
                  ])
-(*  (* In this code it can't find implicit for some reason *)
+ *)
+
+(*  (* in this code it can't find implicit for some reason *)
   let rec classify_prefix_helper expected_kind patts top bot =
     call_fresh @@ fun (right: lambda logic) ->
     fresh (pat_h pat_tl kind2)
@@ -1385,8 +1387,6 @@ module MiniCompile = struct
                  (p1 === !(PatLogic.Pconstant c)) )
 
 
-  (* let (_:int) = top_lineis_constr *)
-
   let empty_matrix m = (m === llist_nil)
 
   let matrix_zero_width (m: matrix_t logic) ans =
@@ -1400,13 +1400,6 @@ module MiniCompile = struct
           (m === h%tl)
           (h === !(pats, handler) )
 
-(*
-  (* by some reason I can't write generic list tail because some type error. WTF.
-   Error: This expression has type varname list logic
-       but an expression was expected of type 'a llist logic
-       Type varname list is not compatible with type 'a llist*)
-  let list_tail what ans = fresh (h) (what === h % ans)
- *)
   let list_tail what ans = fresh (h) (what === h % ans)
   let tuple_tail_wtf (what: string llist logic) ans = fresh (h) (what === h % ans)
 
