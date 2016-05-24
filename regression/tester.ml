@@ -362,19 +362,22 @@ let run1 ?printer ~n (title, goal) =
   run one goal |> (fun stream ->
     let answers = Stream.take ~n stream in
     answers |> List.iter
-      (fun (_logger, (q,_constr)) ->
-         printf "q=%s;\n%!" (pp q);
-      );
-    option_iter (list_last answers) ~f:(fun (graph,_) ->
-      if config.do_plain then
-        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
-        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
-        ();
-      if config.do_html
-      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+                 (fun (_logger, (q,_constr)) ->  printf "q=%s;\n%!" (pp q) );
 
-        print_endline "dumping graph";
-        GraphLogger.dump_graph (Obj.magic graph) stdout;
+    option_iter (list_last answers)
+      ~f:(fun (graph,_) ->
+
+        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
+        let () =
+          if config.do_plain then
+            ignore @@ Logger.output_plain ~filename:(out_file_prefix^".plain") graph
+        in
+
+        if config.do_html
+        then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+
+        (* print_endline "dumping graph"; *)
+        (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
     )
 
   );

@@ -693,7 +693,8 @@ let (=/=) x y state0 =
     let () = make_leaf (sprintf "Occurs_check failed") state1 in
     Stream.cons state1 Stream.nil
 
-  let conj f g = "conj" <=> (fun st -> Stream.bind (f st) g)
+  let conj f g = "conj" <=>
+    (fun ((_,_,l0) as st) -> Stream.bind (f st) (fun (s,l,_) -> g (s,l,l0)) )
 
   let (&&&) = conj
 
