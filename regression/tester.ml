@@ -383,9 +383,10 @@ let run1 ?printer ~n (title, goal) =
   );
   printf "}\n%!"
 
-let run2 ?printer ~n (title,goal) =
+let run2 (* ?(printer:  'a logic -> string) *) ~n (title,goal) =
   print_title title n;
-  let pp = match printer with Some f -> f | None -> show_logic_naive in
+  (* let pp = match printer with Some f -> f | None -> show_logic_naive in *)
+  let pp = show_logic_naive in
   run (succ one) goal |>
     begin fun stream ->
       let answers = Stream.take ~n stream in

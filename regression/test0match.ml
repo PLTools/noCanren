@@ -1206,7 +1206,7 @@ end
 module MiniCompile = struct
   open Pat
   open PatLogic
-
+(*
   let classify_line line kind =
     fresh (h t)
           (line === h%t)
@@ -1216,6 +1216,7 @@ module MiniCompile = struct
                  ])
 
   let (_:PatLogic.t llist logic -> Pat.kind logic -> Tester.M.goal) = classify_line
+                                                                      *)
   (* let (_:int) = of_list *)
   (*                     [ of_list [Pvar (!"x"); constructor "[]" llist_nil] *)
   (*                     ; of_list [constructor "[]" llist_nil; Pany] *)
@@ -1338,6 +1339,7 @@ module MiniCompile = struct
                          ; (name1 =/= name) &&& (good === good2) &&& (bad === line1%bad2)
                          ])
           ]
+  let list_cons xs h tl = xs === h%tl
 
   let pat_is_var p = fresh (name) (p === !(PatLogic.Pvar name))
   let pat_is_any p = p === !PatLogic.Pany
@@ -1346,18 +1348,39 @@ module MiniCompile = struct
     first_of
       [ (matrix === llist_nil) &&& (top === llist_nil) &&& (bot === llist_nil)
       ; fresh (bot0 pats right p1 pothers)
-              (matrix === !(pats, right) % bot0)
-              (pats === p1 % pothers)
-              (cond p1)
-              (fresh (top1 bot cutted_line)
-                     (cut_someth cond bot0 top1 bot)
-                     (cutted_line === !(pothers, right))
-                     (top === cutted_line % top1))
+              (list_cons matrix !(pats, right) bot0)
+              (list_cons pats p1  pothers)
+              (first_of
+                 [ fresh (top1 cutted_line)
+                         (cond p1)
+                         (cutted_line === !(pothers, right))
+                         (top === cutted_line % top1)
+                         (cut_someth cond bot0 top1 bot)
+                 ; (top === llist_nil) &&& (bot === matrix)
+                 ])
       ]
 
   let cut_vars = cut_someth pat_is_var
   let cut_anys = cut_someth pat_is_any
   let cut_vars_or_anys = cut_someth (fun x -> (pat_is_any x) ||| (pat_is_var x))
+
+  let rec cut_vars_verbose (matrix: matrix_t logic) top (bot: matrix_t logic) =
+    first_of
+      [ (matrix === llist_nil) &&& (top === llist_nil) &&& (bot === llist_nil)
+      ; fresh (bot0 pats right p1 pothers)
+              (list_cons matrix !(pats, right) bot0)
+              (list_cons pats p1 pothers)
+              (first_of
+                 [ fresh (name top1 cutted_line)
+                         (p1 === !(PatLogic.Pvar name) )
+                         (cut_vars_verbose bot0 top1 bot)
+                         (cutted_line === !(pothers, right))
+                         (top === cutted_line % top1)
+
+                 ; (top === llist_nil) &&& (bot === matrix)
+                 ])
+      ]
+
 
   (* let eval_constructor_group cname  *)
 (*
@@ -1413,6 +1436,11 @@ module MiniCompile = struct
              ; (p1 === !PatLogic.Pany) &&& (dummy === !1)
              ])
 
+  let top_line_is_any (matrix: matrix_t logic) =
+    fresh (line1 p1 ps right)
+          (top_line_of_matrix matrix line1)
+          (line1 === !(p1 % ps, right) )
+          (pat_is_any p1)
 
 
   let top_line_is_constant (matrix: matrix_t logic) =
@@ -1566,7 +1594,9 @@ module MiniCompile = struct
   let rec compile_constr_prefix (tuple: string llist logic)
                                 (m: matrix_t logic)
                                 onfail
-                                (ans: lambda logic) =
+                                (ans: lambda logic)
+                                (debug_ans: matrix_t logic)
+    =
     let fix_tuple m old_tuple ans =
       fresh (line1)
             (top_line_of_matrix m line1)
@@ -1576,16 +1606,32 @@ module MiniCompile = struct
     fresh (top bot name top2 bot2 top_tuple)
           (top_line_is_constr m name)
           (extract_constrs_helper m name top bot2)
-          (rework_matrix_helper top top2)
-          (fix_tuple m tuple top_tuple)
-          (fresh (ans_top ans_bot check_lam)
-                 (compile tuple     bot2 onfail  ans_bot)
-                 (compile top_tuple top2 onfail ans_top)
-                 (make_lcheckconstr name !"x" check_lam)
-                 (make_ifthenelse check_lam ans_top ans_bot ans)
+          (rework_matrix top top2)
+          (* (top === top2)  (\* the same as rework_matrix when consructors without args*\) *)
+          (fresh (tup_h tup_tl )
+                 (tuple === tup_h % tup_tl)
+                 (fix_tuple m tup_tl top_tuple)
+                 (conde
+                    [ (*fresh (_x)
+                            (bot2 === llist_nil)
+                            (compile top_tuple top2 onfail ans)
+(*                    (* ; fresh (ans_top ans_bot) *)
+                    (*         (compile tuple     bot2 onfail  ans_bot) *)
+                    (*         (compile top_tuple top2 ans_bot ans) *)
+
+ *)
+                    ; *) fresh (ans_top ans_bot check_lam _d _d2)
+                            (compile tuple     bot2 onfail  ans_bot _d)
+                            (compile top_tuple top2 ans_bot ans_top _d2)
+                            (make_lcheckconstr name tup_h check_lam)
+                            (make_ifthenelse check_lam ans_top ans_bot ans)
+                    ])
           )
 
-  and compile (tuple: string llist logic) (m: matrix_t logic) onfail (ans: lambda logic) =
+  and compile (tuple: string llist logic) (m: matrix_t logic) onfail
+              (ans: lambda logic)
+              (debug_ans: matrix_t logic)
+    =
     (* let () = print_endline @@ *)
     (*            sprintf "compile tuple '%a' m '%a' onfail '%a'\n%!" *)
     (*              sprintf_logic tuple *)
@@ -1599,33 +1645,50 @@ module MiniCompile = struct
               (matrix_zero_width m temp)
               (top_right_handler m ans)
 
-      ; fresh (temp top_m bot_m top_tuple onfail2 dummy )
+      ; fresh (temp top_m bot_m onfail2)
+              (top_line_is_any m)
+              (cut_anys m top_m bot_m)
+              (fresh (top_tuple _d1 _d2)
+                     (list_tail tuple top_tuple)
+                     (compile tuple     bot_m onfail  onfail2 _d1)
+                     (compile top_tuple top_m onfail2 ans _d2)
+
+                     (* (compile tuple bot_m onfail ans) *)
+
+                     (* (make_lconst !(Vint 7654)  onfail2) *)
+                     (* (compile top_tuple top_m onfail2 ans debug_ans) *)
+              )
+
+      ; fresh (temp top_m bot_m onfail2 dummy )
               (top_line_is_var m dummy)
-              (cut_vars_or_anys m top_m bot_m)
-              (list_tail tuple top_tuple)
+              (cut_vars m top_m bot_m)
+
+              (*
               (fresh (what handler exit_from_top)
                      (make_exit 5 exit_from_top)
-                     (* (compile tuple     bot_m onfail handler) *)
-                     (make_lconst !(Vint 8888) handler)
+                     (compile tuple     bot_m onfail handler)
+                     (* (make_lconst !(Vint 8888) handler) *)
                      (compile top_tuple top_m exit_from_top what)
                      (make_simple_try what handler ans)
+              ) *)
+              (fresh (top_tuple _d1 _d2)
+                     (list_tail tuple top_tuple)
+                     (compile tuple     bot_m onfail  onfail2 _d2)
+                     (compile top_tuple top_m onfail2 ans _d1)
               )
-              (* ( tuple === tuple_tail) *)
-              (* (compile tuple      bot_m onfail  onfail2) *)
-              (* (compile tuple_tail top_m onfail2 ans) *)
-              (* (ans === !(Lconst (Vint 7777)) *)
+      (* (ans === !(Lconst (Vint 7777)) *)
 (*
       ; fresh (x)
               (* TODO *)
               (top_line_is_constant m)
               (make_lconst !(Vint 99999) ans)
  *)
-      ; fresh (name)
+      ; fresh (name _d1)
               (top_line_is_constr m name)
-              (compile_constr_prefix tuple m onfail ans)
-              (* (make_lconst !(Vint 1) ans) *)
+              (compile_constr_prefix tuple m onfail ans _d1)
 
-      ; (make_lconst !(Vint 1234) ans)
+
+      ; (make_lconst !(Vint 1234) ans) &&& (debug_ans === m)
       ]
 
 end
@@ -1656,10 +1719,10 @@ let _ =
                 ]
   in
 
-  run1 ~n:1 (REPR (classify_line @@ of_list
-                   [constructor "[]" llist_nil; Pany]) );
-  run1 ~n:1 (REPR (classify_line @@ of_list
-                   [Pvar (!"x"); constructor "[]" llist_nil]) );
+  (* run1 ~n:1 (REPR (classify_line @@ of_list *)
+  (*                  [constructor "[]" llist_nil; Pany]) ); *)
+  (* run1 ~n:1 (REPR (classify_line @@ of_list *)
+  (*                  [Pvar (!"x"); constructor "[]" llist_nil]) ); *)
 
   let pats2 = of_list
                       [ of_list [constructor "::" llist_nil; Pany], !(Lconst !(Vint 1))
@@ -1683,7 +1746,7 @@ let _ =
   let () = run2 ~n:1 (REPR (split_constrs_by_name (!"::") (pats2)
                                      ) )
   in
-
+(*
   let () = run1 ~n:1 (REPR (top_line_is_constr pats2  ) ) in
   let () = run1 ~n:1 (REPR (compile (of_list [""]) the_empty_matrix !(Lconst !(Vint 666))))
   in
@@ -1700,19 +1763,46 @@ let _ =
 
   let () = run2 ~n:1 (REPR (extract_constrs pats2_0 (!"::") ))
   in
-
+  *)
   let example1 = of_list
-      [ (* of_list [constructor "[]" llist_nil;              Pany], !(Lconst !(Vint 1)) *)
-      (* ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2)) *)
-      (* ; *) of_list [ constructor "::" (of_list [var "x"; var "xs"])
+      [ of_list [constructor "[]" llist_nil;              Pany], !(Lconst !(Vint 1))
+      ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" (of_list [var "x"; var "xs"])
                 ; constructor "::" (of_list [var "y"; var "ys"])
                 ], !(Lconst !(Vint 3))
-      ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2))
       ]
   in
-  let () = run1 ~n:1 (REPR (compile (of_list ["lx"; "ly"]) example1 !(Lconst !(Vint 666))))
+  let example2 = of_list
+      (* [  of_list [ constructor "::" (of_list [var "x"; var "xs"]) *)
+      (*            ], !(Lconst !(Vint 3)) *)
+      [  of_list [ constructor "[]" (of_list [])  ], !(Lconst !(Vint 3))
+      (* ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2)) *)
+      ; of_list [Pany], !(Lconst !(Vint 2))
+      ]
+  in
+  let example3 = of_list
+      [ of_list [constructor "[]" llist_nil;              Pany], !(Lconst !(Vint 1))
+      ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" (of_list [])
+                ; constructor "::" (of_list [])
+                ], !(Lconst !(Vint 3))
+      ]
+  in
+  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) example3 !(Lconst !(Vint 666))))
   in
 
+
+  (* top-var*)
+  let example4 = of_list
+      [ of_list [ var "s";        constructor "[]" llist_nil], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" (of_list [])
+                ; constructor "::" (of_list [])
+                ], !(Lconst !(Vint 3))
+      ]
+  in
+  (* let () = run2 ~n:1 (REPR (cut_vars_verbose the_empty_matrix )) in *)
+  (* let () = run2 ~n:2 (REPR (cut_vars         example4 )) in *)
+  (* let () = run2 ~n:1 (REPR (cut_vars_verbose example4 )) in *)
   (* let () = run1 ~n:1 (REPR (rework_matrix  example1)) *)
   (* in *)
 
