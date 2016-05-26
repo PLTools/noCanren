@@ -496,26 +496,7 @@ module MiniLambda_Nologic = struct
        and Lstaticcatch (l1, Some n, l2) ---
          catch lam1 width n -> l2
     *)
-    (* | Ltrywith of lambda * Ident.t * Lambda.lambda *)
-    (* | MatchFailure *)
-    (* | Lletrec of (Ident.t * Lambda.lambda) list * Lambda.lambda *)
-    (* | Lprim of Lambda.primitive * Lambda.lambda list *)
-    (* | Lswitch of lambda * lambda_switch *)
-    (* | Lstringswitch of Lambda.lambda * (string * Lambda.lambda) list * *)
-    (*                    Lambda.lambda option *)
-    (* | Lapply of lambda logic * lambda logic llist *)
-    (* | Lfunction of function_kind * Ident.t list * lambda *)
-    (* | Lsequence of lambda * lambda *)
-    (* | Lwhile of Lambda.lambda * Lambda.lambda *)
-    (* | Lfor of Ident.t * Lambda.lambda * Lambda.lambda * *)
-    (*         Asttypes.direction_flag * Lambda.lambda *)
-    (* | Lassign of Ident.t * lambda *)
-    (* | Lsend of Lambda.meth_kind * Lambda.lambda * Lambda.lambda * *)
-    (*   Lambda.lambda list * Location.t *)
-    (* | Levent of Lambda.lambda * Lambda.lambda_event *)
-    (* | Lifused of Ident.t * Lambda.lambda *)
 
-  let () = ()
   let lfield n ident = Lfield(n, ident)
   let lcheckconstr str varname = Lcheckconstr (str, varname)
   let lneq ident value_ = Lneq (ident, value_)
@@ -704,19 +685,6 @@ module NaiveCompilation = struct
              (Some exit_code)
              elseb
 
-(*  (* naive code generation *)
-        | Pconstructor (name,[]) ->
-           lifthenelse (lcheckconstr name varname) right elseb
-        | Pconstructor (name,xs) ->
-           (* naive, with if statement*)
-           let exit_code = next_exit_counter () in
-           Lstaticcatch(
-             Lifthenelse (Lcheckconstr (name, varname),
-                          match_one_patt varname (Ptuple xs) right (Lstaticraise exit_code),
-                          (Lstaticraise exit_code)),
-             exit_code,
-             elseb)
- *)
         | Ptuple [a] ->
            let var_a = next_varname () in
            llet var_a (lfield 0 varname) @@
@@ -736,12 +704,7 @@ module NaiveCompilation = struct
                              elseb
 
         | Ptuple _ -> failwith "Ptuple not implemented"
-        (* | _ -> Lconst (Vint 0) *)
       in
-      (* let start_env = Env.(extend root_varname what empty) in *)
-      (* List.fold_right (fun (pat,r) acc -> match_one_patt start_env root_varname pat r acc) *)
-      (*                 (List.map (fun (p,r) -> (p,Lconst r)) patts) *)
-      (*                 (Lstaticraise 666) *)
       let body =
         List.fold_right (fun (pat,r) acc -> match_one_patt root_varname pat r acc)
           (List.map (fun (p,r) -> (p,Lconst r)) patts)
@@ -749,10 +712,9 @@ module NaiveCompilation = struct
       in
       Llet (root_varname, Lconst what, body)
 
-
 end
 
-exception BadResult of Value.t (* MiniLambda_Nologic.lambda *)
+exception BadResult of Value.t
 let ___ () =
   let open Value in
   let open MiniLambda_Nologic in
@@ -790,7 +752,7 @@ module NaiveCompilationWithMatrixes = struct
   open MiniLambda_Nologic
   open Value
 
-  module StringMultiMap (* : (Map.S with type 'a t = ('a list) t) *) = struct
+  module StringMultiMap = struct
     module M = Map.Make(String)
     include M
 
@@ -841,8 +803,8 @@ module NaiveCompilationWithMatrixes = struct
                 m
 
     let cut_horizontally n m =
-      printf "n = %d\n%!" n;
-      print m;
+      (* printf "n = %d\n%!" n; *)
+      (* print m; *)
       if n = height m then failwith "This cut will provide empty matrix";
       (* assert (height m = List.length rs); *)
       assert (n>0 && n < height m);
@@ -882,33 +844,6 @@ module NaiveCompilationWithMatrixes = struct
                | _ -> failwith "bad argument"
                ) matrix r;
     M.bindings map.contents
-    (* |> List.map (fun (name,moreinfo) *)
-    (* () *)
-
-(*
-  let check_1st_column_wrap checker getter m =
-    if Matrix.check_1st_column checker m && not (Matrix.is_empty m)
-    then
-      let temp = m |> List.map (function x::xs -> (getter x, xs)
-                                       | [] -> failwith "bad argument")
-      in
-      Some (List.split temp)
-    else None
-
-  let check_first_variables m : (varname list * Matrix.t) option =
-    check_1st_column_wrap Pat.is_variable Pat.get_varname_exn m
-
-  let check_first_constructors m : ((string * Pat.t list) list * Matrix.t) option =
-    check_1st_column_wrap Pat.is_constructor Pat.get_const_info_exn m
-    *)
-  type input_data = Value.t list * Matrix.t * lambda list
-  type state = input_data * input_data option
-  let (++) (start,rez) f =
-    match rez with
-    | Some _ -> (start,rez)
-    | None -> (start, f start)
-
-  (* let (_:int)  = (++) *)
 
   let rec compile : tuple:string list -> matrix: Matrix.t  -> lambda
     = fun ~tuple ~matrix ->
@@ -934,12 +869,9 @@ module NaiveCompilationWithMatrixes = struct
       else
       match Matrix.classify_prefix matrix with
       | (Pat.Kconstructor, top, None)  ->
-         (* print_endline "only constructors"; *)
-         (* assert false *)
          only_constructors tuple top onfail
       | (Pat.Kconstructor, top, Some bot) ->
          only_constructors tuple top (main tuple bot onfail)
-         (* assert false *)
       | (Pat.Kvar, top, None)
       | (Pat.Kany, top, None)  ->
          main (List.tl tuple) (Matrix.cut_first_column top) onfail
@@ -988,14 +920,13 @@ module NaiveCompilationWithMatrixes = struct
     in
     main tuple matrix (Lconst (Vint 666))
 
-(*
- *)
 end
 
 module SimplifyMiniLambda = struct
   open MiniLambda_Nologic
   module StringSet = Set.Make(String)
 
+  (** removes unused let bindings *)
   let kill_variables lam =
     let module SS = StringSet in
     let rec helper what =
@@ -1039,10 +970,6 @@ module SimplifyMiniLambda = struct
     in
     snd @@ helper lam
 
-
-
-
-
 end
 
 let ___ () =
@@ -1077,6 +1004,8 @@ let ___ () =
 
   ()
 
+(* ****************************************************************************)
+(* MiniKanren-related stuff *)
 
 open MiniKanren
 open Tester.M
@@ -1092,7 +1021,6 @@ module PatLogic = struct
 
   let show p =
     let rec helper = function
-      (* | Ptuple xs -> failwith "tuples should be removed from code base" *)
       | Pany -> "Pany"
       | Pvar s -> sprintf "(Pvar %a)" (fun () -> show_logic_naive) s
       | Pconstant n -> show_logic_naive n
@@ -1149,8 +1077,6 @@ module MiniLambda = struct
     let rec helper = function
     | Lvar s   -> fprintf ppf "%s" s
     | Lconst c -> pr "%a" fprintf_logic c
-    (* | Lfield (n, ident) -> fprintf ppf "@[get_field@ %d@ %s@ @]" n ident *)
-    (* | Lcheckconstr (cname, vname) -> fprintf ppf "@[check_constr@ \"%s\"@ %s@ @]" cname vname *)
     | Lcheckconstr (s,l) -> pr "check_constr \"%a\" %a" fprintf_logic s fprintf_logic l
     | Lneq (varname, val_) ->
        pr "@[%a@ <>@ %a@,@]" fprintf_logic varname fprintf_logic val_
@@ -1195,6 +1121,7 @@ implicit module Show_value : (SHOW with type t = Value.t)  =
   end
 
 module MiniLambdaHelpers = struct
+  (* Some logic functions for lambdas construction *)
   open MiniLambda
   let extract_from_const c rez = (c === !(Lconst rez))
   let make_neq ident val_ rez  = (rez === !(Lneq (ident, val_)) )
@@ -1206,19 +1133,7 @@ module MiniLambdaHelpers = struct
 end
 
 module MiniCompile = struct
-  open Pat
   open PatLogic
-(*
-  let classify_line line kind =
-    fresh (h t)
-          (line === h%t)
-          (conde [ (h === !Pany) &&& (kind === !Kany)
-                 ; fresh v        ((h === !(Pvar v)) &&& (kind === !Kvar))
-                 ; fresh (n args) ((h === !(Pconstructor (n, args))) &&& (kind === !Kconstructor))
-                 ])
-
-  let (_:PatLogic.t llist logic -> Pat.kind logic -> Tester.M.goal) = classify_line
-                                                                      *)
   open ImplicitPrinters
   open MiniLambda
   open MiniLambdaHelpers
@@ -1297,6 +1212,8 @@ module MiniCompile = struct
 
   let pat_is_var p = fresh (name) (p === !(PatLogic.Pvar name))
   let pat_is_any p = p === !PatLogic.Pany
+
+  (* I think it is only place where I mix Ocaml and miniKanren. *)
   let rec cut_someth (cond: PatLogic.t logic -> goal) (matrix: matrix_t logic) top
                      (bot: matrix_t logic) =
     first_of
@@ -1318,6 +1235,7 @@ module MiniCompile = struct
   let cut_anys = cut_someth pat_is_any
   let cut_vars_or_anys = cut_someth (fun x -> (pat_is_any x) ||| (pat_is_var x))
 
+(*
   let rec cut_vars_verbose (matrix: matrix_t logic) top (bot: matrix_t logic) =
     first_of
       [ (matrix === llist_nil) &&& (top === llist_nil) &&& (bot === llist_nil)
@@ -1325,8 +1243,8 @@ module MiniCompile = struct
               (list_cons matrix !(pats, right) bot0)
               (list_cons pats p1 pothers)
               (first_of
-                 [ fresh (name top1 cutted_line)
-                         (p1 === !(PatLogic.Pvar name) )
+                 [ fresh (top1 cutted_line)
+                         (pat_is_var p1)
                          (cut_vars_verbose bot0 top1 bot)
                          (cutted_line === !(pothers, right))
                          (top === cutted_line % top1)
@@ -1334,17 +1252,8 @@ module MiniCompile = struct
                  ; (top === llist_nil) &&& (bot === matrix)
                  ])
       ]
-
-
-  (* let eval_constructor_group cname  *)
-(*
-  let classify_constructors matrix ans =
-    fresh (phd ptl)
-          (matrix === phd % ptl)
-          (cond
-             [fresh (x)
-                    (ptl === llist_nil)
  *)
+
 
   let top_line_of_matrix (matrix: matrix_t logic) (ans: line_t logic) =
     fresh (tl) (matrix === ans % tl)
@@ -1382,12 +1291,7 @@ module MiniCompile = struct
           (top_line_of_matrix matrix h)
           (h === !(pats, right))
           (list_cons pats p1 pothers)
-          (conde
-             [ fresh (name1)
-                     (p1 === !(PatLogic.Pvar name1))
-             (* For simplicity we treat vars as _ *)
-             (* ; (p1 === !PatLogic.Pany) *)
-             ])
+          (pat_is_var p1)
 
   let top_line_is_any (matrix: matrix_t logic) =
     fresh (line1 p1 ps right)
@@ -1648,44 +1552,38 @@ let _ =
 
   let open MiniLambda in
   let open Value in
-  let pats1 = of_list
+  let _pats1 = of_list
                 [ of_list [var "x";             constructor "[]" []], !(Lconst !(Vint 1))
                 ; of_list [constructor "[]" []; Pany               ], !(Lconst !(Vint 2))
                 ]
   in
 
-  let pats0 = of_list
+  let _pats0 = of_list
                 [ of_list [(*Pvar (!"x") ;*) Pany  ], !(Lconst !(Vint 1))
                 (* ; of_list [Pany], !(Lconst !(Vint 2)) *)
                 ]
   in
 
-  (* run1 ~n:1 (REPR (classify_line @@ of_list *)
-  (*                  [constructor "[]" llist_nil; Pany]) ); *)
-  (* run1 ~n:1 (REPR (classify_line @@ of_list *)
-  (*                  [Pvar (!"x"); constructor "[]" llist_nil]) ); *)
-
-  let pats2 = of_list
+  let _pats2 = of_list
                       [ of_list [constructor "::" []; Pany], !(Lconst !(Vint 1))
                       ; of_list [constructor "[]" []; Pany], !(Lconst !(Vint 2))
                       ; of_list [constructor "::" []; Pany], !(Lconst !(Vint 3))
                       ]
   in
-  let pats2_0 = of_list
+  let _pats2_0 = of_list
                       [ of_list [constructor "::" []], !(Lconst !(Vint 1))
                       ; of_list [constructor "[]" []], !(Lconst !(Vint 2))
                       ; of_list [constructor "::" []], !(Lconst !(Vint 3))
                       ]
   in
-  let the_empty_matrix : matrix_t logic = llist_nil in
-  let z_width_matrix : matrix_t logic =
+  let _the_empty_matrix : matrix_t logic = llist_nil in
+  let _z_width_matrix : matrix_t logic =
     of_list [ (llist_nil, !(Lconst !(Vint 3)) )
             ; (llist_nil, !(Lconst !(Vint 4)) )
             ]
   in
 
-  let () = run2 ~n:1 (REPR (split_constrs_by_name (!"::") (pats2)
-                                     ) )
+  let () = run2 ~n:1 (REPR (split_constrs_by_name (!"::") _pats2 ) )
   in
 (*
   let () = run1 ~n:1 (REPR (top_line_is_constr pats2  ) ) in
@@ -1705,7 +1603,7 @@ let _ =
   let () = run2 ~n:1 (REPR (extract_constrs pats2_0 (!"::") ))
   in
   *)
-  let example1 = of_list
+  let _example1 = of_list
       [ of_list [constructor "[]" [];                Pany], !(Lconst !(Vint 1))
       ; of_list [Pany;                constructor "[]" []], !(Lconst !(Vint 2))
       ; of_list [ constructor "::" [var "x"; var "xs"]
@@ -1713,7 +1611,7 @@ let _ =
                 ], !(Lconst !(Vint 3))
       ]
   in
-  let example2 = of_list
+  let _example2 = of_list
       (* [  of_list [ constructor "::" (of_list [var "x"; var "xs"]) *)
       (*            ], !(Lconst !(Vint 3)) *)
       [  of_list [ constructor "[]" []  ], !(Lconst !(Vint 3))
@@ -1721,7 +1619,7 @@ let _ =
       ; of_list [Pany], !(Lconst !(Vint 2))
       ]
   in
-  let example3 = of_list
+  let _example3 = of_list
       [ of_list [constructor "[]" [];              Pany], !(Lconst !(Vint 1))
       ; of_list [Pany;        constructor "[]" []], !(Lconst !(Vint 2))
       ; of_list [ constructor "::" []
@@ -1729,18 +1627,18 @@ let _ =
                 ], !(Lconst !(Vint 3))
       ]
   in
-  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) example3 !(Lconst !(Vint 666))))
+  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example3 !(Lconst !(Vint 666))))
   in
 
 
   (* top-var*)
-  let example4 = of_list
+  let _example4 = of_list
       [ of_list [ var "s";        constructor "[]" [] ], !(Lconst !(Vint 2))
       ; of_list [ constructor "::" []; constructor "::" []  ], !(Lconst !(Vint 3))
       ]
   in
 
-  let example5 = of_list
+  let _example5 = of_list
       [ of_list [ constructor "::" [var "a"; constructor "::" [var "b"; constructor "[]"[] ]]
                 ; constructor "::" []
                 ], !(Lconst !(Vint 3))
