@@ -1644,6 +1644,8 @@ let _ =
                 ], !(Lconst !(Vint 3))
       ]
   in
+  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example5 !(Lconst !(Vint 666))))
+  in
   (* let () = run2 ~n:1 (REPR (cut_vars_verbose the_empty_matrix )) in *)
   (* let () = run2 ~n:2 (REPR (cut_vars         example4 )) in *)
   (* let () = run2 ~n:1 (REPR (cut_vars_verbose example4 )) in *)
