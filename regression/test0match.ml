@@ -1080,15 +1080,15 @@ let ___ () =
 
 open MiniKanren
 open Tester.M
+open ImplicitPrinters
 
 let (!) = embed
 
 module PatLogic = struct
-  (* понадобился для classify line *)
   type t = Pany
-         | Pvar of varname logic
+         | Pvar of string logic
          | Pconstant of int logic
-         | Pconstructor of varname logic * (t llist) logic
+         | Pconstructor of string logic * ((t llist) logic)
 
   let show p =
     let rec helper = function
@@ -1103,7 +1103,6 @@ module PatLogic = struct
     in
     helper p
 
-  let constructor name xs = Pconstructor (!name, xs)
   let var s = Pvar !s
 
 end
@@ -1120,6 +1119,9 @@ implicit module Show_pat_kind : (SHOW with type t = Pat.kind) =
     let show = Pat.show_kind
   end
 
+(* Can't declare this inside PatLogic because of need implicit module *)
+let constructor (name: string) (xs: PatLogic.t list) =
+  PatLogic.Pconstructor (!name, of_list xs)
 
 implicit module Show_lambda_nologic : (SHOW with type t = MiniLambda_Nologic.lambda)  =
   struct
@@ -1217,30 +1219,10 @@ module MiniCompile = struct
 
   let (_:PatLogic.t llist logic -> Pat.kind logic -> Tester.M.goal) = classify_line
                                                                       *)
-  (* let (_:int) = of_list *)
-  (*                     [ of_list [Pvar (!"x"); constructor "[]" llist_nil] *)
-  (*                     ; of_list [constructor "[]" llist_nil; Pany] *)
-  (*                     ] *)
-
   open ImplicitPrinters
   open MiniLambda
   open MiniLambdaHelpers
   open Value
-(*
-  let rec classify_prefix_helper expected_kind patts top bot =
-    fresh (pat_h pat_tl kind2)
-          (patts === pat_h % pat_tl)
-          (classify_line pat_h kind2)
-
-          (conde [ fresh (top2 bot2)
-                         (kind2 === expected_kind)
-                         (classify_prefix_helper expected_kind pat_tl top2 bot2)
-                         (top === pat_h % top2)
-                         (bot === bot2)
-
-                 ; (kind2 =/= expected_kind) &&& (top === llist_nil) &&& (bot === patts)
-                 ])
- *)
 
 (*  (* in this code it can't find implicit for some reason *)
   let rec classify_prefix_helper expected_kind patts top bot =
@@ -1265,47 +1247,33 @@ module MiniCompile = struct
          PatLogic.t llist llist logic ->
          _ logic -> _) = classify_prefix_helper *)
 
+  let list_cons xs h tl = xs === h%tl
+  let list_hd xs h = fresh tl (xs === h%tl)
+  let list_tail what ans = fresh (h) (what === h % ans)
+
+  let rec list_snoc x xs ans =
+    first_of
+      [ (xs === llist_nil) &&&  (ans === !< x)
+      ; fresh (h tl ans2)
+              (xs === h % tl)
+              (list_snoc x tl ans2)
+              (ans === x % ans2)
+      ]
+
+  let rec appendo a b ab =
+    conde
+      [ (a === llist_nil) &&& (b === ab)
+      ; fresh (h tl ab')
+              (list_cons a h tl)
+              (list_cons ab h ab')
+              (appendo tl b ab')
+      ]
+
   type line_t = PatLogic.t llist logic * lambda logic
   type matrix_t = line_t llist
   type vars_tuple = string llist
 
 
-(*
-  (* let (_:int) = !(PatLogic.Pconstructor (!"asdf", llist_nil)) *)
-  let lambda_hack (arg: MiniLambda.lambda logic) out =
-    conde [ (make_lconst !(Vint 1) arg) &&& (arg === out)
-          ; (arg === out)
-          ]
-
-  let rec classify_handlers handlers top_patts top_handlers bot_handlers =
-    fresh (phd ptl)
-          (top_patts === phd % ptl)
-          (conde
-             [ fresh (x x_lambda_hack)
-                     (ptl === llist_nil)
-                     (handlers === x % bot_handlers)
-                     (lambda_hack x x_lambda_hack)
-                     (top_handlers === (!< x) )
-             ; fresh (x hs top_h2 bot_h2 x_lambda_hack)
-                     (ptl =/= llist_nil)
-                     (handlers === x % hs)
-                     (lambda_hack x x_lambda_hack)
-                     (classify_handlers hs ptl top_h2 bot_h2)
-                     (top_handlers === x % top_h2)
-                     (bot_handlers === bot_h2)
-             ])
-    *)
-  (* let (_:int) = classify_handlers *)
-
-
-(*
-  let classify_prefix (patts: matrix logic) ans top bot =
-    fresh (_1stline right bot kind)
-          (patts === !(_1stline,right) % bot)
-          (classify_line _1stline kind)
-          (ans === kind)
-          (classify_prefix_helper kind patts top bot)
-    *)
   let get_line_constr_name (line: line_t logic) ans =
     fresh (pats right left others)
           (line === !(pats , right) )
@@ -1315,20 +1283,7 @@ module MiniCompile = struct
                                                     (Pconstructor (name, args))) )
                  (ans === (name: string logic))
           )
-(*
-  (* classify single line *)
-  let classify_line_t (line: line_t logic) ans =
-    fresh (pats right left others)
-          (line === !(pats, right) )
-          (pats === left % others)
-          (fresh (name args)
-                 (left === PatLogic.(embed_explicit show
-                                                    (Pconstructor (name, args))) )
-                 (ans === !( (name: string logic),
-                             (args:(PatLogic.t llist) logic),
-                             others))
-          )
- *)
+
   let rec split_constrs_by_name name matrix good bad =
     conde [ (matrix === llist_nil) &&& (good === llist_nil) &&& (bad === llist_nil)
           ; fresh (line1 matrix2 name1 good2 bad2)
@@ -1339,7 +1294,6 @@ module MiniCompile = struct
                          ; (name1 =/= name) &&& (good === good2) &&& (bad === line1%bad2)
                          ])
           ]
-  let list_cons xs h tl = xs === h%tl
 
   let pat_is_var p = fresh (name) (p === !(PatLogic.Pvar name))
   let pat_is_any p = p === !PatLogic.Pany
@@ -1423,17 +1377,16 @@ module MiniCompile = struct
           (other_pats === !(pothers,right) )
 
 
-  let top_line_is_var (matrix: matrix_t logic) dummy =
-    fresh (h tl pats right p1 pothers)
-          (matrix === h%tl)
+  let top_line_is_var (matrix: matrix_t logic) =
+    fresh (h pats right p1 pothers)
+          (top_line_of_matrix matrix h)
           (h === !(pats, right))
-          (pats === p1 % pothers)
+          (list_cons pats p1 pothers)
           (conde
              [ fresh (name1)
                      (p1 === !(PatLogic.Pvar name1))
-                     (dummy === !1)
              (* For simplicity we treat vars as _ *)
-             ; (p1 === !PatLogic.Pany) &&& (dummy === !1)
+             (* ; (p1 === !PatLogic.Pany) *)
              ])
 
   let top_line_is_any (matrix: matrix_t logic) =
@@ -1445,9 +1398,9 @@ module MiniCompile = struct
 
   let top_line_is_constant (matrix: matrix_t logic) =
     fresh (h tl pats right p1 pothers)
-          (matrix === h%tl)
+          (top_line_of_matrix matrix h)
           (h === !(pats, right))
-          (pats === p1 % pothers)
+          (list_hd pats p1)
           (fresh (c)
                  (p1 === !(PatLogic.Pconstant c)) )
 
@@ -1467,21 +1420,9 @@ module MiniCompile = struct
           (m === h%tl)
           (h === !(pats, handler) )
 
-  let list_tail what ans = fresh (h) (what === h % ans)
-  (* let tuple_tail_wtf (what: string llist logic) ans = fresh (h) (what === h % ans) *)
 
   open MiniLambdaHelpers
 
-  let appendo = Test000.appendo
-  let rec list_snoc x xs ans =
-    first_of
-      [ (xs === llist_nil) &&&  (ans === !< x)
-      ; fresh (h tl ans2)
-              (xs === h % tl)
-              (list_snoc x tl ans2)
-              (ans === x % ans2)
-      ]
-  (* let (_:int) = list_snoc *)
 (*
   type constr_collector_arg = (string logic * line_t llist logic)
   type constr_collector = constr_collector_arg llist
@@ -1607,7 +1548,7 @@ module MiniCompile = struct
           (top_line_is_constr m name)
           (extract_constrs_helper m name top bot2)
           (rework_matrix top top2)
-          (* (top === top2)  (\* the same as rework_matrix when consructors without args*\) *)
+          (* (top===top2)  (\* the same as rework_matrix when consructors without args*\) *)
           (fresh (tup_h tup_tl )
                  (tuple === tup_h % tup_tl)
                  (fix_tuple m tup_tl top_tuple)
@@ -1659,8 +1600,8 @@ module MiniCompile = struct
                      (* (compile top_tuple top_m onfail2 ans debug_ans) *)
               )
 
-      ; fresh (temp top_m bot_m onfail2 dummy )
-              (top_line_is_var m dummy)
+      ; fresh (temp top_m bot_m onfail2)
+              (top_line_is_var m)
               (cut_vars m top_m bot_m)
 
               (*
@@ -1700,16 +1641,16 @@ let _ =
   let open PatLogic in
   let (_: PatLogic.t llist logic llist logic) =
                     of_list
-                    [ of_list [Pvar (!"x"); constructor "[]" llist_nil]
-                    ; of_list [constructor "[]" llist_nil; Pany]
+                    [ of_list [Pvar (!"x");         constructor "[]" []]
+                    ; of_list [constructor "[]" []; Pany]
                     ]
   in
 
   let open MiniLambda in
   let open Value in
   let pats1 = of_list
-                [ of_list [Pvar (!"x"); constructor "[]" llist_nil], !(Lconst !(Vint 1))
-                ; of_list [constructor "[]" llist_nil;        Pany], !(Lconst !(Vint 2))
+                [ of_list [var "x";             constructor "[]" []], !(Lconst !(Vint 1))
+                ; of_list [constructor "[]" []; Pany               ], !(Lconst !(Vint 2))
                 ]
   in
 
@@ -1725,15 +1666,15 @@ let _ =
   (*                  [Pvar (!"x"); constructor "[]" llist_nil]) ); *)
 
   let pats2 = of_list
-                      [ of_list [constructor "::" llist_nil; Pany], !(Lconst !(Vint 1))
-                      ; of_list [constructor "[]" llist_nil; Pany], !(Lconst !(Vint 2))
-                      ; of_list [constructor "::" llist_nil; Pany], !(Lconst !(Vint 3))
+                      [ of_list [constructor "::" []; Pany], !(Lconst !(Vint 1))
+                      ; of_list [constructor "[]" []; Pany], !(Lconst !(Vint 2))
+                      ; of_list [constructor "::" []; Pany], !(Lconst !(Vint 3))
                       ]
   in
   let pats2_0 = of_list
-                      [ of_list [constructor "::" llist_nil], !(Lconst !(Vint 1))
-                      ; of_list [constructor "[]" llist_nil], !(Lconst !(Vint 2))
-                      ; of_list [constructor "::" llist_nil], !(Lconst !(Vint 3))
+                      [ of_list [constructor "::" []], !(Lconst !(Vint 1))
+                      ; of_list [constructor "[]" []], !(Lconst !(Vint 2))
+                      ; of_list [constructor "::" []], !(Lconst !(Vint 3))
                       ]
   in
   let the_empty_matrix : matrix_t logic = llist_nil in
@@ -1765,26 +1706,26 @@ let _ =
   in
   *)
   let example1 = of_list
-      [ of_list [constructor "[]" llist_nil;              Pany], !(Lconst !(Vint 1))
-      ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2))
-      ; of_list [ constructor "::" (of_list [var "x"; var "xs"])
-                ; constructor "::" (of_list [var "y"; var "ys"])
+      [ of_list [constructor "[]" [];                Pany], !(Lconst !(Vint 1))
+      ; of_list [Pany;                constructor "[]" []], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" [var "x"; var "xs"]
+                ; constructor "::" [var "y"; var "ys"]
                 ], !(Lconst !(Vint 3))
       ]
   in
   let example2 = of_list
       (* [  of_list [ constructor "::" (of_list [var "x"; var "xs"]) *)
       (*            ], !(Lconst !(Vint 3)) *)
-      [  of_list [ constructor "[]" (of_list [])  ], !(Lconst !(Vint 3))
+      [  of_list [ constructor "[]" []  ], !(Lconst !(Vint 3))
       (* ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2)) *)
       ; of_list [Pany], !(Lconst !(Vint 2))
       ]
   in
   let example3 = of_list
-      [ of_list [constructor "[]" llist_nil;              Pany], !(Lconst !(Vint 1))
-      ; of_list [Pany;        constructor "[]" llist_nil], !(Lconst !(Vint 2))
-      ; of_list [ constructor "::" (of_list [])
-                ; constructor "::" (of_list [])
+      [ of_list [constructor "[]" [];              Pany], !(Lconst !(Vint 1))
+      ; of_list [Pany;        constructor "[]" []], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" []
+                ; constructor "::" []
                 ], !(Lconst !(Vint 3))
       ]
   in
@@ -1794,9 +1735,14 @@ let _ =
 
   (* top-var*)
   let example4 = of_list
-      [ of_list [ var "s";        constructor "[]" llist_nil], !(Lconst !(Vint 2))
-      ; of_list [ constructor "::" (of_list [])
-                ; constructor "::" (of_list [])
+      [ of_list [ var "s";        constructor "[]" [] ], !(Lconst !(Vint 2))
+      ; of_list [ constructor "::" []; constructor "::" []  ], !(Lconst !(Vint 3))
+      ]
+  in
+
+  let example5 = of_list
+      [ of_list [ constructor "::" [var "a"; constructor "::" [var "b"; constructor "[]"[] ]]
+                ; constructor "::" []
                 ], !(Lconst !(Vint 3))
       ]
   in
