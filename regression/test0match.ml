@@ -1440,7 +1440,7 @@ module MiniCompile = struct
                                 (m: matrix_t logic)
                                 onfail
                                 (ans: lambda logic)
-                                (debug_ans: matrix_t logic)
+                                (* (debug_ans: matrix_t logic) *)
     =
     let fix_tuple m old_tuple ans =
       fresh (line1)
@@ -1465,9 +1465,9 @@ module MiniCompile = struct
                     (*         (compile top_tuple top2 ans_bot ans) *)
 
  *)
-                    ; *) fresh (ans_top ans_bot check_lam _d _d2)
-                            (compile tuple     bot2 onfail  ans_bot _d)
-                            (compile top_tuple top2 ans_bot ans_top _d2)
+                    ; *) fresh (ans_top ans_bot check_lam)
+                            (compile tuple     bot2 onfail  ans_bot)
+                            (compile top_tuple top2 ans_bot ans_top)
                             (make_lcheckconstr name tup_h check_lam)
                             (make_ifthenelse check_lam ans_top ans_bot ans)
                     ])
@@ -1475,7 +1475,7 @@ module MiniCompile = struct
 
   and compile (tuple: string llist logic) (m: matrix_t logic) onfail
               (ans: lambda logic)
-              (debug_ans: matrix_t logic)
+              (* (debug_ans: matrix_t logic) *)
     =
     (* let () = print_endline @@ *)
     (*            sprintf "compile tuple '%a' m '%a' onfail '%a'\n%!" *)
@@ -1495,8 +1495,8 @@ module MiniCompile = struct
               (cut_anys m top_m bot_m)
               (fresh (top_tuple _d1 _d2)
                      (list_tail tuple top_tuple)
-                     (compile tuple     bot_m onfail  onfail2 _d1)
-                     (compile top_tuple top_m onfail2 ans _d2)
+                     (compile tuple     bot_m onfail  onfail2)
+                     (compile top_tuple top_m onfail2 ans)
 
                      (* (compile tuple bot_m onfail ans) *)
 
@@ -1516,10 +1516,10 @@ module MiniCompile = struct
                      (compile top_tuple top_m exit_from_top what)
                      (make_simple_try what handler ans)
               ) *)
-              (fresh (top_tuple _d1 _d2)
+              (fresh (top_tuple)
                      (list_tail tuple top_tuple)
-                     (compile tuple     bot_m onfail  onfail2 _d2)
-                     (compile top_tuple top_m onfail2 ans _d1)
+                     (compile tuple     bot_m onfail  onfail2)
+                     (compile top_tuple top_m onfail2 ans)
               )
       (* (ans === !(Lconst (Vint 7777)) *)
 (*
@@ -1528,12 +1528,12 @@ module MiniCompile = struct
               (top_line_is_constant m)
               (make_lconst !(Vint 99999) ans)
  *)
-      ; fresh (name _d1)
+      ; fresh (name)
               (top_line_is_constr m name)
-              (compile_constr_prefix tuple m onfail ans _d1)
+              (compile_constr_prefix tuple m onfail ans)
 
-
-      ; (make_lconst !(Vint 1234) ans) &&& (debug_ans === m)
+      (* When all cases fail *)
+      ; (make_lconst !(Vint 1234) ans) (* &&& (debug_ans === m) *)
       ]
 
 end
@@ -1627,9 +1627,8 @@ let _ =
                 ], !(Lconst !(Vint 3))
       ]
   in
-  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example3 !(Lconst !(Vint 666))))
+  let () = run1 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example3 !(Lconst !(Vint 666))))
   in
-
 
   (* top-var*)
   let _example4 = of_list
@@ -1644,7 +1643,7 @@ let _ =
                 ], !(Lconst !(Vint 3))
       ]
   in
-  let () = run2 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example5 !(Lconst !(Vint 666))))
+  let () = run1 ~n:2 (REPR (compile (of_list ["lx";"ly"]) _example5 !(Lconst !(Vint 666))))
   in
   (* let () = run2 ~n:1 (REPR (cut_vars_verbose the_empty_matrix )) in *)
   (* let () = run2 ~n:2 (REPR (cut_vars         example4 )) in *)
