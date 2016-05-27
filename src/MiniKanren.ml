@@ -194,6 +194,7 @@ let const_not_implemented _ =   "<printer not implemented>"
 let (!) x = Value (x, const_not_implemented)
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
 (* let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show) *)
+let inj = embed
 
 let embed_explicit printer x = Value (x, printer)
 
@@ -253,6 +254,8 @@ let llist_printer v =
   in
   helper v;
   Buffer.contents b
+
+let fprintf_llist fmt ll = Format.fprintf fmt "%s" (llist_printer ll)
 
 module Show_llist_explicit (X: ImplicitPrinters.SHOW) = struct
   type t = X.t llist

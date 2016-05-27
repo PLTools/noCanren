@@ -44,6 +44,8 @@ and  'a var_desc =
 val (!) : 'a -> 'a logic
 
 val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+val inj   : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+
 val embed_explicit: ('a -> string) -> 'a -> 'a logic
 
 module Show_logic_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
@@ -78,6 +80,9 @@ val llist_nil : 'a llist logic
 
 val llist_is_empty : 'a llist -> bool
 val llist_is_empty_logic : 'a llist logic -> bool
+
+val llist_printer : 'a llist -> string
+val fprintf_llist : Format.formatter -> 'a llist -> unit
 
 (** Infix synonym for [Cons] *)
 val (%) : 'a logic -> 'a llist logic -> 'a llist logic
