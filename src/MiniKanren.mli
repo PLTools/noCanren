@@ -33,11 +33,7 @@ end
 module UnitLogger: LOGGER
 
 (** Type of typed logic variable *)
-type 'a logic = private Var of 'a var_desc | Value of 'a * ('a -> string)
-and  'a var_desc =
-  { index: int
-  ; mutable reifier: unit -> 'a logic * ('a logic list)
-  }
+type 'a logic = private Var of int * 'a logic list | Value of 'a * ('a -> string)
 
 
 (** Lifting primitive *)
@@ -62,6 +58,8 @@ val show_logic_naive : 'a logic -> string
 
 val sprintf_logic : unit -> 'a logic -> string
 val fprintf_logic : Format.formatter -> 'a logic -> unit
+val fprintf_logic_with_cs : Format.formatter -> 'a logic -> unit
+val printf_logic_with_cs : 'a logic -> unit
 
 (** Type of ligic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
@@ -210,12 +208,9 @@ module Make : functor (Logger: LOGGER) -> sig
       initial state *)
   val run : ?logger:Logger.t -> (state -> 'a) -> 'a
 
-  (** [diseq] is a type for disequality constraint *)
-  type diseq
-
   (** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
       state [s] *)
-  val refine : State.t -> 'a logic -> 'a logic * diseq
+  val refine : State.t -> 'a logic -> 'a logic
 (*
   (** [reify s x] reifies disequality constraint for a given logic variable; the result
       is a list of logic expressions, which given variable should not be equal to *)
@@ -226,9 +221,7 @@ module Make : functor (Logger: LOGGER) -> sig
   val take  : ?n:int -> State.t Stream.t -> State.t list
   val take' : ?n:int -> state Stream.t -> State.t list
 
-  type 'a logic_diseq = 'a logic list
-
-  module ApplyLatest :
+module ApplyLatest :
   sig
     val two : ('a -> ('a -> 'b) -> 'b) * ('c * 'd -> 'c * 'd)
     val three :
@@ -247,7 +240,7 @@ module Make : functor (Logger: LOGGER) -> sig
    *)
   module ConvenienceCurried :
   sig
-    type 'a reifier = int -> (Logger.t * ('a logic * 'a logic list)) list
+    type 'a reifier = (Logger.t * 'a logic) Stream.t
     type 'a almost_reifier = state Stream.t -> 'a reifier
 
     module LogicAdder :
@@ -285,21 +278,21 @@ module Make : functor (Logger: LOGGER) -> sig
         ('c logic -> 'a) -> state -> 'c logic * 'b
       end
    module Refine : sig
-      val one : State.t -> 'a logic -> 'a logic * 'a logic_diseq
+      val one : State.t -> 'a logic -> 'a logic
       val succ :
         (State.t -> 'a -> 'b) ->
-        State.t -> 'c logic * 'a -> ('c logic * 'c logic_diseq) * 'b
+        State.t -> 'c logic * 'a -> ('c logic) * 'b
    end
 
    val one :
          (('a logic -> state -> 'b) -> state -> 'a logic * 'b) *
          ('c * 'd -> 'c * 'd) *
-         (State.t -> 'e logic -> 'e logic * 'e logic_diseq)
+         (State.t -> 'e logic -> 'e logic )
    val succ :
          ('a -> state -> 'b) * ('c -> 'd * 'e) * (State.t -> 'f -> 'g) ->
          (('h logic -> 'a) -> state -> 'h logic * 'b) *
          ('i * 'c -> ('i * 'd) * 'e) *
-         (State.t -> 'j logic * 'f -> ('j logic * 'j logic_diseq) * 'g)
+         (State.t -> 'j logic * 'f -> ('j logic) * 'g)
    val run :
        ('a -> state -> 'b) * ('b -> 'c * state Stream.t) *
        (State.t -> 'c -> 'g) -> 'a -> (Logger.t * 'g) Stream.t

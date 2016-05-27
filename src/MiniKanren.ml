@@ -223,6 +223,8 @@ let fprintf_logic_with_cs ppf l =
   in
   print ppf l
 
+let printf_logic_with_cs l = fprintf_logic_with_cs Format.std_formatter l
+
 let show_logic_with_cs what =
   let b = Buffer.create 10 in
   let fmt = Format.formatter_of_buffer b in
@@ -759,13 +761,15 @@ let (=/=) x y state0 =
   type diseq = Env.t * Subst.t list
 
   (* let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c)) *)
-let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->
-  let (
+let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun st x ->
+  let (e,s,c) = st in
+
   let rec walk' env var subst =
     let var = Subst.walk env var subst in
     match Env.var env var with
     | None ->
         (match wrap (Obj.repr var) with
+         | Invalid n when n = Obj.closure_tag -> !!var
          | Unboxed _ -> !!var
          | Boxed (t, s, f) ->
             let var = Obj.dup (Obj.repr var) in
@@ -815,7 +819,7 @@ let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x 
 
   let run_ ?(logger=Logger.create()) = run ~logger
 
-
+(*
   module PolyPairs = struct
     let id x = x
 
@@ -835,7 +839,7 @@ let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x 
 
     let p sel = sel id
   end
-
+                     *)
   type 'a result = 'a logic
 (*
   let refine' : 'a . State.t -> 'a logic -> 'a result =
@@ -927,8 +931,8 @@ let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x 
         call_fresh (fun logic st -> (logic, prev (f logic) st) )
     end
     module Refine = struct
-      let one state x = refine' state x
-      let succ prev = fun state (x,y) -> (refine' state x, prev state y)
+      let one state x = refine state x
+      let succ prev = fun state (x,y) -> (refine state x, prev state y)
     end
 
     let one
@@ -957,7 +961,7 @@ let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x 
       (* printf "run finishes %s +%d\n%!" __FILE__ __LINE__; *)
       ans
 
-    let (_: (Logger.t * ((int logic * int logic_diseq) * (string logic * string logic_diseq))) Stream.t)
+    let (_: (Logger.t * (int logic * string logic)) Stream.t)
        = run (succ one) dummy_goal2
 
   end

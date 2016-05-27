@@ -191,11 +191,17 @@ let ___ () =
     let open Tester.M.ConvenienceCurried in
     run one goal1
        (fun reif ->
-        match reif 1 with
+        match Stream.take ~n:1 reif  with
         | [] -> None
-        | (_log,(ans,_)) :: _ -> Some ans
+        | (_log,ans) :: _ -> Some ans
        )
   in
   match bad_example with
   | None -> print_endline "none"
-  | Some x -> printf "%s\n%!" (show_logic_naive x)
+  | Some x ->
+     printf_logic_with_cs x;
+     printf "\n%!"
+
+let () =
+  Tester.run1 ~n:1 (REPR(fun q -> (q=/= !1)) );
+  ()

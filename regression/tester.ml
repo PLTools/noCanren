@@ -356,98 +356,57 @@ let print_title title n =
   ) @@
   printf "`%s`, %s answer%s {\n%!" title
 
-let run1 ?printer ~n (title, goal) =
+let maybe_print_graph ~title answers =
+  option_iter (list_last answers)
+    ~f:(fun (graph,_) ->
+      let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
+      let () =
+        if config.do_plain then
+          ignore @@ Logger.output_plain ~filename:(out_file_prefix^".plain") graph
+      in
+
+      if config.do_html
+      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
+
+      (* print_endline "dumping graph"; *)
+      (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
+    )
+
+let run1 ~n (title, goal) =
   print_title title n;
-  let pp = match printer with Some f -> f | None -> show_logic_naive in
   run one goal |> (fun stream ->
     let answers = Stream.take ~n stream in
     answers |> List.iter
-                 (fun (_logger, (q,_constr)) ->  printf "q=%s;\n%!" (pp q) );
-
-    option_iter (list_last answers)
-      ~f:(fun (graph,_) ->
-
-        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
-        let () =
-          if config.do_plain then
-            ignore @@ Logger.output_plain ~filename:(out_file_prefix^".plain") graph
-        in
-
-        if config.do_html
-        then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
-
-        (* print_endline "dumping graph"; *)
-        (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
-    )
-
+      (fun (_logger, q) ->
+         Format.(fprintf std_formatter) "q=%a;\n%!" fprintf_logic_with_cs q );
+    maybe_print_graph ~title answers;
   );
   printf "}\n%!"
 
-let run2 (* ?(printer:  'a logic -> string) *) ~n (title,goal) =
+let run2 ~n (title,goal) =
   print_title title n;
-  (* let pp = match printer with Some f -> f | None -> show_logic_naive in *)
-  let pp = show_logic_naive in
-  run (succ one) goal |>
-    begin fun stream ->
-      let answers = Stream.take ~n stream in
+  run (succ one) goal |> (fun stream ->
+    let answers = Stream.take ~n stream in
       answers |> List.iter
-        (fun (logger, ((q,cs1),(r,cs2))) ->
-           printf "q=%s; r=%s;\n%!" (pp q) (pp r);
-           (* let cs c name = *)
-           (*   match string_of_constraints cs1 with *)
-           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
-           (*   | None -> () *)
-           (* in *)
-           (* cs cs1 "q"; *)
-           (* cs cs2 "r"; *)
-           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
-           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
-
-           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
-
+        (fun (logger, (q,r)) ->
+           Format.(fprintf std_formatter)
+             "q=%a; r=%a;\n%!" fprintf_logic_with_cs q fprintf_logic_with_cs r;
         );
-     option_iter (list_last answers) ~f:(fun (graph,_) ->
-      if config.do_plain then
-        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
-        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
-        ();
-      if config.do_html
-      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
-    )
-
-    end;
+      maybe_print_graph ~title answers;
+  );
   printf "}\n%!"
 
 let run3 ~n (title,goal) =
   print_title title n;
-  run (succ @@ succ one) goal |>
-    begin fun stream ->
-      let answers = Stream.take ~n stream in
-      answers |> List.iter
-        (fun (logger, ((q,cs1), ((r,cs2), (s,cs3))) ) ->
-           printf "q=%s; r=%s; s=%s;\n%!" (show_logic_naive q) (show_logic_naive r)
-             (show_logic_naive s);
-           (* let cs c name = *)
-           (*   match string_of_constraints cs1 with *)
-           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
-           (*   | None -> () *)
-           (* in *)
-           (* cs cs1 "q"; *)
-           (* cs cs2 "r"; *)
-           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
-           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
-
-           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
-
-        );
-     option_iter (list_last answers) ~f:(fun (graph,_) ->
-      if config.do_plain then
-        let out_file_prefix = Str.global_replace (Str.regexp " ") "_" title in
-        let _ = Logger.output_plain ~filename:(out_file_prefix^".plain") graph in
-        ();
-      if config.do_html
-      then Logger.output_html  ~filename:(out_file_prefix^".html") [] graph;
-    )
-
-    end;
+  run (succ @@ succ one) goal |> (fun stream ->
+    let answers = Stream.take ~n stream in
+    answers |> List.iter
+      (fun (logger, (q,(r,s)) ) ->
+         Format.(fprintf std_formatter) "q=%a; r=%a; s=%a;\n%!"
+               fprintf_logic_with_cs q
+               fprintf_logic_with_cs r
+               fprintf_logic_with_cs s;
+      );
+    maybe_print_graph ~title answers;
+  );
   printf "}\n%!"
