@@ -1,34 +1,7 @@
 open Printf
 open ImplicitPrinters
 
-module Option = struct
-  type 'a t = 'a option
-  let (>>=) x f = match x with Some x -> f x | None -> None
-  let return x = Some x
-
-  let iter ~f = function Some x -> f x; () | None -> ()
-  let map ~f ~default = function Some x -> f x | None -> default
-end
-
-module List = struct
-  include List
-
-  let all_same ~f = function
-    |[] -> true
-    | x::xs ->
-       let first = f x in
-       List.for_all (fun y -> f y = first) xs
-
-  let take ~n xs = ExtList.List.take n xs
-  let split_nth ~n xs = ExtList.List.split_nth n xs
-  let skip ~n = ExtList.List.drop n
-  let fold_left ~f ~init xs = List.fold_left f init xs
-  let hd_exn = List.hd
-  let init = ExtList.List.init
-  let map = ListLabels.map
-end
-
-let fst3 (x,_,_) = x
+open MiniHelpers
 
 module Value = struct
   type t = Vint of int
@@ -1161,28 +1134,6 @@ module MiniCompile = struct
          PatLogic.t llist llist logic ->
          PatLogic.t llist llist logic ->
          _ logic -> _) = classify_prefix_helper *)
-
-  let list_cons xs h tl = xs === h%tl
-  let list_hd xs h = fresh tl (xs === h%tl)
-  let list_tail what ans = fresh (h) (what === h % ans)
-
-  let rec list_snoc x xs ans =
-    first_of
-      [ (xs === llist_nil) &&&  (ans === !< x)
-      ; fresh (h tl ans2)
-              (xs === h % tl)
-              (list_snoc x tl ans2)
-              (ans === x % ans2)
-      ]
-
-  let rec appendo a b ab =
-    conde
-      [ (a === llist_nil) &&& (b === ab)
-      ; fresh (h tl ab')
-              (list_cons a h tl)
-              (list_cons ab h ab')
-              (appendo tl b ab')
-      ]
 
   type line_t = PatLogic.t llist logic * lambda logic
   type matrix_t = line_t llist
