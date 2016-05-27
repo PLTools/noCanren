@@ -216,11 +216,11 @@ module Make : functor (Logger: LOGGER) -> sig
   (** [refine s x] refines a logical variable [x] (created with [fresh]) w.r.t.
       state [s] *)
   val refine : State.t -> 'a logic -> 'a logic * diseq
-
+(*
   (** [reify s x] reifies disequality constraint for a given logic variable; the result
       is a list of logic expressions, which given variable should not be equal to *)
   val reify : diseq -> 'a logic -> 'a logic list
-
+                                   &*)
   (** [take ?(n=k) s] takes at most [k] first answers from the lazy
       stream [s] (reexported from MKStream for convenience) *)
   val take  : ?n:int -> State.t Stream.t -> State.t list

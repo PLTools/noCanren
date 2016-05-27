@@ -180,15 +180,9 @@ let logf fmt =
 
 let (!!) = Obj.magic
 
-type 'a logic = Var of 'a var_desc | Value of 'a * ('a -> string)
-and 'a var_desc =
-  { index: int
-  ; mutable reifier: unit -> 'a logic * 'a logic list
-  }
+type 'a logic = Var of int * 'a logic list | Value of 'a * ('a -> string)
 
-let var_of_int index =
-  let rec ans = Var { index; reifier=fun () -> (ans,[]) } in
-  ans
+let var_of_int index = Var (index, [])
 
 let const_not_implemented _ =   "<printer not implemented>"
 let (!) x = Value (x, const_not_implemented)
@@ -199,24 +193,46 @@ let inj = embed
 let embed_explicit printer x = Value (x, printer)
 
 module Show_logic_explicit (X : ImplicitPrinters.SHOW) = struct
-    type t = X.t logic
-    let show l =
-      match l with
-      | Var {index; _} -> sprintf "_.%d" index
-      | Value (x,_) -> X.show x
+  type t = X.t logic
+
+   let show l =
+    match l with
+    | Var (index,_) -> sprintf "_.%d" index
+    | Value (x,_) -> X.show x
+
 end
 
-implicit module Show_logic {X : ImplicitPrinters.SHOW} = struct
-    type t = X.t logic
-    let show l =
-      match l with
-      | Var {index; _} -> sprintf "_.%d" index
-      | Value (x,_) -> X.show x
+implicit module Show_logic {X : ImplicitPrinters.SHOW} =
+struct
+  type t = X.t logic
+  let show l =
+    let module P = Show_logic_explicit(X) in
+    P.show l
 end
+
+let fprintf_logic_with_cs ppf l =
+  let open Format in
+  let rec print ppf l =
+    match l with
+    | Var (n,[]) -> fprintf ppf "_.%d" n
+    | Var (n, cs) ->
+       fprintf ppf "_.%d [=/=" n;
+       List.iter (fun l -> fprintf ppf " "; print ppf l) cs;
+       fprintf ppf "]"
+    | Value (s, f) -> fprintf ppf "%s" (f s)
+  in
+  print ppf l
+
+let show_logic_with_cs what =
+  let b = Buffer.create 10 in
+  let fmt = Format.formatter_of_buffer b in
+  fprintf_logic_with_cs fmt what;
+  Format.pp_print_flush fmt ();
+  Buffer.contents b
 
 let show_logic_naive =
   function
-  | Var {index;_} -> sprintf "_.%d" index
+  | Var (index,_) -> sprintf "_.%d" index
   | Value (x,printer) ->
     (* TODO: add assert that printer is a function *)
     (* but fix js_of_ocaml before doing that *)
@@ -247,7 +263,7 @@ let llist_printer v =
         Buffer.add_string b (show_logic_naive h);
         Buffer.add_string b " :: ";
         match tl with
-        | Var n -> Buffer.add_string b (show_logic_naive tl)
+        | Var _ -> Buffer.add_string b (show_logic_naive tl)
         | Value (v,pr) -> Buffer.add_string b (pr v)
       end
     | Nil -> Buffer.add_string b "[]"
@@ -352,7 +368,7 @@ module Env :
 
     let show env =
       let f = function
-        | (Var {index=i;_}) as v -> sprintf "_.%d (%d); " i (Hashtbl.hash v)
+        | (Var (i,_)) as v -> sprintf "_.%d (%d); " i (Hashtbl.hash v)
         | Value _ -> assert false
       in
       sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
@@ -361,7 +377,8 @@ module Env :
     let empty () = (H.create 1024, counter_start)
 
     let fresh (h, current) =
-      let rec v = Var {index=current; reifier=fun () -> (v,[]) } in
+      (* let rec v = Var {index=current; reifier=fun () -> (v,[]) } in *)
+      let v = Var (current,[]) in
       H.add h v ();
       assert (H.mem h v);
       (* assert (H.mem h !!(Var current)); *)
@@ -371,12 +388,10 @@ module Env :
       (* printf "calling Env.var when x='%s'\n%!" (generic_show x); *)
       if H.mem h (!! x)
       then
-        (* let () = print_endline "a member" in *)
         match !!x with
-           | Var {index;_} -> Some index
-           | Value _ -> failwith "Value _ should not get to the environment"
+        | Var (index,_) -> Some index
+        | Value _ -> failwith "Value _ should not get to the environment"
       else
-        (* let () = print_endline "None" in *)
         None
 
   end
@@ -743,14 +758,52 @@ let (=/=) x y state0 =
 
   type diseq = Env.t * Subst.t list
 
-  let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c))
+  (* let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c)) *)
+let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->
+  let (
+  let rec walk' env var subst =
+    let var = Subst.walk env var subst in
+    match Env.var env var with
+    | None ->
+        (match wrap (Obj.repr var) with
+         | Unboxed _ -> !!var
+         | Boxed (t, s, f) ->
+            let var = Obj.dup (Obj.repr var) in
+            let sf =
+              if t = Obj.double_array_tag
+              then !! Obj.set_double_field
+              else Obj.set_field
+            in
+            for i = 0 to s - 1 do
+              sf var i (!!(walk' env (!!(f i)) subst))
+           done;
+           !!var
+         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
+        )
+    | Some i ->
+        (match var with
+         | Var (i, _) ->
+            let cs =
+	      List.fold_left
+		(fun acc s ->
+		   match Subst.walk' env (!!var) s with
+		   | Var (j, _) when i = j -> acc
+		   | t -> (refine st t) :: acc
+		)
+		[]
+		c
+	    in
+	    Var (i, cs)
+        )
+  in
+  walk' e (!!x) s
 
   let reify (env, dcs) = function
-    | (Var xi) as v ->
+    | (Var (xi,_)) as v ->
        List.fold_left
          (fun acc s ->
           match Subst.walk' env (!!v) s with
-          | Var yi when yi == xi -> acc
+          | Var (yi,_) when yi == xi -> acc
           | t -> t :: acc
          )
          []
@@ -767,30 +820,29 @@ let (=/=) x y state0 =
     let id x = x
 
     let find_value var st = refine st var
-    let mapper var = fun stream n -> List.map (find_value var) (take' ~n stream)
+    let mapper var = fun stream -> Stream.map (find_value var) stream
 
-    type 'a reifier = int -> ('a logic * diseq) list
+    type 'a reifier = 'a logic Stream.t
 
     let one: ('a reifier -> 'b) -> state Stream.t -> 'a logic -> 'b =
       fun k stream var -> k (mapper var stream)
     let succ prev k = fun stream var -> prev  (fun v -> k (mapper var stream, v)) stream
 
-    let (_: state Stream.t ->
-         'a logic ->
-         'b logic ->
-         ('a reifier) * ('b reifier) ) = (succ one) id
+    (* let (_: state Stream.t -> *)
+    (*      'a logic -> *)
+    (*      'b logic -> *)
+    (*      ('a reifier) * ('b reifier) ) = (succ one) id *)
 
     let p sel = sel id
   end
 
-  type 'a logic_diseq = 'a logic list
-  type 'a result = 'a logic * 'a logic_diseq
-
+  type 'a result = 'a logic
+(*
   let refine' : 'a . State.t -> 'a logic -> 'a result =
     fun ((e, s, c)as st) x ->
       (* printf "calling refine' for state %s\n%!" (State.show st); *)
       (Subst.walk' e (!!x) s, reify (e, c) x)
-
+      *)
   let (dummy_goal2: int logic -> string logic -> goal) = fun _ _ _   -> Obj.magic ()
 
   module ExtractDeepest = struct
@@ -832,16 +884,14 @@ let (=/=) x y state0 =
   module MyUncurry = struct
     let succ k f (x,y) = k (f x) y
     let uncurry1 = (@@)
-    (* let uncurry2 = succ uncurry1 *)
-    (* let uncurry3 = succ uncurry2 *)
   end
 
   module ConvenienceCurried = struct
-    type 'a reifier = int -> (Logger.t * 'a result) list
+    type 'a reifier = (Logger.t * 'a logic) Stream.t
     type 'a almost_reifier = state Stream.t -> 'a reifier
 
-    let reifier : 'a logic -> 'a almost_reifier = fun x ans n ->
-      List.map (fun (st,root,_) -> (root, refine' st x) ) (take ~n ans)
+    let reifier : 'a logic -> 'a almost_reifier = fun x ans ->
+      Stream.map (fun (st,root,_) -> (root, refine st x) ) ans
 
     module LogicAdder = struct
       (* allows to add new logic variables to function *)
