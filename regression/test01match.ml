@@ -6,18 +6,22 @@ open MiniHelpers
 
 let (!) = inj
 
+let good_cname name = (name === !"A") ||| (name === !"B")
+
 module Value = struct
-  type t = V0 | V1 of t llist logic | V2 of t llist logic
+  type t = VC of string logic * t llist logic
 
   open Format
 
   let print ppf root =
     let rec helper = function
-      | V0 -> fprintf ppf "V0"
-      | V1 xs when llist_is_empty_logic xs -> fprintf ppf "V1"
-      | V1 xs -> fprintf ppf "V1 (%a)" fprintf_logic xs
-      | V2 xs when llist_is_empty_logic xs -> fprintf ppf "V2"
-      | V2 xs -> fprintf ppf "V2 (%a)" fprintf_logic xs
+      | VC (name,xs) when llist_is_empty_logic xs -> fprintf ppf "%a" fprintf_logic name
+      | VC (name,xs) -> fprintf ppf "%a (%a)" fprintf_logic name fprintf_logic xs
+      (* | V0 -> fprintf ppf "V0" *)
+      (* | V1 xs when llist_is_empty_logic xs -> fprintf ppf "V1" *)
+      (* | V1 xs -> fprintf ppf "V1 (%a)" fprintf_logic xs *)
+      (* | V2 xs when llist_is_empty_logic xs -> fprintf ppf "V2" *)
+      (* | V2 xs -> fprintf ppf "V2 (%a)" fprintf_logic xs *)
     in
     helper root
 end
@@ -32,12 +36,15 @@ implicit module Show_value : (SHOW with type t = Value.t) = struct
     Buffer.contents b
 end
 
+let empty_value name = !(Value.VC (!name, llist_nil))
+let make_value name xs = (Value.VC (!name, of_list xs))
+
 module Pat = struct
   type t =
     | Pany
     | Pvar of string logic
-    | PC0
-    | PC1 of t llist logic | PC2 of t llist logic
+    | PC of string logic * t llist logic
+    (* | PC1 of t llist logic | PC2 of t llist logic *)
 
   open Format
 
@@ -45,11 +52,9 @@ module Pat = struct
     let rec helper = function
       | Pany -> fprintf ppf "_"
       | Pvar s -> fprintf ppf "\"%a\"" fprintf_logic s
-      | PC0 -> fprintf ppf "PC0"
-      | PC1 xs when llist_is_empty_logic xs -> fprintf ppf "PC1"
-      | PC1 xs -> fprintf ppf "PC1 (%a)" fprintf_logic xs
-      | PC2 xs when llist_is_empty_logic xs -> fprintf ppf "PC2"
-      | PC2 xs -> fprintf ppf "PC2 (%a)" fprintf_logic xs
+      | PC (name,xs) when llist_is_empty_logic xs -> fprintf ppf "%a" fprintf_logic name
+      | PC (name,xs) -> fprintf ppf "%a (%a)" fprintf_logic name fprintf_logic xs
+
     in
     helper root
 end
@@ -63,6 +68,8 @@ implicit module Show_pat : (SHOW with type t = Pat.t) = struct
     Format.pp_print_flush fmt ();
     Buffer.contents b
 end
+
+let make_pat name args = Pat.PC (!name, of_list args)
 
 module Subst = struct
   type t = Bottom | Smth of ((string logic) * Value.t logic ) llist logic
@@ -104,9 +111,23 @@ let subs_extendo name what base ans =
             (ans  === !(Smth temp) )
     ]
 
-let extract_args_V1 what ans = what === !(Value.V1 ans)
+let extract_args_V1 what name args = what === !(Value.VC (name,args))
 
-open Pat
+let subs_uniono (s1: Subst.t logic) (s2: Subst.t logic) ans =
+  let open Subst in
+  conde
+    [ (s1 === bottom) &&& (ans === bottom)
+    ; (s2 === bottom) &&& (ans === bottom)
+    ; fresh (xs ys ans0)
+            (s1 === !(Smth xs))
+            (s2 === !(Smth ys))
+            (appendo xs ys ans0)
+            (ans === !(Smth ans0))
+    ]
+
+let subs_uniono_helper s1 s2 ans st =
+  print_endline "uniono helper";
+  subs_uniono s1 s2 ans st
 
 let rec my_combine (xs:Value.t llist logic) (ys: Pat.t llist logic) ans =
   fresh (hx tx hy ty temp)
@@ -115,11 +136,22 @@ let rec my_combine (xs:Value.t llist logic) (ys: Pat.t llist logic) ans =
         (my_combine tx ty temp)
         (ans === !(hx,hy) % temp)
 
-let rec evalo what patts ans =
+let rec folder (acc: Subst.t logic) (x: (Value.t logic * Pat.t logic) logic) ans =
+    conde
+      [ (acc === bottom) &&& (ans === bottom)
+      ; fresh (v p ans0)
+              (x === !(v,p))
+              (evalo v !<p ans0)
+              (conde
+                 [ (ans0 === bottom) &&& (ans === bottom)
+                 ; (ans0 =/= bottom) &&& (subs_uniono_helper ans0 acc ans)
+                 ])]
+
+
+and evalo what patts ans =
   let open Value in
-  let folder (acc: Subst.t logic) (x: (Value.t logic * Pat.t logic) logic) ans =
-    (ans === acc)
-  in
+  let open Pat in
+
 
   conde
     [ (patts === llist_nil) &&& (ans === bottom)
@@ -130,7 +162,7 @@ let rec evalo what patts ans =
                ; fresh (name)
                        (p1 === !(Pvar name))
                        (subs_make name what ans)
-               ; (p1 === !PC0) &&&
+(*               ; (p1 === !PC0) &&&
                    (conde
                       [ (what === !V0) &&& (ans === !Subst.empty)
                       ; (what =/= !V0) &&& (ans === bottom)
@@ -139,30 +171,28 @@ let rec evalo what patts ans =
                    (conde
                       [ (what === !(V1 llist_nil)) &&& (ans === !Subst.empty)
                       ; (what =/= !(V1 llist_nil)) &&& (ans === bottom)
-                      ])
+                      ]) *)
 
 
-               ; fresh (ps vs pairs rez)
-                       (p1 === !(PC1 ps))
-                       (what === !(Value.V1 vs))
-                       (my_combine vs ps pairs)
-                       (foldo folder !Subst.empty pairs rez)
+               ; fresh (name ps vs pairs rez)
+                       (p1 === !(PC (name,ps)) )
+                       (what === !(VC (name,vs)) )
                        (conde
-                          [ (rez === bottom) &&& (evalo what pothers ans)
-                          ; (rez =/= bottom) &&& (ans === rez)
+                          [ (ps === llist_nil) &&& (vs=== llist_nil) &&& (ans === !Subst.empty)
+                          ; fresh (_X)
+                              (my_combine vs ps pairs)
+                              (foldo folder !Subst.empty pairs rez)
+                              (conde
+                                 [ (rez === bottom) &&& (evalo what pothers ans)
+                                 ; (rez =/= bottom) &&& (ans === rez)
+                                 ])
                           ])
 
 
                ])
     ]
 
-
-(*
-
- let check_pats: patts list -> Value.t option
-
-
- *)
+let make_empty_constr name = Pat.PC(!name, llist_nil)
 
 let _ =
   let open Tester.M.ConvenienceCurried in
@@ -175,11 +205,24 @@ let _ =
   in
 
   let open Value in
-  wrap !V0               (of_list [ Pany; PC0 ]);
-  wrap !V0               (of_list [ Pvar !"x"; PC0 ]);
-  wrap !(V1 (of_list[])) (of_list [ PC0 ]);
-  wrap2 (of_list [ Pvar !"x"; PC0 ]);
-  wrap2 (of_list [ PC0 ]);
+  let open Pat in
+  wrap (empty_value "A")            (of_list [ Pany;      make_empty_constr "xx" ]);
+  wrap (empty_value "B")            (of_list [ Pvar !"x"; make_empty_constr "B" ]);
+  wrap (empty_value "A")            (of_list [ make_empty_constr "A" ]);
+  Tester.run1 ~n:1 (REPR(evalo
+                           !(make_value  "A" [make_value "B" []])
+                           (of_list [make_pat  "A" [make_pat "B" []] ])
+                        ));
+  ;
+  Tester.run1 ~n:1 (REPR(evalo
+                           !(make_value  "A" [])
+                           (of_list [make_pat  "A" [] ])
+                        ));
+  ;
+  (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ Pat.Pvar !"x"; make_empty_constr "A" ]) bottom)); *)
+  (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ make_empty_constr "A" ]) bottom)); *)
+  (* Tester.run1 ~n:1 (REPR(fun q -> folder !Subst.empty  !( !(make_value "A" []), !(make_empty_constr "A")) q)); *)
+  (* Tester.run1 ~n:1 (REPR(fun q -> folder !Subst.empty  !( !(make_value "A" [make_value "C" []]), !(make_pat "A" [make_pat "C" []])) q)); *)
   ()
 
 
@@ -202,6 +245,6 @@ let ___ () =
      printf_logic_with_cs x;
      printf "\n%!"
 
-let () =
-  Tester.run1 ~n:1 (REPR(fun q -> (q=/= !1)) );
-  ()
+(* let () = *)
+(*   Tester.run1 ~n:1 (REPR(fun q -> (q=/= !1)) ); *)
+(*   () *)
