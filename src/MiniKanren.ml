@@ -212,13 +212,14 @@ end
 
 let fprintf_logic_with_cs ppf l =
   let open Format in
+  (* constraints are inside {{ ... }} *)
   let rec print ppf l =
     match l with
     | Var (n,[]) -> fprintf ppf "_.%d" n
     | Var (n, cs) ->
-       fprintf ppf "_.%d [=/=" n;
+       fprintf ppf "_.%d {{=/=" n;
        List.iter (fun l -> fprintf ppf " "; print ppf l) cs;
-       fprintf ppf "]"
+       fprintf ppf "}}"
     | Value (s, f) -> fprintf ppf "%s" (f s)
   in
   print ppf l
@@ -259,13 +260,13 @@ let llist_printer v =
   let rec helper = function
     | Cons (h, tl) when llist_is_empty_logic tl ->
        Buffer.add_string b "[";
-       Buffer.add_string b (show_logic_naive h);
+       Buffer.add_string b (show_logic_with_cs h);
        Buffer.add_string b "]"
     | Cons (h,tl) -> begin
-        Buffer.add_string b (show_logic_naive h);
+        Buffer.add_string b (show_logic_with_cs h);
         Buffer.add_string b " :: ";
         match tl with
-        | Var _ -> Buffer.add_string b (show_logic_naive tl)
+        | Var _ -> Buffer.add_string b (show_logic_with_cs tl)
         | Value (v,pr) -> Buffer.add_string b (pr v)
       end
     | Nil -> Buffer.add_string b "[]"
