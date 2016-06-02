@@ -694,6 +694,9 @@ let (=/=) x y state0 =
   let string_of_prefixes xs =
     String.concat "; " @@ List.map (fun (x,y,z) -> sprintf "(%d,'%s','%s')" x (generic_show !!y) (generic_show !!z) ) xs
   in
+  let show_subst_list ss =
+    sprintf "{{%s}}" (String.concat "; " @@ List.map Subst.show ss)
+  in
   try
     match Subst.unify env x y (Some subst) with
     | (_,None) ->
@@ -706,8 +709,16 @@ let (=/=) x y state0 =
              let () = make_leaf (sprintf "Unified but prefix is empty (subst: %s)" (Subst.show s) ) state1 in
              Stream.nil
          | _  ->
-             let () = make_leaf (sprintf "Adding new answer (%s) with constraints: [%s]" (Subst.show subst) (string_of_prefixes prefix)) state1 in
-             Stream.cons ((env, subst, normalize_store prefix constr),root,l) Stream.nil
+            let constr2 = normalize_store prefix constr in
+            let () = make_leaf
+                       (sprintf "Adding new answer (%s) with constraints: [%s]"
+                                (Subst.show subst)
+                                (* (string_of_prefixes constr) *)
+                                (show_subst_list constr2)
+                       )
+                       state1
+            in
+            Stream.cons ((env, subst, constr2),root,l) Stream.nil
         )
   with Occurs_check ->
     let () = make_leaf (sprintf "Occurs_check failed") state1 in
