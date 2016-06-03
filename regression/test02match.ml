@@ -24,19 +24,21 @@ module Value = struct
     helper root
 end
 
+let print_as_format print what =
+  let b = Buffer.create 10 in
+  let fmt = Format.formatter_of_buffer b in
+  print fmt what;
+  Format.pp_print_flush fmt ();
+  Buffer.contents b
+
 implicit module Show_value : (SHOW with type t = Value.t) = struct
   type t = Value.t
-  let show what =
-    let b = Buffer.create 10 in
-    let fmt = Format.formatter_of_buffer b in
-    Value.print fmt what;
-    Format.pp_print_flush fmt ();
-    Buffer.contents b
+  let show what = print_as_format Value.print what
 end
 
 let empty_value name = !(Value.VC (!name, llist_nil))
 let make_value name xs = (Value.VC (!name, of_list xs))
-let make_int n = (Value.VInt !n)
+let make_vint n = Value.VInt !n
 
 module Pat = struct
   type t =
@@ -70,8 +72,7 @@ end
 
 let make_pat name args = Pat.PC (!name, of_list args)
 let make_pvar name = Pat.PVar !name
-let make_int_pat n = Pat.PInt (!n)
-
+let make_pint n = Pat.PInt !n
 
 module Subst = struct
   type t = Bottom | Smth of ((string logic) * Value.t logic ) llist logic
@@ -85,7 +86,6 @@ module Subst = struct
     helper root
 
   let empty : t = Smth llist_nil
-
 end
 
 implicit module Show_subst : (SHOW with type t = Subst.t) =
@@ -104,6 +104,39 @@ let subs_make (name: string logic) (what: Value.t logic) (ans: Subst.t logic) =
   ans === !(Subst.Smth ( !(name,what) % llist_nil))
 
 let subs_empty = !(Subst.Smth llist_nil)
+
+
+module Expr = struct
+  type 'a t =
+    | EGET : Value.t logic * Value.t logic -> bool t (* greater or equal *)
+    | ELT  : Value.t logic * Value.t logic -> bool t (* less than *)
+    | EVar : string logic -> 'a t
+    | EInt : int logic -> int t
+
+  let print : type a . Format.formatter -> a t -> unit = fun ppf root ->
+    let open Format in
+    let prl = fprintf_logic_with_cs in
+    let rec helper : type a. a t -> unit = function
+      | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r
+      | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r
+      | EVar x     -> fprintf ppf "(EVar %a)" prl x
+      | EInt n     -> fprintf ppf "(EInt %a)" prl n
+    in
+    helper root
+end
+
+implicit module Show_expr {X:SHOW} : (SHOW with type t = X.t Expr.t) = struct
+  type t = X.t Expr.t
+  let show what = print_as_format Expr.print what
+end
+
+let make_ge l r = Expr.(EGET (l,r))
+let make_lt l r = Expr.(ELT  (l,r))
+let make_evar name = Expr.(EVar !name)
+let make_eint n = Expr.(EInt !n)
+
+let rec evalo_expr subs e ans =
+  (ans === !(make_vint 5))
 
 let subs_extendo name what base ans =
   let open Subst in
@@ -229,15 +262,15 @@ let _ =
                         ));
   ;
   Tester.run1 ~n:1 (REPR(evalo
-                           !(make_int 5)
+                           !(make_vint 5)
                            (of_list [make_pvar "a"])
                         ));
   ;
-  Tester.run1 ~n:1 (REPR(evalo !(make_int 5) (of_list [make_int_pat 5]) ));
-  Tester.run1 ~n:1 (REPR(evalo !(make_int 5) (of_list [make_int_pat 6]) ));
+  Tester.run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5]) ));
+  Tester.run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6]) ));
 
-  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_int_pat 5) bottom));
-  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_int_pat 5) subs_empty));
+  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) bottom));
+  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) subs_empty));
   (* Tester.run2 ~n:3 (REPR(wat1)); *)
 
   (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ Pat.PVar !"x"; make_empty_constr "A" ]) bottom)); *)
