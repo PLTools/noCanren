@@ -166,7 +166,11 @@ let rec pamk_e mapper e : expression =
   | Pexp_sequence (e1, e2) ->
      {e with pexp_desc=Pexp_sequence(mapper.expr mapper e1,mapper.expr mapper e2) }
   | Pexp_open (_flag, _loc, ee) ->
-    { e with pexp_desc=Pexp_open (_flag, _loc, mapper.expr mapper ee) }
+     { e with pexp_desc=Pexp_open (_flag, _loc, mapper.expr mapper ee) }
+  | Pexp_newtype (name, ee) ->
+     { e with pexp_desc=Pexp_newtype(name, mapper.expr mapper ee) }
+  | Pexp_constraint (ee,t) ->
+     { e with pexp_desc=Pexp_constraint(mapper.expr mapper ee, t) }
   (* TODO: support all cases *)
   | _ -> e
 

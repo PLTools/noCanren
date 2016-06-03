@@ -75,7 +75,8 @@ let make_pvar name = Pat.PVar !name
 let make_pint n = Pat.PInt !n
 
 module Subst = struct
-  type t = Bottom | Smth of ((string logic) * Value.t logic ) llist logic
+  type lst = ((string logic) * Value.t logic ) llist
+  type t = Bottom | Smth of lst logic
 
   let print ppf root =
     let open Format in
@@ -105,22 +106,48 @@ let subs_make (name: string logic) (what: Value.t logic) (ans: Subst.t logic) =
 
 let subs_empty = !(Subst.Smth llist_nil)
 
+let subs_assoco name subs (ans: Value.t logic option logic) =
+  let open Subst in
+
+  let rec helper (xs: Subst.lst logic) ans =
+    conde [ (xs === llist_nil) &&& (ans === !None)
+          ; fresh (h tl name2 v2)
+                  (list_cons xs h tl)
+                  (h === !(name2, v2))
+                  (conde [ (name===name2) &&& (ans === !(Some v2))
+                         ; (name=/=name2) &&& (helper tl ans)
+                         ])
+          ]
+  in
+
+  conde
+    [ (subs === bottom) &&& (ans === !None)
+    ; fresh (xs s1 v1)
+        (subs === !(Smth xs))
+        (helper xs ans)
+    ]
 
 module Expr = struct
-  type 'a t =
-    | EGET : Value.t logic * Value.t logic -> bool t (* greater or equal *)
-    | ELT  : Value.t logic * Value.t logic -> bool t (* less than *)
-    | EVar : string logic -> 'a t
+  type _ t =
+    (* | EGET : Value.t logic * Value.t logic -> bool t (\* greater or equal *\) *)
+    (* | ELT  : Value.t logic * Value.t logic -> bool t (\* less than *\) *)
+    | EEQ  : Value.t logic * Value.t logic -> int t
+    | ENEQ : Value.t logic * Value.t logic -> int t
+    | EVar : string logic -> int t
     | EInt : int logic -> int t
+    (* | EBool: bool logic -> int t *)
 
   let print : type a . Format.formatter -> a t -> unit = fun ppf root ->
     let open Format in
     let prl = fprintf_logic_with_cs in
     let rec helper : type a. a t -> unit = function
-      | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r
-      | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r
+      (* | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r *)
+      (* | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r *)
+      | EEQ  (l,r) -> fprintf ppf "(%a=%a)" prl l prl r
+      | ENEQ (l,r) -> fprintf ppf "(%a<>%a)"  prl l prl r
       | EVar x     -> fprintf ppf "(EVar %a)" prl x
-      | EInt n     -> fprintf ppf "(EInt %a)" prl n
+      | EInt n     -> fprintf ppf "(EInt  %a)" prl n
+      (* | EBool b    -> fprintf ppf "(EBool %a)" prl b *)
     in
     helper root
 end
@@ -130,13 +157,50 @@ implicit module Show_expr {X:SHOW} : (SHOW with type t = X.t Expr.t) = struct
   let show what = print_as_format Expr.print what
 end
 
-let make_ge l r = Expr.(EGET (l,r))
-let make_lt l r = Expr.(ELT  (l,r))
+(* let make_ge l r = Expr.(EGET (l,r)) *)
+(* let make_lt l r = Expr.(ELT  (l,r)) *)
+let make_eeq  l r = Expr.(EEQ  (l,r))
+let make_ebeq l r = Expr.(ENEQ (l,r))
 let make_evar name = Expr.(EVar !name)
 let make_eint n = Expr.(EInt !n)
+let etrue  = !Expr.(EInt !1)
+let efalse = !Expr.(EInt !0)
 
-let rec evalo_expr subs e ans =
-  (ans === !(make_vint 5))
+let rec evalo_expr : (Subst.t logic) -> int Expr.t logic -> (Value.t) logic -> goal =
+  fun subs e ans ->
+  let open Expr in
+  let open Value in
+  conde
+    [ fresh (n)
+            (e === !(EInt n))
+            (ans === !(VInt n))
+    ; fresh (name maybe_ans)
+            (e === !(EVar name))
+            (subs_assoco name subs maybe_ans)
+            (maybe_ans === !(Some ans))
+    ; fresh (l r ansl ansr)
+            (e === !(EEQ (l,r)) )
+            (conde
+               [ fresh (m n)
+                       (l === !(VInt m))
+                       (r === !(VInt n))
+                       (conde
+                          [ (m===n) &&& (ans === !(VInt !1))
+                          ; (m=/=n) &&& (ans === !(VInt !0))
+                          ])
+               ])
+    ; fresh (l r ansl ansr)
+            (e === !(ENEQ (l,r)) )
+            (conde
+               [ fresh (m n)
+                       (l === !(VInt m))
+                       (r === !(VInt n))
+                       (conde
+                          [ (m===n) &&& (ans === !(VInt !0))
+                          ; (m=/=n) &&& (ans === !(VInt !1))
+                          ])
+               ])
+    ]
 
 let subs_extendo name what base ans =
   let open Subst in
@@ -248,29 +312,45 @@ let _ =
 
   let open Value in
   let open Pat in
+  let run1 = Tester.run1 in
+
   wrap (empty_value "A")            (of_list [ PAny;      make_empty_constr "xx" ]);
   wrap (empty_value "B")            (of_list [ PVar !"x"; make_empty_constr "B" ]);
   wrap (empty_value "A")            (of_list [ make_empty_constr "A" ]);
-  Tester.run1 ~n:1 (REPR(evalo
+  run1 ~n:1 (REPR(evalo
                            !(make_value  "A" [make_value "B" []])
                            (of_list [make_pat  "A" [make_pat "B" []] ])
                         ));
-  ;
-  Tester.run1 ~n:1 (REPR(evalo
+  run1 ~n:1 (REPR(evalo
                            !(make_value  "A" [])
                            (of_list [make_pat  "A" [] ])
                         ));
-  ;
-  Tester.run1 ~n:1 (REPR(evalo
+  run1 ~n:1 (REPR(evalo
                            !(make_vint 5)
                            (of_list [make_pvar "a"])
                         ));
-  ;
-  Tester.run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5]) ));
-  Tester.run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6]) ));
 
-  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) bottom));
-  Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) subs_empty));
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5]) ));
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6]) ));
+
+  run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) bottom));
+  run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) subs_empty));
+
+  run1 ~n:1 (REPR(subs_assoco !"abc" bottom));
+  run1 ~n:1 (REPR(subs_assoco !"abc" !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) ));
+  run1 ~n:1 (REPR(subs_assoco !"x"   !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) ));
+  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
+                              !(make_evar "x")
+                 ));
+  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
+                              !(make_eeq !(make_vint 1) !(make_vint 1))
+                 ));
+  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
+                              !(make_eeq !(make_vint 1) !(make_vint 2))
+                 ));
+
+
+
   (* Tester.run2 ~n:3 (REPR(wat1)); *)
 
   (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ Pat.PVar !"x"; make_empty_constr "A" ]) bottom)); *)
