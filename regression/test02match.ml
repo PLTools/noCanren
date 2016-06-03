@@ -241,6 +241,26 @@ let rec my_combine (xs:Value.t llist logic) (ys: Pat.t llist logic) ans =
         (my_combine tx ty temp)
         (ans === !(hx,hy) % temp)
 
+
+let rec wtf_term_check (ps: int llist logic)
+                       (ans: (int logic * int logic option) logic) =
+  fresh (h tl)
+        (ps === h%tl)
+        (ans === !(h, (None: int logic option)) )
+
+
+let rec noguard (ps: Pat.t llist logic) (ans: (Pat.t logic * Expr.t logic option logic) llist logic) =
+  conde
+    [ (ps===llist_nil) &&& (ans === llist_nil)
+    ; call_fresh (fun (h: Pat.t logic) ->
+          fresh (tl ans2 wtf)
+            (list_cons ps h tl)
+            (noguard tl ans2)
+            (wtf === !(h, !(None: Expr.t logic option)))
+            (ans === wtf % ans2)
+        )
+    ]
+
 let rec folder (acc: Subst.t logic) (x: (Value.t logic * Pat.t logic) logic) ans =
     conde
       [ (acc === bottom) &&& (ans === bottom)
@@ -258,8 +278,8 @@ and evalo what patts ans =
 
   conde
     [ (patts === llist_nil) &&& (ans === bottom)
-    ; fresh (p1 pothers)
-            (list_cons patts p1 pothers)
+    ; fresh (p1 g1 pothers)
+            (list_cons patts !(p1,g1) pothers)
             (conde
                [ (p1 === !PAny) &&& (ans === subs_empty)
                ; fresh (name)
@@ -278,8 +298,9 @@ and evalo what patts ans =
                        (what === !(VC (name,vs)) )
                        (conde
                           [ (ps === llist_nil) &&& (vs=== llist_nil) &&& (ans === subs_empty)
-                          ; fresh (_X)
-                              (my_combine vs ps pairs)
+                          ; fresh (gs)
+                              (noguard ps gs)
+                              (my_combine vs gs pairs)
                               (foldo folder subs_empty pairs rez)
                               (conde
                                  [ (rez === bottom) &&& (evalo what pothers ans)
@@ -318,24 +339,24 @@ let _ =
   let open Pat in
   let run1 = Tester.run1 in
 
-  wrap (empty_value "A")            (of_list [ PAny;      make_empty_constr "xx" ]);
-  wrap (empty_value "B")            (of_list [ PVar !"x"; make_empty_constr "B" ]);
-  wrap (empty_value "A")            (of_list [ make_empty_constr "A" ]);
-  run1 ~n:1 (REPR(evalo
-                           !(make_value  "A" [make_value "B" []])
-                           (of_list [make_pat  "A" [make_pat "B" []] ])
-                        ));
-  run1 ~n:1 (REPR(evalo
-                           !(make_value  "A" [])
-                           (of_list [make_pat  "A" [] ])
-                        ));
-  run1 ~n:1 (REPR(evalo
-                           !(make_vint 5)
-                           (of_list [make_pvar "a"])
-                        ));
+  (* wrap (empty_value "A")            (of_list [ PAny;      make_empty_constr "xx" ]); *)
+  (* wrap (empty_value "B")            (of_list [ PVar !"x"; make_empty_constr "B" ]); *)
+  (* wrap (empty_value "A")            (of_list [ make_empty_constr "A" ]); *)
+  (* run1 ~n:1 (REPR(evalo *)
+  (*                          !(make_value  "A" [make_value "B" []]) *)
+  (*                          (of_list [make_pat  "A" [make_pat "B" []] ]) *)
+  (*                       )); *)
+  (* run1 ~n:1 (REPR(evalo *)
+  (*                          !(make_value  "A" []) *)
+  (*                          (of_list [make_pat  "A" [] ]) *)
+  (*                       )); *)
+  (* run1 ~n:1 (REPR(evalo *)
+  (*                          !(make_vint 5) *)
+  (*                          (of_list [make_pvar "a"]) *)
+  (*                       )); *)
 
-  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5]) ));
-  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6]) ));
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5,None]) ));
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6,None]) ));
 
   run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) bottom));
   run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) subs_empty));
