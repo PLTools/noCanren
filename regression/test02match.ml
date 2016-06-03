@@ -128,19 +128,19 @@ let subs_assoco name subs (ans: Value.t logic option logic) =
     ]
 
 module Expr = struct
-  type _ t =
+  type t =
     (* | EGET : Value.t logic * Value.t logic -> bool t (\* greater or equal *\) *)
     (* | ELT  : Value.t logic * Value.t logic -> bool t (\* less than *\) *)
-    | EEQ  : Value.t logic * Value.t logic -> int t
-    | ENEQ : Value.t logic * Value.t logic -> int t
-    | EVar : string logic -> int t
-    | EInt : int logic -> int t
+    | EEQ  of t logic * t logic (* -> int t *)
+    | ENEQ of t logic * t logic (* -> int t *)
+    | EVar of string logic (* -> int t *)
+    | EInt of int logic (* -> int t *)
     (* | EBool: bool logic -> int t *)
 
-  let print : type a . Format.formatter -> a t -> unit = fun ppf root ->
+  let print : Format.formatter -> t -> unit = fun ppf root ->
     let open Format in
     let prl = fprintf_logic_with_cs in
-    let rec helper : type a. a t -> unit = function
+    let rec helper : t -> unit = function
       (* | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r *)
       (* | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r *)
       | EEQ  (l,r) -> fprintf ppf "(%a=%a)" prl l prl r
@@ -152,21 +152,21 @@ module Expr = struct
     helper root
 end
 
-implicit module Show_expr {X:SHOW} : (SHOW with type t = X.t Expr.t) = struct
-  type t = X.t Expr.t
+implicit module Show_expr (* {X:SHOW} *) : (SHOW with type t = (* X.t *) Expr.t) = struct
+  type t = (* X.t *) Expr.t
   let show what = print_as_format Expr.print what
 end
 
 (* let make_ge l r = Expr.(EGET (l,r)) *)
 (* let make_lt l r = Expr.(ELT  (l,r)) *)
 let make_eeq  l r = Expr.(EEQ  (l,r))
-let make_ebeq l r = Expr.(ENEQ (l,r))
+let make_eneq l r = Expr.(ENEQ (l,r))
 let make_evar name = Expr.(EVar !name)
 let make_eint n = Expr.(EInt !n)
 let etrue  = !Expr.(EInt !1)
 let efalse = !Expr.(EInt !0)
 
-let rec evalo_expr : (Subst.t logic) -> int Expr.t logic -> (Value.t) logic -> goal =
+let rec evalo_expr : (Subst.t logic) -> Expr.t logic -> (Value.t) logic -> goal =
   fun subs e ans ->
   let open Expr in
   let open Value in
@@ -180,10 +180,12 @@ let rec evalo_expr : (Subst.t logic) -> int Expr.t logic -> (Value.t) logic -> g
             (maybe_ans === !(Some ans))
     ; fresh (l r ansl ansr)
             (e === !(EEQ (l,r)) )
+            (evalo_expr subs l ansl)
+            (evalo_expr subs r ansr)
             (conde
                [ fresh (m n)
-                       (l === !(VInt m))
-                       (r === !(VInt n))
+                       (ansl === !(VInt m))
+                       (ansr === !(VInt n))
                        (conde
                           [ (m===n) &&& (ans === !(VInt !1))
                           ; (m=/=n) &&& (ans === !(VInt !0))
@@ -191,10 +193,12 @@ let rec evalo_expr : (Subst.t logic) -> int Expr.t logic -> (Value.t) logic -> g
                ])
     ; fresh (l r ansl ansr)
             (e === !(ENEQ (l,r)) )
+            (evalo_expr subs l ansl)
+            (evalo_expr subs r ansr)
             (conde
                [ fresh (m n)
-                       (l === !(VInt m))
-                       (r === !(VInt n))
+                       (ansl === !(VInt m))
+                       (ansr === !(VInt n))
                        (conde
                           [ (m===n) &&& (ans === !(VInt !0))
                           ; (m=/=n) &&& (ans === !(VInt !1))
@@ -343,10 +347,16 @@ let _ =
                               !(make_evar "x")
                  ));
   run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eeq !(make_vint 1) !(make_vint 1))
+                              !(make_eint 6)
                  ));
   run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eeq !(make_vint 1) !(make_vint 2))
+                              !(make_eeq !(make_eint 1) !(make_eint 1))
+                 ));
+  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
+                              !(make_eeq !(make_eint 1) !(make_eint 2))
+                 ));
+  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
+                              !(make_eeq !(make_evar "x") !(make_eint 5))
                  ));
 
 
