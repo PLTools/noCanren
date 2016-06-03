@@ -27,6 +27,15 @@ end
 
 implicit module Show_list = Show_list_explicit
 
+module Show_option_explicit {X : SHOW}: (SHOW with type t=X.t option) = struct
+    type t = X.t option
+    let show = function
+      | None -> "None"
+      | Some x -> sprintf "Some (%s)" (X.show x)
+end
+
+implicit module Show_option = Show_option_explicit
+
 implicit module Show_int : (SHOW with type t = int) = struct
     type t = int
     let show x = sprintf "%d" x

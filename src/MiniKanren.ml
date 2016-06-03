@@ -217,9 +217,9 @@ let fprintf_logic_with_cs ppf l =
     match l with
     | Var (n,[]) -> fprintf ppf "_.%d" n
     | Var (n, cs) ->
-       fprintf ppf "_.%d {{=/=" n;
+       fprintf ppf "(_.%d {{=/=" n;
        List.iter (fun l -> fprintf ppf " "; print ppf l) cs;
-       fprintf ppf "}}"
+       fprintf ppf "}})"
     | Value (s, f) -> fprintf ppf "%s" (f s)
   in
   print ppf l
@@ -553,6 +553,8 @@ module Subst :
 
   end
 
+implicit module Show_subst : (ImplicitPrinters.SHOW with type t = Subst.t) = Subst
+
 module State =
   struct
     type t = Env.t * Subst.t * Subst.t list
@@ -613,7 +615,8 @@ exception Disequality_violated
 let snd3 (_,x,_) = x
 
 let (===) x y st =
-  (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
+  (* printf "  call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
+  (* printf "  >  but really '%s' and '%s'\n%!" (generic_show x) (generic_show y); *)
   let (((env, subst, constr), root, l) as state1) =
     st |> adjust_state @@ sprintf "unify '%s' and '%s' ('%s' and '%s')"
                                   (show_logic_naive x) (show_logic_naive y)
@@ -621,6 +624,11 @@ let (===) x y st =
   in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
+    (* let () = printf "    prefix = '%s'\n%!" Subst.(show @@ of_list prefix) in *)
+    (* let open ImplicitPrinters in *)
+    (* let () = printf "    subst' = '%s'\n%!" (show subst') in *)
+
+    let (_: (int * Obj.t * Obj.t) list) = prefix in
     begin match subst' with
     | None ->
        make_leaf "Failed" state1;

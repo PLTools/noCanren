@@ -15,10 +15,11 @@ module Value = struct
   open Format
 
   let print ppf root =
+    let prl = fprintf_logic_with_cs in
     let rec helper = function
-      | VC (name,xs) when llist_is_empty_logic xs -> fprintf ppf "%a" fprintf_logic name
-      | VC (name,xs) -> fprintf ppf "%a (%a)" fprintf_logic name fprintf_logic xs
-      | VInt n -> fprintf ppf "%a" fprintf_logic n
+      | VC (name,xs) when llist_is_empty_logic xs -> fprintf ppf "%a" prl name
+      | VC (name,xs) -> fprintf ppf "%a (%a)" prl name prl xs
+      | VInt n -> fprintf ppf "VInt %a" prl n
     in
     helper root
 end
@@ -191,11 +192,17 @@ and evalo_const what patt ans =
   let open Pat in
   fresh (n m)
     (what === !(VInt n))
-    (* (patt === !(PInt m)) *)
-    (* (conde [ (n===m) &&& (ans === subs_empty) *)
-    (*        ; (n=/=m) &&& (ans === bottom) *)
-    (*        ]) *)
+    (patt === !(PInt m))
+    (conde [ (n===m) &&& (ans === subs_empty)
+           ; (n=/=m) &&& (ans === bottom)
+           ])
 
+
+let wat1 what ans =
+  let open Value in
+  fresh (n)
+    (what === !(VInt n))
+    (* (ans === what) *)
 
 let make_empty_constr name = Pat.PC(!name, llist_nil)
 
@@ -205,9 +212,6 @@ let _ =
     Tester.run1 ~n (REPR(evalo what patts ))
   in
 
-  (* let wrap2 ?(n=1) patts = *)
-  (*   Tester.run1 ~n (REPR(fun q -> evalo q patts bottom )) *)
-  (* in *)
 
   let open Value in
   let open Pat in
@@ -234,6 +238,7 @@ let _ =
 
   Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_int_pat 5) bottom));
   Tester.run1 ~n:1 (REPR(fun q -> evalo_const q !(make_int_pat 5) subs_empty));
+  (* Tester.run2 ~n:3 (REPR(wat1)); *)
 
   (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ Pat.PVar !"x"; make_empty_constr "A" ]) bottom)); *)
   (* Tester.run1 ~n:1 (REPR(fun q -> evalo q (of_list [ make_empty_constr "A" ]) bottom)); *)
