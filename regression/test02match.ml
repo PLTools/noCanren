@@ -6,7 +6,7 @@ open MiniHelpers
 
 let (!) = inj
 
-let good_cname name = (name === !"A") ||| (name === !"B")
+(* let good_cname name = (name === !"A") ||| (name === !"B") *)
 
 module Value = struct
   type t = VC of string logic * t llist logic
@@ -73,6 +73,7 @@ end
 let make_pat name args = Pat.PC (!name, of_list args)
 let make_pvar name = Pat.PVar !name
 let make_pint n = Pat.PInt !n
+let make_empty_constr name = Pat.PC(!name, llist_nil)
 
 module Subst = struct
   type lst = ((string logic) * Value.t logic ) llist
@@ -129,25 +130,25 @@ let subs_assoco name subs (ans: Value.t logic option logic) =
 
 module Expr = struct
   type t =
-    (* | EGET : Value.t logic * Value.t logic -> bool t (\* greater or equal *\) *)
-    (* | ELT  : Value.t logic * Value.t logic -> bool t (\* less than *\) *)
     | EEQ  of t logic * t logic (* -> int t *)
     | ENEQ of t logic * t logic (* -> int t *)
     | EVar of string logic (* -> int t *)
     | EInt of int logic (* -> int t *)
     (* | EBool: bool logic -> int t *)
+    (* | EGET : Value.t logic * Value.t logic -> bool t (\* greater or equal *\) *)
+    (* | ELT  : Value.t logic * Value.t logic -> bool t (\* less than *\) *)
 
   let print : Format.formatter -> t -> unit = fun ppf root ->
     let open Format in
     let prl = fprintf_logic_with_cs in
     let rec helper : t -> unit = function
-      (* | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r *)
-      (* | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r *)
       | EEQ  (l,r) -> fprintf ppf "(%a=%a)" prl l prl r
       | ENEQ (l,r) -> fprintf ppf "(%a<>%a)"  prl l prl r
       | EVar x     -> fprintf ppf "(EVar %a)" prl x
       | EInt n     -> fprintf ppf "(EInt  %a)" prl n
       (* | EBool b    -> fprintf ppf "(EBool %a)" prl b *)
+      (* | EGET (l,r) -> fprintf ppf "(%a>=%a)" prl l prl r *)
+      (* | ELT  (l,r) -> fprintf ppf "(%a<%a)"  prl l prl r *)
     in
     helper root
 end
@@ -230,10 +231,6 @@ let subs_uniono (s1: Subst.t logic) (s2: Subst.t logic) ans =
             (ans === !(Smth ans0))
     ]
 
-let subs_uniono_helper s1 s2 ans st =
-  print_endline "uniono helper";
-  subs_uniono s1 s2 ans st
-
 let rec my_combine (xs:Value.t llist logic) (ys: Pat.t llist logic) ans =
   fresh (hx tx hy ty temp)
         (list_cons xs hx tx)
@@ -242,21 +239,23 @@ let rec my_combine (xs:Value.t llist logic) (ys: Pat.t llist logic) ans =
         (ans === !(hx,hy) % temp)
 
 
-let rec wtf_term_check (ps: int llist logic)
-                       (ans: (int logic * int logic option) logic) =
-  fresh (h tl)
-        (ps === h%tl)
-        (ans === !(h, (None: int logic option)) )
+(* let rec wtf_term_check (ps: int llist logic) *)
+(*                        (ans: (int logic * int list option) logic) = *)
+(*   fresh (h tl) *)
+(*         (ps === h%tl) *)
+(*         (ans === !(h, (None: int list option)) ) *)
 
+type guard = Expr.t logic option
 
-let rec noguard (ps: Pat.t llist logic) (ans: (Pat.t logic * Expr.t logic option logic) llist logic) =
+(* assigns None for every pattern. Useful to construct arguments when match two constrs. *)
+let rec noguard (ps: Pat.t llist logic) (ans: guard llist logic) =
   conde
     [ (ps===llist_nil) &&& (ans === llist_nil)
     ; call_fresh (fun (h: Pat.t logic) ->
           fresh (tl ans2 wtf)
             (list_cons ps h tl)
             (noguard tl ans2)
-            (wtf === !(h, !(None: Expr.t logic option)))
+            (wtf === !(None: guard))
             (ans === wtf % ans2)
         )
     ]
@@ -264,77 +263,111 @@ let rec noguard (ps: Pat.t llist logic) (ans: (Pat.t logic * Expr.t logic option
 let rec folder (acc: Subst.t logic) (x: (Value.t logic * Pat.t logic) logic) ans =
     conde
       [ (acc === bottom) &&& (ans === bottom)
-      ; fresh (v p ans0)
+      ; fresh (v p ans0 guards)
               (x === !(v,p))
-              (evalo v !<p ans0)
+              (guards === !< (!None) )
+              (evalo v !<p guards ans0)
               (conde
                  [ (ans0 === bottom) &&& (ans === bottom)
-                 ; (ans0 =/= bottom) &&& (subs_uniono_helper ans0 acc ans)
+                 ; (ans0 =/= bottom) &&& (subs_uniono ans0 acc ans)
                  ])]
 
-and evalo what patts ans =
+and with_guard maybe_g subs ans =
+  let open Value in
+  conde
+    [ fresh (g grez)
+        (maybe_g === !(Some g))
+        (evalo_expr subs g grez)
+        (conde
+           [ (grez === !(VInt !1)) &&& (ans === subs)
+           ; (grez === !(VInt !0)) &&& (ans === bottom)
+           ])
+    ; (maybe_g === !None) &&& (ans === subs)
+    ]
+
+(* Main function. *)
+and evalo what patts (guards: guard llist logic) ans =
+  conde
+    [ (patts === llist_nil) &&& (guards === llist_nil) &&& (ans === bottom)
+    ; fresh (ph ptl gh gtl rez)
+            (list_cons patts ph ptl)
+            (list_cons guards gh gtl)
+            (evalo_pat subs_empty what ph gh rez)
+            (conde
+               [ (rez === bottom) &&& (evalo what ptl gtl ans)
+               ; (rez =/= bottom) &&& (ans === rez)
+               ])
+    ]
+
+and evalo_pat subs what pat (guard: Expr.t logic option logic) ans =
   let open Value in
   let open Pat in
 
-  conde
-    [ (patts === llist_nil) &&& (ans === bottom)
-    ; fresh (p1 g1 pothers)
-            (list_cons patts !(p1,g1) pothers)
-            (conde
-               [ (p1 === !PAny) &&& (ans === subs_empty)
-               ; fresh (name)
-                       (p1 === !(PVar name))
-                       (subs_make name what ans)
-               ; fresh (n m)
-                       (what === !(VInt n))
-                       (p1 === !(PInt m))
-                       (conde [ (n===m) &&& (ans === subs_empty)
-                              ; (n=/=m) &&& (ans === bottom)
-                              ])
+  (conde
+     [ (pat === !PAny) &&& (with_guard guard subs ans)
 
-               ; (evalo_const what p1 ans)
-               ; fresh (name ps vs pairs rez)
-                       (p1 === !(PC (name,ps)) )
-                       (what === !(VC (name,vs)) )
-                       (conde
-                          [ (ps === llist_nil) &&& (vs=== llist_nil) &&& (ans === subs_empty)
-                          ; fresh (gs)
-                              (noguard ps gs)
-                              (my_combine vs gs pairs)
-                              (foldo folder subs_empty pairs rez)
-                              (conde
-                                 [ (rez === bottom) &&& (evalo what pothers ans)
-                                 ; (rez =/= bottom) &&& (ans === rez)
-                                 ])
-                          ])
-               ])
-    ]
-and evalo_const what patt ans =
+     ; fresh (name temp_subs)
+         (pat === !(PVar name))
+         (subs_make name what temp_subs)
+         (with_guard guard temp_subs ans)
+     ; fresh (n m)
+         (what === !(VInt n))
+         (pat === !(PInt m))
+         (conde [ (n===m) &&& (with_guard guard subs_empty ans)
+                ; fresh (temp_ans)
+                        (n=/=m)
+                        (* Not sure that next conde is really required *)
+                        (conde
+                           [ (with_guard guard subs_empty bottom) &&& (ans === bottom)
+                           ; (with_guard guard subs_empty temp_ans) &&&
+                               (temp_ans =/= bottom) &&& (ans === bottom)
+                           ])
+
+
+                ])
+
+     ; (evalo_const subs what pat guard ans)
+
+     (* match two constructors *)
+     ; fresh (name ps vs pairs rez)
+         (pat === !(PC (name,ps)) )
+         (what === !(VC (name,vs)) )
+         (conde
+            [ (ps === llist_nil) &&& (vs=== llist_nil) &&& (ans === subs_empty)
+            ; fresh (gs)
+                (noguard ps gs)
+                (my_combine vs ps pairs)
+                (foldo folder subs pairs rez)
+                (conde
+                   [ (rez === bottom) &&& (ans===bottom)
+                   ; (rez =/= bottom) &&& (with_guard guard rez ans)
+                   ])
+            ])
+     ])
+
+and evalo_const subs what patt guard ans =
   let open Value in
   let open Pat in
   fresh (n m)
     (what === !(VInt n))
     (patt === !(PInt m))
-    (conde [ (n===m) &&& (ans === subs_empty)
+    (conde [ fresh (grez)
+                   (n===m)
+                   (with_guard guard subs_empty ans)
+                   (* (conde *)
+                   (*    [ (guard === !None) &&& (ans === subs) *)
+                   (*    ; fresh (g) *)
+                   (*            (guard === !(Some g)) *)
+                   (*            (evalo_expr subs g grez) *)
+                   (*            (conde *)
+                   (*               [ (grez === !(VInt !1)) &&& (ans === subs) *)
+                   (*               ; (grez =/= !(VInt !1)) &&& (ans === bottom) *)
+                   (*               ]) *)
+                   (*    ]) *)
            ; (n=/=m) &&& (ans === bottom)
            ])
 
-
-let wat1 what ans =
-  let open Value in
-  fresh (n)
-    (what === !(VInt n))
-    (* (ans === what) *)
-
-let make_empty_constr name = Pat.PC(!name, llist_nil)
-
 let _ =
-  let open Tester.M.ConvenienceCurried in
-  let wrap ?(n=1) what patts =
-    Tester.run1 ~n (REPR(evalo what patts ))
-  in
-
-
   let open Value in
   let open Pat in
   let run1 = Tester.run1 in
@@ -355,30 +388,76 @@ let _ =
   (*                          (of_list [make_pvar "a"]) *)
   (*                       )); *)
 
-  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5,None]) ));
-  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6,None]) ));
+  let single_no_guard = of_list [(None : Expr.t logic option)] in
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 5])
+                    single_no_guard
+                 ));
+  run1 ~n:1 (REPR(evalo !(make_vint 5) (of_list [make_pint 6])
+                    single_no_guard
+                 ));
 
-  run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) bottom));
-  run1 ~n:1 (REPR(fun q -> evalo_const q !(make_pint 5) subs_empty));
+  run1 ~n:1 (REPR(fun q -> evalo_const subs_empty q
+                                       !(make_pint 5)
+                                       !(None: Expr.t logic option)
+                                       bottom ));
+  run1 ~n:1 (REPR(fun q -> evalo_const subs_empty q
+                                       !(make_pint 5)
+                                       !(None: Expr.t logic option)
+                                       subs_empty));
 
-  run1 ~n:1 (REPR(subs_assoco !"abc" bottom));
-  run1 ~n:1 (REPR(subs_assoco !"abc" !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) ));
-  run1 ~n:1 (REPR(subs_assoco !"x"   !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) ));
-  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_evar "x")
-                 ));
-  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eint 6)
-                 ));
-  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eeq !(make_eint 1) !(make_eint 1))
-                 ));
-  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eeq !(make_eint 1) !(make_eint 2))
-                 ));
-  run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))]))
-                              !(make_eeq !(make_evar "x") !(make_eint 5))
-                 ));
+  run1 ~n:1 (REPR(fun q -> evalo !(make_vint 1)
+                                 (of_list [ (make_pvar "x")] )
+                                 (of_list [ (Some !(make_eeq !(make_evar "x")
+                                                             !(make_eint 2)) )
+                                          ])
+                                 q));
+
+  run1 ~n:1 (REPR(fun q -> evalo !(make_vint 1)
+                                 (of_list [ (make_pvar "x")] )
+                                 (of_list [ (Some !(make_eeq !(make_evar "x")
+                                                             !(make_eint 1)) )
+                                          ])
+                                 q));
+
+  (* really exhaustive. Doesn't return any answers *)
+  run1 ~n:1 (REPR(fun q -> evalo q
+                                 (of_list [ make_pvar "x"
+                                          ; make_pvar "x"
+                                          ])
+                                 (of_list [ Some !(make_eeq  !(make_evar "x")
+                                                             !(make_eint 1))
+                                          ; Some !(make_eneq !(make_evar "x")
+                                                             !(make_eint 1))
+                                          ])
+                                 bottom));
+
+  (* should be not exhaustive. Returns some answers *)
+  run1 ~n:1 (REPR(fun q -> evalo q
+                                 (of_list [ make_pvar "x"
+                                          ])
+                                 (of_list [ Some !(make_eeq  !(make_evar "x")
+                                                             !(make_eint 1))
+                                          ])
+                                 bottom));
+
+  (* run1 ~n:1 (REPR(subs_assoco !"abc" bottom)); *)
+  (* run1 ~n:1 (REPR(subs_assoco !"abc" !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) )); *)
+  (* run1 ~n:1 (REPR(subs_assoco !"x"   !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) )); *)
+  (* run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) *)
+  (*                             !(make_evar "x") *)
+  (*                )); *)
+  (* run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) *)
+  (*                             !(make_eint 6) *)
+  (*                )); *)
+  (* run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) *)
+  (*                             !(make_eeq !(make_eint 1) !(make_eint 1)) *)
+  (*                )); *)
+  (* run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) *)
+  (*                             !(make_eeq !(make_eint 1) !(make_eint 2)) *)
+  (*                )); *)
+  (* run1 ~n:1 (REPR(evalo_expr  !(Subst.Smth (of_list [ (!"x", !(make_vint 5))])) *)
+  (*                             !(make_eeq !(make_evar "x") !(make_eint 5)) *)
+  (*                )); *)
 
 
 

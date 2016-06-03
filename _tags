@@ -16,9 +16,9 @@ true: debug
 <regression/test02match.ml> or<regression/test01match.ml> or <regression/test0match.ml> or <regression/testDiseq*> or <regression/test0*.*>: ppx(ppx/smart_logger_bin.native), ppx(ppx/ppx_repr_bin.native)
 <regression/test02match.ml> or <regression/test01match.ml> or <regression/test0match.ml> or <regression/test004.ml> or <regression/test009.ml> or <regression/test005.ml>: ppx(ppx/pa_minikanren_bin.native)
 
-<regression/test0match.native>: package(extlib), short_paths
-<regression/test01match.native>: package(extlib), short_paths
-<regression/test02match.native>: package(extlib), short_paths
+<regression/test0match.*>: package(extlib), short_paths
+<regression/test01match.*>: package(extlib), short_paths
+<regression/test02match.*>: package(extlib), short_paths
 
 <ppx/smart_logger*>: package(ppx_tools.metaquot)
 <ppx/pa_minikanren*>: package(ppx_tools.metaquot)

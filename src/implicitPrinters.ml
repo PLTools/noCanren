@@ -75,3 +75,33 @@ struct
     type t = X.t * Y.t * Z.t
     let show (x,y,z) = sprintf "(%s,%s,%s)" (X.show x) (Y.show y) (Z.show z)
 end
+
+(*
+(****************************************************)
+type 'a logic = Var of int * 'a logic list | Value of 'a * ('a -> string)
+implicit module Show_logic {X : SHOW} =
+struct
+  type t = X.t logic
+  let show l = "asdf"
+end
+
+type 'a llist = Nil | Cons of 'a logic * 'a llist logic
+implicit module Show_llist {X: SHOW} = struct
+  type t = X.t llist
+  let show _ = "llist"
+end
+
+let (!) {S : SHOW} x = Value (x, S.show)
+type goal
+let call_fresh : ('a logic -> goal) -> goal = fun _ -> Obj.magic ()
+let (===) : 'a logic -> 'a logic -> goal =  fun _ _ -> Obj.magic ()
+let (&&&) : goal -> goal -> goal =  fun x _ -> x
+let (%) : 'a logic -> 'a llist logic -> 'a llist logic = fun _ _ -> Obj.magic Nil
+
+let rec wtf (ps: int llist logic)
+    (ans: (int logic * int list option) logic) =
+  call_fresh (fun h -> call_fresh (fun tl ->
+      (ps === h%tl) &&&
+      (ans === !(h, (None: int list option)) )
+    ))
+  *)
