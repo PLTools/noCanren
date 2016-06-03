@@ -343,6 +343,7 @@ and evalo_pat subs what pat (guard: Expr.t logic option logic) ans =
                    ; (rez =/= bottom) &&& (with_guard guard rez ans)
                    ])
             ])
+     (* TODO: Maybe check that we match VInt and PConstr and return bottom in that case *)
      ])
 
 and evalo_const subs what patt guard ans =
