@@ -615,8 +615,9 @@ let snd3 (_,x,_) = x
 let (===) x y st =
   (* printf "call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
   let (((env, subst, constr), root, l) as state1) =
-    st |> adjust_state @@ sprintf "unify '%s' and '%s'"
+    st |> adjust_state @@ sprintf "unify '%s' and '%s' ('%s' and '%s')"
                                   (show_logic_naive x) (show_logic_naive y)
+                                  (generic_show x) (generic_show y)
   in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in

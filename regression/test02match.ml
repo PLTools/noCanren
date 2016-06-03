@@ -191,10 +191,10 @@ and evalo_const what patt ans =
   let open Pat in
   fresh (n m)
     (what === !(VInt n))
-    (patt === !(PInt m))
-    (conde [ (n===m) &&& (ans === subs_empty)
-           ; (n=/=m) &&& (ans === bottom)
-           ])
+    (* (patt === !(PInt m)) *)
+    (* (conde [ (n===m) &&& (ans === subs_empty) *)
+    (*        ; (n=/=m) &&& (ans === bottom) *)
+    (*        ]) *)
 
 
 let make_empty_constr name = Pat.PC(!name, llist_nil)
