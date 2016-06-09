@@ -8,9 +8,9 @@ let rec wrap (x : Obj.t) =
       List.fold_left
         (fun f t tag -> tag <> t && f tag)
         (fun _ -> true)
-        [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
+        [lazy_tag   ; closure_tag  ; object_tag  ; (* infix_tag ; *)
          forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-         custom_tag ; unaligned_tag; out_of_heap_tag
+         custom_tag ; unaligned_tag(* ; out_of_heap_tag *)
         ]
     in
     let is_unboxed obj =
@@ -21,6 +21,7 @@ let rec wrap (x : Obj.t) =
     then Unboxed x
     else
       let t = tag x in
+      (* printf "Got tag %d\n%!" t; *)
       if is_valid_tag t
       then
         let f = if t = double_array_tag then Obj.magic double_field else field in
