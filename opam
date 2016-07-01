@@ -1,0 +1,24 @@
+opam-version: "1.2"
+
+authors: [ "https://github.com/dboulytchev" "https://github.com/Kakadu" ]
+name: "miniKanren-typed"
+version: "0.0.1"
+maintainer: "kakadu.hafanana@gmail.com"
+homepage: "https://github.com/Kakadu/miniKanren-ocaml-typed"
+bug-reports: "https://github.com/Kakadu/miniKanren-ocaml-typed/issues"
+dev-repo: "https://github.com/Kakadu/miniKanren-ocaml-typed.git"
+
+build: [make]
+build-test: [make "test"]
+
+install: [make "PREFIX=%{prefix}%" "install"]
+remove: [make "PREFIX=%{prefix}%" "uninstall"]
+
+available: [compiler = "4.02.3-modular-implicits"]
+depends: [
+  "ocamlfind"
+  "extlib"
+  "ppx_tools" {= "0.99.4-modular-implicits"}
+  "typeutil"  { test }
+  "ppx_deriving" { test & = "3.0-modular-implicits" }
+]
