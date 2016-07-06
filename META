@@ -1,8 +1,8 @@
 version = "0.1"
 description = "miniKanren"
 #requires = "GT"
-archive(byte) = "MiniKanren.cmo"
-archive(native) = "MiniKanren.cmx"
+archive(byte) = "MiniKanren.cma"
+archive(native) = "MiniKanren.cmxa"
 
 package "js_of_ocaml" (
   description="library as a dependency for toplevel"
@@ -12,5 +12,6 @@ package "js_of_ocaml" (
 package "tester" (
   description="Tests helper"
   requires="settings"
-  archive(byte)="tester.cmo"
+  archive(byte)  ="tester.cmo"
+  archive(native)="tester.cmx"
 )

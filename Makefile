@@ -1,15 +1,15 @@
 MKDIR ?= mkdir -vp
 CP    ?= cp
 
-OB=ocamlbuild -use-ocamlfind -classic-display -plugin-tag "package(str)"
+OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
 ifdef OBV
 OB += -verbose 6
 endif
 
 CMA_TARGETS=src/MiniKanren.cmo
 CMO_TARGETS=src/tester.cmo
-BYTE_TARGES=$(CMO_TARGETS) $(CMA_TARGETS)
-NATIVE_TARGETS=$(CMO_TARGETS:.cmo=.cmx) $(CMA_TARGETS:.cma=.cmxa)
+BYTE_TARGETS=$(CMO_TARGETS) $(CMA_TARGETS) src/MiniKanren.cma
+NATIVE_TARGETS=$(CMO_TARGETS:.cmo=.cmx) $(CMA_TARGETS:.cma=.cmxa) src/MiniKanren.cmxa
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
@@ -53,7 +53,7 @@ define TESTRULES
 .PHONY: test_$(1) test$(1).native
 test$(1).native: regression/test$(1).native
 regression/test$(1).native: regression/test$(1).ml
-	$(OB) -Is src,jsoo_runner,ppx $$@
+	OCAMLPATH=`pwd`/_build/bundle $(OB)  $$@
 
 compile_tests: regression/test$(1).native
 
@@ -75,14 +75,16 @@ unittests:
 	$(OB) -I src src_test/test.byte && ./test.byte
 
 INSTALL_TARGETS=META \
-	_build/src/implicitPrinters.cmi \
-	_build/src/MiniKanren.cmi \
+	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
 	_build/src/tester.cmo \
 	_build/src/tester.cmx \
 	_build/src/tester.cmi \
 	_build/ppx/smart_logger.cmi \
+	$(wildcard _build/ppx/*.native)
+
+$(info  )
 
 MAYBE_INSTALL_TARGETS=\
 	_build/jsoo_runner/jsoo_runner.cmi \
@@ -103,7 +105,7 @@ define MAKE_BUNDLE_RULE
 $(BUNDLEDIR)/$(notdir $(1)): $(1)
 	cp $(1) $(BUNDLEDIR)
 MAKE_BUNDLE_TARGETS += $(BUNDLEDIR)/$(notdir $(1))
-$(info pizda $(1) )
+
 endef
 $(foreach i,$(INSTALL_TARGETS),$(eval $(call MAKE_BUNDLE_RULE,$(i)) ) )
 
@@ -115,7 +117,7 @@ $(info MAKE_BUNDLE_TARGETS $(MAKE_BUNDLE_TARGETS))
 bundle: $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
 
 install:
-	ocamlfind install miniKanren $(BUNDLE_DIR)/*
+	ocamlfind install miniKanren $(BUNDLEDIR)/*
 
 uninstall:
 	ocamlfind remove miniKanren

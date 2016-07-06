@@ -3,14 +3,11 @@ true: debug
 
 <src/tester.ml>: package(typeutil)
 
-#<src/MiniKanren.mli> or <src/MiniKanrenImpl.ml>: syntax(camlp5o), package(typeutil,GT.syntax.all)
-#<src/MiniKanren.ml>: package(typeutil,GT)
-#<camlp5/pa_minikanren.ml>: syntax(camlp5o), package(GT.syntax)
-#<src/MiniKanren.mli>: syntax(camlp5o), package(GT.syntax.all,typeutil)
 
 <regression/orig/*>: traverse
 <regression/miniHelpers.ml>: package(extlib), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
-<regression/test*.native> or <regression/test*.byte>: package(str,typeutil)
+<regression/test*.ml*>: package(miniKanren)
+<regression/test*.native> or <regression/test*.byte>: package(str,typeutil,miniKanren.tester)
 <regression/test003.ml>: use_pa_minikanren
 <regression/test0match.ml>: warn(-40), package(extlib), short_paths
 
