@@ -19,6 +19,6 @@ depends: [
   "ocamlfind"
   "extlib"
   "ppx_tools" {= "0.99.4-modular-implicits"}
-  "typeutil"  { test }
+  "typeutil"  
   "ppx_deriving" { test & = "3.0-modular-implicits" }
 ]
