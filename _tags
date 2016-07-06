@@ -6,6 +6,7 @@ true: debug
 
 <regression/orig/*>: traverse
 <regression/miniHelpers.ml>: package(extlib), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
+<regression/miniHelpers.*>: package(miniKanren)
 <regression/test*.ml*>: package(miniKanren)
 <regression/test*.native> or <regression/test*.byte>: package(str,typeutil,miniKanren.tester)
 <regression/test003.ml>: use_pa_minikanren

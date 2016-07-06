@@ -77,10 +77,10 @@ unittests:
 INSTALL_TARGETS=META \
 	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
+	_build/src/MiniKanren.[oa] \
 	_build/src/MiniKanren.cmxa \
-	_build/src/tester.cmo \
-	_build/src/tester.cmx \
-	_build/src/tester.cmi \
+	_build/src/tester.cm[iox] \
+	_build/src/tester.o \
 	_build/ppx/smart_logger.cmi \
 	$(wildcard _build/ppx/*.native)
 
