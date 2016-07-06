@@ -67,7 +67,7 @@ $(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
 promote:
 	$(MAKE) -C regression promote TEST=$(TEST)
 
-tests: ppx compile_tests run_tests
+tests: minikanren_stuff ppx bundle compile_tests run_tests
 regression: tests
 test: tests
 
@@ -77,9 +77,9 @@ unittests:
 INSTALL_TARGETS=META \
 	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
-	_build/src/MiniKanren.[oa] \
+	$(wildcard _build/src/MiniKanren.[oa]) \
 	_build/src/MiniKanren.cmxa \
-	_build/src/tester.cm[iox] \
+	$(wildcard _build/src/tester.cm[iox]) \
 	_build/src/tester.o \
 	_build/ppx/smart_logger.cmi \
 	$(wildcard _build/ppx/*.native)
