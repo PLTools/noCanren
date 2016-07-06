@@ -1,0 +1,9 @@
+`split_constrs_by_name (!"::") _pats2`, 1 answer {
+q=(Pconstructor("::",[]) :: [Pany],1) :: [(Pconstructor("::",[]) :: [Pany],3)]; r=[(Pconstructor("[]",[]) :: [Pany],2)];
+}
+`compile (of_list ["lx"; "ly"]) _example3 (!(Lconst (!(Vint 666))))`, 2 answers {
+q=if check_constr "[]" lx then 1 else if check_constr "[]" ly then 2 else if check_constr "::" lx then if check_constr "::" ly then 3 else 666 else 666;
+}
+`compile (of_list ["lx"; "ly"]) _example5 (!(Lconst (!(Vint 666))))`, 2 answers {
+q=if check_constr "::" lx then if check_constr "::" x then if check_constr "[]" x then if check_constr "::" ly then 3 else 666 else 666 else 666 else 666;
+}

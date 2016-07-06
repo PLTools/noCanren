@@ -1,0 +1,37 @@
+`evalo (!(make_vint 5)) (of_list [make_pint 5]) single_no_guard`, 1 answer {
+q=[];
+}
+`evalo (!(make_vint 5)) (of_list [make_pint 6]) single_no_guard`, 1 answer {
+q=_|_;
+}
+`fun q  ->
+  evalo_const subs_empty q (!(make_pint 5)) (!(None : Expr.t logic option))
+    bottom`, 1 answer {
+q=VInt (_.11 {{=/= 5}});
+}
+`fun q  ->
+  evalo_const subs_empty q (!(make_pint 5)) (!(None : Expr.t logic option))
+    subs_empty`, 1 answer {
+q=VInt 5;
+}
+`fun q  ->
+  evalo (!(make_vint 1)) (of_list [make_pvar "x"])
+    (of_list [Some (!(make_eeq (!(make_evar "x")) (!(make_eint 2))))]) q`, 1 answer {
+q=_|_;
+}
+`fun q  ->
+  evalo (!(make_vint 1)) (of_list [make_pvar "x"])
+    (of_list [Some (!(make_eeq (!(make_evar "x")) (!(make_eint 1))))]) q`, 1 answer {
+q=[(x,VInt 1)];
+}
+`fun q  ->
+  evalo q (of_list [make_pvar "x"; make_pvar "x"])
+    (of_list
+       [Some (!(make_eeq (!(make_evar "x")) (!(make_eint 1))));
+       Some (!(make_eneq (!(make_evar "x")) (!(make_eint 1))))]) bottom`, 1 answer {
+}
+`fun q  ->
+  evalo q (of_list [make_pvar "x"])
+    (of_list [Some (!(make_eeq (!(make_evar "x")) (!(make_eint 1))))]) bottom`, 1 answer {
+q=VInt (_.34 {{=/= 1}});
+}

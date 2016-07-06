@@ -1,0 +1,38 @@
+`evalo (empty_value "A") (of_list [Pany; empty_constr "z"])`, 1 answer {
+q=[];
+}
+`evalo (empty_value "B") (of_list [Pvar (!"x"); empty_constr "B"])`, 1 answer {
+q=[(x,B)];
+}
+`evalo (empty_value "A") (of_list [empty_constr "A"])`, 1 answer {
+q=[];
+}
+`evalo (!(make_value "A" [make_value "B" []]))
+  (of_list [make_pat "A" [make_pat "B" []]])`, 1 answer {
+q=[];
+}
+`foldo folder (!Subst.empty)
+  (of_list [((!(make_value "A" [])), (!(make_pat "A" [])))])`, 1 answer {
+q=[];
+}
+`my_combine (of_list [make_value "A" []; make_value "C" [make_value "D" []]])
+  (of_list [make_pat "A" []; make_pat "C" [make_pat "D" []]])`, 1 answer {
+q=(A,A) :: [(C ([D]),C ([D]))];
+}
+`fun q  -> evalo q (of_list [Pvar (!"x"); empty_constr "A"]) bottom`, 1 answer {
+}
+`evalo (empty_value "B") (of_list [empty_constr "A"])`, 1 answer {
+q=_|_;
+}
+`fun q  -> evalo q (of_list [empty_constr "A"]) bottom`, 1 answer {
+q=(_.14 {{=/= A}}) (_.16);
+}
+`fun q  -> evalo q (of_list [PC ((!"A"), (of_list [Pany]))]) bottom`, 1 answer {
+q=(_.14 {{=/= A}}) (_.16);
+}
+`fun q  -> q =/= (!1)`, 1 answer {
+q=(_.10 {{=/= 1}});
+}
+`foo`, 1 answer {
+q=(_.11 {{=/= 5}}) :: [(_.12 {{=/= 6}})];
+}

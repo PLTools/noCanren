@@ -1,0 +1,7 @@
+`nation1`, 2 answers {
+q=(_.10 {{=/= Test0domains.Englishman Test0domains.Welshman Test0domains.Irishman}});
+}
+`nation2`, 2 answers {
+q=Test0domains.Scot;
+q=(Test0domains.Unknown _.13);
+}
