@@ -14,7 +14,7 @@ PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanre
 TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean clean_tests install uninstall tests test regression promote compile_tests run_tests\
+.PHONY: all celan clean clean_tests install uninstall tests test regression promote \
 	only-toplevel toplevel jslib ppx minikanren_stuff tester bundle
 
 .DEFAULT_GOAL: all
@@ -53,18 +53,20 @@ REGRES_CASES := 000 004 005 009 0match 01match 02match 0domains
 
 #$(warning $(REGRES_CASES))
 define TESTRULES
-.PHONY: test_$(1) test$(1).native
+BYTE_TEST_EXECUTABLES += regression/test$(1).byte
+NATIVE_TEST_EXECUTABLES += regression/test$(1).native
+TEST_MLS += regression/test$(1).ml
+
+.PHONY: test_$(1) test$(1).native compile_tests_native compile_tests_byte
+
 test$(1).native: regression/test$(1).native
-regression/test$(1).native: regression/test$(1).ml
-	OCAMLPATH=`pwd`/_build/bundle $(OB)  $$@
+test$(1).byte:   regression/test$(1).byte
 
 regression/test$(1).byte: regression/test$(1).ml
-	OCAMLPATH=`pwd`/_build/bundle $(OB)  $$@
+	$(OB) -Is src $$@
 
-compile_tests: regression/test$(1).native
-
-clean_tests:
-	$(RM) -r _build/regression
+regression/test$(1).native: regression/test$(1).ml
+	$(OB) -Is src $$@
 
 run_tests: test_$(1)
 test_$(1): #regression/test$(1).native
@@ -72,6 +74,19 @@ test_$(1): #regression/test$(1).native
 	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
 endef
 $(foreach i,$(REGRES_CASES),$(eval $(call TESTRULES,$(i)) ) )
+
+.PHONY: compile_tests_native compile_tests_byte compile_tests run_tests
+
+compile_tests_native: $(TEST_MLS)
+	$(OB) -Is src $(NATIVE_TEST_EXECUTABLES)
+
+compile_tests_byte: $(TEST_MLS)
+	$(OB) -Is src $(BYTE_TEST_EXECUTABLES)
+
+compile_tests: compile_tests_native
+
+clean_tests:
+	$(RM) -r _build/regression
 
 promote:
 	$(MAKE) -C regression promote TEST=$(TEST)
@@ -88,7 +103,7 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cma \
 	$(wildcard _build/src/MiniKanren.[oa]) \
 	_build/src/MiniKanren.cmxa \
-	$(wildcard _build/src/tester.cm[iox]) \
+	$(wildcard _build/src/tester.cm[ox]) \
 	_build/src/tester.o \
 	_build/ppx/smart_logger.cmi \
 	$(wildcard _build/ppx/*.native)
@@ -102,7 +117,6 @@ MAYBE_INSTALL_TARGETS=\
 define MAYBE_ADD_TARGET
 ifneq (,$(wildcard $(1)))
 INSTALL_TARGETS += $(1)
-$(info add $(1) install target)
 endif
 endef
 
@@ -124,7 +138,7 @@ rmbundledir:
 $(BUNDLEDIR):
 	$(MKDIR) $@
 
-$(info MAKE_BUNDLE_TARGETS $(MAKE_BUNDLE_TARGETS))
+#$(info MAKE_BUNDLE_TARGETS $(MAKE_BUNDLE_TARGETS))
 
 bundle: rmbundledir $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
 
