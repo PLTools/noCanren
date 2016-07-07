@@ -6,10 +6,10 @@ ifdef OBV
 OB += -verbose 6
 endif
 
-CMA_TARGETS=src/MiniKanren.cmo
+CMA_TARGETS=src/MiniKanren.cma
 CMO_TARGETS=src/tester.cmo
-BYTE_TARGETS=$(CMO_TARGETS) $(CMA_TARGETS) src/MiniKanren.cma
-NATIVE_TARGETS=$(CMO_TARGETS:.cmo=.cmx) $(CMA_TARGETS:.cma=.cmxa) src/MiniKanren.cmxa
+BYTE_TARGETS=$(CMA_TARGETS) $(CMO_TARGETS)
+NATIVE_TARGETS= $(CMA_TARGETS:.cma=.cmxa) $(CMO_TARGETS:.cmo=.cmx)
 PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native
 TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma

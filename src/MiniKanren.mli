@@ -289,17 +289,21 @@ module ApplyLatest :
    end
 
    val one :
+         unit ->
          (('a logic -> state -> 'b) -> state -> 'a logic * 'b) *
          ('c * 'd -> 'c * 'd) *
          (State.t -> 'e logic -> 'e logic )
    val succ :
-         ('a -> state -> 'b) * ('c -> 'd * 'e) * (State.t -> 'f -> 'g) ->
+         (unit -> ('a -> state -> 'b) * ('c -> 'd * 'e) * (State.t -> 'f -> 'g)) ->
+         unit ->
          (('h logic -> 'a) -> state -> 'h logic * 'b) *
          ('i * 'c -> ('i * 'd) * 'e) *
          (State.t -> 'j logic * 'f -> ('j logic) * 'g)
    val run :
-       ('a -> state -> 'b) * ('b -> 'c * state Stream.t) *
-       (State.t -> 'c -> 'g) -> 'a -> (Logger.t * 'g) Stream.t
+       (unit -> ('a -> state -> 'b) *
+                ('b -> 'c * state Stream.t) *
+                (State.t -> 'c -> 'g)) ->
+       'a -> (Logger.t * 'g) Stream.t
    end
 
 end

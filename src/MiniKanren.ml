@@ -772,8 +772,6 @@ let (=/=) x y state0 =
     let root_node = Logger.make_node logger in
     g (State.empty (), logger, root_node)
 
-  type diseq = Env.t * Subst.t list
-
   let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun st x ->
     let (e,s,c) = st in
 
@@ -801,7 +799,6 @@ let (=/=) x y state0 =
           | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
          )
       | Some i when recursive ->
-         print_endline "Something is found in env";
          (match var with
           | Var (a,i,_) ->
              (* let (_:Subst.t list) = c in *)
@@ -827,19 +824,7 @@ let (=/=) x y state0 =
       | _ -> var
     in
     walk' true e (!!!x) s
-(*
-  let reify (env, dcs) = function
-    | (Var (xi,_)) as v ->
-       List.fold_left
-         (fun acc s ->
-          match Subst.walk' env (!!v) s with
-          | Var (yi,_) when yi == xi -> acc
-          | t -> t :: acc
-         )
-         []
-         dcs
-    | _ -> []
- *)
+
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
   let run_ ?(logger=Logger.create()) = run ~logger
@@ -865,13 +850,7 @@ let (=/=) x y state0 =
     let p sel = sel id
   end
                      *)
-  type 'a result = 'a logic
-(*
-  let refine' : 'a . State.t -> 'a logic -> 'a result =
-    fun ((e, s, c)as st) x ->
-      (* printf "calling refine' for state %s\n%!" (State.show st); *)
-      (Subst.walk' e (!!x) s, reify (e, c) x)
-      *)
+
   let (dummy_goal2: int logic -> string logic -> goal) = fun _ _ _   -> Obj.magic ()
 
   module ExtractDeepest = struct
@@ -960,16 +939,20 @@ let (=/=) x y state0 =
       let succ prev = fun state (x,y) -> (refine state x, prev state y)
     end
 
-    let one
-       = (fun x -> LogicAdder.(succ zero) x), ExtractDeepest.ext2, Refine.one
+    let one () =
+      (fun x -> LogicAdder.(succ zero) x), ExtractDeepest.ext2, Refine.one
 
-    let succ (prev,extD,af) =
+    let succ n () =
+      let (prev,extD,af) = n () in
       (LogicAdder.succ prev, ExtractDeepest.succ extD, Refine.succ af)
 
-    let run (adder,extD,appF) goalish =
+    let two ()   = succ one ()
+    let three () = succ two ()
+    let four ()  = succ three ()
+
+    let run n goalish =
+      let (adder,extD,appF) = n () in
       let tuple,stream = run_ (adder goalish) |> extD in
-      (* printf "run %s +%d\n%!" __FILE__ __LINE__; *)
-      (* printf "stream = '%s'\n%!" (generic_show stream); *)
       let ans =
         Stream.map (fun (st: state) ->
           (* print_endline "inside mapper function"; *)
