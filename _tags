@@ -1,10 +1,16 @@
 true: debug
-<toplevel/*>:  not_hygienic
+
+# PPX rewriters related stuff
+<ppx/smart_logger*>: package(ppx_tools.metaquot)
+<ppx/pa_minikanren*>: package(ppx_tools.metaquot)
+<ppx/ppx_repr*>: package(ppx_tools.metaquot)
 
 <src/tester.ml>: package(typeutil)
+<src/miniKanrenStd.*>: ppx(ppx/pa_minikanren_bin.native)
 
 
 <regression/orig/*>: traverse
+<regression/miniHelpers.ml>: package(extlib), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
 <regression/miniHelpers.ml>: package(extlib), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
 <regression/test*.native> or <regression/test*.byte>: package(str,typeutil)
 <regression/test003.ml>: use_pa_minikanren
@@ -18,14 +24,10 @@ true: debug
 <regression/test02match.*>: package(extlib), short_paths
 <regression/test0domains.*>: package(extlib,ppx_deriving.show), short_paths
 
-<ppx/smart_logger*>: package(ppx_tools.metaquot)
-<ppx/pa_minikanren*>: package(ppx_tools.metaquot)
-<ppx/ppx_repr*>: package(ppx_tools.metaquot)
 
 <jsoo_runner/jsoo_runner.ml>: package(ppx_tools,js_of_ocaml.ppx)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx,js_of_ocaml.tyxml)
 
-<src_test/*>: package(oUnit)
 
 # toplevel related stuff
 #<toplevel/toplevel.cppo.cmo>: package(js_of_ocaml.ppx,base64)
@@ -37,3 +39,4 @@ true: debug
 <toplevel/toplevel.js>: export_package(lwt),export_package(js_of_ocaml),export_package(js_of_ocaml.toplevel),package(ppx_tools)
 <toplevel/toplevel.js>: jsopt(+toplevel.js),jsopt(+dynlink.js),jsopt(+nat.js),jsopt(+weak.js)
 <toplevel/toplevel.js>: package(compiler-libs.common)
+<toplevel/*>:  not_hygienic

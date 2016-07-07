@@ -973,6 +973,28 @@ let (=/=) x y state0 =
        = run (succ one) dummy_goal2
 
   end
+(*
+  module Std = MiniKanrenStd.Make(
+                   struct
+                     type nonrec 'a logic = 'a logic
+                     type nonrec goal = goal
+                     type nonrec state = state
+                     type nonrec 'a llist = 'a llist
+
+                     let call_fresh = call_fresh
+                     let call_fresh_named = call_fresh_named
+                     let inj = inj
+
+                     let (===) = (===)
+                     let (&&&) = (&&&)
+                     let conde = conde
+
+                     let (%) = (%)
+                     let (%<) = (%<)
+                     let (!<) = (!<)
+                     let llist_nil = llist_nil
+                   end)
+ *)
 end
 
 
