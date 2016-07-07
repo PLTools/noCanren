@@ -33,8 +33,11 @@ end
 module UnitLogger: LOGGER
 
 (** Type of typed logic variable *)
-type 'a logic = private Var of int * 'a logic list | Value of 'a * ('a -> string)
+type 'a logic
 
+type 'a unlogic = [`Var of int * 'a logic list | `Value of 'a ]
+
+val destruct : 'a logic -> 'a unlogic
 
 (** Lifting primitive *)
 val (!) : 'a -> 'a logic
@@ -216,9 +219,10 @@ module Make : functor (Logger: LOGGER) -> sig
       is a list of logic expressions, which given variable should not be equal to *)
   val reify : diseq -> 'a logic -> 'a logic list
                                    &*)
-  (** [take ?(n=k) s] takes at most [k] first answers from the lazy
-      stream [s] (reexported from MKStream for convenience) *)
-  val take  : ?n:int -> State.t Stream.t -> State.t list
+
+  (* (\** [take ?(n=k) s] takes at most [k] first answers from the lazy *)
+  (*     stream [s] (reexported from MKStream for convenience) *\) *)
+  (* val take  : ?n:int -> State.t Stream.t -> State.t list *)
   val take' : ?n:int -> state Stream.t -> State.t list
 
 module ApplyLatest :

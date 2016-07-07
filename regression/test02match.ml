@@ -472,25 +472,3 @@ let _ =
   ()
 
 
-
-let goal1 x = (x === !5)
-
-let ___ () =
-  let bad_example =
-    let open Tester.M.ConvenienceCurried in
-    run one goal1
-       (fun reif ->
-        match Stream.take ~n:1 reif  with
-        | [] -> None
-        | (_log,ans) :: _ -> Some ans
-       )
-  in
-  match bad_example with
-  | None -> print_endline "none"
-  | Some x ->
-     printf_logic_with_cs x;
-     printf "\n%!"
-
-(* let () = *)
-(*   Tester.run1 ~n:1 (REPR(fun q -> (q=/= !1)) ); *)
-(*   () *)

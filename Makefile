@@ -14,10 +14,13 @@ PPX_TARGETS=ppx/smart_logger_bin.native ppx/ppx_repr_bin.native ppx/pa_minikanre
 TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
-.PHONY: all celan clean install uninstall tests test regression promote compile_tests run_tests\
+.PHONY: all celan clean clean_tests install uninstall tests test regression promote compile_tests run_tests\
 	only-toplevel toplevel jslib ppx minikanren_stuff tester bundle
 
+.DEFAULT_GOAL: all
+
 all: minikanren_stuff ppx
+	$(MAKE) bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
@@ -26,7 +29,7 @@ ppx:
 	$(OB) $(TARGETS) $(PPX_TARGETS)
 
 jslib: minikanren_stuff ppx
-	$(OB) -Is src,ppx $(JSOO_LIB)
+	$(OB) $(JSOO_LIB)
 
 only-toplevel:
 	$(OB) toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
@@ -39,8 +42,8 @@ tester:
 
 celan: clean
 
-clean:
-	rm -fr _build *.log  *.native *.byte
+clean: clean_tests
+	$(RM) -r _build *.log  *.native *.byte
 	$(MAKE) -C regression clean
 
 #REGRES_CASES=$(shell seq -s " " -f %03g 0 11)
@@ -55,7 +58,13 @@ test$(1).native: regression/test$(1).native
 regression/test$(1).native: regression/test$(1).ml
 	OCAMLPATH=`pwd`/_build/bundle $(OB)  $$@
 
+regression/test$(1).byte: regression/test$(1).ml
+	OCAMLPATH=`pwd`/_build/bundle $(OB)  $$@
+
 compile_tests: regression/test$(1).native
+
+clean_tests:
+	$(RM) -r _build/regression
 
 run_tests: test_$(1)
 test_$(1): #regression/test$(1).native
@@ -109,12 +118,15 @@ MAKE_BUNDLE_TARGETS += $(BUNDLEDIR)/$(notdir $(1))
 endef
 $(foreach i,$(INSTALL_TARGETS),$(eval $(call MAKE_BUNDLE_RULE,$(i)) ) )
 
+rmbundledir:
+	$(RM) -r $(BUNDLEDIR)
+
 $(BUNDLEDIR):
 	$(MKDIR) $@
 
 $(info MAKE_BUNDLE_TARGETS $(MAKE_BUNDLE_TARGETS))
 
-bundle: $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
+bundle: rmbundledir $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
 
 install:
 	ocamlfind install miniKanren $(BUNDLEDIR)/*

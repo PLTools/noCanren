@@ -57,33 +57,30 @@ struct
 
   let from_fun (f: unit -> 'a t) : 'a t =
     let l = Lazy.from_fun f in
-    (* print_endline "forcing"; *)
-    (* let _ = Lazy.force l in *)
     Lazy l
-    (* Lazy (Lazy.from_fun f) *)
 
   let nil = Nil
 
-  let cons h t =
-    (* printf "calling cons of '%s' '%s'\n%!" (generic_show h) (generic_show t); *)
-    Cons (h, t)
+  let rec is_empty = function
+  | Nil    -> true
+  | Lazy s -> is_empty @@ Lazy.force s
+  | _ -> false
+
+  let cons h t = Cons (h, t)
 
   let rec take ?(n=(-1)) s =
-    (* printf "Stream.take: %s +%d\n%!" __FILE__ __LINE__; *)
     if n = 0
     then []
     else
-      (* let () = printf "s = '%s'\n%!" (generic_show s) in *)
       match s with
       | Nil          -> []
       | Cons (x, xs) -> x :: take ~n:(n-1) xs
       | Lazy  z      ->
-         (* printf "%s +%d\n%!" __FILE__ __LINE__; *)
-         (* printf "%s\n%!" (generic_show @@ Lazy.force z); *)
         take ~n:n (Lazy.force z)
 
+  let hd s = List.hd @@ take ~n:1 s
+
   let rec mplus fs gs =
-    (* LOG[trace1] (logn "mplus"); *)
     from_fun (fun () ->
         match fs with
         | Nil           -> gs
@@ -179,28 +176,46 @@ let logf fmt =
   else Printf.kprintf (fun fmt -> ignore (Printf.sprintf "%s" fmt)) fmt
 *)
 
-let (!!) = Obj.magic
+let (!!!) = Obj.magic
 
-type 'a logic = Var of int * 'a logic list | Value of 'a * ('a -> string)
 
-let var_of_int index = Var (index, [])
+type 'a logic =
+  (** TODO: describe fields explicitly *)
+  | Var of int list * int * 'a logic list
+  | Value of 'a * ('a -> string)
 
-let const_not_implemented _ =   "<printer not implemented>"
+(* unlogic is needed to observe logic values in a way when we can't change
+   them, put them back to evaluating and break something
+ *)
+type 'a unlogic = [`Var of int * 'a logic list | `Value of 'a ]
+
+let destruct = function
+  | Var (_,n,xs) -> `Var (n,xs)
+  | Value (x,_printer) -> `Value x
+
+let var_of_int index = Var ([0], index, [])
+
+let const_not_implemented _ = "<printer not implemented>"
 let (!) x = Value (x, const_not_implemented)
 let embed {S : ImplicitPrinters.SHOW} x = Value (x, S.show)
-(* let embed {S : ImplicitPrinters.SHOW} x = Value (x, generic_show) *)
-let inj = embed
 
 let embed_explicit printer x = Value (x, printer)
+
+let inj = embed
+
+exception Not_a_value
+
+let prj_k k = function Value (x,_) -> x | v -> k v
+let prj x = prj_k (fun _ -> raise Not_a_value) x
+
+let (!?) = prj
 
 module Show_logic_explicit (X : ImplicitPrinters.SHOW) = struct
   type t = X.t logic
 
-   let show l =
-    match l with
-    | Var (index,_) -> sprintf "_.%d" index
+  let show = function
+    | Var (_,index,_) -> sprintf "_.%d" index
     | Value (x,_) -> X.show x
-
 end
 
 implicit module Show_logic {X : ImplicitPrinters.SHOW} =
@@ -216,8 +231,8 @@ let fprintf_logic_with_cs ppf l =
   (* constraints are inside {{ ... }} *)
   let rec print ppf l =
     match l with
-    | Var (n,[]) -> fprintf ppf "_.%d" n
-    | Var (n, cs) ->
+    | Var (_,n,[]) -> fprintf ppf "_.%d" n
+    | Var (_,n, cs) ->
        fprintf ppf "(_.%d {{=/=" n;
        List.iter (fun l -> fprintf ppf " "; print ppf l) cs;
        fprintf ppf "}})"
@@ -234,9 +249,8 @@ let show_logic_with_cs what =
   Format.pp_print_flush fmt ();
   Buffer.contents b
 
-let show_logic_naive =
-  function
-  | Var (index,_) -> sprintf "_.%d" index
+let show_logic_naive = function
+  | Var (_,index,_) -> sprintf "_.%d" index
   | Value (x,printer) ->
     (* TODO: add assert that printer is a function *)
     (* but fix js_of_ocaml before doing that *)
@@ -300,7 +314,7 @@ let (%<) x y =
   let ans = Value( Cons(x,ans), llist_printer) in
   ans
 
-let (!<) x   =
+let (!<) x =
   (* let printer = function *)
   (*   | Cons (v, Value (Nil,_)) -> sprintf "[%s]" (show_logic_naive v) *)
   (*   | _ -> assert false *)
@@ -325,61 +339,70 @@ let of_list_hack {S : ImplicitPrinters.SHOW} xs =
     | x::xs -> Cons (Value(x, S.show), embed (helper xs) )
   in  helper xs
 
-exception Not_a_value
 exception Occurs_check
 
 let is_value = function Value _ -> true | Var _ -> false
 let to_value_exn = function Var _ -> raise Not_a_value | Value (x,_) -> x
 
 let rec to_listk k = function
-| Value (Nil,_) -> []
-| Value (Cons (Value (x,_), xs),_) -> x :: to_listk k xs
-| z -> k z
+  | Value (Nil,_) -> []
+  | Value (Cons (Value (x,_), xs),_) -> x :: to_listk k xs
+  | z -> k z
 
 let to_list l = to_listk (fun _ -> raise Not_a_value) l
 
 
-module Env :
-  sig
-    type t
+module Env : sig
+  type t
 
-    val empty  : unit -> t
-    val fresh  : t -> 'a logic * t
-    val var    : t -> 'a logic -> int option
-    val vars   : t -> unit logic list
-    val show   : t -> string
+  val empty  : unit -> t
+  val fresh  : t -> 'a logic * t
+  val var    : t -> 'a logic -> int option
+  (* val vars   : t -> unit logic list *)
 
-    val iter   : t -> ('a logic -> unit) -> unit
-  end =
-  struct
-    module H = Hashtbl.Make (
-      struct
-        type t = unit logic
-        let hash = Hashtbl.hash
-        let equal a b = a == b
-          (* match a,b with *)
-          (* | Var n, Var m when m=n -> true *)
-          (* | Var _, Var _ -> false *)
-          (* | _ -> a == b *)
-      end)
+  (* show is omitted because environment doesn't store variable any more *)
+  (* val show   : t -> string *)
 
-    type latest_counter = int
-    type t = unit H.t * latest_counter
+  (* val iter   : t -> ('a logic -> unit) -> unit *)
+end = struct
 
-    let iter : t -> ('a logic -> unit) -> unit = fun (h,_) f -> H.iter (fun key _v -> f (!!key) ) h
-
-    let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h []
-
-    let show env =
-      let f = function
-        | (Var (i,_)) as v -> sprintf "_.%d (%d); " i (Hashtbl.hash v)
-        | Value _ -> assert false
-      in
-      sprintf "{ %s }" (String.concat " " @@ List.map f (vars env))
+    type t = int list * int (* WTF and next varaible to introduce *)
 
     let counter_start = 10 (* 1 to be able to detect empty list *)
-    let empty () = (H.create 1024, counter_start)
+    let empty () = ([0], counter_start)
 
+    let fresh : t -> 'a logic * t = fun (a, current) ->
+      let v = Var (a, current, []) in
+      (!!!v, (a, current+1))
+
+    let var_tag, var_size =
+      let v = Var ([], 0, []) in
+      Obj.tag (!!! v), Obj.size (!!! v)
+
+    let var (a, _) x =
+      let t = !!! x in
+      if Obj.tag  t = var_tag  &&
+         Obj.size t = var_size &&
+         (let q = Obj.field t 0 in
+          not (Obj.is_int q) && q == (!!!a)
+         )
+      then let Var (_, i, _) = !!! x in Some i
+      else None
+
+    (* let iter : t -> ('a logic -> unit) -> unit = *)
+    (*   fun (h,_) f -> H.iter (fun key _v -> f (!!key) ) h *)
+
+    (* let vars (h, _) = H.fold (fun v _ acc -> v :: acc) h [] *)
+
+    (* let show env = *)
+    (*   let f = function *)
+    (*     | (Var (_,i,_)) as v -> sprintf "_.%d; " i *)
+    (*     | Value _ -> assert false *)
+    (*   in *)
+    (*   sprintf "{ %s }" (String.concat " " @@ List.map f (vars env)) *)
+
+
+(*
     let fresh (h, current) =
       (* let rec v = Var {index=current; reifier=fun () -> (v,[]) } in *)
       let v = Var (current,[]) in
@@ -397,37 +420,34 @@ module Env :
         | Value _ -> failwith "Value _ should not get to the environment"
       else
         None
+        *)
+end
 
-  end
+module Subst : sig
+  type t
 
-module Subst :
-  sig
-    type t
+  val empty   : t
+  val show    : t -> string
 
-    val empty   : t
+  val of_list : (int * Obj.t * Obj.t) list -> t
+  val split   : t -> Obj.t list * Obj.t list
+  val walk    : Env.t -> 'a logic -> t -> 'a logic
+  val unify   : Env.t -> 'a logic -> 'a logic -> t option -> (int * Obj.t * Obj.t) list * t option
 
-    val of_list : (int * Obj.t * Obj.t) list -> t
-    val split   : t -> Obj.t list * Obj.t list
-    val walk    : Env.t -> 'a logic -> t -> 'a logic
-    val walk'   : Env.t -> 'a logic -> t -> 'a logic
-    val unify   : Env.t -> 'a logic -> 'a logic -> t option -> (int * Obj.t * Obj.t) list * t option
-    val show    : t -> string
-  end =
-  struct
+end = struct
+
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
 
     (* substitutions are stored as map of pairs key -> (_, to) *)
     type t = (Obj.t * Obj.t) M.t
 
-
     let show m =
       let b = Buffer.create 40 in
-      (* let open ImplicitPrinters in *)
       bprintf b "subst {";
       M.iter (fun ikey (_, x) ->
           (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
           bprintf b "%s -> " (show_logic_naive (var_of_int ikey));
-          bprintf b "%s; "   (show_logic_naive !!x (* (Value (fst !!x, snd !!x)) *) )
+          bprintf b "%s; "   (show_logic_naive @@ Obj.magic x (* (Value (fst !!x, snd !!x)) *) )
         ) m;
       bprintf b "}";
       Buffer.contents b
@@ -439,18 +459,20 @@ module Subst :
 
     let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
 
-    (* [walk e x subs] returns variable which should be substituted according to [x] in substitution [subs] *)
+    (* [walk e x subs] returns variable which should be substituted according to [x] in
+     * substitution [subs] *)
     let rec walk env var subst =
       (* printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst); *)
       match Env.var env var with
       | None   -> var
       | Some i ->
-          try walk env (snd (M.find i (!! subst))) subst
+          try walk env (snd (M.find i (Obj.magic subst))) subst
           with Not_found -> var
 
     let rec occurs env xi term subst =
       (* printf "occurs?%!"; *)
-      (* printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) (show subst); *)
+      (* printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) *)
+      (*     (show subst); *)
       let y = walk env term subst in
       match Env.var env y with
       | Some yi -> xi = yi
@@ -463,41 +485,9 @@ module Subst :
          | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
-              else occurs env xi (!!(f i)) subst || inner (i+1)
+              else occurs env xi (Obj.magic @@ f i) subst || inner (i+1)
             in
             inner 0
-
-    let rec walk' env var subst =
-      (* printf "\nwalk' env:'%s' var:'%s' subst:'%s'\n%!" (Env.show env) (generic_show var) (show subst); *)
-      match Env.var env var with
-      | None ->
-           let v = var in
-           (match wrap (Obj.repr v) with
-           | Invalid n when n = Obj.closure_tag -> !!var
-           | Unboxed _                          -> !!var
-           | Invalid n    -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
-           | Boxed (t, s, f) ->
-               let var = Obj.dup (Obj.repr v) in
-               let sf =
-                 if t = Obj.double_array_tag
-                 then !! Obj.set_double_field
-                 else Obj.set_field
-               in
-               for i = 0 to s - 1 do
-                 sf var i (!!(walk' env (!!(f i)) subst))
-               done;
-               !!var
-          )
-
-      | Some i ->
-         (* let () = printf "index = %d\n%!" i in *)
-         (* let () = printf "%s +%d: subst = '%s'\n%!" __FILE__ __LINE__ (show subst) in *)
-         (* let () = print_endline @@ generic_show @@ (M.find i (!! subst)) in *)
-         (* let () = print_endline @@ generic_show (snd (M.find i (!! subst)) ) in *)
-         (* let () = flush stdout in *)
-         (try walk' env (snd (M.find i (!! subst))) subst
-           with Not_found -> !!var
-          )
 
     let show_option f = function Some x -> "Some "^(f x) | None -> "None"
     let unify env x y subst =
@@ -511,9 +501,10 @@ module Subst :
         (* printf "UNIFY x = '%s'\n%!" (generic_show !!x); *)
         (* printf "      y = '%s'\n%!" (generic_show !!y); *)
         let extend xi x term delta subst =
-          if occurs env xi term subst then raise Occurs_check
+          if occurs env xi term subst
+          then raise Occurs_check
           else
-            (xi, !!x, !!term)::delta, Some (!! (M.add xi (!!x, term) (!! subst)))
+            (xi, Obj.magic x, Obj.magic term)::delta, Some (!!! (M.add xi (!!!x, term) (!!! subst)))
         in
         match subst with
         | None -> delta, None
@@ -540,7 +531,7 @@ module Subst :
                         | None -> delta, None
                         | Some _ ->
                            if i < sx
-                           then inner (i+1) (unify (!!(fx i)) (!!(fy i)) (delta, subst))
+                           then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
                            else delta, subst
                       in
                       inner 0 (delta, s)
@@ -556,18 +547,18 @@ module Subst :
 
 implicit module Show_subst : (ImplicitPrinters.SHOW with type t = Subst.t) = Subst
 
-module State =
-  struct
-    type t = Env.t * Subst.t * Subst.t list
-    let empty () = (Env.empty (), Subst.empty, [])
-    let env   (env, _, _) = env
-    let show  (env, subst, constr) =
-      sprintf "st {%s, %s, [%s]}"
-              (Env.show env) (Subst.show subst)
-              (* (GT.show(GT.list) Subst.show constr) *)
-              (String.concat "; " @@ List.map Subst.show constr)
-              (* "<showing list of constraints should be implemented with implicits>" *)
-  end
+module State = struct
+  type t = Env.t * Subst.t * Subst.t list
+  let empty () = (Env.empty (), Subst.empty, [])
+  let env   (env, _, _) = env
+  let show  (env, subst, constr) =
+    sprintf "st {%s, %s, [%s]}"
+            "<env>" (* (Env.show env) *)
+            (Subst.show subst)
+            (* (GT.show(GT.list) Subst.show constr) *)
+            (String.concat "; " @@ List.map Subst.show constr)
+            (* "<showing list of constraints should be implemented with implicits>" *)
+end
 
 let fst3 (x,_,_) = x
 
@@ -648,7 +639,7 @@ let (===) x y st =
               (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) t); *)
 
               try
-                let p, s' = Subst.unify env (!!x) (!!t) subst' in
+                let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
                 match s' with
                 | None -> css'
                 | Some _ ->
@@ -686,7 +677,7 @@ let (=/=) x y state0 =
     let prefix = List.split (List.map (fun (_, x, t) -> (x, t)) prefix) in
     let subsumes subst (vs, ts) =
       try
-        match Subst.unify env !!vs !!ts (Some subst) with
+        match Subst.unify env !!!vs !!!ts (Some subst) with
         | [], Some _ -> true
         | _ -> false
       with Occurs_check -> false
@@ -703,7 +694,8 @@ let (=/=) x y state0 =
     traverse constr
   in
   let string_of_prefixes xs =
-    String.concat "; " @@ List.map (fun (x,y,z) -> sprintf "(%d,'%s','%s')" x (generic_show !!y) (generic_show !!z) ) xs
+    String.concat "; " @@
+      List.map (fun (x,y,z) -> sprintf "(%d,'%s','%s')" x (generic_show !!!y) (generic_show !!!z) ) xs
   in
   let show_subst_list ss =
     sprintf "{{%s}}" (String.concat "; " @@ List.map Subst.show ss)
@@ -782,48 +774,60 @@ let (=/=) x y state0 =
 
   type diseq = Env.t * Subst.t list
 
-  (* let refine (e, s, c) x = (Subst.walk' e (!!x) s, (e, c)) *)
-let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun st x ->
-  let (e,s,c) = st in
+  let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun st x ->
+    let (e,s,c) = st in
 
-  let rec walk' env var subst =
-    let var = Subst.walk env var subst in
-    match Env.var env var with
-    | None ->
-        (match wrap (Obj.repr var) with
-         | Invalid n when n = Obj.closure_tag -> !!var
-         | Unboxed _ -> !!var
-         | Boxed (t, s, f) ->
-            let var = Obj.dup (Obj.repr var) in
-            let sf =
-              if t = Obj.double_array_tag
-              then !! Obj.set_double_field
-              else Obj.set_field
-            in
-            for i = 0 to s - 1 do
-              sf var i (!!(walk' env (!!(f i)) subst))
-           done;
-           !!var
-         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
-        )
-    | Some i ->
-        (match var with
-         | Var (i, _) ->
-            let cs =
-	      List.fold_left
-		(fun acc s ->
-		   match Subst.walk' env (!!var) s with
-		   | Var (j, _) when i = j -> acc
-		   | t -> (refine st t) :: acc
-		)
-		[]
-		c
-	    in
-	    Var (i, cs)
-        )
-  in
-  walk' e (!!x) s
+    (* printf "refine: state = %s\n%!" (State.show st); *)
 
+    let rec walk' recursive env var subst =
+      let var = Subst.walk env var subst in
+      (* printf "in walk' var = '%s'\n%!" (generic_show var); *)
+      match Env.var env var with
+      | None ->
+         (match wrap (Obj.repr var) with
+          | Unboxed _                          -> !!!var
+          | Invalid n when n = Obj.closure_tag -> !!!var
+          | Boxed (t, s, f) ->
+             let var = Obj.dup (Obj.repr var) in
+             let sf =
+               if t = Obj.double_array_tag
+               then !!! Obj.set_double_field
+               else Obj.set_field
+             in
+             for i = 0 to s - 1 do
+               sf var i (!!!(walk' true env (!!!(f i)) subst))
+             done;
+             !!!var
+          | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
+         )
+      | Some i when recursive ->
+         print_endline "Something is found in env";
+         (match var with
+          | Var (a,i,_) ->
+             (* let (_:Subst.t list) = c in *)
+             (* let open ImplicitPrinters in *)
+             (* printf "Constraints: (count = %d)\n%!" (List.length c); *)
+             (* print_endline @@ show c; *)
+             (* List.iter (fun s -> print_endline @@ Subst.show s) c; *)
+
+             let cs =
+	       List.fold_left
+		 (fun acc s ->
+                  let u = walk' false env (!!!var) s  in
+                  (* printf "u = %s\n%!" (generic_show u); *)
+		  match u with
+                  | Var (_,j,_) when i = j -> acc
+                  | t -> (refine st t) :: acc
+		 )
+		 []
+		 c
+	     in
+	     Var (a,i,cs)
+         )
+      | _ -> var
+    in
+    walk' true e (!!!x) s
+(*
   let reify (env, dcs) = function
     | (Var (xi,_)) as v ->
        List.fold_left
@@ -835,8 +839,7 @@ let rec refine : 'a . State.t -> 'a logic -> 'a logic = fun st x ->
          []
          dcs
     | _ -> []
-
-  let take = Stream.take
+ *)
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
   let run_ ?(logger=Logger.create()) = run ~logger
