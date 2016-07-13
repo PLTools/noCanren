@@ -46,12 +46,9 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte
 	$(MAKE) -C regression clean
 
-#REGRES_CASES=$(shell seq -s " " -f %03g 0 11)
-#REGRES_CASES:=$(REGRES_CASES) bad000
-#REGRES_CASES:=$(REGRES_CASES) Diseq000
+######################## Tests related stuff  ##########################
 REGRES_CASES := 000 004 005 009 0match 01match 02match 0domains
 
-#$(warning $(REGRES_CASES))
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
 NATIVE_TEST_EXECUTABLES += regression/test$(1).native
@@ -69,7 +66,7 @@ regression/test$(1).native: regression/test$(1).ml
 	$(OB) -Is src $$@
 
 run_tests: test_$(1)
-test_$(1): #regression/test$(1).native
+test_$(1):
 	@cd regression  && $(TESTS_ENVIRONMENT) ../test$(1).native; \
 	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
 endef
@@ -95,9 +92,7 @@ tests: minikanren_stuff ppx bundle compile_tests run_tests
 regression: tests
 test: tests
 
-unittests:
-	$(OB) -I src src_test/test.byte && ./test.byte
-
+######################## Installation related stuff ##########################
 INSTALL_TARGETS=META \
 	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
@@ -107,8 +102,6 @@ INSTALL_TARGETS=META \
 	_build/src/tester.o \
 	_build/ppx/smart_logger.cmi \
 	$(wildcard _build/ppx/*.native)
-
-$(info  )
 
 MAYBE_INSTALL_TARGETS=\
 	_build/jsoo_runner/jsoo_runner.cmi \
@@ -133,16 +126,14 @@ endef
 $(foreach i,$(INSTALL_TARGETS),$(eval $(call MAKE_BUNDLE_RULE,$(i)) ) )
 
 rmbundledir:
-	$(RM) -r $(BUNDLEDIR)
+	@$(RM) -r $(BUNDLEDIR)
 
 $(BUNDLEDIR):
-	$(MKDIR) $@
-
-#$(info MAKE_BUNDLE_TARGETS $(MAKE_BUNDLE_TARGETS))
+	@$(MKDIR) $@
 
 bundle: rmbundledir $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
 
-install:
+install: bundle
 	ocamlfind install miniKanren $(BUNDLEDIR)/*
 
 uninstall:

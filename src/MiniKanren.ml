@@ -340,6 +340,9 @@ exception Occurs_check
 
 let is_value = function Value _ -> true | Var _ -> false
 let to_value_exn = function Var _ -> raise Not_a_value | Value (x,_) -> x
+let number_of_var_exn = function
+  | Var (_,n,_) -> n
+  | Value _ -> failwith "Bad argument of number_of_var_exn"
 
 let rec to_listk k = function
   | Value (Nil,_) -> []
@@ -354,6 +357,10 @@ module Env : sig
 
   val empty  : unit -> t
   val fresh  : t -> 'a logic * t
+
+  (** Call [var env lvar] returns number if logic variable if it was
+   * introduced in this [env]. Else returns None.
+   *)
   val var    : t -> 'a logic -> int option
   (* val vars   : t -> unit logic list *)
 
@@ -363,28 +370,31 @@ module Env : sig
   (* val iter   : t -> ('a logic -> unit) -> unit *)
 end = struct
 
-    type t = int list * int (* WTF and next varaible to introduce *)
+  (* We store a dummy value in environment and in all logic variables
+   * we reference this value. So we are able to check if concrete logic
+   * value was created in concrete environment (see function [var]). *)
+  type t = int list * int (* hack and next varaible to introduce *)
 
-    let counter_start = 10 (* 1 to be able to detect empty list *)
-    let empty () = ([0], counter_start)
+  let counter_start = 10 (* 1 to be able to detect empty list *)
+  let empty () = ([0], counter_start)
 
-    let fresh : t -> 'a logic * t = fun (a, current) ->
-      let v = Var (a, current, []) in
-      (!!!v, (a, current+1))
+  let fresh : t -> 'a logic * t = fun (a, current) ->
+    let v = Var (a, current, []) in
+    (!!!v, (a, current+1))
 
-    let var_tag, var_size =
-      let v = Var ([], 0, []) in
-      Obj.tag (!!! v), Obj.size (!!! v)
+  let var_tag, var_size =
+    let v = Var ([], 0, []) in
+    Obj.tag (!!! v), Obj.size (!!! v)
 
-    let var (a, _) x =
-      let t = !!! x in
-      if Obj.tag  t = var_tag  &&
-         Obj.size t = var_size &&
-         (let q = Obj.field t 0 in
-          not (Obj.is_int q) && q == (!!!a)
-         )
-      then let Var (_, i, _) = !!! x in Some i
-      else None
+  let var (a, _) x =
+    let t = !!! x in
+    if Obj.tag  t = var_tag  &&
+       Obj.size t = var_size &&
+       (let q = Obj.field t 0 in
+        not (Obj.is_int q) && q == (!!!a)
+       )
+    then let Var (_, i, _) = !!! x in Some i
+    else None
 
     (* let iter : t -> ('a logic -> unit) -> unit = *)
     (*   fun (h,_) f -> H.iter (fun key _v -> f (!!key) ) h *)
@@ -433,46 +443,47 @@ module Subst : sig
 
 end = struct
 
-    module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
+  module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
 
-    (* substitutions are stored as map of pairs key -> (_, to) *)
-    type t = (Obj.t * Obj.t) M.t
+  (* substitution of logic variable [l] is stored in a  map of pairs:
+   * [index] -> ([l], [res]) where  [index] is number of introduced logic variable [l]
+  *)
+  type t = (Obj.t * Obj.t) M.t
 
-    let show m =
-      let b = Buffer.create 40 in
-      bprintf b "subst {";
-      M.iter (fun ikey (_, x) ->
-          (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
-          bprintf b "%s -> " (show_logic_naive (var_of_int ikey));
-          bprintf b "%s; "   (show_logic_naive @@ Obj.magic x (* (Value (fst !!x, snd !!x)) *) )
-        ) m;
-      bprintf b "}";
-      Buffer.contents b
+  let show m =
+    let b = Buffer.create 40 in
+    bprintf b "subst {";
+    M.iter (fun ikey (_logic, x) ->
+      (* printf "inside M.iter x ~= %s\n%!" (generic_show !!x); *)
+      bprintf b "%s -> " (show_logic_naive (var_of_int ikey));
+      bprintf b "%ss; "  (generic_show x)
+    ) m;
+    bprintf b "}";
+    Buffer.contents b
 
+  let empty = M.empty
 
-    let empty = M.empty
+  let of_list l = List.fold_left (fun s (i, v, t) -> M.add i (v, t) s) empty l
 
-    let of_list l = List.fold_left (fun s (i, v, t) -> M.add i (v, t) s) empty l
+  let split s = M.fold (fun _ (l, t) (ls, ts) -> l::ls, t::ts) s ([], [])
 
-    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
+  (* [walk e x subs] returns variable which should be substituted according to [x] in
+   * substitution [subs] *)
+  let rec walk env var subst =
+    (* printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst); *)
+    match Env.var env var with
+    | None   -> var
+    | Some i ->
+        try walk env (snd (M.find i (Obj.magic subst))) subst
+        with Not_found -> var
 
-    (* [walk e x subs] returns variable which should be substituted according to [x] in
-     * substitution [subs] *)
-    let rec walk env var subst =
-      (* printf "walk _env ~var:'%s' ~subst:'%s'\n%!" (generic_show !!var) (show subst); *)
-      match Env.var env var with
-      | None   -> var
-      | Some i ->
-          try walk env (snd (M.find i (Obj.magic subst))) subst
-          with Not_found -> var
-
-    let rec occurs env xi term subst =
+  let rec occurs env xi term subst =
       (* printf "occurs?%!"; *)
       (* printf " _ ~xi:'%s' ~term:'%s' ~subst:'%s'\n%!" (generic_show !!xi) (generic_show !!term) *)
       (*     (show subst); *)
       let y = walk env term subst in
       match Env.var env y with
-      | Some yi -> xi = yi
+      | Some yi -> xi = yi (* if logic value substitutes to logic value we should check indexes *)
       | None ->
          let wy = wrap (Obj.repr y) in
          match wy with
@@ -480,14 +491,21 @@ end = struct
          | Invalid 247 -> false
          | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
          | Boxed (_, s, f) ->
+            (* if [term] is substituted to non logic boxed value we should iterate over tree *)
             let rec inner i =
               if i >= s then false
               else occurs env xi (Obj.magic @@ f i) subst || inner (i+1)
             in
             inner 0
 
-    let show_option f = function Some x -> "Some "^(f x) | None -> "None"
-    let unify env x y subst =
+  let show_option f = function Some x -> "Some "^(f x) | None -> "None"
+
+  (** Call [unify env x y s] tries to unify value [x] with value [y] using current substituion [s].
+   *  Returns pair of substitutions [(delta,ans)] where
+   *   delta is mini substitution: list of newly added mappings;
+   *   ans is result substitution: new mapping applied above [s].
+   **)
+  let unify env x y subst =
       (* printf "_.11 = '%s'\n%!" (generic_show !!(var_of_int 11)); *)
       (* printf "unify: env ~x:'%s' ~subst:'%s'\n%!" (generic_show !!x) *)
       (*        (show_option show subst); *)
@@ -498,6 +516,7 @@ end = struct
         (* printf "UNIFY x = '%s'\n%!" (generic_show !!x); *)
         (* printf "      y = '%s'\n%!" (generic_show !!y); *)
         let extend xi x term delta subst =
+          assert (xi = number_of_var_exn x);
           if occurs env xi term subst
           then raise Occurs_check
           else
@@ -508,18 +527,21 @@ end = struct
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
+            | Some xi, Some yi when xi = yi ->
+               (delta, s)
+            | Some xi, Some _  -> extend xi x y delta subst
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
-            | _ ->
-               if x==y
-               then (* let () = printf "ptrs are equal\n%!" in *) (delta,s)
-               else
+            | None,    None when x==y ->
+               (* we don't need unification when values are physically equal  *)
+               (delta,s)
+            | None,None ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
-                 | Invalid 247, Invalid 247 (* when x==y *) -> delta, s
-
+                 | Invalid 247, Invalid 247 (* when x==y *) ->
+                    (* We suppose that functional values are always unifiable *)
+                    delta, s
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
                     then
@@ -558,6 +580,7 @@ module State = struct
 end
 
 let fst3 (x,_,_) = x
+let snd3 (_,x,_) = x
 
 module Make (Logger: LOGGER) = struct
   module Logger = Logger
@@ -581,7 +604,8 @@ module Make (Logger: LOGGER) = struct
     Logger.connect root l dest msg;
     (st,root,dest)
 
-  let (<=>)  : string -> (state -> 'b) -> (state -> 'b)
+  (** Primitive for adding debug/tracing information *)
+  let (<=>) : string -> (state -> 'b) -> (state -> 'b)
     = fun msg f st -> f (adjust_state msg st)
 
   let call_fresh: ('a logic -> state -> 'b) -> state -> 'b = fun f (((env,s,ss), _, _) as state) ->
@@ -599,9 +623,8 @@ module Make (Logger: LOGGER) = struct
      (fun (_,l,dest) -> f x (new_st, l, dest) ))
       state
 
-exception Disequality_violated
+  exception Disequality_violated
 
-let snd3 (_,x,_) = x
 
 let (===) x y st =
   (* printf "  call (%s) === (%s)\n%!" (show_logic_naive x) (show_logic_naive y); *)
@@ -624,12 +647,19 @@ let (===) x y st =
        Stream.nil
     | Some s ->
         try
-          (* TODO: only apply constraints with the relevant vars *)
+          (* TODO (dboulytchev): only apply constraints with the relevant vars *)
+          (* Hypotesis (kakadu): `prefix` contains newly introduced mapping.
+             We need to fold only them
+          *)
           (* print_endline "folding constraints"; *)
           (* printf "constr = '%s'\n%!" (generic_show constr); *)
           let constr' =
-            List.fold_left (fun css' cs ->
-              let (x, t) : Obj.t list * Obj.t list  = Subst.split cs in
+            List.fold_left (fun acc cs ->
+              let (x, t) : Obj.t list * Obj.t list = Subst.split cs in
+              (* Hack above only works because of current list representation.
+               * Non-hacky implementation requires iteration over substituion
+               * and many calls of [Subst.unify] inside *)
+
               (* printf "css' = '%s', cs='%s'\n%!" (generic_show !!css') (Subst.show cs); *)
               (* printf "x = [%s], t=[%s]\n%!" *)
               (*   (String.concat "; " @@ List.map (fun x -> generic_show !!x) x) *)
@@ -638,12 +668,12 @@ let (===) x y st =
               try
                 let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
                 match s' with
-                | None -> css'
+                | None -> acc
                 | Some _ ->
                     match p with
                     | [] -> raise Disequality_violated
-                    | _  -> (Subst.of_list p)::css'
-              with Occurs_check -> css'
+                    | _  -> (Subst.of_list p)::acc
+              with Occurs_check -> acc
             )
             []
             constr
