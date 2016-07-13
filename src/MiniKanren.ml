@@ -184,9 +184,6 @@ type 'a logic =
   | Var of int list * int * 'a logic list
   | Value of 'a * ('a -> string)
 
-(* unlogic is needed to observe logic values in a way when we can't change
-   them, put them back to evaluating and break something
- *)
 type 'a unlogic = [`Var of int * 'a logic list | `Value of 'a ]
 
 let destruct = function
@@ -256,7 +253,7 @@ let show_logic_naive = function
     (* but fix js_of_ocaml before doing that *)
     printer x
 
-let sprintf_logic () x = show_logic_naive x
+let sprintf_logic () = show_logic_naive
 let fprintf_logic fmt l = Format.fprintf fmt "%s" (sprintf_logic () l)
 
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic

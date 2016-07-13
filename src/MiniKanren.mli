@@ -35,18 +35,32 @@ module UnitLogger: LOGGER
 (** Type of typed logic variable *)
 type 'a logic
 
+(** Type [unlogic] is needed to observe logic values in a way when we can't change
+ *  them, put them back to evaluating and break something
+ *)
 type 'a unlogic = [`Var of int * 'a logic list | `Value of 'a ]
 
 val destruct : 'a logic -> 'a unlogic
 
-(** Lifting primitive *)
+(** Lifting primitive: create a value without a printer. To inject values with
+  * their printers use [inj].
+  *)
 val (!) : 'a -> 'a logic
 
-val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+(** Lift value and its printer to logic domain *)
 val inj   : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
 
+(** Synonym for [inj] *)
+val embed : {S: ImplicitPrinters.SHOW} -> S.t -> S.t logic
+
+(** Lift value and its printer to logic domain. The same as [inj] but doesn't
+ *  abuse modular implicits
+ *)
 val embed_explicit: ('a -> string) -> 'a -> 'a logic
 
+(* TODO: remove this module because we can use syntax like
+   show {Show_int} 5
+*)
 module Show_logic_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
                         type t = X.t logic
                         val show : X.t logic -> string
@@ -57,16 +71,25 @@ implicit module Show_logic : functor {X : ImplicitPrinters.SHOW} -> sig
                         val show : X.t logic -> string
 end
 
+(** Print logic value using printer stored in it *)
 val show_logic_naive : 'a logic -> string
 
+(** Printing primitive. Useful in sprintf "%a" like functions *)
 val sprintf_logic : unit -> 'a logic -> string
+(** Printing with Format module *)
 val fprintf_logic : Format.formatter -> 'a logic -> unit
-val fprintf_logic_with_cs : Format.formatter -> 'a logic -> unit
-val printf_logic_with_cs : 'a logic -> unit
 
-(** Type of ligic lists *)
+(** Prints logic value with it's constraint in format like
+ *  _.num {{ <constraints> }}
+ *)
+val printf_logic_with_cs : 'a logic -> unit
+(** The same for [printf_logic_with_cs] but for using in Format module *)
+val fprintf_logic_with_cs : Format.formatter -> 'a logic -> unit
+
+(** Type of logic lists *)
 type 'a llist = Nil | Cons of 'a logic * 'a llist logic
 
+(* TODO: remove this module*)
 module Show_llist_explicit : functor (X : ImplicitPrinters.SHOW) -> sig
                        type t = X.t llist
                        val show : X.t llist -> string
@@ -77,9 +100,12 @@ implicit module Show_llist : functor {X : ImplicitPrinters.SHOW} -> sig
                        val show : X.t llist -> string
 end
 
+(** Empty logic llist *)
 val llist_nil : 'a llist logic
 
+(** Returns true when argument is empty list *)
 val llist_is_empty : 'a llist -> bool
+(** Returns true with argument is logic value which contains empty list *)
 val llist_is_empty_logic : 'a llist logic -> bool
 
 val llist_printer : 'a llist -> string
