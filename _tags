@@ -24,7 +24,12 @@ true: debug
 <regression/test02match.*>: package(extlib), short_paths
 <regression/test0domains.*>: package(extlib,ppx_deriving.show), short_paths
 
+# demo related stuff
+<demo*.*>: short_paths, package(extlib,ppx_deriving.show,str,typeutil)
+<demo*.*>: ppx(ppx/smart_logger_bin.native), ppx(ppx/ppx_repr_bin.native), ppx(ppx/pa_minikanren_bin.native)
 
+####################################################################
+# JSOO toplevel related stuff
 <jsoo_runner/jsoo_runner.ml>: package(ppx_tools,js_of_ocaml.ppx)
 <jsoo_runner/jsoo_runner.cmo>: package(js_of_ocaml.ppx,js_of_ocaml.tyxml)
 

@@ -92,6 +92,14 @@ tests: minikanren_stuff ppx bundle compile_tests run_tests
 regression: tests
 test: tests
 
+######################## in demo files we do some experimentation ############
+.PHONY: demo clean_demo
+demo: demo.native
+demo.native: demo.ml
+	$(OB) -Is src $@
+clean_demo:
+	@$(RM) demo.native
+clean: clean_demo
 ######################## Installation related stuff ##########################
 INSTALL_TARGETS=META \
 	$(wildcard _build/src/*.cmi) \

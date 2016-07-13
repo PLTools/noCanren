@@ -520,7 +520,8 @@ end = struct
           if occurs env xi term subst
           then raise Occurs_check
           else
-            (xi, Obj.magic x, Obj.magic term)::delta, Some (!!! (M.add xi (!!!x, term) (!!! subst)))
+            (xi, Obj.magic x, Obj.magic term)::delta,
+            Some (!!! (M.add xi (!!!x, term) (!!! subst)))
         in
         match subst with
         | None -> delta, None
