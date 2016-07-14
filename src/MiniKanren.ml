@@ -15,7 +15,7 @@ let rec wrap (x : Obj.t) =
     in
     let is_unboxed obj =
       is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
+      (fun t -> t = string_tag || t = double_tag || t = infix_tag) (tag obj)
     in
     if is_unboxed x
     then Unboxed x
@@ -44,7 +44,10 @@ let generic_show x =
 
     | Boxed   (t, l, f) ->
       bprintf b "boxed %d <" t;
-      for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
+      for i = 0 to l - 1 do (
+        inner (f i);
+        if i<l-1 then Buffer.add_string b " "
+      ) done;
       Buffer.add_string b ">"
   in
   inner x;
