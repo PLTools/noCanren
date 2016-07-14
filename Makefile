@@ -93,9 +93,11 @@ regression: tests
 test: tests
 
 ######################## in demo files we do some experimentation ############
-.PHONY: demo clean_demo
+.PHONY: demo clean_demo demo.byte demo.native
 demo: demo.native
-demo.native: demo.ml
+demo.native:
+	$(OB) -Is src $@
+demo.byte:
 	$(OB) -Is src $@
 clean_demo:
 	@$(RM) demo.native
