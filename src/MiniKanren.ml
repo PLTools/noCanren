@@ -1024,8 +1024,7 @@ let (=/=) x y state0 =
                      let (%<) = (%<)
                      let (!<) = (!<)
                      let llist_nil = llist_nil
-                   end)
- *)
+                   end) *)
 end
 
 

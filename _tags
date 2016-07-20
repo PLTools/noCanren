@@ -6,7 +6,7 @@ true: debug
 <ppx/ppx_repr*>: package(ppx_tools.metaquot)
 
 <src/tester.ml>: package(typeutil)
-<src/miniKanrenStd.*>: ppx(ppx/pa_minikanren_bin.native)
+<src/miniKanrenStd.*>: ppx(ppx/pa_minikanren_bin.native), backtrack
 
 
 <regression/orig/*>: traverse

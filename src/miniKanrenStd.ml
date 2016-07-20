@@ -1,3 +1,5 @@
+open ImplicitPrinters
+
 module type MINIKANREN_CORE = sig
   type state
   type goal
@@ -17,13 +19,16 @@ module type MINIKANREN_CORE = sig
   val (%<) : 'a logic -> 'a logic -> 'a llist logic
   val (!<) : 'a logic -> 'a llist logic
   val llist_nil: 'a llist logic
+
+  implicit module Show_logic(X: SHOW) : (SHOW with type t = X.t logic)
+  implicit module Show_llist(X: SHOW) : (SHOW with type t = X.t llist)
 end
 
 let fst3 (x,_,_) = x
 
 module Make(MK: MINIKANREN_CORE) = struct
+  open implicit MK
   open MK
-  open ImplicitPrinters
 
   let (!) = inj
 
@@ -59,25 +64,30 @@ module Make(MK: MINIKANREN_CORE) = struct
               (f a' h ans)
       ]
 
+  implicit module Show_string2 = ImplicitPrinters.Show_string
+  implicit module Show_logic(X:SHOW) : SHOW with type t = X.t logic = MK.Show_logic(X)
+  (* let _f (x: int) (y: string logic) : (int (\* logic *\) * string logic) logic = *)
+  (*   let open ImplicitPrinters in *)
+  (*   let (_:string) = show {Show_logic(Show_string)} y in *)
+  (*   !(x,y) *)
 
   let _ = !(5,"")
 
-  let rec f {A: SHOW} {B:SHOW} (x: A.t) (y: B.t) = [ (x,y) ] @ (f x y) ;;
+  (* let rec f {A: SHOW} {B:SHOW} (x: A.t) (y: B.t) = [ (x,y) ] @ (f x y) ;; *)
+  implicit module Show_llist(X: SHOW) : (SHOW with type t = X.t llist) = struct
+    type t = X.t llist
+    let show _ = ""
+  end
 
-  let rec combine {X:SHOW} {Y:SHOW}
-                  (xs: X.t llist logic)
-                  (ys: Y.t llist logic)
-                  (ans: (X.t logic * Y.t logic) llist logic) =
-    fresh (hx tx hy ty temp)
+  let rec combine : {X:SHOW} -> {Y:SHOW} -> X.t llist logic -> Y.t llist logic ->
+                    (X.t logic * Y.t logic) llist logic -> goal
+    = fun {X:SHOW} {Y:SHOW} (xs: X.t llist logic) (ys: Y.t llist logic)
+          (ans: (X.t logic * Y.t logic) llist logic) ->
+    call_fresh @@ fun (temp: (X.t logic * Y.t logic) llist logic) ->
+    fresh (hx tx hy ty )
           (list_cons xs hx tx)
           (list_cons ys hy ty)
-          (combine tx ty temp)
-          (ans === !(hx,hy) % temp)
+          (combine {X} {Y} tx ty temp)
+          (ans === (inj {Show_pair(Show_logic(X))(Show_logic(Y)) } (hx,hy)) % temp)
 
 end
-
-
-
-(* open Tester.M *)
-(* open MiniKanren *)
-

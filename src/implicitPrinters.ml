@@ -46,6 +46,11 @@ implicit module Show_bool : (SHOW with type t = bool) = struct
     let show x = sprintf "%b" x
 end
 
+implicit module Show_char : (SHOW with type t = char) = struct
+    type t = char
+    let show x = sprintf "%c" x
+end
+
 implicit module Show_string : (SHOW with type t = string) = struct
     type t = string
     let show x = x

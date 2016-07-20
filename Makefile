@@ -19,7 +19,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .DEFAULT_GOAL: all
 
-all: minikanren_stuff ppx
+all: ppx minikanren_stuff
 	$(MAKE) bundle
 
 minikanren_stuff:
@@ -28,7 +28,7 @@ minikanren_stuff:
 ppx:
 	$(OB) $(TARGETS) $(PPX_TARGETS)
 
-jslib: minikanren_stuff ppx
+jslib: ppx minikanren_stuff
 	$(OB) $(JSOO_LIB)
 
 only-toplevel:
@@ -88,7 +88,7 @@ clean_tests:
 promote:
 	$(MAKE) -C regression promote TEST=$(TEST)
 
-tests: minikanren_stuff ppx bundle compile_tests run_tests
+tests: ppx minikanren_stuff bundle compile_tests run_tests
 regression: tests
 test: tests
 
