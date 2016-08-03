@@ -38,7 +38,7 @@ implicit module Show_option = Show_option_explicit
 
 implicit module Show_int : (SHOW with type t = int) = struct
     type t = int
-    let show x = sprintf "%d" x
+    let show = string_of_int
 end
 
 implicit module Show_bool : (SHOW with type t = bool) = struct

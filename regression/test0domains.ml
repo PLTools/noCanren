@@ -2,7 +2,6 @@ open Printf
 open MiniKanren
 open Tester.M
 open ImplicitPrinters
-open MiniHelpers
 
 let (!) = inj
 

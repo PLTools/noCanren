@@ -1,6 +1,7 @@
 open Printf
 open MiniKanren
 open Tester.M
+open Tester.M.Std
 open ImplicitPrinters
 open MiniHelpers
 
@@ -470,5 +471,3 @@ let _ =
   (* Tester.run1 ~n:1 (REPR(fun q -> folder !Subst.empty  !( !(make_value "A" [make_value "C" []]), !(make_pat "A" [make_pat "C" []])) q)); *)
   (* Tester.run2 ~n:1 (REPR(fun q v -> q =/= v)); *)
   ()
-
-

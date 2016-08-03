@@ -332,4 +332,14 @@ module ApplyLatest :
        'a -> (Logger.t * 'g) Stream.t
    end
 
+
+  module Std : sig
+    val list_cons : 'a llist logic  -> 'a logic -> 'a llist logic -> goal
+    val list_hd   : 'a llist logic  -> 'a logic -> goal
+    val list_tail : 'a llist logic  -> 'a llist logic -> goal
+
+    val appendo : 'a llist logic -> 'a llist logic -> 'a llist logic -> goal
+    val foldo : ('b logic -> 'a logic -> 'b logic -> goal) -> 'b logic -> 'a llist logic
+                -> 'b logic -> goal
+  end
 end

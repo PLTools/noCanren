@@ -1004,7 +1004,7 @@ let (=/=) x y state0 =
        = run (succ one) dummy_goal2
 
   end
-(*
+
   module Std = MiniKanrenStd.Make(
                    struct
                      type nonrec 'a logic = 'a logic
@@ -1024,7 +1024,10 @@ let (=/=) x y state0 =
                      let (%<) = (%<)
                      let (!<) = (!<)
                      let llist_nil = llist_nil
-                   end) *)
+
+                     implicit module Show_llist = Show_llist
+                     implicit module Show_logic = Show_logic
+                   end)
 end
 
 

@@ -982,6 +982,7 @@ let ___ () =
 
 open MiniKanren
 open Tester.M
+open Tester.M.Std
 open ImplicitPrinters
 
 let (!) = embed
