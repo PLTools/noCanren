@@ -23,3 +23,9 @@ depends: [
   "typeutil"
   "ppx_deriving" { test & = "3.0-modular-implicits" }
 ]
+
+depopts: [
+  "js_of_ocaml"
+]
+conflicts: [ "js_of_ocaml" { != "2.7-implicits" } ]
+
