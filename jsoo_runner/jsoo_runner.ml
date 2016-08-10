@@ -53,7 +53,8 @@ module GraphLogger = struct
   let find g node =
     G.find g.l_graph node
 
-  let output_plain ~filename _ = ()
+  let output_plain ~filename _ = failwith "not implemented in js_of_ocaml"
+
   let output_html ~filename _answers g =
     let module T = Tyxml_js.Html5 in
     let open Tyxml_js.Html5 in
@@ -101,9 +102,9 @@ let run1 ~n (title, goal) =
   run one goal
     |> (fun stream ->
           Stream.take ~n stream |> List.iter
-          (fun (_logger,q) ->
+          (fun (logger,q) ->
             Format.printf "q=%a\n%!" fprintf_logic_with_cs q;
-            ()
+            M.Logger.output_html ~filename:"" [] logger;
           )
        );
   printf "}\n%!"
@@ -113,8 +114,9 @@ let run2 ~n (title,goal) =
   run (succ one) goal |>
     begin fun stream ->
      Stream.take ~n stream |> List.iter
-        (fun (_logger,(q,r)) ->
-           Format.printf "q=%a; r=%a\n%!" fprintf_logic_with_cs q fprintf_logic_with_cs r;
+        (fun (logger,(q,r)) ->
+          Format.printf "q=%a; r=%a\n%!" fprintf_logic_with_cs q fprintf_logic_with_cs r;
+          M.Logger.output_html ~filename:"" [] logger;
         )
     end;
   printf "}\n%!"
