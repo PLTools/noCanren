@@ -816,6 +816,9 @@ let (=/=) x y state0 =
          (match wrap (Obj.repr var) with
           | Unboxed _                          -> !!!var
           | Invalid n when n = Obj.closure_tag -> !!!var
+          (* dirty hack for js_of_ocaml *)
+          (* but we can fix it by overriding primitive for getting tag *)
+          (* | Boxed (t, _, _) when t = 1000 -> !!!var *)
           | Boxed (t, s, f) ->
              let var = Obj.dup (Obj.repr var) in
              let sf =
@@ -859,6 +862,7 @@ let (=/=) x y state0 =
   let take' ?(n=(-1)) stream = List.map (fun (x,_,_) -> x) (Stream.take ~n stream)
 
   let run_ ?(logger=Logger.create()) = run ~logger
+
 
 (*
   module PolyPairs = struct
@@ -1004,6 +1008,27 @@ let (=/=) x y state0 =
        = run (succ one) dummy_goal2
 
   end
+
+(*
+  let () =
+    print_endline "selftest0";
+    let open ConvenienceStream in
+    let () = run one (fun q -> q===Value (5, string_of_int))
+      |> (fun stream ->
+        Stream.hd stream |> (fun (_logger,q) ->
+          Format.printf "q=%a\n%!" fprintf_logic_with_cs q))
+    in
+    print_endline "selftest0 ended";
+    ()
+
+  let () =
+    print_endline "selftest1";
+    let (q,s) = run (call_fresh (fun q st -> (q,(q===Value (5, string_of_int)) st) )) in
+    Stream.hd s |> (fun ((e,subst,_),_,_) ->
+      printf "%s -> %s;\n" (show_logic_naive q) (show_logic_naive @@ Subst.walk e q subst));
+    print_endline "selftest1 ended";
+    ()
+*)
 
   module Std = MiniKanrenStd.Make(
                    struct

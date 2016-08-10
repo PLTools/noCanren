@@ -60,20 +60,19 @@ module Ocaml_dependencies = Pack.Ocaml_dependencies.Make(Ocaml_dependencies_inpu
 let caml_transitive_closure = Ocaml_dependencies.caml_transitive_closure
 
 let init_js_of_ocaml () =
+  dep ["link"; "js_of_ocaml"] ["jsoo_runner/jsoo_runner.cmo"];
+
   let prod = "%.js" in
   let dep = "%.cmo" in
 
   let f env (_:builder) =
     let cmX = env "%.cmo" in
-    printf "cmX = %s\n%!" cmX;
     (* let dep = env dep in *)
     let prod = env prod in
     (* let link_opts = link_opts prod in *)
     let tags = tags_of_pathname prod ++ "js_of_ocaml" in
     (* printf "link_opts = %s\n%!" link_opts; *)
     (* printf "tags      = %s\n%!" (String.concat " " tags); *)
-
-    printf "D\n%!";
 
     let libs = [] in
     let dyndeps = [] in
@@ -84,6 +83,9 @@ let init_js_of_ocaml () =
         ~used_libraries:libs ~hidden_packages (cmX :: dyndeps) in
     (* let deps = (List.filter (fun l -> not (List.mem l deps)) libs) @ deps in *)
     (* printf "my deps [%s]\n%!" (String.concat "; " deps); *)
+
+    let deps = "jsoo_runner.cmo" :: deps in
+
     let deps = deps |> List.map (fun s ->
       if ends_with s ~suffix:".cmi"
       then
@@ -96,8 +98,17 @@ let init_js_of_ocaml () =
 
     Cmd (S ([A"jsoo_mktop"
             ;A"-verbose"
+            ;A"-g"
             ;A"-safe-string"
+            (* -dont-export-unit make interface visible but do not link the code *)
             ;A"-dont-export-unit";A"gc"
+            ;A"-dont-export-unit";A"weak"
+            ;A"-dont-export-unit";A"genlex"
+            ;A"-dont-export-unit";A"lexing"
+            ;A"-dont-export-unit";A"parsing"
+            ;A"-dont-export-unit";A"callback"
+            ;A"-dont-export-unit";A"marshal"
+            (* ;A"-dont-export-unit";A"listLabels" *)
             ;A"-I";A"src"
             ;A"-jsopt";A"-I";A"-jsopt";A"src"
             ;A"-I";A"ppx"
@@ -105,20 +116,26 @@ let init_js_of_ocaml () =
             ;A"-I";A"jsoo_runner"
             ;A"-jsopt";A"-I";A"-jsopt";A"jsoo_runner"
             ;A"-jsopt";A"--pretty --disable shortvar"
+
+            ;A"-jsopt";A"--no-inline"
+            ;A"-jsopt";A"--debug-info"
+            (* ;A"-jsopt";A"--source-map" *)
+
             ;A"-export-unit";A"implicitPrinters"; A"src/implicitPrinters.cmo"
+            ;A"-export-unit";A"miniKanrenStd";A"src/miniKanrenStd.cmo"
             ;A"-export-unit";A"MiniKanren";A"src/MiniKanren.cmo"
-            ;A"-export-unit";A"smart_logger";A"ppx/smart_logger.cmo"
-            ;A"-export-unit";A"ppx_repr";A"ppx/ppx_repr.cmo"
-            ;A"-export-unit";A"jsoo_runner";A"jsoo_runner/jsoo_runner.cmo"
+            ;A"-export-unit";A"jsoo_runner"
+            (* ;A"jsoo_runner/jsoo_runner.cmo" *)
             ;T tags; A "-o"; P prod
-            (* ;A"-export-package";A"bigarray" *)
             ;A"-export-package";A"js_of_ocaml.tyxml"
+            (* Requried by extensions linked it toplevel.cppo.ml *)
             ;A"-export-package";A"ppx_tools"
-            ;A"-export-package";A"lwt"
+
             ;A"-jsopt";A"-I";A"-jsopt";A"../toplevel/"
             ;A"-jsopt";A"--file";A"-jsopt";A"examples.ml"
             ] @
-            (List.map (fun s -> P s) deps))
+            (List.map (fun s -> P s) deps) @
+            [A"-jsopt";A"../toplevel/mystdlib.js"])
         )
   in
   rule "js_of_ocaml toplevel: *.cmo -> .js" ~dep ~prod
@@ -143,17 +160,18 @@ let () = dispatch (function
      ()
 
  | After_rules ->
+     ocaml_lib "src/MiniKanren";
      init_js_of_ocaml ();
      (* miniKanren related stuff*)
      (* flag ["ocamldep"; "use_mkshow"] (S [A"-ppopt";A"-I";A"-ppopt";A"plugin"; A"-ppopt";A"mkshow.cmo" ]); *)
-     flag ["compile"; "use_pa_minikanren"]
-       (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" ]);
+     (* flag ["compile"; "use_pa_minikanren"] *)
+     (*   (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" ]); *)
 
-     flag ["compile"; "link_minikanren"]
-       (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo"
-          ; A"-ppopt";A"-L";A"-ppopt";A"plugin"
-	  ]
-       );
+     (* flag ["compile"; "link_minikanren"] *)
+     (*   (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" *)
+     (*      ; A"-ppopt";A"-L";A"-ppopt";A"plugin" *)
+     (*      ] *)
+     (*   ); *)
 
      (* cppo-related stuff *)
      let cppo_rules ext =

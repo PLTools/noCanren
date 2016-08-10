@@ -1,7 +1,7 @@
 MKDIR ?= mkdir -vp
 CP    ?= cp
 
-OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
+OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)" -classic-display
 ifdef OBV
 OB += -verbose 6
 endif
@@ -26,13 +26,14 @@ minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
-	$(OB) $(TARGETS) $(PPX_TARGETS)
+	$(OB) $(PPX_TARGETS)
 
 jslib: ppx minikanren_stuff
-	$(OB) $(JSOO_LIB)
+	$(OB) -Is src $(JSOO_LIB)
 
 only-toplevel:
-	$(OB) toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
+	rm -fr _build/toplevel
+	$(OB) -Is ppx toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
 	toplevel/toplevel.js
 
 toplevel: ppx jslib only-toplevel

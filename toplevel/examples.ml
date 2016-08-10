@@ -1,14 +1,14 @@
 (** Declare a and b *)
 let a_and_b a =
   call_fresh (fun b ->
-      conj (a === embed 7)
-           (disj (b === embed 6)
-                 (b === embed 5)
+      conj (a === inj 7)
+           (disj (b === inj 6)
+                 (b === inj 5)
            )
   )
 
 (** Eval a and b *)
-let _ =   run 1 one ~varnames:["q"]     (REPR a_and_b)
+let _ = run1 ~n:1 (REPR a_and_b)
 
 (** Declare appendo *)
 let rec appendo a b ab =
@@ -42,19 +42,16 @@ let rec reverso a b =
 
 (** Run appendo 1 *)
 let _ =
-  run 1 (succ one) ~varnames:["q"] (REPR (fun q -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) )
+  run1 ~n:1 (REPR (fun q -> appendo q (of_list [3; 4]) (of_list [1; 2; 3; 4])) )
 
 (** Run appendo 2 *)
-let _ =
-  run 4 (succ one) ~varnames:["q"; "r"] (REPR (fun q r -> appendo q llist_nil r)
+let _ = run2 ~n:4 (REPR (fun q r -> appendo q llist_nil r))
 
 (** Run reverso 1 *)
-let _ =
-  run 1 one ~varnames:["q"] (REPR (fun q -> (reverso q (of_list [1; 2; 3; 4]))) )
+let _ = run1 ~n:1 (REPR (fun q -> reverso q (of_list [1; 2; 3; 4])) )
 
 (** Declare fives *)
-let rec fives x = (x === embed 5) ||| delay_goal (fun () -> fives x)
+let rec fives x = (x === inj 5) ||| delay_goal (fun () -> fives x)
 
 (** Run fives *)
-let _ =
-  run 1 one ~varnames:["q"]     (REPR fives)
+let _ = run1 ~n:5 (REPR fives)

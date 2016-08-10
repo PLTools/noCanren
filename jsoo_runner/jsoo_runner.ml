@@ -91,12 +91,6 @@ module GraphLogger = struct
 
 end
 
-let smart_ppx = Smart_logger.smart_logger [| |]
-let pa_minikanren_ppx = Smart_logger.pa_minikanren [| |]
-let repr_ppx = Ppx_repr.mapper
-
-let dumb_ppx = Ast_mapper.({ default_mapper with structure_item=fun _ i -> Printf.printf "A\n%!"; i});;
-
 open MiniKanren
 module M = Make(GraphLogger)
 open M
@@ -105,9 +99,11 @@ open M.ConvenienceStream
 let run1 ~n (title, goal) =
   printf "'%s', asking for max %d results {\n%!" title n;
   run one goal
-    |> (fun stream -> Stream.take ~n stream |> List.iter
-          (fun (q,_constr) ->
-            printf "q=%s\n%!" (show_logic_naive q);
+    |> (fun stream ->
+          Stream.take ~n stream |> List.iter
+          (fun (_logger,q) ->
+            Format.printf "q=%a\n%!" fprintf_logic_with_cs q;
+            ()
           )
        );
   printf "}\n%!"
@@ -117,34 +113,37 @@ let run2 ~n (title,goal) =
   run (succ one) goal |>
     begin fun stream ->
      Stream.take ~n stream |> List.iter
-        (fun ((q,cs1),(r,cs2)) ->
-           printf "q=%s; r=%s\n%!" (show_logic_naive q) (show_logic_naive r);
-           (* let cs c name = *)
-           (*   match string_of_constraints cs1 with *)
-           (*   | Some s -> printf "  when %s =/= anything from [%s]\n%!" name s *)
-           (*   | None -> () *)
-           (* in *)
-           (* cs cs1 "q"; *)
-           (* cs cs2 "r"; *)
-           (* M.Logger.output_plain loginfo ~filename:".plain"; *)
-           (* M.Logger.output_html  [] loginfo ~filename:".html" ; *)
-
-           (* printf "  when %s and %s\n%!" (constraints_string q) (constraints_string r); *)
-
+        (fun (_logger,(q,r)) ->
+           Format.printf "q=%a; r=%a\n%!" fprintf_logic_with_cs q fprintf_logic_with_cs r;
         )
     end;
   printf "}\n%!"
 (*
-let run ?(varnames=[]) n num (repr,goal) =
-  let open M.Convenience4 in
+let () =
+   let open ImplicitPrinters in
+   print_endline "selfttest 2";
+   let a_and_b a = a === inj 5 in
+   let _ = run1 ~n:1 ("",a_and_b) in
+   print_endline "selfttest 2 end"
+*)
+(*
+let run ?(varnames=[]) n num (repr,goal) handler =
+  run num goal (fun stream ->
+    let answers = Stream.take ~n stream in
+    Tester.print_title title n;
+
+  )
+  let table =
+    List.map (fun (name, ans) -> name, Stream.take ~n ans) (run num goal)
+  in
   run (fun st ->
-    let result = runner goal st in
+    let result: int  = num goal st in
 
     Printf.printf "%s answer%s {\n"
       (if n = (-1) then "all" else string_of_int n)
       (if n <>  1  then "s" else "");
-(*
-    let vars' = make_var_pairs ~varnames stor in
+
+    (* let vars' = make_var_pairs ~varnames stor in *)
     let answers =
       (* GraphLogger.dump_graph (Obj.magic graph) stdout; *)
       for i=1 to n do
@@ -154,20 +153,20 @@ let run ?(varnames=[]) n num (repr,goal) =
       take' ~n result
     in
 
-    let text_answers =
-      answers |> List.map
-        (fun (st: State.t) ->
-           let s = List.map
-            (fun (x, varname) ->
-              let rez, _dc = refine st x in
-              sprintf "%s=%s;" varname (show_logic_naive rez)
-             )
-             vars' |> String.concat " "
-           in
-           printf "%s\n%!" s;
-           s
-        )
-    in *)
+    (* let text_answers = *)
+    (*   answers |> List.map *)
+    (*     (fun (st: State.t) -> *)
+    (*        let s = List.map *)
+    (*         (fun (x, varname) -> *)
+    (*           let rez, _dc = refine st x in *)
+    (*           sprintf "%s=%s;" varname (show_logic_naive rez) *)
+    (*          ) *)
+    (*          vars' |> String.concat " " *)
+    (*        in *)
+    (*        printf "%s\n%!" s; *)
+    (*        s *)
+    (*     ) *)
+    (* in *)
 
     Printf.printf "}\n%!";
     M.Logger.output_html ~filename:"" (* text_answers *) [] graph;

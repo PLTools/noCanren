@@ -163,7 +163,7 @@
         var fileref=document.createElement('script');
         fileref.setAttribute("type","text/javascript");
         fileref.setAttribute("src", prefix+(version==""?"":(version+"/"))+url);
-      document.getElementsByTagName("head")[0].appendChild(fileref);
+        document.getElementsByTagName("head")[0].appendChild(fileref);
       }
       load_script("../_build/stdlib.cmis.js");
       load_script("../_build/js_of_ocaml.cmis.js");
@@ -208,9 +208,10 @@
   </head>
   <body>
     <div id="toplevel-container">
+      <!--
       <a href="http://ocsigen.org/js_of_ocaml" >
 	<img src="https://ocsigen.org/resources/logos/text_js_of_ocaml_with_shadow.png" alt="js_of_ocaml" />
-      </a>
+      </a> -->
       <pre id="output"></pre>
       <div>
         <div id="sharp" class="sharp"></div>

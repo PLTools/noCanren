@@ -20,7 +20,7 @@
 
 open Lwt
 
-let compiler_name = "OCaml with MiniKanren support"
+let compiler_name = "OCaml"
 
 let by_id s = Dom_html.getElementById s
 let by_id_coerce s f  = Js.Opt.get (f (Dom_html.getElementById s)) (fun () -> raise Not_found)
@@ -52,6 +52,9 @@ let exec' s =
 
 let setup_toplevel () =
   JsooTop.initialize ();
+  Ast_mapper.register "js_of_ocaml" (fun _ -> Ppx_repr.mapper);
+  Ast_mapper.register "js_of_ocaml" (fun _ -> Smart_logger.smart_logger);
+  Ast_mapper.register "js_of_ocaml" (fun _ -> Smart_logger.pa_minikanren);
   Sys.interactive := false;
   (*
   exec' ("module Lwt_main = struct
@@ -63,30 +66,20 @@ let setup_toplevel () =
   *)
 
   let header1 =
-      Printf.sprintf "        %s version %%s" compiler_name in
+      Printf.sprintf "     %s version %%s (with MiniKanren support)" compiler_name in
   let header2 = Printf.sprintf
       "     Compiled with Js_of_ocaml version %s" Sys_js.js_of_ocaml_version in
   exec' (Printf.sprintf "Format.printf \"%s@.\" Sys.ocaml_version;;" header1);
   exec' (Printf.sprintf "Format.printf \"%s@.\";;" header2);
-  (*
-  (if JsooTop.get_camlp4_syntaxes () <> []
-  then
-    let header3 = Printf.sprintf
-        "     'JsooTop.get_camlp4_syntaxes ()' to get loaded syntax extensions" in
-    exec' (Printf.sprintf "Format.printf \"%s@.@.\";;" header3)); *)
   (*
   exec' ("#enable \"pretty\";;");
   exec' ("#enable \"shortvar\";;"); *)
   Sys.interactive := true;
   exec' "#rectypes;;";
   exec' "open ImplicitPrinters;;";
-  exec' "open MiniKanren;;";      (* for embed *)
-  exec' "open Jsoo_runner;;";     (* count variables *)
+  exec' "open MiniKanren;;";      (* for inj *)
+  exec' "open Jsoo_runner;;";
   exec' "open M;;";
-  (* exec' "let run = Jsoo_runner.run;;"; *)
-  exec' "#ppx2 Jsoo_runner.pa_minikanren_ppx;;";
-  exec' "#ppx2 Jsoo_runner.smart_ppx;;";
-  exec' "#ppx2 Jsoo_runner.repr_ppx;;";
   ()
 
 let resize ~container ~textbox ()  =
