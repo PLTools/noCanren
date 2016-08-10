@@ -72,7 +72,7 @@ let map_value_binding (vb : value_binding) =
     { vb with pvb_expr = walkthrough ~fname vb.pvb_expr }
   |  _ -> vb
 
-let smart_logger argv =
+let smart_logger =
   { default_mapper with
     structure_item = fun mapper sitem ->
       match sitem.pstr_desc with
@@ -152,9 +152,6 @@ let rec pamk_e mapper e : expression =
   | Pexp_fun (l,opt,pat,e) ->
      { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
 
-  | Pexp_apply (e1, es) ->
-      { e with pexp_desc = Pexp_apply (mapper.expr mapper e1,
-                                       List.map (fun (l,e) -> (l, mapper.expr mapper e)) es) }
   | Pexp_construct (_, None) -> e
   | Pexp_construct (id, Some e1) -> { e with pexp_desc = Pexp_construct (id, Some (mapper.expr mapper e1)) }
 
@@ -175,6 +172,6 @@ let rec pamk_e mapper e : expression =
   | _ -> e
 
 
-let pa_minikanren argv =
+let pa_minikanren =
   { default_mapper with expr = fun mapper e -> pamk_e mapper e
   }
