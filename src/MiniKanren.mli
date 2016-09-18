@@ -333,6 +333,32 @@ module ApplyLatest :
    end
 
 
+  (** {2 Combinators to produce fresh variables} *)
+  module Fresh : sig
+
+    (** [succ num f] increments the number of free logic variables in
+        a goal; can be used to get rid of ``fresh'' syntax extension *)
+    val succ : ('a -> state -> 'b) -> ('c logic -> 'a) -> state -> 'b
+
+    (** Zero logic parameters *)
+    val zero : 'a -> 'a
+
+    (** {3 One to five logic parameter(s)} *)
+    val one   : ('a logic ->                                                 state -> 'b) -> state -> 'b
+    val two   : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+    val three : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+    val four  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+    val five  : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+
+    (** {3 One to five logic parameter(s), conventional names} *)
+    val q     : ('a logic ->                                                 state -> 'b) -> state -> 'b
+    val qr    : ('a logic -> 'b logic ->                                     state -> 'c) -> state -> 'c
+    val qrs   : ('a logic -> 'b logic -> 'c logic ->                         state -> 'd) -> state -> 'd
+    val qrst  : ('a logic -> 'b logic -> 'c logic -> 'd logic ->             state -> 'e) -> state -> 'e
+    val pqrst : ('a logic -> 'b logic -> 'c logic -> 'd logic -> 'e logic -> state -> 'f) -> state -> 'f
+
+  end
+
   module Std : sig
     val list_cons : 'a llist logic  -> 'a logic -> 'a llist logic -> goal
     val list_hd   : 'a llist logic  -> 'a logic -> goal

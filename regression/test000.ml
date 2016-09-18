@@ -25,17 +25,11 @@ let rec fives x =
        (delay_goal (fun () -> fives x))
 
 let rec appendo a b ab =
-  disj
-    (conj (a === llist_nil) (b === ab) )
-    (call_fresh (fun h ->
-      (call_fresh (fun t ->
-        (conj (a === h % t)
-           (call_fresh (fun ab' ->
-              conj (h % ab' === ab)
-                   (appendo t b ab')
-           ))
-      )))
-    ))
+  ((a === llist_nil) &&& (b === ab))
+  |||
+    Fresh.three (fun h tl tmp ->
+      ((a === h%tl) &&& (h % tmp === ab) &&& (appendo tl b tmp)) )
+
 
 let rec reverso a b =
   disj

@@ -1029,6 +1029,22 @@ let (=/=) x y state0 =
     print_endline "selftest1 ended";
     ()
 *)
+  module Fresh = struct
+    let succ prev f = call_fresh (fun x -> prev (f x))
+
+    let zero  f = f
+    let one   f = succ zero f
+    let two   f = succ one f
+    let three f = succ two f
+    let four  f = succ three f
+    let five  f = succ four f
+
+    let q     = one
+    let qr    = two
+    let qrs   = three
+    let qrst  = four
+    let pqrst = five
+  end
 
   module Std = MiniKanrenStd.Make(
                    struct
