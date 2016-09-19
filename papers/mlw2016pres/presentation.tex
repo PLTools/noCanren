@@ -5,6 +5,7 @@
 \usepackage{amssymb, amsmath}
 \usepackage[all]{xy}
 \usepackage{alltt}
+\usepackage{tikz,xcolor}
 \usepackage{pslatex}
 \usepackage{epigraph}
 \usepackage{verbatim}
@@ -38,6 +39,27 @@
     \textsf{[{#1}]} & \raisebox{-1pt}{\ensuremath{#2}}
   \end{array}}
 
+\makeatletter
+\newenvironment{btHighlight}[1][]
+{\begingroup\tikzset{bt@Highlight@par/.style={#1}}\begin{lrbox}{\@tempboxa}}
+{\end{lrbox}\bt@HL@box[bt@Highlight@par]{\@tempboxa}\endgroup}
+
+\newcommand\btHL[1][]{%
+  \begin{btHighlight}[#1]\bgroup\aftergroup\bt@HL@endenv%
+}
+\def\bt@HL@endenv{%
+  \end{btHighlight}%   
+  \egroup
+}
+\newcommand{\bt@HL@box}[2][]{%
+  \tikz[#1]{%
+    \pgfpathrectangle{\pgfpoint{1pt}{0pt}}{\pgfpoint{\wd #2}{\ht #2}}%
+    \pgfusepath{use as bounding box}%
+    \node[anchor=base west, fill=orange!30,outer sep=0pt,inner xsep=1pt, inner ysep=0pt, rounded corners=3pt, minimum height=\ht\strutbox+1pt,#1]{\raisebox{1pt}{\strut}\strut\usebox{#2}};
+  }%
+}
+\makeatother
+
 \lstdefinelanguage{ocaml}{
 keywords={let, begin, end, in, match, type, and, fun, 
 function, try, with, class, object, method, of, rec, repeat, until,
@@ -51,7 +73,9 @@ identifierstyle=\ttfamily,
 basewidth={0.5em,0.5em},
 columns=fixed,
 fontadjust=true,
-literate={->}{{$\to$}}1
+literate={->}{{$\to$}}1,
+moredelim=**[is][\btHL]{`}{`},
+moredelim=**[is][{\btHL[fill=green!30,draw=red,dashed,thin]}]{@}{@},
 }
 
 \lstset{
@@ -73,6 +97,23 @@ language=ocaml
 \mode<presentation>{
   \usetheme{default}
 }
+
+% change this to customize the appearance of the highlight
+% \tikzstyle{highlighter} = [
+%   yellow,
+%   line width = \baselineskip,
+% ]
+
+% \usetikzlibrary{decorations.pathmorphing}
+% \tikzstyle{highlighter} += [decorate, decoration = random steps]
+
+% implementation of the core highlighting logic; do not change!
+%\newcounter{highlight}[page]
+%\newcommand{\tikzhighlightanchor}[1]{\ensuremath{\vcenter{\hbox{\tikz[remember picture, overlay]{\coordinate (#1 highlight \arabic{highlight});}}}}}
+%\newcommand{\bh}[0]{\stepcounter{highlight}\tikzhighlightanchor{begin}}
+%\newcommand{\eh}[0]{\tikzhighlightanchor{end}}
+%\AtBeginShipout{\AtBeginShipoutUpperLeft{\ifthenelse{\value{highlight} > 0}{\tikz[remember picture, overlay]{\foreach \stroke in {1,...,\arabic{highlight}} \draw[highlighter] (begin highlight \stroke) -- (end highlight \stroke);}}{}}}
+
 
 \theoremstyle{definition}
 
@@ -240,6 +281,25 @@ Let's try to execute it.
 \end{itemize}
 \end{frame}
 
+\begin{frame}[fragile]
+\begin{lstlisting}
+let foo ints strings =
+  Fresh.two (fun h tl ->
+    (ints === h % tl) &&& (h === inj 5) &&&
+    Fresh.two (fun h' tl' ->
+       (strings === h % @tl'@) &&& (tl' === (inj "asdf") % llist_nil)
+      ))
+\end{lstlisting}
+
+\begin{verbatim}
+File "regression/test000.ml", line 37, characters 50-51:
+Error: This expression has type bytes llist logic but 
+       an expression was expected of type int llist logic
+       Type bytes is not compatible with type int \end{verbatim}
+
+\end{frame}
+
+
 \begin{frame}[fragile]{About implementations with \texttt{term} type}
 \begin{itemize}
  \item Special type for relation-related evaluations.
@@ -260,14 +320,9 @@ type term = Var of int
   \begin{itemize}
     \item Value of type \texttt{term} can contain free logic variables. "
     \item The value \texttt{ListCons(ConstInt, ListCons(ConstString "a"),ListNil))} cannot be converted 
-    neither to OCaml \texttt{int list} not to \texttt{string list}.
+    neither to OCaml \texttt{int list} nor to \texttt{string list}.
   \end{itemize}
-
 \end{itemize}
-
- %\item Special type for 
-%\end{lstlisting}
- 
 \end{frame}
 
 
