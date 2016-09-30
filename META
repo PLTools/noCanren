@@ -1,17 +1,17 @@
 version = "0.1"
-description = "miniKanren"
-#requires = "GT"
+description = "ocanren"
+requires = "GT"
 archive(byte) = "MiniKanren.cma"
 archive(native) = "MiniKanren.cmxa"
 
-package "js_of_ocaml" (
-  description="library as a dependency for toplevel"
-  requires="ppx_tools js_of_ocaml.ppx"
-  archive(byte)="jsoo_runner.cma"
+package "syntax" (
+  description="Camlp5 syntax extension"
+  archive(syntax,preprocessor) = "pa_minikanren.cmo"
+  archive(syntax,toploop)      = "pa_minikanren.cmo"
 )
 package "tester" (
   description="Tests helper"
-  requires="miniKanren"
+  requires="ocanren"
   archive(byte)  ="tester.cmo"
   archive(native)="tester.cmx"
 )

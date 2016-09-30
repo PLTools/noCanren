@@ -18,24 +18,13 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .DEFAULT_GOAL: all
 
-all: minikanren_stuff
-	#$(MAKE) bundle
+all: minikanren_stuff bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
-
-only-toplevel:
-	rm -fr _build/toplevel
-	$(OB) -Is ppx toplevel/indent.cmo toplevel/colorize.cmo toplevel/toplevel.cmo \
-	toplevel/toplevel.js
-
-toplevel: ppx jslib only-toplevel
-
-tester:
-	$(OB) -Is src,jsoo_runner regression/tester.cmo
 
 celan: clean
 
@@ -91,14 +80,16 @@ test: tests
 
 ######################## Installation related stuff ##########################
 INSTALL_TARGETS=META \
+	$(wildcard _build/regression/tester.cmi) \
+	$(wildcard _build/regression/tester.cmo) \
+	$(wildcard _build/regression/tester.cmx) \
 	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
-	$(wildcard _build/src/MiniKanren.[oa]) \
 	_build/src/MiniKanren.cmxa \
-	$(wildcard _build/src/tester.cm[ox]) \
-	_build/src/tester.o \
-	_build/ppx/smart_logger.cmi \
-	$(wildcard _build/ppx/*.native)
+	$(wildcard _build/src/MiniKanren.[oa]) \
+	$(wildcard _build/camlp5/pa_minikanren.cm[oi]) \
+#	_build/src/tester.o \
+
 
 MAYBE_INSTALL_TARGETS=\
 	_build/jsoo_runner/jsoo_runner.cmi \
@@ -112,7 +103,7 @@ endef
 
 $(foreach i,$(MAYBE_INSTALL_TARGETS),$(eval $(call MAYBE_ADD_TARGET,$(i)) ) )
 
-BUNDLEDIR=_build/bundle/miniKanren
+BUNDLEDIR=_build/bundle/ocanren
 
 define MAKE_BUNDLE_RULE
 $(BUNDLEDIR)/$(notdir $(1)): $(1)
@@ -131,7 +122,7 @@ $(BUNDLEDIR):
 bundle: rmbundledir $(BUNDLEDIR) $(MAKE_BUNDLE_TARGETS)
 
 install: bundle
-	ocamlfind install miniKanren $(BUNDLEDIR)/*
+	ocamlfind install ocanren $(BUNDLEDIR)/*
 
 uninstall:
-	ocamlfind remove miniKanren
+	ocamlfind remove ocanren
