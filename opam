@@ -18,6 +18,5 @@ depends: [
   "ocamlfind" {build}
   "camlp5"
   "logger"
-  "typeutil"
 ]
 
