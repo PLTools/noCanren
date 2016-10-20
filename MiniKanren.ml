@@ -35,7 +35,7 @@ let rec wrap (x : Obj.t) =
       (fun _ -> true)
       [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
        forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-       final_tag  ; unaligned_tag; out_of_heap_tag
+       custom_tag  ; unaligned_tag; out_of_heap_tag
       ]
     in
     let is_unboxed obj =
@@ -193,6 +193,7 @@ module Subst :
 
 type state = Env.t * Subst.t
 type lunit = state -> state Stream.t
+type goal = lunit
 
 let show_st (env, subst) = sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
 
@@ -230,35 +231,92 @@ let show_list   e fa l = print_if_var e l (fun _ -> GT.transform(GT.list) fa (ne
 let show_int    e i    = print_if_var e i (fun _ -> GT.transform(GT.int)     (new minikanren_int_t   ) e i)
 let show_string e s    = print_if_var e s (fun _ -> GT.transform(GT.string)  (new minikanren_string_t) e s)
 
+
 let fresh f (env, subst) =
   let x, env' = Env.fresh env in
   f x (env', subst)
 
 let (===) x y (env, subst) =
-  LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (show_st (env, subst)));
+  (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (show_st (env, subst))); *)
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
   | Some s -> LOG[trace1] (logn "'%s'" (show_st (env, s))); Stream.cons (env, s) Stream.nil
 
-let conj f g st =
-  LOG[trace1] (logn "conj %s" (show_st st));
+let conj : goal -> goal -> goal = fun f g st ->
+  (* LOG[trace1] (logn "conj %s" (show_st st)); *)
   Stream.from_fun (fun () -> Stream.concat_map g (f st))
 
+let (&&&) = conj
+
+let rec conde : goal list -> goal = fun gs ->
+  match gs with
+  | [] -> assert false
+  | [h] -> h
+  | h::tl -> h &&& (conde tl)
 
 let disj f g st =
-  LOG[trace1] (logn "disj %s" (show_st st));
+  (* LOG[trace1] (logn "disj %s" (show_st st)); *)
   let rec interleave fs gs =
-    LOG[trace1] (logn "interleave");
+    (* LOG[trace1] (logn "interleave"); *)
     Stream.from_fun (
       fun () ->
         (* logn "fs=%s" (generic_show !!fs); *)
-	match Stream.destruct fs with
-	| `Nil -> gs
-	| `Cons (hd, tl) ->
-           (* logn "destruct says Cons(%s,%s)" (show_st hd) (generic_show !!tl); *)
-           Stream.cons hd (interleave gs tl)
-    )
+	    match Stream.destruct fs with
+	    | `Nil -> gs
+	    | `Cons (hd, tl) ->
+         (* logn "destruct says Cons(%s,%s)" (show_st hd) (generic_show !!tl); *)
+         Stream.cons hd (interleave gs tl)
+      )
   in
   interleave
     (f st)
     (Stream.from_fun (fun () -> g st) )
+
+let call_fresh f (e,subs) =
+  let q,e = Env.fresh e in
+  f q (e,subs)
+
+module Fresh =
+  struct
+    let succ prev f = call_fresh (fun x -> prev (f x))
+    let zero f = f
+    let one f = succ zero f
+    let two f = succ one f
+    let three f = succ two f
+    let four f = succ three f
+    let five f = succ four f
+    let six f = succ five f
+    let seven f = succ six f
+    let eight f = succ seven f
+  end
+
+(*
+type ('a, 'l) llist =
+    Nil
+  | Cons of 'a * 'l
+
+module LList = struct
+  include List
+  let rec of_list =
+    function
+    | [] -> Nil
+    | x :: xs -> Cons (x, of_list xs)
+  let rec to_list =
+    function
+    | Nil -> []
+    | Cons (x, xs) -> x :: to_list xs
+
+  let (%) x y = (!!) (Cons (x, y))
+  let (%<) x y = (!!) (Cons (x, (!!) (Cons (y, (!!) Nil))))
+  let (!<) x = (!!) (Cons (x, (!!) Nil))
+  let nil = inj Nil
+
+
+end
+
+let (%)  = LList.(%)
+let (%<) = LList.(%<)
+let (!<) = LList.(!<)
+let nil  = LList.nil
+
+ *)

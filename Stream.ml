@@ -1,15 +1,15 @@
 open Printf
 
-type 'a t = ('a * 'a t) Lazy.t
+type 'a t = ('a * 'a t) Lazy.t 
 
 exception End_of_stream
 
 let from_fun (f: unit -> 'a t) : 'a t =
-  Lazy.lazy_from_fun (fun () -> Lazy.force (f ()))
+  Lazy.from_fun (fun () -> Lazy.force (f ()))
 
 let nil        = from_fun (fun () -> raise End_of_stream)
 
-let cons h t : 'a t  = Lazy.lazy_from_val (h, t)
+let cons h t : 'a t  = Lazy.from_val (h, t)
 
 let is_empty (s: 'a t) =
   try ignore (Lazy.force s); false with End_of_stream -> true
