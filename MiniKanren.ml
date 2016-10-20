@@ -12,9 +12,9 @@ let config = { do_log=true; do_readline=false }
 
 let () =
   let args = ref [("-r", Arg.Unit (fun () -> config.do_readline <- true), "readlines")] in
-  LOG[trace1](
+  (* LOG[trace1](
        args := ("-q", Arg.Unit (fun () -> config.do_log <- false), "quite") :: !args;
-       args := ("-v", Arg.Unit (fun () -> config.do_log <- true), "verbose") :: !args );
+       args := ("-v", Arg.Unit (fun () -> config.do_log <- true), "verbose") :: !args ); *)
   Arg.parse !args
             (fun s -> eprintf "Unknown parameter '%s'\n" s; exit 0)
             "This is usage message"
@@ -95,7 +95,7 @@ module Env :
     let empty () = (H.create 1024, counter_start)
 
     let fresh (h, current) =
-      LOG[trace1] (logn "fresh var %d" current);
+      (* LOG[trace1] (logn "fresh var %d" current); *)
       if config.do_readline then ignore (read_line ());
       let v = Var current in
       H.add h v ();
@@ -237,25 +237,30 @@ let fresh f (env, subst) =
   f x (env', subst)
 
 let (===) x y (env, subst) =
-  (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = " (generic_show !!x) (generic_show !!y) (show_st (env, subst))); *)
+  LOG[trace1] (logf "unify '%s' and '%s' in '%s' = ....\n%!" (generic_show !!x) (generic_show !!y) (show_st (env, subst)) );
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
-  | Some s -> LOG[trace1] (logn "'%s'" (show_st (env, s))); Stream.cons (env, s) Stream.nil
+  | Some s ->
+    LOG[trace1] (logn "\t'%s'" (show_st (env, s)));
+    Stream.cons (env, s) Stream.nil
 
-let conj : goal -> goal -> goal = fun f g st ->
-  (* LOG[trace1] (logn "conj %s" (show_st st)); *)
-  Stream.bind (f st) g
+let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj
 
-let rec conde : goal list -> goal = fun gs ->
-  match gs with
-  | [] -> assert false
-  | [h] -> h
-  | h::tl -> h &&& (conde tl)
-
-
 let disj f g st = Stream.mplus (f st) (g st)
+
+let (|||) = disj
+
+let rec (?|) = function
+  | [h]  -> h
+  | h::t -> h ||| ?| t
+
+let rec (?&) = function
+  | [h]  -> h
+  | h::t -> h &&& ?& t
+
+let conde = (?|)
 
 let call_fresh f (e,subs) =
   let q,e = Env.fresh e in

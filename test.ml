@@ -24,16 +24,16 @@ let run_2var memo printer n goal =
 let run_1var memo printer n goal =
   let q, e   = Env.fresh (Env.empty ())  in
   let st     = e, Subst.empty            in
-  printf "taking %d...\n" n ;
+  (* printf "taking %d...\n" n ; *)
   let result = Stream.take ~n (goal q st) in
   Printf.printf "%s {\n" memo;
   List.iter
-    (fun ((env, subst) (* as st *)) ->
-      printf "WTF\n";
-        (* LOG[trace1] (printf "State:\n%!"); *)
-        (* LOG[trace1] (printf "%s" (show_st st)); *)
-        (* LOG[trace1] (printf "q=%d\n%!" (let Var i = !! q in i)); *)
-        printf "q='%s'\n" (printer env (Subst.walk' env q subst))
+    (fun ((env, subst) as _st) ->
+      (* printf "WTF\n";
+      printf "State:\n%!";
+      printf "%s" (show_st st);
+      printf "q=%d\n%!" (let Var i = !! q in i); *)
+      printf "q='%s'\n" (printer env (Subst.walk' env q subst))
     )
     result;
   Printf.printf "}\n%!"
@@ -41,6 +41,9 @@ let run_1var memo printer n goal =
 let string_of_intlist xs =
   Printf.sprintf "[%s]" (String.concat "," (List.map string_of_int xs) )
 
+let show_int e n =
+  (* logn "show_int: env=%s\n%!"  (Env.show e); *)
+  string_of_int n
 
 let just_a a = a === 5
 
@@ -90,11 +93,6 @@ let rec build_num =
 (*   () *)
 
 let rec appendo a b ab ((env, subst) as st) =
-  (* logn "show [] = '%s'" (generic_show !![]); *)
-  (* logn "show 5  = '%s'" (generic_show !!5); *)
-  (* logn "show [5] = '%s'" (generic_show !![5]); *)
-
-  (* LOG[trace1] (logn "appendo %s, %s, %s" (generic_show !!a) (generic_show !!b) (generic_show !!ab)); *)
   if MiniKanren.config.do_readline then ignore (read_line ());
 
   disj
@@ -111,7 +109,6 @@ let rec appendo a b ab ((env, subst) as st) =
   st
 
 let rec reverso a b ((env, subst) as st) =
-  (* LOG[trace1] (logn "reverso: %s %s" (generic_show !!a) (generic_show !!b)); *)
   if MiniKanren.config.do_readline then ignore (read_line ());
 
   disj
@@ -142,13 +139,14 @@ let full_addero b x y r c =
     (0 === b) &&& (0 === x) &&& (1 === y) &&& (1 === r) &&& (0 === c);
     (1 === b) &&& (0 === x) &&& (1 === y) &&& (0 === r) &&& (1 === c);
     (0 === b) &&& (1 === x) &&& (1 === y) &&& (0 === r) &&& (1 === c);
-    (1 === b) &&& (1 === x) &&& (1 === y) &&& (1 === r) &&& (1 === c)
+    (1 === b) &&& (1 === x) &&& (1 === y) &&& (1 === r) &&& (1 === c);
   ]
 
 let rec (?&) =
   function
-    [h] -> h
+  | [h] -> h
   | h :: t -> (&&&) h (?& t)
+  | [] -> assert false
 
 let defer (f: unit -> state -> state Stream.t) : goal =
   fun st -> Stream.from_fun (fun () -> f () st)
@@ -494,12 +492,11 @@ let _ =
    (* run_1var "reverso [1] q max 1 result" int_list 1 (fun q st -> reverso [1; 2; 3; 4] q st); *)
    (* run_1var "rev_test1 max 1 result" int_list 1 (fun q st -> rev_test1 q q st); *)
    (* run_1var "multo" int_list 1 (fun q st -> multo (build_num 2) (build_num 3) q st); *)
-  run_1var "fa" int_list 1 (fun q st -> full_addero (1) (1)
-                                                    ( 1) ( 1) q st);
+  (* run_1var "fa" show_int 1 (fun q st -> full_addero 1 1 1 1 q st); *)
 
-   run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 0) (build_num 0) q st);
-   run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 2) (build_num 3) q st);
-   (* run_1var "asdf" int_list 1 (fun q st -> expo (build_num 3) (build_num 5) q st); *)
+   (* run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 0) (build_num 0) q st);
+   run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 2) (build_num 3) q st); *)
+   run_1var "asdf" int_list 1 (fun q st -> expo (build_num 3) (build_num 5) q st);
   (* run_1var "reverso q q max 1  result" int_list 1  (fun q st -> reverso q q st); *)
   (* run_1var "reverso q q max 2  result" int_list 2  (fun q st -> reverso q q st); *)
   (* run_1var "reverso q q max 3  result" int_list 3  (fun q st -> reverso q q st); *)
