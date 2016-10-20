@@ -6,7 +6,7 @@ let run_2var memo printer n goal =
   let q, e   = Env.fresh (Env.empty ())  in
   let r, e   = Env.fresh e               in
   let st     = e, Subst.empty            in
-  let result = Stream.take n (goal q r st) in
+  let result = Stream.take ~n (goal q r st) in
   Printf.printf "%s {\n" memo;
   List.iter
     (fun ((env, subst) (* as st *)) ->
@@ -25,7 +25,7 @@ let run_1var memo printer n goal =
   let q, e   = Env.fresh (Env.empty ())  in
   let st     = e, Subst.empty            in
   printf "taking %d...\n" n ;
-  let result = Stream.take n (goal q st) in
+  let result = Stream.take ~n (goal q st) in
   Printf.printf "%s {\n" memo;
   List.iter
     (fun ((env, subst) (* as st *)) ->

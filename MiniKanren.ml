@@ -244,7 +244,7 @@ let (===) x y (env, subst) =
 
 let conj : goal -> goal -> goal = fun f g st ->
   (* LOG[trace1] (logn "conj %s" (show_st st)); *)
-  Stream.from_fun (fun () -> Stream.concat_map g (f st))
+  Stream.bind (f st) g
 
 let (&&&) = conj
 
@@ -254,23 +254,8 @@ let rec conde : goal list -> goal = fun gs ->
   | [h] -> h
   | h::tl -> h &&& (conde tl)
 
-let disj f g st =
-  (* LOG[trace1] (logn "disj %s" (show_st st)); *)
-  let rec interleave fs gs =
-    (* LOG[trace1] (logn "interleave"); *)
-    Stream.from_fun (
-      fun () ->
-        (* logn "fs=%s" (generic_show !!fs); *)
-	    match Stream.destruct fs with
-	    | `Nil -> gs
-	    | `Cons (hd, tl) ->
-         (* logn "destruct says Cons(%s,%s)" (show_st hd) (generic_show !!tl); *)
-         Stream.cons hd (interleave gs tl)
-      )
-  in
-  interleave
-    (f st)
-    (Stream.from_fun (fun () -> g st) )
+
+let disj f g st = Stream.mplus (f st) (g st)
 
 let call_fresh f (e,subs) =
   let q,e = Env.fresh e in
