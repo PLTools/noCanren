@@ -1,100 +1,19 @@
-open GT
 open MiniKanren
 open Printf
 
-let run_2var memo printer n goal =
-  let q, e   = Env.fresh (Env.empty ())  in
-  let r, e   = Env.fresh e               in
-  let st     = e, Subst.empty            in
-  let result = Stream.take ~n (goal q r st) in
-  Printf.printf "%s {\n" memo;
-  List.iter
-    (fun ((env, subst) (* as st *)) ->
-        (* LOG[trace1] (logn "State:"; *)
-        (*              logn "%s" (show_st st); *)
-        (*              logn "q=%d, r=%d" (let Var i = !! q in i) (let Var i = !!r in i)); *)
-        printf "q=%s, r=%s\n" (printer env (Subst.walk' env q subst)) (printer env (Subst.walk' env r subst))
-    )
-    result;
-  Printf.printf "}\n%!"
+let (!) = inj
 
-(* copy and pase
-   Maybe we should implement more polymorphic runner like Oleg Kiselev
-*)
-let run_1var memo printer n goal =
-  let q, e   = Env.fresh (Env.empty ())  in
-  let st     = e, Subst.empty            in
-  (* printf "taking %d...\n" n ; *)
-  let result = Stream.take ~n (goal q st) in
-  Printf.printf "%s {\n" memo;
-  List.iter
-    (fun ((env, subst) as _st) ->
-      (* printf "WTF\n";
-      printf "State:\n%!";
-      printf "%s" (show_st st);
-      printf "q=%d\n%!" (let Var i = !! q in i); *)
-      printf "q='%s'\n" (printer env (Subst.walk' env q subst))
-    )
-    result;
-  Printf.printf "}\n%!"
+let nullo q = (q === nil)
+let cdro p d = fresh (fun a -> (a%d === p))
 
-let string_of_intlist xs =
-  Printf.sprintf "[%s]" (String.concat "," (List.map string_of_int xs) )
-
-let show_int e n =
-  (* logn "show_int: env=%s\n%!"  (Env.show e); *)
-  string_of_int n
-
-let just_a a = a === 5
-
-let a_and_b  a =
-  fresh (
-    fun b ->
-      conj (a === 7)
-           (disj (b === 6)
-                 (b === 5)
-           )
-  )
-
-let a_and_b' b =
-  fresh (
-    fun a ->
-      conj (a === 7)
-           (disj (b === 6)
-                 (b === 5)
-           )
-  )
-
-let rec fives x =
-  disj (x === 5)
-       (fun st -> Stream.from_fun (fun () -> fives x st))
-
-let int_list e l =
-  (* LOG[trace1] (logn "int_list: env=%s, list=%s\n%!"  (Env.show e)  (generic_show !!l)); *)
-  show_list e show_int l
-
-let nullo q = (q === [])
-let cdro p d = fresh (fun a -> (a::d === p))
-
-let rec build_num =
-  function
+let rec build_num n =
+  let rec helper = function
   | 0                   -> []
-  | n -> (n mod 2) :: (build_num (n/2))
-  (* | n when n mod 2 == 0 -> 0 :: (build_num (n / 2)) *)
-  (* | n                   -> !1 % build_num (n / 2) *)
+  | n -> (n mod 2) :: (helper (n/2))
+  in
+  LList.of_list (helper n)
 
-(* let () = *)
-(*   let two = build_num 2 in *)
-(*   let five = build_num 5 in *)
-(*   let three = build_num 3 in  *)
-(*   printf "%s\n" (string_of_intlist @@ two); *)
-(*   printf "%s\n" (string_of_intlist @@ three); *)
-(*   printf "%s\n" (string_of_intlist @@ five); *)
-(*   () *)
-
-let rec appendo a b ab ((env, subst) as st) =
-  if MiniKanren.config.do_readline then ignore (read_line ());
-
+(* let rec appendo a b ab ((env, subst) as st) =
   disj
     (conj (a === []) (b === ab) )
     (fresh (fun h ->
@@ -109,8 +28,6 @@ let rec appendo a b ab ((env, subst) as st) =
   st
 
 let rec reverso a b ((env, subst) as st) =
-  if MiniKanren.config.do_readline then ignore (read_line ());
-
   disj
     (conj (a === []) (b === []))
     (fresh (fun h ->
@@ -122,58 +39,52 @@ let rec reverso a b ((env, subst) as st) =
               ))
         )
     )
-  ))) st
+  ))) st *)
 
 (* list is not empty *)
-let poso q = fresh (fun h -> fresh (fun t -> q === h::t))
+let poso q = Fresh.two (fun h t -> q === h%t)
 
 (* let has at least two elems *)
-let gt1o q = fresh (fun h -> fresh (fun t -> fresh (fun tt ->
-                                                 q === h::t::tt)))
+let gt1o q = Fresh.three (fun h t tt -> q === h%(t%tt) )
+
 let full_addero b x y r c =
   conde [
-    (0 === b) &&& (0 === x) &&& (0 === y) &&& (0 === r) &&& (0 === c);
-    (1 === b) &&& (0 === x) &&& (0 === y) &&& (1 === r) &&& (0 === c);
-    (0 === b) &&& (1 === x) &&& (0 === y) &&& (1 === r) &&& (0 === c);
-    (1 === b) &&& (1 === x) &&& (0 === y) &&& (0 === r) &&& (1 === c);
-    (0 === b) &&& (0 === x) &&& (1 === y) &&& (1 === r) &&& (0 === c);
-    (1 === b) &&& (0 === x) &&& (1 === y) &&& (0 === r) &&& (1 === c);
-    (0 === b) &&& (1 === x) &&& (1 === y) &&& (0 === r) &&& (1 === c);
-    (1 === b) &&& (1 === x) &&& (1 === y) &&& (1 === r) &&& (1 === c);
+    (!0 === b) &&& (!0 === x) &&& (!0 === y) &&& (!0 === r) &&& (!0 === c);
+    (!1 === b) &&& (!0 === x) &&& (!0 === y) &&& (!1 === r) &&& (!0 === c);
+    (!0 === b) &&& (!1 === x) &&& (!0 === y) &&& (!1 === r) &&& (!0 === c);
+    (!1 === b) &&& (!1 === x) &&& (!0 === y) &&& (!0 === r) &&& (!1 === c);
+    (!0 === b) &&& (!0 === x) &&& (!1 === y) &&& (!1 === r) &&& (!0 === c);
+    (!1 === b) &&& (!0 === x) &&& (!1 === y) &&& (!0 === r) &&& (!1 === c);
+    (!0 === b) &&& (!1 === x) &&& (!1 === y) &&& (!0 === r) &&& (!1 === c);
+    (!1 === b) &&& (!1 === x) &&& (!1 === y) &&& (!1 === r) &&& (!1 === c);
   ]
 
-let rec (?&) =
+(* let rec (?&) =
   function
   | [h] -> h
   | h :: t -> (&&&) h (?& t)
-  | [] -> assert false
+  | [] -> assert false *)
 
 let defer (f: unit -> state -> state Stream.t) : goal =
   fun st -> Stream.from_fun (fun () -> f () st)
 
-let (!<) x = [x]
-let (%) x y = x :: y
-let (%<) x y = x :: y :: []
-let (!) x = x
-let nil = []
-
 let rec addero d n m r =
   conde [
-    (0 === d) &&& ([] === m) &&& (n === r);
-    (0 === d) &&& ([] === n) &&& (m === r) &&& (poso m);
-    (1 === d) &&& ([] === m) &&& (defer (fun () -> addero 0 n [1] r));
-    (1 === d) &&& ([] === n) &&& (poso m) &&&
-      (defer (fun () -> addero 0 m (!< 1) r));
+    (!0 === d) &&& (nil === m) &&& (n === r);
+    (!0 === d) &&& (nil === n) &&& (m === r) &&& (poso m);
+    (!1 === d) &&& (nil === m) &&& (defer (fun () -> addero !0 n (!< !1) r));
+    (!1 === d) &&& (nil === n) &&& (poso m) &&&
+      (defer (fun () -> addero !0 m (!< !1) r));
     ?& [
-      ([1] === n);
-      ([1] === m);
+      ((!< !1) === n);
+      ((!< !1) === m);
       Fresh.two (fun a c ->
           ((a %< c) === r) &&&
-          (full_addero d 1 1 a c)
+          (full_addero d !1 !1 a c)
         )
     ];
-    ([1] === n) &&& (gen_addero d n m r);
-    ([1] === m) &&& (gt1o n) &&& (gt1o r)
+    ((!< !1) === n) &&& (gen_addero d n m r);
+    ((!< !1) === m) &&& (gt1o n) &&& (gt1o r)
                     &&& (defer (fun () -> addero d (!< !1) n r));
     (gt1o n) &&& (gen_addero d n m r)
   ]
@@ -391,7 +302,7 @@ let rec exp2 n b q =
             ((!0 % q1) === q);
             (poso q1);
             (ltlo b n);
-            (appendo b (!1 % b) b2);
+            (LList.appendo b (!1 % b) b2);
             (exp2 n b2 q1)
       ]);
     Fresh.four (fun q1 nh b2 s ->
@@ -400,7 +311,7 @@ let rec exp2 n b q =
             (poso q1);
             (poso nh);
             (splito n b s nh);
-            (appendo b (!1 % b) b2);
+            (LList.appendo b (!1 % b) b2);
             (exp2 nh b2 q1)
       ])
   ]
@@ -476,9 +387,61 @@ let rec rev_test1 f g (e,st) =
   let st = Subst.unify e r [] st in
   match st with
     | None -> failwith "st is bad"
-    | Some st -> reverso q r (e,st)
+    | Some st -> LList.reverso q r (e,st)
+
+let run_2var memo printer n goal =
+  let q, e   = Env.fresh (Env.empty ())  in
+  let r, e   = Env.fresh e               in
+  let st     = e, Subst.empty            in
+  let result = Stream.take ~n (goal q r st) in
+  Printf.printf "%s {\n" memo;
+  List.iter
+    (fun ((env, subst) (* as st *)) ->
+       (* LOG[trace1] (logn "State:"; *)
+       (*              logn "%s" (show_st st); *)
+       (*              logn "q=%d, r=%d" (let Var i = !! q in i) (let Var i = !!r in i)); *)
+       printf "q=%s, r=%s\n" (printer env (Subst.walk' env q subst)) (printer env (Subst.walk' env r subst))
+    )
+    result;
+  Printf.printf "}\n%!"
+
+(* copy and pase
+   Maybe we should implement more polymorphic runner like Oleg Kiselev
+*)
+let run_1var memo printer n goal =
+  let q, e   = Env.fresh (Env.empty ())  in
+  let st     = e, Subst.empty            in
+  (* printf "taking %d...\n" n ; *)
+  let result = Stream.take ~n (goal q st) in
+  Printf.printf "%s {\n" memo;
+  List.iter
+    (fun ((env, subst) as _st) ->
+       (* printf "WTF\n";
+          printf "State:\n%!";
+          printf "%s" (show_st st);
+          printf "q=%d\n%!" (let Var i = !! q in i); *)
+       printf "q='%s'\n" (printer env (Subst.walk' env q subst))
+    )
+    result;
+  Printf.printf "}\n%!"
 
 
+open GT
+
+let string_of_intlist xs =
+  Printf.sprintf "[%s]" (String.concat "," (List.map string_of_int xs) )
+
+let show_int e n =
+  (* logn "show_int: env=%s\n%!"  (Env.show e); *)
+  string_of_int n
+
+let rec fives x =
+  disj (x === 5)
+    (fun st -> Stream.from_fun (fun () -> fives x st))
+
+let int_list e l =
+  (* LOG[trace1] (logn "int_list: env=%s, list=%s\n%!"  (Env.show e)  (generic_show !!l)); *)
+  show_list e show_int l
 
 
 let _ =
@@ -495,9 +458,13 @@ let _ =
   (* run_1var "fa" show_int 1 (fun q st -> full_addero 1 1 1 1 q st); *)
 
    (* run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 0) (build_num 0) q st);
-   run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 2) (build_num 3) q st); *)
-   run_1var "asdf" int_list 1 (fun q st -> expo (build_num 3) (build_num 5) q st);
-  (* run_1var "reverso q q max 1  result" int_list 1  (fun q st -> reverso q q st); *)
+   run_1var "pluso" int_list 1 (fun q st -> pluso (build_num 2) (build_num 3) q st);
+   run_1var "multo" int_list 1 (fun q st -> multo (build_num 2) (build_num 1) q st);
+   run_1var "multo" int_list 1 (fun q st -> multo (build_num 2) (build_num 3) q st);
+
+   run_1var "expo"  int_list 1 (fun q st -> expo (build_num 3) (build_num 2) q st); *)
+   run_1var "expo"  int_list 1 (fun q st -> expo (build_num 3) (build_num 5) q st);
+   (* run_1var "reverso q q max 1  result" int_list 1  (fun q st -> reverso q q st); *)
   (* run_1var "reverso q q max 2  result" int_list 2  (fun q st -> reverso q q st); *)
   (* run_1var "reverso q q max 3  result" int_list 3  (fun q st -> reverso q q st); *)
   (* run_1var "reverso q q max 10 result" int_list 10 (fun q st -> reverso q q st); *)

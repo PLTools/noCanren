@@ -1,2 +1,5 @@
 FLG -rectypes
 PKG GT
+
+S src/
+B _build/src

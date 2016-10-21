@@ -4,20 +4,12 @@ open Printf
 type var = Var of int
 type w   = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
-type config =
-  { mutable do_log: bool;
-    mutable do_readline: bool }
+type 'a logic = 'a
+let inj : 'a -> 'a logic = fun x -> x
+let prj_exn _ = assert false
 
-let config = { do_log=true; do_readline=false }
-
-let () =
-  let args = ref [("-r", Arg.Unit (fun () -> config.do_readline <- true), "readlines")] in
-  (* LOG[trace1](
-       args := ("-q", Arg.Unit (fun () -> config.do_log <- false), "quite") :: !args;
-       args := ("-v", Arg.Unit (fun () -> config.do_log <- true), "verbose") :: !args ); *)
-  Arg.parse !args
-            (fun s -> eprintf "Unknown parameter '%s'\n" s; exit 0)
-            "This is usage message"
+type config = { mutable do_log: bool }
+let config = { do_log=true }
 
 let logn fmt =
   if config.do_log then kprintf (printf "%s\n%!") fmt
@@ -48,8 +40,8 @@ let rec wrap (x : Obj.t) =
       let t = tag x in
       if is_valid_tag t
       then
-	let f = if t = double_array_tag then !! double_field else field in
-	Boxed (t, size x, f x)
+	      let f = if t = double_array_tag then !! double_field else field in
+	      Boxed (t, size x, f x)
       else Invalid t
     )
 
@@ -96,7 +88,6 @@ module Env :
 
     let fresh (h, current) =
       (* LOG[trace1] (logn "fresh var %d" current); *)
-      if config.do_readline then ignore (read_line ());
       let v = Var current in
       H.add h v ();
       (!!v, (h, current+1))
@@ -192,8 +183,7 @@ module Subst :
   end
 
 type state = Env.t * Subst.t
-type lunit = state -> state Stream.t
-type goal = lunit
+type goal = state -> state Stream.t
 
 let show_st (env, subst) = sprintf "st {%s, %s}" (Env.show env) (Subst.show subst)
 
@@ -237,11 +227,11 @@ let fresh f (env, subst) =
   f x (env', subst)
 
 let (===) x y (env, subst) =
-  LOG[trace1] (logf "unify '%s' and '%s' in '%s' = ....\n%!" (generic_show !!x) (generic_show !!y) (show_st (env, subst)) );
+  (* LOG[trace1] (logf "unify '%s' and '%s' in '%s' = ....\n%!" (generic_show !!x) (generic_show !!y) (show_st (env, subst)) ); *)
   match Subst.unify env x y (Some subst) with
   | None   -> Stream.nil
   | Some s ->
-    LOG[trace1] (logn "\t'%s'" (show_st (env, s)));
+    (* LOG[trace1] (logn "\t'%s'" (show_st (env, s))); *)
     Stream.cons (env, s) Stream.nil
 
 let conj f g st = Stream.bind (f st) g
@@ -280,33 +270,59 @@ module Fresh =
     let eight f = succ seven f
   end
 
-(*
+
 type ('a, 'l) llist =
-    Nil
+  | Nil
   | Cons of 'a * 'l
 
 module LList = struct
   include List
-  let rec of_list =
+
+  type 'a logic1 = 'a logic
+  type ('a, 'l) ttt = ('a, 'l) llist
+  type 'a ground = ('a, 'a ground) ttt
+  type 'a t = 'a ground
+
+  let rec of_list : 'a list -> 'a ground logic =
     function
-    | [] -> Nil
-    | x :: xs -> Cons (x, of_list xs)
+    | [] -> inj Nil
+    | x :: xs -> inj @@ Cons (x, of_list xs)
   let rec to_list =
     function
     | Nil -> []
     | Cons (x, xs) -> x :: to_list xs
 
-  let (%) x y = (!!) (Cons (x, y))
-  let (%<) x y = (!!) (Cons (x, (!!) (Cons (y, (!!) Nil))))
-  let (!<) x = (!!) (Cons (x, (!!) Nil))
+  let (%) : 'a logic -> 'a ground logic -> 'a ground logic =
+    fun x y -> inj (Cons (x, y))
+  let (%<) : 'a logic -> 'a logic -> 'a ground logic =
+    fun x y -> inj (Cons (x, inj (Cons (y, inj Nil))))
+  let (!<) : 'a logic -> 'a ground logic =
+    fun x -> inj (Cons (x, inj Nil))
   let nil = inj Nil
 
+  type 'a logic  = ('a ground) logic1
 
+  let rec appendo a b ab =
+    conde [
+      (a === nil) &&& (b === ab);
+      Fresh.three (fun h t ab' ->
+          (a === h%t) &&&
+          (h%ab' === ab) &&&
+          (appendo t b ab')
+        )
+    ]
+  let rec reverso a b =
+    conde [
+      (a === nil) &&& (b === nil);
+      Fresh.three (fun h t a' ->
+          (a === h%t) &&&
+          (appendo a' !<h b) &&&
+          (reverso t a')
+        )
+    ]
 end
 
 let (%)  = LList.(%)
 let (%<) = LList.(%<)
 let (!<) = LList.(!<)
 let nil  = LList.nil
-
- *)
