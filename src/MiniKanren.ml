@@ -21,7 +21,7 @@ module Stream =
 
     type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
 
-    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.lazy_from_fun f)
+    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
 
     let nil = Nil
 
@@ -64,7 +64,7 @@ module Stream =
     let rec map f = function
     | Nil -> Nil
     | Cons (x, xs) -> Cons (f x, map f xs)
-    | Lazy s -> Lazy (Lazy.lazy_from_fun (fun () -> map f @@ Lazy.force s))
+    | Lazy s -> Lazy (Lazy.from_fun (fun () -> map f @@ Lazy.force s))
 
     let rec iter f = function
     | Nil -> ()
@@ -78,7 +78,7 @@ let (!!!) = Obj.magic;;
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
 
 let logic = {logic with 
-  gcata = (); 
+  gcata = ();
   plugins = 
     object 
       method html    = logic.plugins#html
@@ -134,7 +134,7 @@ let rec wrap (x : Obj.t) =
       (fun _ -> true)
       [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
        forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-       final_tag  ; unaligned_tag; out_of_heap_tag
+       custom_tag  ; unaligned_tag; out_of_heap_tag
       ]
     in
     let is_unboxed obj =
