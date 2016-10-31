@@ -1,32 +1,36 @@
+OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
 print-%: ; @echo $*=$($*)
 
-TESTS=001
+TESTS=001 002
 EXPRTESTS=$(addprefix expr, $(TESTS))
 CTESTS=$(addprefix c, $(TESTS))
 
-DEFAULT_GOAL:= perf
+.PHONY: perf
+perf:
+
+#.DEFAULT_GOAL := perf
 
 define XXX
 $$(warning arg = $(1))
-$$(warning file = $$(wildcard test001*.ml) )
+#$$(warning file = $$(wildcard test001*.ml) )
 
-MLFILE = $$(wildcard test$(1)*.ml)
+MLFILE_$(1) = $$(wildcard test$(1)*.ml)
 $$(warning R =  $$(eval $$R) )
 perf$(1)_ml:
-ifneq ($$(MLFILE),)
-	# do some rules for ML file
-	cd ../.. && ocamlbuild -use-ocamlfind -Is src,regression regression/performance/$$(MLFILE:.ml=.native)
-	/usr/bin/time -f "%U" ../../$$(MLFILE:.ml=.native)
+# do some rules for ML file
+ifneq ($$(MLFILE_$(1)),)
+	cd ../.. && $(OB) -Is src,regression regression/performance/$$(MLFILE_$(1):.ml=.native)
+	/usr/bin/time -f "%U" ../../$$(MLFILE_$(1):.ml=.native)
 endif
 perf: perf$(1)_ml
 
-RKTFILE = $$(wildcard test$(1)*.rkt)
-#$$(warning R =  $$(eval $$R) )
+RKTFILE_$(1) = $$(wildcard test$(1)*.rkt)
+$$(warning RKTFILE_$(1) = $$(RKTFILE_$(1)))
 perf$(1)_rkt:
-ifneq ($$(RKTFILE),)
+ifneq ($$(RKTFILE_$(1)),)
 	# do some rules for ML file
-	raco exe --gui $$(RKTFILE) #-o $$(RKTFILE:.rkt=)
-	/usr/bin/time -f "%U" ./$$(basename $$(RKTFILE) )
+	raco exe --gui $$(RKTFILE_$(1)) #-o $$(RKTFILE:.rkt=)
+	/usr/bin/time -f "%U" ./$$(basename $$(RKTFILE_$(1)) )
 endif
 
 perf: perf$(1)_rkt
@@ -38,6 +42,12 @@ endef
 
 $(foreach i,$(TESTS), $(eval $(call XXX,$(i)) ) )
 
+perf:
+	$(MAKE) -C ../../ -f Makefile.ob plugin
+
+.PHONY: clean
+clean:
+	$(MAKE) -C ../../ -f Makefile.ob clean
 
 # .PHONY: check $(EXPRTESTS) $(CTESTS) $(CTESTSO)
 #

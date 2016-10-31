@@ -1,0 +1,10 @@
+;(define empty-subst-map '())
+;(include "mk.scm")
+(include "mk-vicare.scm")
+
+(include "test-check.scm")
+
+(include "numbers.scm")
+
+(run* (q)
+  (expo '(1 1) '(1 0 1) q))
