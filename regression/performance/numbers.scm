@@ -119,7 +119,7 @@
            ((== '() n)
             (== `(,a2 . ,z) m)
             (bound-*o x y z '()))
-           ((== `(,a3 . ,z) n) 
+           ((== `(,a3 . ,z) n)
             (bound-*o x y z m))))))))
 
 (define =lo
@@ -299,4 +299,3 @@
 (define expo
   (lambda (b q n)
     (logo n b q '())))
-

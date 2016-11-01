@@ -1,44 +1,102 @@
 OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
 print-%: ; @echo $*=$($*)
 
+DATAFILE=data.gnuplot
 TESTS=001 002
 EXPRTESTS=$(addprefix expr, $(TESTS))
 CTESTS=$(addprefix c, $(TESTS))
+MEASURE=/usr/bin/time -f "%U"
+DUMMY_MEASURE=echo " 0"
 
-.PHONY: perf
-perf:
-
-#.DEFAULT_GOAL := perf
+.DEFAULT_GOAL := all
+ML_TESTS_TO_COMPILE :=
+.PHONY: compile_rkt compile_ml compile_scm measure_rkt measure_ml measure_scm
 
 define XXX
-$$(warning arg = $(1))
-#$$(warning file = $$(wildcard test001*.ml) )
-
+#ocanren
 MLFILE_$(1) = $$(wildcard test$(1)*.ml)
-$$(warning R =  $$(eval $$R) )
-perf$(1)_ml:
-# do some rules for ML file
+ML_NATIVE_$(1) := regression/performance/$$(MLFILE_$(1):.ml=.native)
+ML_TESTS_TO_COMPILE += $$(ML_NATIVE_$(1))
+
+compile$(1)_ml:
 ifneq ($$(MLFILE_$(1)),)
-	cd ../.. && $(OB) -Is src,regression regression/performance/$$(MLFILE_$(1):.ml=.native)
-	/usr/bin/time -f "%U" ../../$$(MLFILE_$(1):.ml=.native)
+	cd ../.. && $(OB) -Is src,regression $$(ML_NATIVE_$(1))
+endif
+measure$(1)_ml:
+ifneq ($$(MLFILE_$(1)),)
+	$(MEASURE) --append -o .$(1).data ../../$$(MLFILE_$(1):.ml=.native)
+else
+	$(DUMMY_MEASURE) >> .$(1).data
 endif
 perf: perf$(1)_ml
 
-RKTFILE_$(1) = $$(wildcard test$(1)*.rkt)
-$$(warning RKTFILE_$(1) = $$(RKTFILE_$(1)))
-perf$(1)_rkt:
-ifneq ($$(RKTFILE_$(1)),)
-	# do some rules for ML file
-	raco exe --gui $$(RKTFILE_$(1)) #-o $$(RKTFILE:.rkt=)
-	/usr/bin/time -f "%U" ./$$(basename $$(RKTFILE_$(1)) )
+#racket
+RKT_FILE_$(1) = $$(wildcard test$(1)*.rkt)
+RKT_NATIVE_$(1) = $$(RKT_FILE_$(1)).native
+$$(warning RKTFILE_$(1) = $$(RKT_FILE_$(1)))
+.PHONY: compile$(1)_rkt
+ifneq ($$(RKT_FILE_$(1)),)
+compile$(1)_rkt: $$(RKT_NATIVE_$(1))
+$$(RKT_NATIVE_$(1)):
+	raco exe -o $$(RKT_NATIVE_$(1)) $$(RKT_FILE_$(1))
+compile_rkt: compile$(1)_rkt
+else
+compile$(1)_rkt:
+
 endif
 
-perf: perf$(1)_rkt
+measure$(1)_rkt:
+ifneq ($$(RKT_FILE_$(1)),)
+	$(MEASURE) --append -o .$(1).data ./$$(RKT_NATIVE_$(1))
+else
+	$(DUMMY_MEASURE) >> .$(1).data
+endif
+
+# scheme
+SCM_FILE_$(1) = $(wildcard test$(1)*.chez)
+SCM_NATIVE_$(1) = $$(SCM_FILE_$(1):.chez=).so
+
+ifneq ("$$(SCM_FILE_$(1))","")
+.PHONY: compile$(1)_scm
+compile$(1)_scm: $$(SCM_NATIVE_$(1))
+	echo '(compile-file "$$(SCM_FILE_$(1))")' | scheme -q
+compile_scm: compile$(1)_scm
+else
+compile$(1)_scm:
+endif
+
+measure$(1)_scm:
+ifneq ($$(SCM_FILE_$(1)),)
+	$(MEASURE) --append -o .$(1).data scheme --program $$(SCM_NATIVE_$(1))
+else
+	$(DUMMY_MEASURE) >> .$(1).data
+endif
+
+.PHONY: measure$(1) measure$(1)_prepare
+measure$(1)_prepare:
+	$(RM) .$(1).data .$(1).name
+measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm
+	printf "WTF " >> $(DATAFILE)
+	tr '\n' ' ' < .$(1).data >> $(DATAFILE)
+	printf "\n" >> $(DATAFILE)
+do_measure: measure$(1)
 
 endef
 
-#$(info $(call XXX,001))
+.PHONY: prepare_header do_measure
+prepare_header:
+	echo "x OCanren Racket Scheme" > data.gnuplot
+
+compile_ocanren:
+	cd ../../ && $(OB) -Is src,regression $(ML_TESTS_TO_COMPILE)
+
+compile: compile_ocanren compile_rkt compile_scm
+measure: prepare_header do_measure
+#$(info $(call XXX,002))
 #$(eval $(call XXX,001))
+all: compile measure graph
+graph:
+	gnuplot script.gnuplot && xdg-open graph.pdf
 
 $(foreach i,$(TESTS), $(eval $(call XXX,$(i)) ) )
 
