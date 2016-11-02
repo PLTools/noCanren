@@ -10,13 +10,15 @@ DUMMY_MEASURE=echo " 0"
 
 .DEFAULT_GOAL := all
 ML_TESTS_TO_COMPILE :=
-.PHONY: compile_rkt compile_ml compile_scm measure_rkt measure_ml measure_scm
+.PHONY: compile_rkt compile_ml compile_scm compile_muscm\
+	measure_rkt measure_ml measure_scm measure_muscm
 
 define XXX
 #ocanren
 MLFILE_$(1) = $$(wildcard test$(1)*.ml)
 ML_NATIVE_$(1) := regression/performance/$$(MLFILE_$(1):.ml=.native)
 ML_TESTS_TO_COMPILE += $$(ML_NATIVE_$(1))
+TEST$(1)_NAME = $$(MLFILE_$(1):test$(1)%.ml=%)
 
 compile$(1)_ml:
 ifneq ($$(MLFILE_$(1)),)
@@ -52,7 +54,7 @@ else
 	$(DUMMY_MEASURE) >> .$(1).data
 endif
 
-# scheme
+# miniKanren in Scheme
 SCM_FILE_$(1) = $(wildcard test$(1)*.chez)
 SCM_NATIVE_$(1) = $$(SCM_FILE_$(1):.chez=).so
 
@@ -72,11 +74,32 @@ else
 	$(DUMMY_MEASURE) >> .$(1).data
 endif
 
+# muKanren in Scheme
+MUSCM_FILE_$(1) = $(wildcard test$(1)*.mu.scm)
+MUSCM_NATIVE_$(1) = $$(MUSCM_FILE_$(1):.scm=).so
+ifneq ("$$(MUSCM_FILE_$(1))","")
+.PHONY: compile$(1)_muscm
+compile$(1)_muscm: $$(MUSCM_NATIVE_$(1))
+$$(MUSCM_NATIVE_$(1)): $$(MUSCM_FILE_$(1))
+	echo '(compile-file "$$(MUSCM_FILE_$(1))")' | scheme -q
+compile_muscm: compile$(1)_muscm
+else
+compile$(1)_muscm:
+endif
+
+measure$(1)_muscm:
+ifneq ($$(MUSCM_FILE_$(1)),)
+	$(MEASURE) --append -o .$(1).data scheme --program $$(MUSCM_NATIVE_$(1))
+else
+	$(DUMMY_MEASURE) >> .$(1).data
+endif
+################################################################################
 .PHONY: measure$(1) measure$(1)_prepare
 measure$(1)_prepare:
 	$(RM) .$(1).data .$(1).name
-measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm
-	printf "WTF " >> $(DATAFILE)
+measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm\
+							measure$(1)_muscm
+	printf "$$(TEST$(1)_NAME) " >> $(DATAFILE)
 	tr '\n' ' ' < .$(1).data >> $(DATAFILE)
 	printf "\n" >> $(DATAFILE)
 do_measure: measure$(1)
@@ -85,12 +108,12 @@ endef
 
 .PHONY: prepare_header do_measure
 prepare_header:
-	echo "x OCanren Racket Scheme" > data.gnuplot
+	echo "x OCanren Racket Scheme uKanren/Scheme" > data.gnuplot
 
 compile_ocanren:
 	cd ../../ && $(OB) -Is src,regression $(ML_TESTS_TO_COMPILE)
 
-compile: compile_ocanren compile_rkt compile_scm
+compile: compile_ocanren compile_rkt compile_scm compile_muscm
 measure: prepare_header do_measure
 #$(info $(call XXX,002))
 #$(eval $(call XXX,001))
