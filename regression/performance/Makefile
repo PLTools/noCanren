@@ -2,11 +2,11 @@ OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
 print-%: ; @echo $*=$($*)
 
 DATAFILE=data.gnuplot
-TESTS=001 002
+TESTS=001 002 003
 EXPRTESTS=$(addprefix expr, $(TESTS))
 CTESTS=$(addprefix c, $(TESTS))
 MEASURE=/usr/bin/time -f "%U"
-DUMMY_MEASURE=echo " 0"
+DUMMY_MEASURE=echo " -0.1"
 
 .DEFAULT_GOAL := all
 ML_TESTS_TO_COMPILE :=
@@ -18,7 +18,7 @@ define XXX
 MLFILE_$(1) = $$(wildcard test$(1)*.ml)
 ML_NATIVE_$(1) := regression/performance/$$(MLFILE_$(1):.ml=.native)
 ML_TESTS_TO_COMPILE += $$(ML_NATIVE_$(1))
-TEST$(1)_NAME = $$(MLFILE_$(1):test$(1)%.ml=%)
+TEST$(1)_NAME = $$(MLFILE_$(1):test$(1)_%.ml=%)
 
 compile$(1)_ml:
 ifneq ($$(MLFILE_$(1)),)
@@ -35,7 +35,7 @@ perf: perf$(1)_ml
 #racket
 RKT_FILE_$(1) = $$(wildcard test$(1)*.rkt)
 RKT_NATIVE_$(1) = $$(RKT_FILE_$(1)).native
-$$(warning RKTFILE_$(1) = $$(RKT_FILE_$(1)))
+#$$(warning RKTFILE_$(1) = $$(RKT_FILE_$(1)))
 .PHONY: compile$(1)_rkt
 ifneq ($$(RKT_FILE_$(1)),)
 compile$(1)_rkt: $$(RKT_NATIVE_$(1))
@@ -108,7 +108,7 @@ endef
 
 .PHONY: prepare_header do_measure
 prepare_header:
-	echo "x OCanren Racket Scheme uKanren/Scheme" > data.gnuplot
+	echo "x     OCanren Racket Scheme uKanren/Scheme" > data.gnuplot
 
 compile_ocanren:
 	cd ../../ && $(OB) -Is src,regression $(ML_TESTS_TO_COMPILE)

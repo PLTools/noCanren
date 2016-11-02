@@ -4,40 +4,6 @@
 (require "mk.rkt")
 (include "test-check.scm")
 
-(define nullo
-  (lambda (x)
-    (== '() x)))
-(define pairo
-  (lambda (p)
-    (fresh (a d)
-      (conso a d p))))
-(define conso
-  (lambda (a d p)
-    (== (cons a d) p)))
-(define poso
-  (lambda (n)
-    (fresh (a d)
-      (== `(,a . ,d) n))))
-(define cdro
-  (lambda (p d)
-    (fresh (a)
-      (== (cons a d) p))))
-(define caro
-  (lambda (p a)
-    (fresh (d)
-      (== (cons a d) p))))
-
-;(include "numbers.scm")
-
-(define appendo
-  (lambda (l s out)
-    (conde
-      [(== '() l) (== s out)]
-      [(fresh (a d res)
-         (== `(,a . ,d) l)
-         (== `(,a . ,res) out)
-         (appendo d s res))])))
-
 (define peano
   (lambda (n)
     (conde
@@ -63,11 +29,22 @@
 
 (define >o
   (lambda (n1 n2)
+    (fresh (t zz)
+           (addo n2 t n1)
+           (== t `(s ,zz)))))
+#|
+(define >o2  ; bad
+  (lambda (n1 n2)
     (conde
       ((fresh (t1) 
          (== n1 `(s ,t1)) (== n2 'z))
        (fresh (t1 t2)
          (== n1 `(s ,t1)) (== n2 `(s ,t2)) (>o t1 t2))))))
+|#
+;(run* (q)  (<=o '(s (s z)) q))
+;(run* (q)  (>o  q '(s (s z)) ))
+;(run* (q)  (>o2 q '(s (s z)) ))
+;(run* (q)  (<=o q '(s (s z)) ))
 
 #|
 let minmaxo a b min max = Nat.(conde [
@@ -122,11 +99,27 @@ let rec sorto x y = conde [
         (sorto xs xs2)
         (smallesto x s xs))))))
 
-(run* (q)  (>o '(s (s z)) q))
-(run* (q)  (<=o q '(s (s z)) ))
-(run* (q r)
-  (addo q r '(s (s z))))
-;(run 1 (q r)
-;  (smallesto '((s (s z)) (s z) z) r q))
-;(run* (r)
-;  (sorto '((s (s z)) (s z) z) r))
+;(run* (q)  (<=o q '(s (s z)) ))
+;(run* (q r)
+;  (addo q r '(s (s z))))
+
+;(run 1 (r q)
+;  (smallesto '(
+;               (s (s z))
+;               (s z) z) r q))
+
+;(run 1 (r) (sorto '() r))
+;(run 1 (r) (sorto '(z) r))
+(run 1 (r)
+  (sorto '(
+           ;(s(s(s(s(s(s(s(s (s z))))))))) ; 9
+           ;(s(s(s(s(s(s(s (s z))))))))
+           ;(s(s(s(s(s(s (s z)))))))
+           ;(s(s(s(s(s (s z))))))          ;6
+           ;(s(s(s(s (s z)))))
+           ; (s(s(s (s z))))
+           (s(s (s z)))                   ;3
+           (s (s z))
+           (s z)
+           z)                             ; 0
+         r))
