@@ -1,0 +1,3 @@
+[submodule "microKanren"]
+	path = microKanren
+	url = https://github.com/jasonhemann/microKanren.git
