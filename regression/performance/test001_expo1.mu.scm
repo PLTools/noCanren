@@ -1,5 +1,5 @@
 (include "../../microKanren/microKanren.scm")
-(include "../../microKanren/miniKanren-wrappers2.scm")
+(include "mini_from_microKanren.scm")
 
 (define poso
   (lambda (n)
