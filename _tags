@@ -10,6 +10,7 @@ true: debug, rectypes
 <regression/test0*.*>: package(GT,logger.syntax), syntax(camlp5o)
 <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test007.*> or <regression/test006.*> or <regression/test005.*> or <regression/test004.*> or <regression/test003.*>: use_pa_minikanren, package(GT.syntax.all)
 <regression/performance/*.ml> or <regression/performance/test0*.*>: syntax(camlp5o), package(GT,GT.syntax.all,logger.syntax), use_pa_minikanren
+<regression/performance>: not_hygienic
 
 ####################################################################
 # JSOO toplevel related stuff
