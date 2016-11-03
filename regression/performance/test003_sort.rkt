@@ -1,8 +1,8 @@
 #lang racket
 (require racket/include)
 
-(require "mk.rkt")
-(include "test-check.scm")
+(require "../../faster-miniKanren/mk.rkt")
+(include "../../faster-miniKanren/test-check.scm")
 
 (define peano
   (lambda (n)
@@ -36,7 +36,7 @@
 (define >o2  ; bad
   (lambda (n1 n2)
     (conde
-      ((fresh (t1) 
+      ((fresh (t1)
          (== n1 `(s ,t1)) (== n2 'z))
        (fresh (t1 t2)
          (== n1 `(s ,t1)) (== n2 `(s ,t2)) (>o t1 t2))))))
@@ -58,10 +58,10 @@ let minmaxo a b min max = Nat.(conde [
      ((== max  a) (== min b) (>o a b)))))
 
 #|
-(* [l] is a (non-empty) list, [s] is its smallest element, 
+(* [l] is a (non-empty) list, [s] is its smallest element,
    [l'] --- all other elements
 *)
-let rec smallesto l s l' = conde [       
+let rec smallesto l s l' = conde [
   (l === !< s) &&& (l' === !!Nil);
   fresh (h t s' t' max)
     (l' === max % t')
@@ -84,7 +84,7 @@ let rec sorto x y = conde [
   (x === !!Nil) &&& (y === !!Nil);
   fresh (s xs xs')
     (* or the sorted one is a concatenation of the
-       smallest element (s) and sorted list of all other elements (xs') 
+       smallest element (s) and sorted list of all other elements (xs')
     *)
     (y === s % xs')
     (sorto xs xs')       (* 1 *)

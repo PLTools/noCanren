@@ -1,8 +1,8 @@
 #lang racket
 (require racket/include)
 
-(require "mk.rkt")
-(include "test-check.scm")
+(require "../../faster-miniKanren/mk.rkt")
+(include "../../faster-miniKanren/test-check.scm")
 
 (define nullo
   (lambda (x)
@@ -29,7 +29,5 @@
 
 (include "numbers.scm")
 
-(run* (r) 
+(run* (r)
   (expo '(1 1) '(1 0 1) r))
-
-
