@@ -61,6 +61,7 @@ SCM_NATIVE_$(1) = $$(SCM_FILE_$(1):.chez=).so
 ifneq ("$$(SCM_FILE_$(1))","")
 .PHONY: compile$(1)_scm
 compile$(1)_scm: $$(SCM_NATIVE_$(1))
+$$(SCM_NATIVE_$(1)):
 	echo '(compile-file "$$(SCM_FILE_$(1))")' | scheme -q
 compile_scm: compile$(1)_scm
 else
@@ -111,6 +112,7 @@ prepare_header:
 	echo "x     OCanren Racket Scheme uKanren/Scheme" > data.gnuplot
 
 compile_ocanren:
+	$(MAKE) -C ../..
 	cd ../../ && $(OB) -Is src,regression $(ML_TESTS_TO_COMPILE)
 
 compile: compile_ocanren compile_rkt compile_scm compile_muscm
@@ -128,29 +130,5 @@ perf:
 
 .PHONY: clean
 clean:
-	$(MAKE) -C ../../ -f Makefile.ob clean
-
-# .PHONY: check $(EXPRTESTS) $(CTESTS) $(CTESTSO)
-#
-# check: prepare $(EXPRTESTS) $(CTESTS) $(CTESTSO) complete
-#
-#
-# compile:
-#
-# complete:
-# 	paste -d'\t' names.data o0.data expr.data expr-so.data o3.data >> data.gnuplot && gnuplot script.gnuplot
-#
-# prepare:
-# 	rm -rf *.data && for i in $(TESTS) ; do echo $$i >> names.data ; done && echo "Test\tgcc-O0\texpr\texpr-so\tgcc-O3" > data.gnuplot
-#
-# $(CTESTS): %: %.c
-# 	gcc -o $@-O0 -m32 -O0 $< && /usr/bin/time -o o0.data --append -f '%U' ./$@-O0 > $@.log && diff $@.log orig/`echo $@.log | sed 's/^c/expr/'`
-# 	gcc -o $@-O3 -m32 -O3 $< && /usr/bin/time -o o3.data --append -f '%U' ./$@-O3 > $@.log && diff $@.log orig/`echo $@.log | sed 's/^c/expr/'`
-#
-# $(EXPRTESTS): %: %.expr
-# 	RC_RUNTIME=../../runtime ../../rc.native     $< && /usr/bin/time -o expr.data    --append -f '%U' ./$@ > $@.log | tr -d '\n' >> data.gnuplot && diff $@.log orig/$@.log
-# 	RC_RUNTIME=../../runtime ../../rc.native -so $< && /usr/bin/time -o expr-so.data --append -f '%U' ./$@ > $@.log | tr -d '\n' >> data.gnuplot && diff $@.log orig/$@.log
-#
-# clean:
-# 	$(RM) -f *.log *.s *~ $(TESTS)
-#
+	#$(MAKE) -C ../../ -f Makefile.ob clean
+	$(RM) *.native *.so *~
