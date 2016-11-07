@@ -98,7 +98,7 @@ endif
 .PHONY: measure$(1) measure$(1)_prepare
 measure$(1)_prepare:
 	$(RM) .$(1).data .$(1).name
-measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm\
+measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm \
 							measure$(1)_muscm
 	printf "$$(TEST$(1)_NAME) " >> $(DATAFILE)
 	tr '\n' ' ' < .$(1).data >> $(DATAFILE)
@@ -112,9 +112,15 @@ prepare_header:
 	echo "x     OCanren Racket Scheme uKanren/Scheme" > data.gnuplot
 
 compile_ocanren:
-	$(MAKE) -C ../..
+	$(MAKE) -C ../.. -f Makefile.ob
 	cd ../../ && $(OB) -Is src,regression $(ML_TESTS_TO_COMPILE)
 
+.PHONY: check_submodules
+check_submodules:
+	if [ ! -d "../../faster-miniKanren" ]; then \
+		(cd ../.. && git submodule init && git submodule update); fi
+
+compile: check_submodules
 compile: compile_ocanren compile_rkt compile_scm compile_muscm
 measure: prepare_header do_measure
 #$(info $(call XXX,002))
