@@ -2,7 +2,7 @@ OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)"
 print-%: ; @echo $*=$($*)
 
 DATAFILE=data.gnuplot
-TESTS=001 002 003
+TESTS=001 002 004 003 005
 EXPRTESTS=$(addprefix expr, $(TESTS))
 CTESTS=$(addprefix c, $(TESTS))
 MEASURE=/usr/bin/time -f "%U"
@@ -130,5 +130,4 @@ perf:
 
 .PHONY: clean
 clean:
-	#$(MAKE) -C ../../ -f Makefile.ob clean
-	$(RM) *.native *.so *~
+	$(RM) *.native *.so *~ ./compiled
