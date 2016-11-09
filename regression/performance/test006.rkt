@@ -6,12 +6,10 @@
 
 (include "q.scm")
 
-(run 4 (x)
-  (fresh (p q r)
+; twines
+(run 2 (x)
+  (fresh (p q)
     (=/= p q)
-    (=/= q r)
-    (=/= r p)
     (eval-expo p '() q)
-    (eval-expo q '() r)
-    (eval-expo r '() p)
-    (== `(,p ,q ,r) x)))
+    (eval-expo q '() p)
+    (== `(,p ,q) x)))
