@@ -117,7 +117,7 @@ compile_ocanren:
 
 .PHONY: check_submodules
 check_submodules:
-	if [ ! -d "../../faster-miniKanren" ]; then \
+	if [ -d "../../faster-miniKanren" ]; then \
 		(cd ../.. && git submodule init && git submodule update); fi
 
 compile: check_submodules
