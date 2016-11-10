@@ -100,9 +100,9 @@ measure$(1)_prepare:
 	$(RM) .$(1).data .$(1).name
 measure$(1): measure$(1)_prepare measure$(1)_ml measure$(1)_rkt measure$(1)_scm \
 							measure$(1)_muscm
-	printf "$$(TEST$(1)_NAME) " >> $(DATAFILE)
-	tr '\n' ' ' < .$(1).data >> $(DATAFILE)
-	printf "\n" >> $(DATAFILE)
+	@printf "$$(TEST$(1)_NAME) " >> $(DATAFILE)
+	@tr '\n' ' ' < .$(1).data >> $(DATAFILE)
+	@printf "\n" >> $(DATAFILE)
 do_measure: measure$(1)
 
 endef

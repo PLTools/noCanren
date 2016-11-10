@@ -1,0 +1,9 @@
+(include "mk-vicare.scm")
+(include "mk.scm")
+(include "test-check.scm")
+
+(include "q.scm")
+
+; quines
+(run 5 (p)
+  (eval-expo p '() p))
