@@ -7,7 +7,7 @@
 (include "q.scm")
 
 ; thrines
-(run 4 (x)
+(run 3 (x)
   (fresh (p q r)
     (=/= p q)
     (=/= q r)

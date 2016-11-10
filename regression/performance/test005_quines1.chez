@@ -5,7 +5,7 @@
 
 (include "q.scm")
 
-(run 4 (x)
+(run 3 (x)
   (fresh (p q r)
     (=/= p q)
     (=/= q r)
