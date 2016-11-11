@@ -1,17 +1,17 @@
 (*
  * MiniKanren: miniKanren implementation.
  * Copyright (C) 2015-2016
- * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, 
+ * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin,
  * St.Petersburg State University, JetBrains Research
- * 
+ *
  * This software is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License version 2, as published by the Free Software Foundation.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * See the GNU Library General Public License version 2 for more details
  * (enclosed in the file COPYING).
  *)
@@ -45,7 +45,7 @@ module Stream :
 
     (** [hd s] gets a tail of the stream *)
     val tl : 'a t -> 'a t
-    
+
     (** [map f s] maps function [f] over the stream [s] *)
     val map : ('a -> 'b) -> 'a t -> 'b t
 
@@ -79,14 +79,14 @@ type 'a logic (* [ ] *)
 (*
 (** A GT-compatible typeinfo for ['a logic] *)
 val logic :
-  (unit, 
-   < show    : ('a -> string) -> 'a logic -> string;    
+  (unit,
+   < show    : ('a -> string) -> 'a logic -> string;
      html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
      eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
      compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
      foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
-     gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic 
+     gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 *)
 
@@ -132,11 +132,51 @@ module Fmap (T : T) :
 
   end
 
-val lmap : ('a, 'b) fancy -> (('a, 'l) llist as 'l, ('b, 'm) llist as 'm) fancy
+module Higher : sig
+  (** Type expression application. *)
+  type ('p, 'f) app
+
+  (** Construct a newtype for a type constructor with no parameters. *)
+  module type Newtype0 = sig
+    type s
+    type t
+    external inj : s -> t = "%identity"
+    external prj : t -> s = "%identity"
+  end
+  module Newtype0 (T : sig type t end) : Newtype0 with type s = T.t
+
+  (** Construct a newtype for a type constructor with one parameter. *)
+  module type Newtype1 = sig
+    type 'a s
+    type t
+    external inj : 'a s -> ('a, t) app = "%identity"
+    external prj : ('a, t) app -> 'a s = "%identity"
+    (* val fancify1 :
+      (('a, t) app -> 'a s) -> (('a,t) app, 'b) fancy -> ('a s, 'b) fancy
+    val fancify2 :
+      (('a, t) app -> 'a s) -> ('b, ('a,t) app) fancy -> ('b, 'a s) fancy *)
+    external funky: (('a,t) app, ('b,t) app) fancy -> ('a s, 'b s) fancy = "%identity"
+  end
+  module Newtype1 (T : sig type 'a t end) : Newtype1 with type 'a s = 'a T.t
+
+  (** Construct a newtype for a type constructor with two parameters. *)
+  module type Newtype2 = sig
+    type ('a, 'b) s
+    type t
+    external inj : ('a, 'b) s -> ('a, ('b, t) app) app = "%identity"
+    external prj : ('a, ('b, t) app) app -> ('a, 'b) s = "%identity"
+  end
+  module Newtype2 (T : sig type ('a, 'b) t end) : Newtype2
+    with type ('a, 'b) s = ('a, 'b) T.t
+
+  val fmap1 : (('a, 'b) fancy, 't) app -> (('a, 't)app, ('b, 't)app) fancy
+end
+
+(* val lmap : ('a, 'b) fancy -> (('a, 'l) llist as 'l, ('b, 'm) llist as 'm) fancy
 
 val cons : ('a, 'b logic) fancy -> (('a, 'z) llist as 'z, ('b logic, 'c) llist logic as 'c) fancy -> (('a, 'z) llist, ('b logic, 'c) llist logic) fancy
 
-val nil : (('a, 'z) llist as 'z, ('a logic, 'c) llist logic as 'c) fancy 
+val nil : (('a, 'z) llist as 'z, ('a logic, 'c) llist logic as 'c) fancy  *)
 
 
 (** Abstract nat type *)
@@ -146,7 +186,7 @@ module Bool :
   sig
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
-    type 'a logic' = 'a logic 
+    type 'a logic' = 'a logic
 
     (** Ground boolean (the regular one) *)
     type ground = bool
@@ -161,7 +201,7 @@ module Bool :
          gmap    : ground -> ground;
          html    : ground -> HTML.viewer;
          show    : ground -> string >)
-      GT.t 
+      GT.t
 
     (** Logic boolean *)
     type logic = bool logic'
@@ -188,7 +228,7 @@ module Bool :
     val noto : logic -> goal
 
     (** Disjunction *)
-    val oro : logic -> logic -> logic -> goal 
+    val oro : logic -> logic -> logic -> goal
 
     (** Disjunction as a goal *)
     val (||) : logic -> logic -> goal
@@ -205,7 +245,7 @@ module Nat :
   sig
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
-    type 'a logic' = 'a logic 
+    type 'a logic' = 'a logic
 
     (** Synonym for abstract nat type *)
     type 'a t = 'a lnat
@@ -246,7 +286,7 @@ module Nat :
 
     (** [to_int g] converts ground [n] into integer *)
     val to_int : ground -> int
-    
+
     (** [inj n] converts ground nat [n] into logic one *)
     val inj : ground -> logic
 
@@ -257,13 +297,13 @@ module Nat :
     val prj : logic -> ground
 
     (** Relational addition *)
-    val addo : logic -> logic -> logic -> goal 
+    val addo : logic -> logic -> logic -> goal
 
     (** Infix syninym for [addo] *)
     val (+) : logic -> logic -> logic -> goal
 
     (** Relational multiplication *)
-    val mulo : logic -> logic -> logic -> goal 
+    val mulo : logic -> logic -> logic -> goal
 
     (** Infix syninym for [mulo] *)
     val ( + ) : logic -> logic -> logic -> goal
@@ -295,7 +335,7 @@ module List :
     include module type of struct include List end
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
-    type 'a logic' = 'a logic 
+    type 'a logic' = 'a logic
 
     (** Synonym for abstract list type *)
     type ('a, 'l) t = ('a, 'l) llist
@@ -320,21 +360,21 @@ module List :
 
     (** [to_list l] make regular list from a ground one *)
     val to_list : 'a ground -> 'a list
-   
+
     (** Logic lists (with the tails as logic lists) *)
     type 'a logic  = ('a, 'a logic)  t logic'
 
     (** GT-compatible typeinfo for ['a logic] *)
     val logic :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison; 
-         eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool; 
+       < compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
+         eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
-         foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b; 
+         foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
          gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
          show    : ('a -> string) -> 'a logic -> GT.string >)
-      GT.t 
+      GT.t
 
     (** List injection *)
     val inj : ('a -> 'b) -> 'a ground -> 'b logic
@@ -463,7 +503,7 @@ module Fresh :
 
     (** Zero logic parameters *)
     val zero : 'a -> 'a
- 
+
     (** {3 One to five logic parameter(s)} *)
 
     val one   : (('a, 'b logic) fancy ->                                                                                                 State.t -> 'c) -> State.t -> 'c
@@ -471,7 +511,7 @@ module Fresh :
     val three : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy ->                                                 State.t -> 'g) -> State.t -> 'g
     val four  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy ->                         State.t -> 'i) -> State.t -> 'i
     val five  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy -> ('i, 'j logic) fancy -> State.t -> 'k) -> State.t -> 'k
- 
+
     (** {3 One to five logic parameter(s), conventional names} *)
 
     val q     : (('a, 'b logic) fancy ->                                                                                                 State.t -> 'c) -> State.t -> 'c
@@ -479,7 +519,7 @@ module Fresh :
     val qrs   : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy ->                                                 State.t -> 'g) -> State.t -> 'g
     val qrst  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy ->                         State.t -> 'i) -> State.t -> 'i
     val pqrst : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy -> ('i, 'j logic) fancy -> State.t -> 'k) -> State.t -> 'k
- 
+
   end
 
 (** {2 Top-level running primitives} *)
@@ -489,8 +529,8 @@ module Fresh :
     machinery {a la} Danvy and represented by a number of predefined numerals and
     successor function (see below). The refinement replaces each variable, passed
     to [g], with the stream of values, associated with that variables as the goal
-    succeeds. 
-     
+    succeeds.
+
     Examples:
 
     - [run one        (fun q   -> q === !5)              (fun qs    -> ]{i here [q]s     --- a stream of all values, associated with the variable [q]}[)]
@@ -505,7 +545,7 @@ type 'a refiner = State.t Stream.t -> 'a Stream.t
 
 (** Successor function *)
 val succ :
-  (unit -> ('a -> State.t -> 'b) * ('c -> 'd -> 'e) * (('f -> 'g -> 'h) * ('i -> 'j * 'k))) -> 
+  (unit -> ('a -> State.t -> 'b) * ('c -> 'd -> 'e) * (('f -> 'g -> 'h) * ('i -> 'j * 'k))) ->
   (unit -> ((('l, 'z logic) fancy -> 'a) -> State.t -> 'l refiner * 'b) * (('m -> 'c) -> 'm * 'd -> 'e) * (('f -> ('f -> 'n) * 'g -> 'n * 'h) * ('o * 'i -> ('o * 'j) * 'k)))
 
 

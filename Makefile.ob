@@ -1,6 +1,11 @@
 MKDIR ?= mkdir -vp
 CP    ?= cp
 
+.PHONY: antiphantom
+antiphantom:
+	eval `opam config env` && $(MAKE) all test000.native && ./test000.native
+
+
 OB=ocamlbuild -use-ocamlfind -plugin-tag "package(str)" -classic-display
 ifdef OBV
 OB += -verbose 6

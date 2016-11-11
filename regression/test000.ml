@@ -1,6 +1,7 @@
-1open GT
+open GT
 open MiniKanren
 open Tester
+open Printf
 
 let just_a a = a === (5 |> lift |> inj)
 (*
@@ -23,7 +24,7 @@ let a_and_b' b =
   )
 
 let rec fives x =
-  disj (x === !5)       
+  disj (x === !5)
        (fun st -> Stream.from_fun (fun () -> fives x st))
 
 let rec appendo a b ab =
@@ -59,18 +60,29 @@ let show_int_list = show(List.logic) show_int
 *)
 ;;
 
-let rec show_list l = show(llist) (show(int)) show_list l;;
+(* let rec show_list l = show(llist) (show(int)) show_list l;; *)
 
-@type 'a test = A of 'a with show
+@type 'a test = A of 'a with show;;
 
 module LTest = Fmap (struct type 'a t = 'a test let fmap f = function A x -> A (f x)  end)
-
-let rec show_test t = show(test) (show(int)) t
+module LOption = Fmap (struct
+  type 'a t = 'a option
+  let fmap f = function Some x -> Some(f x) | None -> None
+end)
 
 let _ =
-  MiniKanren.run q 
+  let () = MiniKanren.run q
     (fun q -> inj (LTest.fmap (A q)) === inj (LTest.fmap (A (inj (lift 5)))))
-    (fun qs -> Printf.printf "%s\n" (show(int) @@ Stream.hd qs))
+    (fun qs -> printf "%s\n" (show(int) @@ Stream.hd qs))
+  in
+
+  let (_: (int, int logic) fancy) = inj @@ lift 5 in
+  let (_: (int option, int logic option) fancy) = LOption.fmap (Some (inj @@ lift 5)) in
+  let () =
+    MiniKanren.run q
+      (fun q -> q === inj (LOption.fmap (Some (inj (lift 5)))))
+      (fun qs -> printf "%s\n" (show(option) (show(int)) @@ Stream.hd qs))
+  in
 (*
   run show_int_list  1  q (REPR (fun q   -> appendo q (inj_list [3; 4]) (inj_list [1; 2; 3; 4]))) qh;
   run show_int_list  4 qr (REPR (fun q r -> appendo q (inj_list []) r                          )) qrh;
@@ -86,5 +98,26 @@ let _ =
   run show_int       1  q (REPR (fun q   -> a_and_b q                                          )) qh;
   run show_int       2  q (REPR (fun q   -> a_and_b' q                                         )) qh;
   run show_int      10  q (REPR (fun q   -> fives q                                            )) qh
-
 *)
+  ()
+
+
+open Higher
+@type 'a maybe = Just of 'a | Nothing with show;;
+module Maybe = Newtype1(struct type 'a t = 'a maybe end);;
+
+(* let (_:int) = inj (LOption.fmap (Some (inj (lift 5)))) *)
+(* let (_:(protoint maybe, protoint logic maybe logic) fancy) =
+  inj @@ Maybe.fancify1 Maybe.prj @@ Maybe.fancify2 Maybe.prj @@ fmap1 @@ Maybe.inj (Just (inj@@lift 5)) *)
+let (_:(protoint maybe, protoint logic maybe logic) fancy) =
+  inj @@ Maybe.funky @@ fmap1 @@ Maybe.inj (Just (inj@@lift 5))
+;;
+
+let () =
+  MiniKanren.run q
+    (fun q -> q === inj @@ Maybe.funky @@ fmap1 @@ Maybe.inj (Just (inj@@lift 15)) )
+    (fun qs -> printf "%s\n" (show(maybe) (show(int)) @@ Stream.hd qs))
+;;
+
+  (* let rec show_test t = show(test) (show(int)) t *)
+  @type ('a,'b) result = OK of 'a | Error of 'b with show
