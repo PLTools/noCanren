@@ -119,5 +119,11 @@ let () =
     (fun qs -> printf "%s\n" (show(maybe) (show(int)) @@ Stream.hd qs))
 ;;
 
-  (* let rec show_test t = show(test) (show(int)) t *)
-  @type ('a,'b) result = OK of 'a | Error of 'b with show
+(* let rec show_test t = show(test) (show(int)) t *)
+@type ('a,'b) result = OK of 'a | Error of 'b with show
+module Result = Newtype2(struct type ('a,'b) t = ('a,'b) result end);;
+
+let (_:int) =
+  (* let r : (int,string) result = OK 7 in  *)
+  (* Result.inj (OK (inj@@lift 7)) *)
+  Result.inj (OK 7)

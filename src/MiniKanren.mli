@@ -159,17 +159,23 @@ module Higher : sig
   end
   module Newtype1 (T : sig type 'a t end) : Newtype1 with type 'a s = 'a T.t
 
+  val fmap1 : (('a, 'b) fancy, 't) app -> (('a, 't)app, ('b, 't)app) fancy
   (** Construct a newtype for a type constructor with two parameters. *)
   module type Newtype2 = sig
     type ('a, 'b) s
     type t
     external inj : ('a, 'b) s -> ('a, ('b, t) app) app = "%identity"
     external prj : ('a, ('b, t) app) app -> ('a, 'b) s = "%identity"
+
+    (* external fmap :  *)
+    external wrap_fancy: ('a, ('b, t) app) app ->
+    (* ('a,'b)r ->  .... (('a,'b)r, ('a,'b)r logic) fancy *)
+    external fmap2
   end
   module Newtype2 (T : sig type ('a, 'b) t end) : Newtype2
     with type ('a, 'b) s = ('a, 'b) T.t
 
-  val fmap1 : (('a, 'b) fancy, 't) app -> (('a, 't)app, ('b, 't)app) fancy
+
 end
 
 (* val lmap : ('a, 'b) fancy -> (('a, 'l) llist as 'l, ('b, 'm) llist as 'm) fancy

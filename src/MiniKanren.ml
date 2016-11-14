@@ -21,7 +21,7 @@ module Stream =
 
     type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
 
-    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.lazy_from_fun f)
+    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
 
     let nil = Nil
 
@@ -64,7 +64,7 @@ module Stream =
     let rec map f = function
     | Nil -> Nil
     | Cons (x, xs) -> Cons (f x, map f xs)
-    | Lazy s -> Lazy (Lazy.lazy_from_fun (fun () -> map f @@ Lazy.force s))
+    | Lazy s -> Lazy (Lazy.from_fun (fun () -> map f @@ Lazy.force s))
 
     let rec iter f = function
     | Nil -> ()
@@ -137,7 +137,7 @@ let rec wrap (x : Obj.t) =
       (fun _ -> true)
       [lazy_tag   ; closure_tag  ; object_tag  ; infix_tag ;
        forward_tag; no_scan_tag  ; abstract_tag; custom_tag;
-       final_tag  ; unaligned_tag; out_of_heap_tag
+       custom_tag  ; unaligned_tag; out_of_heap_tag
       ]
     in
     let is_unboxed obj =
@@ -457,7 +457,6 @@ module Higher = struct
     external inj : s -> t = "%identity"
     external prj : t -> s = "%identity"
   end
-  module Newtype0 (T : sig type t end) : Newtype0 with type s = T.t
 
   (** Construct a newtype for a type constructor with one parameter. *)
   module type Newtype1 = sig
@@ -472,7 +471,7 @@ module Higher = struct
       (('a, t) app -> 'a s) -> ('b, ('a,t) app) fancy -> ('b, 'a s) fancy = fun _ -> "%identity" *)
 
     (* funky is fancify1 and fancify2 together for this concrete module *)
-    (* external funky : (('a, t) app, ('b, t) app) fancy -> ('a s, 'b s) fancy = "%identity" *)
+    external funky : (('a, t) app, ('b, t) app) fancy -> ('a s, 'b s) fancy = "%identity"
   end
 
   (** Construct a newtype for a type constructor with two parameters. *)
@@ -489,18 +488,19 @@ module Higher = struct
     external prj : 'a -> 'b = "%identity"
   end
 
-  module Newtype0 (T : sig type t end) = struct
+  module Newtype0 (T : sig type t end) : Newtype0 with type s = T.t = struct
     type s = T.t
     include Common
   end
 
-  module Newtype1 (T : sig type 'a t end) = struct
+  module Newtype1 (T : sig type 'a t end) : Newtype1 with type 'a s = 'a T.t = struct
     type 'a s = 'a T.t
     include Common
-    external fancify1 :
+    (* external fancify1 :
       (('a, t) app -> 'a s) -> (('a,t) app, 'b) fancy -> ('a s, 'b) fancy = "%identity"
     external fancify2 :
-      (('a, t) app -> 'a s) -> ('b, ('a,t) app) fancy -> ('b, 'a s) fancy = "%identity"
+      (('a, t) app -> 'a s) -> ('b, ('a,t) app) fancy -> ('b, 'a s) fancy = "%identity" *)
+    external funky : (('a, t) app, ('b, t) app) fancy -> ('a s, 'b s) fancy = "%identity"
   end
 
   module Newtype2 (T : sig type ('a, 'b) t end) = struct

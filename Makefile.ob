@@ -1,6 +1,7 @@
 MKDIR ?= mkdir -vp
 CP    ?= cp
 
+.NOTPARALLEL :
 .PHONY: antiphantom
 antiphantom:
 	eval `opam config env` && $(MAKE) all test000.native && ./test000.native
