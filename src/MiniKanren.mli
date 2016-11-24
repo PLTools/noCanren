@@ -119,20 +119,24 @@ val prj_k : (int -> 'a logic list -> 'a) -> 'a logic -> 'a
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
 
 
-module type T =
-  sig
-    type 'a t
-    val fmap : ('a -> 'b) -> 'a t -> 'b t
-  end
+module type T = sig
+  type 'a t
+  val fmap : ('a -> 'b) -> 'a t -> 'b t
+end
+module type T2 = sig
+  type ('a, 'b) t
+  val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
+end
 
-module Fmap (T : T) :
-  sig
 
-    val fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy
+module Fmap1 (T : T) : sig
+  val fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy
+end
+module Fmap2 (T : T2) : sig
+  val fmap : (('a, 'b) fancy, ('c, 'd) fancy) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) fancy
+end
 
-  end
-
-module Higher : sig
+(* module Higher : sig
   (** Type expression application. *)
   type ('p, 'f) app
 
@@ -176,7 +180,7 @@ module Higher : sig
     with type ('a, 'b) s = ('a, 'b) T.t
 
 
-end
+end *)
 
 (* val lmap : ('a, 'b) fancy -> (('a, 'l) llist as 'l, ('b, 'm) llist as 'm) fancy
 

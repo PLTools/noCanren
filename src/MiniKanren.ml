@@ -1,4 +1,4 @@
-1(*
+(*
  * MiniKanren: miniKanren implementation.
  * Copyright (C) 2015-2016
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin,
@@ -437,16 +437,18 @@ module type T2 = sig
   val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
 end
 
-module Fmap (T : T) = struct
-  let fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy = fun x -> x
+module Fmap1 (T : T) = struct
+  external fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy = "%identity"
 end
 
-(* module Fmap2 (T : T2) = struct
-  let fmap : (('a, 'b) fancy, ('c, 'd) fancy) T.t -> ('a T.t, 'b T.t) fancy = fun x -> x
-end *)
+module Fmap2 (T : T2) = struct
+  type ('a,'b) t = ('a,'b) T.t
+  external fmap : (('a, 'b) fancy, ('c, 'd) fancy) t ->
+                   (('a, 'b) t, ('c, 'd) t) fancy = "%identity"
+end
 
 
-module Higher = struct
+(* module Higher = struct
   (** Type expression application. *)
   type ('p, 'f) app
 
@@ -513,7 +515,7 @@ module Higher = struct
 
   (* let prj_fancy (p1: 'a -> 'c) -> (p2: 'a -> 'c) -> ('a,') *)
 
-end
+end *)
 
 (* let lmap : ('a, 'b) fancy -> (('a, 'l) llist as 'l, ('b, 'm) llist as 'm) fancy = fun x -> Cons (x, Nil)
 

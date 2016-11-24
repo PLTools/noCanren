@@ -1,4 +1,5 @@
-true: debug, rectypes, short_paths
+true: debug, rectypes
+true: short_paths
 
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
 
