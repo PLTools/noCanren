@@ -75,7 +75,7 @@ module Stream =
 
 let (!!!) = Obj.magic;;
 
-type ('a, 'b) fancy = 'a
+type ('a, 'b) fancy = 'a * ('a -> 'b)
 type 'a logic = 'a
 type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
 

@@ -131,17 +131,21 @@ module F = Fmap2 (struct
   | Cons (x, y) -> Cons (f x, g y)
 end)
 
-let nil () = inj (F.fmap Nil)
+let nil ()  = inj (F.fmap Nil)
 let cons x y = inj (F.fmap (Cons (x, y)))
 
 let rec show_intlist xs = show(alist) (show(int)) show_intlist xs
+let (_: ((int, 'a) alist as 'a) -> bytes) = show_intlist
+
 let test1 x =
   Fresh.one (fun y ->
     (x === cons (inj@@lift 5) y) &&&
     (y === nil ())
   )
-
+(* let (_:int) = test1 *)
 let () =
     MiniKanren.run q test1
-      (fun qs -> printf "%s\n" (show_intlist @@ Stream.hd qs))
+      (fun qs ->
+        let (_:int) = qs in
+        printf "%s\n" (show_intlist @@ Stream.hd qs))
   ;;
