@@ -38,7 +38,7 @@ module Stream =
       else match s with
            | Nil          -> [], s
            | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
-	   | Lazy  z      -> retrieve ~n:n (Lazy.force z)
+           | Lazy  z      -> retrieve ~n:n (Lazy.force z)
 
     let take ?(n=(-1)) s = fst @@ retrieve ~n:n s
 
@@ -50,14 +50,14 @@ module Stream =
          match fs with
          | Nil           -> gs
          | Cons (hd, tl) -> cons hd (mplus gs tl)
-	 | Lazy z        -> mplus gs (Lazy.force z)
+         | Lazy z        -> mplus gs (Lazy.force z)
       )
 
     let rec bind xs f =
       from_fun (fun () ->
         match xs with
         | Cons (x, xs) -> mplus (f x) (bind xs f)
-	| Nil          -> nil
+        | Nil          -> nil
         | Lazy z       -> bind (Lazy.force z) f
      )
 
@@ -78,6 +78,17 @@ let (!!!) = Obj.magic;;
 type ('a, 'b) fancy = 'a * ('a -> 'b)
 type 'a logic = 'a
 type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+                    | Value of 'a
+
+let lift: 'a. 'a -> ('a,'a) fancy = fun x -> (x,(fun y -> y))
+
+let inj: ('a, 'b) fancy -> ('a, 'b logic) fancy =
+  fun (a,f) -> (a, fun x -> Value (f x))
+
+let (_:int) = inj
+let (!!) = inj
+
+
 
 (*
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
@@ -114,11 +125,6 @@ let logic = {logic with
 
 exception Not_a_value
 
-let lift x = x
-
-let (!!) x = (*Value*) x
-let inj = (!!)
-
 (*
 let prj_k k = function Value x -> x | Var (_, i, c) -> k i c
 let prj x = prj_k (fun _ -> raise Not_a_value) x
@@ -150,8 +156,8 @@ let rec wrap (x : Obj.t) =
       let t = tag x in
       if is_valid_tag t
       then
-	let f = if t = double_array_tag then !!! double_field else field in
-	Boxed (t, size x, f x)
+        let f = if t = double_array_tag then !!! double_field else field in
+        Boxed (t, size x, f x)
       else Invalid t
     )
 
@@ -415,8 +421,8 @@ let failure _  = Stream.nil
 
 let eqo x y t =
   conde [
-    (x === y) &&& (t === !!true);
-    (x =/= y) &&& (t === !!false);
+    (x === y) &&& (t === inj@@(lift true) );
+    (x =/= y) &&& (t === inj@@lift false);
   ]
 
 let neqo x y t =

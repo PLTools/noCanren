@@ -76,6 +76,15 @@ type ('a, 'b) fancy (* { , } *)
 (** A type of abstract logic values *)
 type 'a logic (* [ ] *)
 
+val lift : 'a -> ('a, 'a) fancy
+
+(** Injecting values into logics *)
+val (!!) : ('a, 'b) fancy -> ('a, 'b logic) fancy
+
+(** A synonym for [(!!)] *)
+val inj : ('a, 'b) fancy -> ('a, 'b logic) fancy
+
+
 (*
 (** A GT-compatible typeinfo for ['a logic] *)
 val logic :
@@ -90,13 +99,6 @@ val logic :
    >) GT.t
 *)
 
-val lift : 'a -> ('a, 'a) fancy
-
-(** Injecting values into logics *)
-val (!!) : ('a, 'b) fancy -> ('a, 'b logic) fancy
-
-(** A synonym for [(!!)] *)
-val inj : ('a, 'b) fancy -> ('a, 'b logic) fancy
 
 (** Exception to raise on a non-value case *)
 exception Not_a_value
