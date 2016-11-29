@@ -85,7 +85,7 @@ val lift : 'a -> ('a, 'a, 'a) fancy
 val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
 
 (** A synonym for [(!!)] *)
-val inj : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
+val inj : ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy
 
 
 (*

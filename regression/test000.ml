@@ -108,6 +108,7 @@ module Maybe = Fmap1 (struct
   let fmap f = function Just a -> Just (f a) | Nothing -> Nothing
 end)
 
+(* let (_:int) = MiniKanren.run q *)
 let () =
   MiniKanren.run q
     (fun q -> q === inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) )
