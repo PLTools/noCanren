@@ -71,18 +71,21 @@ type goal = State.t -> State.t Stream.t
 
 (** {3 Logics} *)
 
-type ('a, 'b) fancy (* { , } *)
+type ('a, 'b, 'c) fancy (* { , } *)
 
 (** A type of abstract logic values *)
 type 'a logic (* [ ] *)
 
-val lift : 'a -> ('a, 'a) fancy
+type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+                    | Value of 'a
+
+val lift : 'a -> ('a, 'a, 'a) fancy
 
 (** Injecting values into logics *)
-val (!!) : ('a, 'b) fancy -> ('a, 'b logic) fancy
+val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
 
 (** A synonym for [(!!)] *)
-val inj : ('a, 'b) fancy -> ('a, 'b logic) fancy
+val inj : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
 
 
 (*
@@ -132,10 +135,12 @@ end
 
 
 module Fmap1 (T : T) : sig
-  val fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy
+  val fmap : ('a, 'b, 'c) fancy T.t -> ('a T.t, 'b T.t, 'c T.t) fancy
 end
 module Fmap2 (T : T2) : sig
-  val fmap : (('a, 'b) fancy, ('c, 'd) fancy) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) fancy
+  type ('a, 'b) t = ('a, 'b) T.t
+  val fmap : (('a, 'b, 'c) fancy, ('q, 'w, 'e) fancy) t ->
+             (('a, 'q) t, ('b, 'w) t, ('c, 'e) t) fancy
 end
 
 (* module Higher : sig
@@ -455,17 +460,19 @@ val nil : 'a List.logic
 *)
 (** {2 miniKanren basic primitives} *)
 
+type ('a, 'b) fancier = ('a, 'b logic, 'b inner_logic) fancy
+
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
-val call_fresh : (('a, 'b logic) fancy -> State.t -> 'c) -> State.t -> 'c
+val call_fresh : (('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'c
 
 (** [x === y] creates a goal, which performs a unifications of
     [x] and [y] *)
-val (===) : ('a, 'b logic) fancy -> ('a, 'b logic) fancy -> goal
+val (===) : ('a, 'b) fancier -> ('a, 'b logic, 'b inner_logic) fancy -> goal
 
 (** [x =/= y] creates a goal, which introduces a disequality constraint for
     [x] and [y] *)
-val (=/=) : ('a, 'b logic) fancy -> ('a, 'b logic) fancy -> goal
+val (=/=) : ('a, 'b) fancier -> ('a, 'b) fancier -> goal
 
 (*
 (** Equality as boolean relation *)
@@ -511,26 +518,29 @@ module Fresh :
 
     (** [succ num f] increments the number of free logic variables in
         a goal; can be used to get rid of ``fresh'' syntax extension *)
-    val succ : ('a -> State.t -> 'b) -> (('c, 'd logic) fancy -> 'a) -> State.t -> 'b
+    val succ : ('a -> State.t -> 'b) -> (('c, 'd) fancier -> 'a) -> State.t -> 'b
 
     (** Zero logic parameters *)
     val zero : 'a -> 'a
 
     (** {3 One to five logic parameter(s)} *)
 
-    val one   : (('a, 'b logic) fancy ->                                                                                                 State.t -> 'c) -> State.t -> 'c
-    val two   : (('a, 'b logic) fancy -> ('c, 'd logic) fancy ->                                                                         State.t -> 'e) -> State.t -> 'e
-    val three : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy ->                                                 State.t -> 'g) -> State.t -> 'g
-    val four  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy ->                         State.t -> 'i) -> State.t -> 'i
-    val five  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy -> ('i, 'j logic) fancy -> State.t -> 'k) -> State.t -> 'k
+    val one   : (('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'c
+    val two   : (('a, 'b logic) fancier -> ('c, 'd logic) fancier ->
+                State.t -> 'e) -> State.t -> 'e
+
+    val three : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier ->                                                 State.t -> 'g) -> State.t -> 'g
+    val four  : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier -> ('g, 'h logic) fancier ->                         State.t -> 'i) -> State.t -> 'i
+    val five  : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier -> ('g, 'h logic) fancier ->
+                 ('i, 'j logic) fancier -> State.t -> 'k) -> State.t -> 'k
 
     (** {3 One to five logic parameter(s), conventional names} *)
 
-    val q     : (('a, 'b logic) fancy ->                                                                                                 State.t -> 'c) -> State.t -> 'c
-    val qr    : (('a, 'b logic) fancy -> ('c, 'd logic) fancy ->                                                                         State.t -> 'e) -> State.t -> 'e
-    val qrs   : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy ->                                                 State.t -> 'g) -> State.t -> 'g
-    val qrst  : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy ->                         State.t -> 'i) -> State.t -> 'i
-    val pqrst : (('a, 'b logic) fancy -> ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> ('g, 'h logic) fancy -> ('i, 'j logic) fancy -> State.t -> 'k) -> State.t -> 'k
+    val q     : (('a, 'b logic) fancier ->                                                                                                 State.t -> 'c) -> State.t -> 'c
+    val qr    : (('a, 'b logic) fancier -> ('c, 'd logic) fancier ->                                                                         State.t -> 'e) -> State.t -> 'e
+    val qrs   : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier ->                                                 State.t -> 'g) -> State.t -> 'g
+    val qrst  : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier -> ('g, 'h logic) fancier ->                         State.t -> 'i) -> State.t -> 'i
+    val pqrst : (('a, 'b logic) fancier -> ('c, 'd logic) fancier -> ('e, 'f logic) fancier -> ('g, 'h logic) fancier -> ('i, 'j logic) fancier -> State.t -> 'k) -> State.t -> 'k
 
   end
 
@@ -553,28 +563,29 @@ val run : (unit -> ('a -> State.t -> 'c) * ('d -> 'e -> 'f) * (('g -> 'h -> 'e) 
 
 (** Some type to refine a stream of states into the stream of answers (w.r.t. some known
     logic variable *)
-type 'a refiner = State.t Stream.t -> 'a Stream.t
+type 'a refiner = State.t Stream.t -> 'a inner_logic Stream.t
 
 (** Successor function *)
 val succ :
   (unit -> ('a -> State.t -> 'b) * ('c -> 'd -> 'e) * (('f -> 'g -> 'h) * ('i -> 'j * 'k))) ->
-  (unit -> ((('l, 'z logic) fancy -> 'a) -> State.t -> 'l refiner * 'b) * (('m -> 'c) -> 'm * 'd -> 'e) * (('f -> ('f -> 'n) * 'g -> 'n * 'h) * ('o * 'i -> ('o * 'j) * 'k)))
+  (unit -> ((('l, 'z) fancier -> 'a) -> State.t -> 'z refiner * 'b) * (('m -> 'c) -> 'm * 'd -> 'e) * (('f -> ('f -> 'n) * 'g -> 'n * 'h) * ('o * 'i -> ('o * 'j) * 'k)))
 
 
 (** {3 Predefined numerals (one to five)} *)
 
 val one :
   unit ->
-  ((('a, 'b logic) fancy -> State.t -> 'c) -> State.t -> 'a refiner * 'c) *
+  ((('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'b refiner * 'c) *
   (('d -> 'e) -> 'd -> 'e) * (('f -> ('f -> 'g) -> 'g) * ('h -> 'h))
 
 val two :
   unit ->
-  ((('a, 'b logic) fancy -> ('c, 'd logic) fancy -> State.t -> 'e) ->
-   State.t -> 'a refiner * ('c refiner * 'e)) *
+  ((('a, 'b logic) fancier -> ('c, 'd logic) fancier -> State.t -> 'e) ->
+   State.t -> 'b refiner * ('d refiner * 'e)) *
   (('f -> 'g -> 'h) -> 'f * 'g -> 'h) *
   (('i -> ('i -> 'j) * ('i -> 'k) -> 'j * 'k) *
    ('l * ('m * 'n) -> ('l * 'm) * 'n))
+   (*
 val three :
   unit ->
   ((('a, 'b logic) fancy ->
@@ -608,30 +619,30 @@ val five :
     ('r -> 's) * (('r -> 't) * (('r -> 'u) * (('r -> 'v) * ('r -> 'w)))) ->
     's * ('t * ('u * ('v * 'w)))) *
    ('x * ('y * ('z * ('a1 * ('b1 * 'c1)))) ->
-    ('x * ('y * ('z * ('a1 * 'b1)))) * 'c1))
+    ('x * ('y * ('z * ('a1 * 'b1)))) * 'c1)) *)
 
 (** {3 The same numerals with conventional names} *)
 
 val q :
   unit ->
-  ((('a, 'b logic) fancy -> State.t -> 'c) -> State.t -> 'a refiner * 'c) *
+  ((('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'b refiner * 'c) *
   (('d -> 'e) -> 'd -> 'e) * (('f -> ('f -> 'g) -> 'g) * ('h -> 'h))
 val qr :
   unit ->
-  ((('a, 'b logic) fancy -> ('c, 'd logic) fancy -> State.t -> 'e) ->
-   State.t -> 'a refiner * ('c refiner * 'e)) *
+  ((('a, 'b) fancier -> ('c, 'd) fancier -> State.t -> 'e) ->
+   State.t -> 'b refiner * ('d refiner * 'e)) *
   (('f -> 'g -> 'h) -> 'f * 'g -> 'h) *
   (('i -> ('i -> 'j) * ('i -> 'k) -> 'j * 'k) *
    ('l * ('m * 'n) -> ('l * 'm) * 'n))
-val qrs :
+(* val qrs :
   unit ->
-  ((('a, 'b logic) fancy ->
-    ('c, 'd logic) fancy -> ('e, 'f logic) fancy -> State.t -> 'g) ->
+  ((('a, 'b logic) fancier ->
+    ('c, 'd logic) fancier -> ('e, 'f logic) fancier -> State.t -> 'g) ->
    State.t -> 'a refiner * ('c refiner * ('e refiner * 'g))) *
   (('h -> 'i -> 'j -> 'k) -> 'h * ('i * 'j) -> 'k) *
   (('l -> ('l -> 'm) * (('l -> 'n) * ('l -> 'o)) -> 'm * ('n * 'o)) *
    ('p * ('q * ('r * 's)) -> ('p * ('q * 'r)) * 's))
-val qrst :
+ val qrst :
   unit ->
   ((('a, 'b logic) fancy ->
     ('c, 'd logic) fancy ->
@@ -656,4 +667,4 @@ val pqrst :
     ('r -> 's) * (('r -> 't) * (('r -> 'u) * (('r -> 'v) * ('r -> 'w)))) ->
     's * ('t * ('u * ('v * 'w)))) *
    ('x * ('y * ('z * ('a1 * ('b1 * 'c1)))) ->
-    ('x * ('y * ('z * ('a1 * 'b1)))) * 'c1))
+    ('x * ('y * ('z * ('a1 * 'b1)))) * 'c1)) *)

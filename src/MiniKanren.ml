@@ -16,6 +16,8 @@
  * (enclosed in the file COPYING).
  *)
 
+open Printf
+
 module Stream =
   struct
 
@@ -75,17 +77,16 @@ module Stream =
 
 let (!!!) = Obj.magic;;
 
-type ('a, 'b) fancy = 'a * ('a -> 'b)
+type ('a, 'b, 'c) fancy = 'a * ('a -> 'c)
 type 'a logic = 'a
 type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                     | Value of 'a
 
-let lift: 'a. 'a -> ('a,'a) fancy = fun x -> (x,(fun y -> y))
+let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun y -> y))
 
-let inj: ('a, 'b) fancy -> ('a, 'b logic) fancy =
+let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
   fun (a,f) -> (a, fun x -> Value (f x))
 
-let (_:int) = inj
 let (!!) = inj
 
 
@@ -310,6 +311,8 @@ module State =
 
 type goal = State.t -> State.t Stream.t
 
+type ('a, 'b) fancier = ('a, 'b logic, 'b inner_logic) fancy
+
 let call_fresh f (env, subst, constr) =
   let x, env' = Env.fresh env in
   f x (env', subst, constr)
@@ -421,14 +424,14 @@ let failure _  = Stream.nil
 
 let eqo x y t =
   conde [
-    (x === y) &&& (t === inj@@(lift true) );
+    (x === y) &&& (t === inj@@lift true);
     (x =/= y) &&& (t === inj@@lift false);
   ]
 
 let neqo x y t =
   conde [
-    (x =/= y) &&& (t === !!true);
-    (x === y) &&& (t === !!false);
+    (x =/= y) &&& (t === inj@@lift true);
+    (x === y) &&& (t === inj@@lift false);
   ];;
 
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
@@ -439,18 +442,19 @@ module type T = sig
   val fmap : ('a -> 'b) -> 'a t -> 'b t
 end
 module type T2 = sig
-  type ('a,'b) t
+  type ('a, 'b) t
   val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
 end
 
 module Fmap1 (T : T) = struct
-  external fmap : ('a, 'b) fancy T.t -> ('a T.t, 'b T.t) fancy = "%identity"
+  open T
+  external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity"
 end
 
 module Fmap2 (T : T2) = struct
   type ('a,'b) t = ('a,'b) T.t
-  external fmap : (('a, 'b) fancy, ('c, 'd) fancy) t ->
-                   (('a, 'b) t, ('c, 'd) t) fancy = "%identity"
+  external fmap : (('a, 'b, 'c) fancy, ('q, 'w, 'e) fancy) t ->
+                   (('a, 'q) t, ('b, 'w) t, ('c, 'e) t) fancy = "%identity"
 end
 
 
@@ -919,7 +923,8 @@ let rec prj_nat_list l =
   | Cons (x, xs) -> prj_nat x :: prj_nat_list xs
 *)
 
-let rec refine : State.t -> ('a, 'b logic) fancy -> 'a = fun ((e, s, c) as st) x ->
+let rec refine : State.t -> ('a, 'b logic, 'b inner_logic) fancy -> 'b inner_logic
+  = fun ((e, s, c) as st) (x,func) ->
   let rec walk' recursive env var subst =
     let var = Subst.walk env var subst in
     match Env.var env var with
@@ -936,10 +941,12 @@ let rec refine : State.t -> ('a, 'b logic) fancy -> 'a = fun ((e, s, c) as st) x
             for i = 0 to s - 1 do
               sf var i (!!!(walk' true env (!!!(f i)) subst))
            done;
-           !!!var
-         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
+           Value (Obj.magic var)
+         | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
         )
-    | Some i when recursive -> invalid_arg "Free variable in refine."
+    | Some i when recursive ->
+      (var : _ inner_logic)
+      (* invalid_arg "Free variable in refine." *)
 (*
         (match var with
          | Var (a, i, _) ->
@@ -956,9 +963,11 @@ let rec refine : State.t -> ('a, 'b logic) fancy -> 'a = fun ((e, s, c) as st) x
 	    Var (a, i, cs)
         )
 *)
-    | _ -> var
+    | _ -> Value (Obj.magic var)
   in
   walk' true e (!!!x) s
+
+(* let (_:int) = refine *)
 
 module ExtractDeepest =
   struct
@@ -992,16 +1001,19 @@ module Uncurry =
     let succ k f (x,y) = k (f x) y
   end
 
-type 'a refiner = State.t Stream.t -> 'a Stream.t
+type 'a refiner = State.t Stream.t -> 'a inner_logic Stream.t
 
-let refiner : ('a, 'b logic) fancy -> 'a refiner = fun x ans ->
+let refiner : ('a, 'b logic, 'b inner_logic) fancy -> 'b refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
+
+
+(* let (_:int)  = refiner *)
 
 module LogicAdder =
   struct
     let zero f = f
 
-    let succ (prev: 'a -> State.t -> 'b) (f: ('c, 'z logic) fancy -> 'a) : State.t -> 'c refiner * 'b =
+    let succ (prev: 'a -> State.t -> 'b) (f: ('c, 'z) fancier -> 'a) : State.t -> 'z refiner * 'b =
       call_fresh (fun logic st -> (refiner logic, prev (f logic) st))
   end
 
