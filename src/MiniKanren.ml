@@ -40,9 +40,9 @@ module Stream =
       else match s with
            | Nil          -> [], s
            | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
-           | Lazy  z      -> retrieve ~n:n (Lazy.force z)
+           | Lazy  z      -> retrieve ~n (Lazy.force z)
 
-    let take ?(n=(-1)) s = fst @@ retrieve ~n:n s
+    let take ?(n=(-1)) s = fst @@ retrieve ~n s
 
     let hd s = List.hd @@ take ~n:1 s
     let tl s = snd @@ retrieve ~n:1 s
@@ -76,80 +76,6 @@ module Stream =
   end
 
 let (!!!) = Obj.magic;;
-
-type ('a, 'b, 'c) fancy = 'a * ('a -> 'c);;
-@type 'a logic = 'a with show,html,eq,compare,foldl,foldr,gmap;;
-
-let logic = {logic with
-  gcata = ();
-  plugins =
-    object
-      method html    = logic.plugins#html
-      method eq      = logic.plugins#eq
-      method compare = logic.plugins#compare
-      method foldr   = logic.plugins#foldr
-      method foldl   = logic.plugins#foldl
-      method gmap    = logic.plugins#gmap
-      method show    = logic.plugins#show
-    end
-};;
-
-@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
-                     | Value of 'a
-                     with show
-
-let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun y -> y))
-
-let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
-  fun (a,f) -> (a, fun x -> Value (f x))
-
-let (!!) = inj
-
-
-
-(*
-@type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
-
-let logic = {logic with
-  gcata = ();
-  plugins =
-    object
-      method html    = logic.plugins#html
-      method eq      = logic.plugins#eq
-      method compare = logic.plugins#compare
-      method foldr   = logic.plugins#foldr
-      method foldl   = logic.plugins#foldl
-      method gmap    = logic.plugins#gmap
-      method show fa x =
-        GT.transform(logic)
-           (GT.lift fa)
-           (object inherit ['a] @logic[show]
-              method c_Var _ s _ i cs =
-                let c =
-		  match cs with
-		  | [] -> ""
-                  | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
-		in
-                Printf.sprintf "_.%d%s" i c
-
-              method c_Value _ _ x = x.GT.fx ()
-            end)
-           ()
-           x
-    end
-};;
-*)
-
-exception Not_a_value
-
-(*
-let prj_k k = function Value x -> x | Var (_, i, c) -> k i c
-let prj x = prj_k (fun _ -> raise Not_a_value) x
-
-let (!?) = prj
-*)
-exception Occurs_check
-
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
 let rec wrap (x : Obj.t) =
@@ -196,6 +122,82 @@ let generic_show x =
   in
   inner x;
   Buffer.contents b
+
+type ('a, 'b, 'c) fancy = 'a * ('a -> 'c);;
+@type 'a logic = 'a with show,html,eq,compare,foldl,foldr,gmap;;
+
+let logic = {logic with
+  gcata = ();
+  plugins =
+    object
+      method html    = logic.plugins#html
+      method eq      = logic.plugins#eq
+      method compare = logic.plugins#compare
+      method foldr   = logic.plugins#foldr
+      method foldl   = logic.plugins#foldl
+      method gmap    = logic.plugins#gmap
+      method show    = logic.plugins#show
+    end
+};;
+
+@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+                     | Value of 'a
+                     with show
+
+let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun y -> y))
+
+let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
+  fun (a,f) -> (a, fun x -> Value (f x))
+
+let (!!) = inj
+
+let discr : ('a->bool) -> ('a, 'b) fancy -> 'b =
+  fun is_logic (x,_) ->
+    if is_logic x then Obj.magic x
+    else Obj.magic @@ Value x
+
+(*
+@type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
+
+let logic = {logic with
+  gcata = ();
+  plugins =
+    object
+      method html    = logic.plugins#html
+      method eq      = logic.plugins#eq
+      method compare = logic.plugins#compare
+      method foldr   = logic.plugins#foldr
+      method foldl   = logic.plugins#foldl
+      method gmap    = logic.plugins#gmap
+      method show fa x =
+        GT.transform(logic)
+           (GT.lift fa)
+           (object inherit ['a] @logic[show]
+              method c_Var _ s _ i cs =
+                let c =
+		  match cs with
+		  | [] -> ""
+                  | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
+		in
+                Printf.sprintf "_.%d%s" i c
+
+              method c_Value _ _ x = x.GT.fx ()
+            end)
+           ()
+           x
+    end
+};;
+*)
+
+exception Not_a_value
+
+(*
+let prj_k k = function Value x -> x | Var (_, i, c) -> k i c
+let prj x = prj_k (fun _ -> raise Not_a_value) x
+
+let (!?) = prj
+*)
+exception Occurs_check
 
 module Env :
   sig
@@ -371,7 +373,7 @@ let (=/=) x y ((env, subst, constr) as st) =
     let subsumes subst (vs, ts) =
       try
         match Subst.unify env !!!vs !!!ts (Some subst) with
-	| [], Some _ -> true
+        | [], Some _ -> true
         | _ -> false
       with Occurs_check -> false
     in
