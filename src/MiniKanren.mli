@@ -70,25 +70,12 @@ module State :
 type goal = State.t -> State.t Stream.t
 
 (** {3 Logics} *)
-
-type ('a, 'b, 'c) fancy (* { , } *)
+(* { , } *)
+type ('a, 'b, 'c) fancy;;
 
 (** A type of abstract logic values *)
-type 'a logic (* [ ] *)
-
-type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
-                    | Value of 'a
-
-val lift : 'a -> ('a, 'a, 'a) fancy
-
-(** Injecting values into logics *)
-val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
-
-(** A synonym for [(!!)] *)
-val inj : ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy
-
-
-(*
+(* [ ] *)
+type 'a logic;;
 (** A GT-compatible typeinfo for ['a logic] *)
 val logic :
   (unit,
@@ -100,8 +87,18 @@ val logic :
      foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
-*)
 
+@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+                     | Value of 'a
+                     with show
+
+val lift : 'a -> ('a, 'a, 'a) fancy
+
+(** Injecting values into logics *)
+val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
+
+(** A synonym for [(!!)] *)
+val inj : ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy
 
 (** Exception to raise on a non-value case *)
 exception Not_a_value
@@ -468,7 +465,7 @@ val call_fresh : (('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'c
 
 (** [x === y] creates a goal, which performs a unifications of
     [x] and [y] *)
-val (===) : ('a, 'b) fancier -> ('a, 'b logic, 'b inner_logic) fancy -> goal
+val (===) : ('a, 'b, 'c) fancy -> ('a, 'b, 'c) fancy -> goal
 
 (** [x =/= y] creates a goal, which introduces a disequality constraint for
     [x] and [y] *)
@@ -625,7 +622,7 @@ val five :
 
 val q :
   unit ->
-  ((('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'b refiner * 'c) *
+  ((('a, 'b, 'r inner_logic) fancy -> State.t -> 'c) -> State.t -> 'r refiner * 'c) *
   (('d -> 'e) -> 'd -> 'e) * (('f -> ('f -> 'g) -> 'g) * ('h -> 'h))
 val qr :
   unit ->

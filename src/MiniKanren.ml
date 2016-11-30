@@ -77,10 +77,26 @@ module Stream =
 
 let (!!!) = Obj.magic;;
 
-type ('a, 'b, 'c) fancy = 'a * ('a -> 'c)
-type 'a logic = 'a
-type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
-                    | Value of 'a
+type ('a, 'b, 'c) fancy = 'a * ('a -> 'c);;
+@type 'a logic = 'a with show,html,eq,compare,foldl,foldr,gmap;;
+
+let logic = {logic with
+  gcata = ();
+  plugins =
+    object
+      method html    = logic.plugins#html
+      method eq      = logic.plugins#eq
+      method compare = logic.plugins#compare
+      method foldr   = logic.plugins#foldr
+      method foldl   = logic.plugins#foldl
+      method gmap    = logic.plugins#gmap
+      method show    = logic.plugins#show
+    end
+};;
+
+@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+                     | Value of 'a
+                     with show
 
 let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun y -> y))
 

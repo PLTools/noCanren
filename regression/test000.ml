@@ -108,11 +108,26 @@ module Maybe = Fmap1 (struct
   let fmap f = function Just a -> Just (f a) | Nothing -> Nothing
 end)
 
-(* let (_:int) = MiniKanren.run q *)
+(* let (_: int) = (inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) ) *)
+(* let (_:int) = (===)
+let (_:_ fancy -> goal) = fun q ->
+  let (right: (int maybe, int logic maybe logic,
+               int inner_logic maybe inner_logic) fancy)
+    = inj @@ Maybe.fmap @@ (Just (inj@@lift 15))  in
+  q === right
+let (_:int) = MiniKanren.run q *)
+
+let show_logic_maybe f x : string =
+  show inner_logic (show(maybe) f) x
+
 let () =
   MiniKanren.run q
-    (fun q -> q === inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) )
-    (fun qs -> printf "%s\n" (show(maybe) (show(int)) @@ Stream.hd qs))
+    (fun q ->
+      let (right: (int maybe, int logic maybe logic,
+                   int inner_logic maybe inner_logic) fancy)
+        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15))  in
+      q === right)
+    (fun qs -> printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;;
 
 (* let rec show_test t = show(test) (show(int)) t *)
@@ -143,10 +158,10 @@ let test1 x =
     (x === cons (inj@@lift 5) y) &&&
     (y === nil ())
   )
-(* let (_:int) = test1 *)
+(* 
 let () =
     MiniKanren.run q test1
       (fun qs ->
         let (_:int) = qs in
         printf "%s\n" (show_intlist @@ Stream.hd qs))
-  ;;
+  ;; *)
