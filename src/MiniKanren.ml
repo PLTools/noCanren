@@ -124,22 +124,113 @@ let generic_show x =
   Buffer.contents b
 
 type ('a, 'b, 'c) fancy = 'a * ('a -> 'c);;
-@type 'a logic = 'a with show,html,eq,compare,foldl,foldr,gmap;;
-
-let logic = {logic with
-  gcata = ();
-  plugins =
-    object
-      method html    = logic.plugins#html
-      method eq      = logic.plugins#eq
-      method compare = logic.plugins#compare
-      method foldr   = logic.plugins#foldr
-      method foldl   = logic.plugins#foldl
-      method gmap    = logic.plugins#gmap
-      method show    = logic.plugins#show
-    end
-};;
-
+type 'a logic = 'a;;
+class type virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
+  object
+    method value :
+      'inh -> ('inh, 'a logic, 'syn, < a : 'ia -> 'a -> 'sa >) GT.a ->
+        ('ia, 'a, 'sa, < a : 'ia -> 'a -> 'sa >) GT.a -> 'syn
+    method t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+let (logic :
+ (('ia -> 'a -> 'sa) -> ('a, 'ia, 'sa, 'inh, 'syn) #logic_tt -> 'inh ->
+   'a logic -> 'syn, unit)
+   GT.t) =
+  let rec logic_gcata fa trans inh subj =
+    let rec self = logic_gcata fa trans
+    and tpo = object method a = fa end in
+    match subj with
+      p0 ->
+        trans#value inh (GT.make self subj tpo)
+          (let (e0) = p0 in GT.make fa e0 tpo)
+  in
+  {GT.gcata = logic_gcata; GT.plugins = ()}
+class virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_t =
+  object (this)
+    method virtual value :
+      'inh -> ('inh, 'a logic, 'syn, < a : 'ia -> 'a -> 'sa >) GT.a ->
+        ('ia, 'a, 'sa, < a : 'ia -> 'a -> 'sa >) GT.a -> 'syn
+    method t_logic fa = GT.transform logic fa this
+  end
+class type ['a] show_logic_env_tt = object  end
+class type ['a, 'sa] gmap_logic_env_tt = object  end
+class ['a] show_proto_logic env =
+  object (this)
+    inherit ['a, unit, string, unit, string] logic_t
+    method value inh subj p0 =
+      ("(" ^ (let (e0) = p0 in ("(" ^ e0.GT.fx ()) ^ ")")) ^ ")"
+  end
+class ['a, 'sa] gmap_proto_logic env =
+  object (this)
+    inherit ['a, unit, 'sa, unit, 'sa logic] logic_t
+    method value inh subj p0 = (let (e0) = p0 in e0.GT.fx ())
+  end
+class ['a] show_logic_t =
+  let self = Obj.magic (ref ()) in
+  object (this)
+    inherit ['a, unit, string, unit, string] logic_t
+    inherit ['a] show_proto_logic self
+    initializer (:=) self (this :> 'a show_logic_t)
+  end
+class ['a, 'sa] gmap_logic_t =
+  let self = Obj.magic (ref ()) in
+  object (this)
+    inherit ['a, unit, 'sa, unit, 'sa logic] logic_t
+    inherit ['a, 'sa] gmap_proto_logic self
+    initializer (:=) self (this :> ('a, 'sa) gmap_logic_t)
+  end
+let (logic :
+ (('ia -> 'a -> 'sa) -> ('a, 'ia, 'sa, 'inh, 'syn) #logic_tt -> 'inh ->
+   'a logic -> 'syn, < show : ('a -> string) -> 'a logic -> string;
+ gmap : ('a -> 'sa) -> 'a logic -> 'sa logic >)
+   GT.t) =
+  {GT.gcata = logic.GT.gcata;
+   GT.plugins =
+     object
+       method show a = GT.transform logic (GT.lift a) (new show_logic_t) ()
+       method gmap a = GT.transform logic (GT.lift a) (new gmap_logic_t) ()
+     end}
+;;
+(********************* *)
+(* class type virtual ['a,'ia,'sa,'inh,'syn] logic_tt =
+  object
+    method  value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+let (logic :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,unit)
+    GT.t)
+  =
+  let rec logic_gcata fa trans inh subj =
+    let rec self = logic_gcata fa trans
+    and tpo = object method a = fa end
+     in
+    match subj with
+    | p0 ->
+        trans#value inh (GT.make self subj tpo)
+          (let e0 = p0  in GT.make fa e0 tpo)
+     in
+  { GT.gcata = logic_gcata; GT.plugins = () }
+let logic =
+  {
+    logic with
+    gcata = ();
+    plugins =
+      (object
+         method html = (logic.plugins)#html
+         method eq = (logic.plugins)#eq
+         method compare = (logic.plugins)#compare
+         method foldr = (logic.plugins)#foldr
+         method foldl = (logic.plugins)#foldl
+         method gmap = (logic.plugins)#gmap
+         method show = (logic.plugins)#show
+       end)
+  }
+;; *)
 @type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
                      with show
@@ -151,7 +242,7 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
 
 let (!!) = inj
 
-let discr : ('a->bool) -> ('a, 'b) fancy -> 'b =
+let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
   fun is_logic (x,_) ->
     if is_logic x then Obj.magic x
     else Obj.magic @@ Value x

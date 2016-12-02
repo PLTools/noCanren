@@ -75,16 +75,21 @@ type ('a, 'b, 'c) fancy;;
 
 (** A type of abstract logic values *)
 (* [ ] *)
-type 'a logic;;
+type 'a logic ;;
 (** A GT-compatible typeinfo for ['a logic] *)
+class type ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
+  object
+    method t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a -> 'syn
+    method value :
+      'inh ->
+      ('inh, 'a, 'syn, < a : 'ia -> 'a -> 'sa >) GT.a ->
+      ('ia, 'a, 'sa, < a : 'ia -> 'a -> 'sa >) GT.a -> 'syn
+  end
+
 val logic :
-  (unit,
+  (('ia -> 'a -> 'sa) ->
+            ('a, 'ia, 'sa, 'inh, 'syn) #logic_tt -> 'inh -> 'a -> 'syn,
    < show    : ('a -> string) -> 'a logic -> string;
-     html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
-     eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
-     compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
-     foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
-     foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 
