@@ -123,7 +123,7 @@ let generic_show x =
   inner x;
   Buffer.contents b
 
-type ('a, 'b, 'c) fancy = 'a * ('a -> 'c);;
+type ('a, 'b, 'c) fancy = 'a * (('a -> bool) -> 'a -> 'c);;
 type 'a logic = 'a;;
 class type virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
   object
@@ -192,58 +192,20 @@ let (logic :
      end}
 ;;
 (********************* *)
-(* class type virtual ['a,'ia,'sa,'inh,'syn] logic_tt =
-  object
-    method  value :
-      'inh ->
-        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
-          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
-    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
-  end
-let (logic :
-  (('ia -> 'a -> 'sa) ->
-     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,unit)
-    GT.t)
-  =
-  let rec logic_gcata fa trans inh subj =
-    let rec self = logic_gcata fa trans
-    and tpo = object method a = fa end
-     in
-    match subj with
-    | p0 ->
-        trans#value inh (GT.make self subj tpo)
-          (let e0 = p0  in GT.make fa e0 tpo)
-     in
-  { GT.gcata = logic_gcata; GT.plugins = () }
-let logic =
-  {
-    logic with
-    gcata = ();
-    plugins =
-      (object
-         method html = (logic.plugins)#html
-         method eq = (logic.plugins)#eq
-         method compare = (logic.plugins)#compare
-         method foldr = (logic.plugins)#foldr
-         method foldl = (logic.plugins)#foldl
-         method gmap = (logic.plugins)#gmap
-         method show = (logic.plugins)#show
-       end)
-  }
-;; *)
-let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
-  fun is_logic (x,_) ->
-    if is_logic x then Obj.magic x
-    else Obj.magic @@ Value x
-;;
 @type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
-                     with show
+                     with show;;
 
-let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun y -> y))
+let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
+fun is_logic (x,_) ->
+ if is_logic x then Obj.magic x
+ else Obj.magic @@ Value x
+;;
+
+let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> y))
 
 let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
-  fun (a,f) -> (a, fun x -> Value (f x))
+  fun (a,f) -> (a, fun _ x -> Value (f x))
 
 let (!!) = inj
 
