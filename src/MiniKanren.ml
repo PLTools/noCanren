@@ -231,6 +231,11 @@ let logic =
        end)
   }
 ;; *)
+let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
+  fun is_logic (x,_) ->
+    if is_logic x then Obj.magic x
+    else Obj.magic @@ Value x
+;;
 @type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
                      with show
@@ -241,11 +246,6 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
   fun (a,f) -> (a, fun x -> Value (f x))
 
 let (!!) = inj
-
-let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
-  fun is_logic (x,_) ->
-    if is_logic x then Obj.magic x
-    else Obj.magic @@ Value x
 
 (*
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
@@ -360,10 +360,11 @@ module Subst :
       | Some yi -> xi = yi
       | None ->
          let wy = wrap (Obj.repr y) in
-	 match wy with
-	 | Unboxed _ -> false
-	 | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
-	 | Boxed (_, s, f) ->
+         match wy with
+         | Invalid 247
+         | Unboxed _ -> false
+         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
+         | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
 	      else occurs env xi (!!!(f i)) subst || inner (i+1)
@@ -383,10 +384,11 @@ module Subst :
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
             | Some xi, _       -> extend xi x y delta subst
-	    | _      , Some yi -> extend yi y x delta subst
-	    | _ ->
-	        let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
+            | _      , Some yi -> extend yi y x delta subst
+            | _ ->
+                let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
+                 | Invalid 247, Invalid 247 -> delta,s
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
@@ -401,7 +403,7 @@ module Subst :
                       in
 		      inner 0 (delta, s)
                     else delta, None
-	         | Invalid n, _
+                 | Invalid n, _
                  | _, Invalid n -> invalid_arg (Printf.sprintf "Invalid values for unification (%d)" n)
 	         | _ -> delta, None
 	        )
@@ -1032,7 +1034,7 @@ let rec prj_nat_list l =
   | Cons (x, xs) -> prj_nat x :: prj_nat_list xs
 *)
 
-let rec refine : State.t -> ('a, 'b logic, 'b inner_logic) fancy -> 'b inner_logic
+let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
   let rec walk' recursive env var subst =
     let var = Subst.walk env var subst in
@@ -1074,7 +1076,7 @@ let rec refine : State.t -> ('a, 'b logic, 'b inner_logic) fancy -> 'b inner_log
 *)
     | _ -> Value (Obj.magic var)
   in
-  walk' true e (!!!x) s
+  func !!!(walk' true e (!!!x) s)
 
 (* let (_:int) = refine *)
 
