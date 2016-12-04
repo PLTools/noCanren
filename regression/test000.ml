@@ -125,11 +125,20 @@ let () =
     (fun q ->
       let (right: (int maybe, int logic maybe logic,
                    int inner_logic maybe inner_logic) fancy)
-        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15))  in
+        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
+      let () =
+        let s,x = REPR(inj(lift 15)) in
+        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        let s,x = REPR(Maybe.fmap (Just (inj(lift 15)))) in
+        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        let s,x = REPR(inj (Maybe.fmap (Just (inj(lift 15))))) in
+        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        ()
+      in
       q === right)
     (fun qs -> printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;;
-
+(*
 (* let rec show_test t = show(test) (show(int)) t *)
 @type ('a,'b) result = OK of 'a | Error of 'b with show
 module Result = Fmap2(struct
@@ -157,8 +166,8 @@ let test1 x =
   Fresh.one (fun y ->
     (x === cons (inj@@lift 5) y) &&&
     (y === nil ())
-  )
-(* 
+  ) *)
+(*
 let () =
     MiniKanren.run q test1
       (fun qs ->

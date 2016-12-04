@@ -123,8 +123,9 @@ let generic_show x =
   inner x;
   Buffer.contents b
 
-type ('a, 'b, 'c) fancy = 'a * (('a -> bool) -> 'a -> 'c);;
+type ('a, 'b, 'c) fancy = 'a * (('a->bool) -> 'a -> 'c);;
 type 'a logic = 'a;;
+
 class type virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
   object
     method value :
@@ -191,21 +192,25 @@ let (logic :
        method gmap a = GT.transform logic (GT.lift a) (new gmap_logic_t) ()
      end}
 ;;
-(********************* *)
+
 @type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
                      with show;;
-
-let discr : ('a->bool) -> ('a, 'b, 'c) fancy -> 'c =
-fun is_logic (x,_) ->
- if is_logic x then Obj.magic x
- else Obj.magic @@ Value x
+let discr : ('a->bool) -> 'a -> 'c =
+ fun is_logic x ->
+   let () = printf "Discr: %s\n%!" (generic_show x) in
+   if is_logic x then Obj.magic x
+   else Obj.magic @@ Value x
 ;;
-
-let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> y))
+(* let (_:int) = discr;; *)
+let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> printf "id with '%s'\n%!" (generic_show y); y))
 
 let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
-  fun (a,f) -> (a, fun _ x -> Value (f x))
+  (* Obj.magic @@ *)
+  (* fun (a,f) -> (a, fun cond x -> !!!(discr cond @@ f cond !!!x) ) *)
+  fun (a,f) ->
+    let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
+    (a, fun cond x -> discr !!!cond @@ f cond x)
 
 let (!!) = inj
 
@@ -393,6 +398,7 @@ let call_fresh f (env, subst, constr) =
 exception Disequality_violated
 
 let (===) x y (env, subst, constr) =
+  let () = printf "(===) '%s' and '%s'\n%!" (generic_show x) (generic_show y) in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -495,7 +501,7 @@ module Fresh =
 let success st = Stream.cons st Stream.nil
 let failure _  = Stream.nil
 
-let eqo x y t =
+(* let eqo x y t =
   conde [
     (x === y) &&& (t === inj@@lift true);
     (x =/= y) &&& (t === inj@@lift false);
@@ -505,10 +511,10 @@ let neqo x y t =
   conde [
     (x =/= y) &&& (t === inj@@lift true);
     (x === y) &&& (t === inj@@lift false);
-  ];;
+  ];; *)
 
-@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
-@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap
+(* @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
+@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap *)
 
 module type T = sig
   type 'a t
@@ -999,6 +1005,7 @@ let rec prj_nat_list l =
 let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
   let rec walk' recursive env var subst =
+    let () = printf "walk' for var = '%s'\n%!" (generic_show var) in
     let var = Subst.walk env var subst in
     match Env.var env var with
     | None ->
@@ -1036,9 +1043,15 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
 	    Var (a, i, cs)
         )
 *)
-    | _ -> Value (Obj.magic var)
+    | _ ->
+      let () = printf "Got a value '%s'\n%!" (generic_show var) in
+      Value (Obj.magic var)
   in
-  func !!!(walk' true e (!!!x) s)
+  let () = printf "going to refine....\n%!" in
+  func (fun x ->
+      printf "calling isVar of '%s' \n%!" (generic_show x);
+      Env.var e x <> None)
+      !!!(walk' true e (!!!x) s)
 
 (* let (_:int) = refine *)
 

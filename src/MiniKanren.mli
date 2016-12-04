@@ -54,6 +54,8 @@ module Stream :
 
   end
 
+val generic_show: 'a -> string
+
 (** {3 States and goals} *)
 
 (** A state *)
@@ -123,7 +125,7 @@ val prj_k : (int -> 'a logic list -> 'a) -> 'a logic -> 'a
 (** {3 Support for some predefined types (lists, nats, bools etc.)} *)
 
 (** Abstract list type *)
-@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
+(* @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap *)
 
 
 module type T = sig
@@ -199,7 +201,7 @@ val nil : (('a, 'z) llist as 'z, ('a logic, 'c) llist logic as 'c) fancy  *)
 
 
 (** Abstract nat type *)
-@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap
+(* @type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap *)
 (*
 module Bool :
   sig
