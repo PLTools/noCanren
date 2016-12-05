@@ -3,62 +3,7 @@ open MiniKanren
 open Tester
 open Printf
 
-let just_a a = a === (5 |> lift |> inj)
-(*
-let a_and_b a =
-  call_fresh (
-    fun b ->
-      conj (a === !7)
-           (disj (b === !6)
-                 (b === !5)
-           )
-  )
-
-let a_and_b' b =
-  call_fresh (
-    fun a ->
-      conj (a === !7)
-           (disj (b === !6)
-                 (b === !5)
-           )
-  )
-
-let rec fives x =
-  disj (x === !5)
-       (fun st -> Stream.from_fun (fun () -> fives x st))
-
-let rec appendo a b ab =
-  disj
-    (conj (a === !Nil) (b === ab) )
-    (call_fresh (fun h ->
-      (call_fresh (fun t ->
-        (conj (a === h % t)
-           (call_fresh (fun ab' ->
-              conj (h % ab' === ab)
-                   (appendo t b ab')
-           ))
-      )))
-    ))
-
-let rec reverso a b =
-  disj
-    (conj (a === !Nil) (b === !Nil))
-    (call_fresh (fun h ->
-      (call_fresh (fun t ->
-          (conj (a === h % t)
-                (call_fresh (fun a' ->
-                   conj (appendo a' !< h b)
-                        (reverso t a')
-                ))
-        )
-    )
-    )))
-*)
-(*
-let show_int      = show(logic) (show int)
-let show_int_list = show(List.logic) show_int
-*)
-;;
+(* let just_a a = a === (5 |> lift |> inj) *)
 
 (* let rec show_list l = show(llist) (show(int)) show_list l;; *)
 (*
@@ -102,10 +47,16 @@ let _ =
   (* ()
 ;; *)
 
-@type 'a maybe = Just of 'a | Nothing with show;;
+@type 'a maybe =
+  | Nothing
+  | Just of 'a  with show;;
 module Maybe = Fmap1 (struct
   type 'a t = 'a maybe
-  let fmap f = function Just a -> Just (f a) | Nothing -> Nothing
+  let fmap f x =
+    let () = printf "Maybe.fmap of '%s'\n%!" (generic_show x) in
+    match x with
+    | Just a -> Just (f a)
+    | Nothing -> Nothing
 end)
 
 (* let (_: int) = (inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) ) *)
@@ -120,21 +71,37 @@ let (_:int) = MiniKanren.run q *)
 let show_logic_maybe f x : string =
   show inner_logic (show(maybe) f) x
 
+(* let () =
+  MiniKanren.run q
+    (fun q ->
+      let () = printf "+++++++++++++++++++++++++++\n%!" in
+      let (right: (int, int logic , int inner_logic ) fancy)  = inj@@lift 15 in
+      q === right)
+    (fun qs -> printf "%s\n" ((show(inner_logic)@@show(int)) @@ Stream.hd qs))
+;; *)
+
 let () =
   MiniKanren.run q
     (fun q ->
-      let (right: (int maybe, int logic maybe logic,
-                   int inner_logic maybe inner_logic) fancy)
-        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
-      let () =
+      (* let () =
+        let s,x = REPR(Just 15) in
+        let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
+        let s,x = REPR(q) in
+        let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
         let s,x = REPR(inj(lift 15)) in
-        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
+        let s,x = REPR(Just (inj(lift 15))) in
+        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
         let s,x = REPR(Maybe.fmap (Just (inj(lift 15)))) in
-        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
         let s,x = REPR(inj (Maybe.fmap (Just (inj(lift 15))))) in
         let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
         ()
-      in
+      in *)
+      let () = printf "=========================\n%!" in
+      let (right: (int maybe, int logic maybe logic,
+                   int inner_logic maybe inner_logic) fancy)
+        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
       q === right)
     (fun qs -> printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;;

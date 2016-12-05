@@ -210,7 +210,9 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
   (* fun (a,f) -> (a, fun cond x -> !!!(discr cond @@ f cond !!!x) ) *)
   fun (a,f) ->
     let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
-    (a, fun cond x -> discr !!!cond @@ f cond x)
+    let new_r = fun cond x -> discr !!!cond @@ f cond x in
+    printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(Obj.magic new_r));
+    (a, new_r)
 
 let (!!) = inj
 
@@ -264,6 +266,7 @@ module Env :
     val empty  : unit -> t
     val fresh  : t -> 'a logic * t
     val var    : t -> 'a logic -> int option
+    val is_var : t -> 'a logic -> bool
   end =
   struct
     type t = GT.int GT.list * int
@@ -287,7 +290,7 @@ module Env :
          )
       then let Var (_, i, _) = !!! x in Some i
       else None
-
+    let is_var env v = None <> var env v
   end
 
 module Subst :
@@ -350,7 +353,9 @@ module Subst :
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
-            | Some xi, _       -> extend xi x y delta subst
+            | Some xi, _       ->
+              let () = printf "unifying var %d with '%s'\n%!" xi (generic_show y) in
+              extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
@@ -391,14 +396,32 @@ type goal = State.t -> State.t Stream.t
 
 type ('a, 'b) fancier = ('a, 'b logic, 'b inner_logic) fancy
 
+let dummy_discr _ x = !!!x
+
 let call_fresh f (env, subst, constr) =
   let x, env' = Env.fresh env in
-  f x (env', subst, constr)
+  f (x, !!!dummy_discr) (env', subst, constr)
 
 exception Disequality_violated
 
 let (===) x y (env, subst, constr) =
   let () = printf "(===) '%s' and '%s'\n%!" (generic_show x) (generic_show y) in
+  (* we should always unify two fancy types *)
+  assert Obj.(tag  @@ repr x = 0);
+  assert Obj.(tag  @@ repr y = 0);
+  assert Obj.(size @@ repr x = 2);
+  assert Obj.(size @@ repr y = 2);
+  assert Obj.(tag @@ repr @@ snd x = closure_tag);
+  assert Obj.(tag @@ repr @@ snd y = closure_tag);
+  let () =
+    let foo x y =
+      if Env.is_var env (fst !!!x) && not (Env.is_var env (fst !!!y))
+      then Obj.(set_field (repr x) 1 (field (repr y) 1))
+    in
+    foo x y;
+    foo y x;
+  in
+  (* if Env.is_var env *)
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -527,7 +550,24 @@ end
 
 module Fmap1 (T : T) = struct
   open T
-  external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity"
+  (* external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity" *)
+  let fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy =
+      (fun x ->
+        let x = !!!x in
+        (* let fi = ref (fun _ _ -> assert false) in *)
+        Obj.magic begin
+        let left = T.fmap (fun (z,f) -> (*fi := f;*) z) x in
+        printf "left = '%s'\n%!" (generic_show left);
+        let rec right cond y =
+          printf "Inside right: right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
+          printf "Inside right: cond is '%s' with address = %d\n%!" (generic_show cond) (2 * (!!!cond));
+          printf "Inside right: y    is '%s'\n%!" (generic_show y);
+          discr cond @@ T.fmap (fun (z,f) -> f cond z) y
+        in
+        printf "Right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
+        (left, right)
+        end
+      )
 end
 
 module Fmap2 (T : T2) = struct
@@ -1048,10 +1088,20 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
       Value (Obj.magic var)
   in
   let () = printf "going to refine....\n%!" in
+  let pizda = !!!(walk' true e (!!!x) s)in
+  printf "PIZDA\n%!";
+  printf "   x  is '%s' with address = %d\n%!" (generic_show x)     (2 * (!!!x));
+  printf "func  is '%s' with address = %d\n%!" (generic_show func)  (2 * (!!!func));
+  printf "pizda is '%s' with address = %d\n%!" (generic_show pizda) (2 * (!!!pizda));
+
+  let () =
+    let zzz = !!!func (fun _ -> print_endline "HERR"; false) 5 in
+    printf "zzz is '%s'\n%!" (generic_show zzz)
+  in
   func (fun x ->
       printf "calling isVar of '%s' \n%!" (generic_show x);
       Env.var e x <> None)
-      !!!(walk' true e (!!!x) s)
+      pizda
 
 (* let (_:int) = refine *)
 
