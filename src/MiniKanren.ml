@@ -112,8 +112,8 @@ let generic_show x =
     | Invalid n             -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
     | Unboxed n when !!!n=0 -> Buffer.add_string b "[]"
     | Unboxed n             -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
-    | Boxed (t,l,f) when t=0 && l=1 && (match wrap (f 0) with Unboxed i when !!!i >=10 -> true | _ -> false) ->
-       Printf.bprintf b "var%d" (match wrap (f 0) with Unboxed i -> !!!i | _ -> failwith "shit")
+    (* | Boxed (t,l,f) when t=0 && l=1 && (match wrap (f 0) with Unboxed i when !!!i >=10 -> true | _ -> false) ->
+       Printf.bprintf b "var%d" (match wrap (f 0) with Unboxed i -> !!!i | _ -> failwith "shit") *)
 
     | Boxed   (t, l, f) ->
         Buffer.add_string b (Printf.sprintf "boxed %d <" t);
@@ -210,7 +210,10 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
   (* fun (a,f) -> (a, fun cond x -> !!!(discr cond @@ f cond !!!x) ) *)
   fun (a,f) ->
     let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
-    let new_r = fun cond x -> discr !!!cond @@ f cond x in
+    let new_r cond x =
+      let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in
+      discr !!!cond @@ f cond x
+    in
     printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(Obj.magic new_r));
     (a, new_r)
 
@@ -556,13 +559,18 @@ module Fmap1 (T : T) = struct
         let x = !!!x in
         (* let fi = ref (fun _ _ -> assert false) in *)
         Obj.magic begin
-        let left = T.fmap (fun (z,f) -> (*fi := f;*) z) x in
+        let fi : (('a1->bool) -> 'a1 -> 'c1) ref =  ref (fun _  _ -> failwith "qqq hacking") in
+        let left = T.fmap (fun (z,f) -> fi := f; z) x in
         printf "left = '%s'\n%!" (generic_show left);
         let rec right cond y =
           printf "Inside right: right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
           printf "Inside right: cond is '%s' with address = %d\n%!" (generic_show cond) (2 * (!!!cond));
           printf "Inside right: y    is '%s'\n%!" (generic_show y);
-          discr cond @@ T.fmap (fun (z,f) -> f cond z) y
+          discr cond @@ T.fmap (fun heck ->
+            printf "Inside T.fmap, heck = '%s'\n%!" (generic_show heck);
+            (* assert false *)
+            !fi cond heck
+          ) y
         in
         printf "Right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
         (left, right)
@@ -1061,7 +1069,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
             for i = 0 to s - 1 do
               sf var i (!!!(walk' true env (!!!(f i)) subst))
            done;
-           Value (Obj.magic var)
+           (Obj.magic var)
          | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
         )
     | Some i when recursive ->
@@ -1085,7 +1093,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
 *)
     | _ ->
       let () = printf "Got a value '%s'\n%!" (generic_show var) in
-      Value (Obj.magic var)
+      (Obj.magic var)
   in
   let () = printf "going to refine....\n%!" in
   let pizda = !!!(walk' true e (!!!x) s)in
@@ -1094,16 +1102,25 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   printf "func  is '%s' with address = %d\n%!" (generic_show func)  (2 * (!!!func));
   printf "pizda is '%s' with address = %d\n%!" (generic_show pizda) (2 * (!!!pizda));
 
-  let () =
+  (* let ans =
+    match pizda with
+    | Var _ -> pizda
+    | Value x -> Value (func (fun x ->
+          printf "calling isVar of '%s' \n%!" (generic_show x);
+          Env.var e x <> None)
+          x)
+    | _ -> failwith "Neither Var nor Value"
+  in
+  !!!ans *)
+  (* let () =
     let zzz = !!!func (fun _ -> print_endline "HERR"; false) 5 in
     printf "zzz is '%s'\n%!" (generic_show zzz)
-  in
+  in *)
   func (fun x ->
-      printf "calling isVar of '%s' \n%!" (generic_show x);
-      Env.var e x <> None)
+      let ans = Env.var e x <> None in
+      printf "calling isVar of '%s' says %b\n%!" (generic_show x) ans;
+      ans)
       pizda
-
-(* let (_:int) = refine *)
 
 module ExtractDeepest =
   struct
@@ -1141,9 +1158,6 @@ type 'a refiner = State.t Stream.t -> 'a inner_logic Stream.t
 
 let refiner : ('a, 'b logic, 'b inner_logic) fancy -> 'b refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
-
-
-(* let (_:int)  = refiner *)
 
 module LogicAdder =
   struct

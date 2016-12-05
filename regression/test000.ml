@@ -49,14 +49,21 @@ let _ =
 
 @type 'a maybe =
   | Nothing
+  (* | Dummy1 of int *)
+  (* | Dummy2 of string *)
+  (* | Dummy3 of string list *)
+  (* | Dummy4 of ('a list) *)
+  (* | Dummy5 of int*int *)
+  (* | Dummy6 of int*int*string *)
   | Just of 'a  with show;;
 module Maybe = Fmap1 (struct
   type 'a t = 'a maybe
   let fmap f x =
     let () = printf "Maybe.fmap of '%s'\n%!" (generic_show x) in
     match x with
-    | Just a -> Just (f a)
-    | Nothing -> Nothing
+    | Just a  -> print_endline "WWWW"; Just (f a)
+    | Nothing -> print_endline "QQQQ"; Nothing
+    | _ -> assert false
 end)
 
 (* let (_: int) = (inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) ) *)
@@ -83,10 +90,10 @@ let show_logic_maybe f x : string =
 let () =
   MiniKanren.run q
     (fun q ->
-      (* let () =
+      let () =
         let s,x = REPR(Just 15) in
         let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
-        let s,x = REPR(q) in
+        (* let s,x = REPR(q) in
         let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
         let s,x = REPR(inj(lift 15)) in
         let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
@@ -95,15 +102,18 @@ let () =
         let s,x = REPR(Maybe.fmap (Just (inj(lift 15)))) in
         let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
         let s,x = REPR(inj (Maybe.fmap (Just (inj(lift 15))))) in
-        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in
+        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in *)
         ()
-      in *)
+      in
       let () = printf "=========================\n%!" in
       let (right: (int maybe, int logic maybe logic,
                    int inner_logic maybe inner_logic) fancy)
         = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
       q === right)
-    (fun qs -> printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
+    (fun qs ->
+      let () = print_endline "Going to print the stuff" in
+      let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in
+      printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;;
 (*
 (* let rec show_test t = show(test) (show(int)) t *)
