@@ -75,8 +75,7 @@ let (_:_ fancy -> goal) = fun q ->
   q === right
 let (_:int) = MiniKanren.run q *)
 
-let show_logic_maybe f x : string =
-  show inner_logic (show(maybe) f) x
+let show_logic_maybe f x : string = show inner_logic (show(maybe) f) x
 
 (* let () =
   MiniKanren.run q
@@ -84,38 +83,37 @@ let show_logic_maybe f x : string =
       let () = printf "+++++++++++++++++++++++++++\n%!" in
       let (right: (int, int logic , int inner_logic ) fancy)  = inj@@lift 15 in
       q === right)
-    (fun qs -> printf "%s\n" ((show(inner_logic)@@show(int)) @@ Stream.hd qs))
+    (fun qs -> printf "Answer: %s\n" ((show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;; *)
 
-let () =
-  MiniKanren.run q
-    (fun q ->
-      let () =
-        let s,x = REPR(Just 15) in
-        let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
-        (* let s,x = REPR(q) in
-        let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
-        let s,x = REPR(inj(lift 15)) in
-        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
-        let s,x = REPR(Just (inj(lift 15))) in
-        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
-        let s,x = REPR(Maybe.fmap (Just (inj(lift 15)))) in
-        let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
-        let s,x = REPR(inj (Maybe.fmap (Just (inj(lift 15))))) in
-        let () = printf "%30s                             is       %s\n%!" s (generic_show x) in *)
-        ()
-      in
-      let () = printf "=========================\n%!" in
-      let (right: (int maybe, int logic maybe logic,
-                   int inner_logic maybe inner_logic) fancy)
-        = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
-      q === right)
-    (fun qs ->
-      let () = print_endline "Going to print the stuff" in
-      let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in
-      printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
+let _asdf () =
+  MiniKanren.run q (fun q ->
+    let () =
+      (* let s,x = REPR(Just 15) in
+      let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in *)
+      (* let s,x = REPR(q) in
+      let () = printf "%30s                              is       %s\n\n%!" s (generic_show x) in
+      let s,x = REPR(inj(lift 15)) in
+      let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
+      let s,x = REPR(Just (inj(lift 15))) in
+      let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
+      let s,x = REPR(Maybe.fmap (Just (inj(lift 15)))) in
+      let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in
+      let s,x = REPR(inj (Maybe.fmap (Just (inj(lift 15))))) in
+      let () = printf "%30s                             is       %s\n%!" s (generic_show x) in *)
+      (* let s,x = REPR(Value(Just(Value 15))) in
+      let () = printf "%30s                             is       %s\n\n%!" s (generic_show x) in *)
+      ()
+    in
+    let (right: (int maybe, int logic maybe logic,
+                 int inner_logic maybe inner_logic) fancy)
+      = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
+    q === right)
+  (fun qs ->
+    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    printf "%s\n" (show_logic_maybe (show(inner_logic)@@show(int)) @@ Stream.hd qs))
 ;;
-(*
+
 (* let rec show_test t = show(test) (show(int)) t *)
 @type ('a,'b) result = OK of 'a | Error of 'b with show
 module Result = Fmap2(struct
@@ -123,8 +121,26 @@ module Result = Fmap2(struct
   let fmap f g = function OK a -> OK (f a) | Error b -> Error (g b)
 end);;
 
+let show_logic_result f g x : string = show inner_logic (show(result) f g) x
+
+let test_result () =
+  MiniKanren.run q (fun q ->
+    let (right: ((int,string) result, (int logic,string logic) result logic,
+                 (int inner_logic, string inner_logic) result inner_logic) fancy)
+      = inj @@ Result.fmap @@ (OK (inj@@lift 15)) in
+    q === right)
+  (fun qs ->
+    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    printf "%s\n" (show_logic_result (show(inner_logic)@@show(int)) (show inner_logic @@ show string) @@ Stream.hd qs));
+;;
+
+
+
 (* Lists ******************************* *)
-@type ('a, 'b) alist = Nil | Cons of 'a * 'b with show
+@type ('a, 'b) alist = Nil | Cons of 'a * 'b with show;;
+type int_list = (int, int_list) alist
+type int_llist = (int logic, int_llist logic) alist
+
 
 module F = Fmap2 (struct
   type ('a, 'b) t = ('a, 'b) alist
@@ -138,16 +154,21 @@ let cons x y = inj (F.fmap (Cons (x, y)))
 
 let rec show_intlist xs = show(alist) (show(int)) show_intlist xs
 let (_: ((int, 'a) alist as 'a) -> bytes) = show_intlist
+let rec show_alist_logic xs =
+  show(inner_logic) (show(alist) (show(inner_logic) @@ show(int)) show_alist_logic) xs
 
 let test1 x =
   Fresh.one (fun y ->
-    (x === cons (inj@@lift 5) y) &&&
+    (* (x === cons (inj@@lift 5) y) &&& *)
+    (x === y) &&&
     (y === nil ())
-  ) *)
-(*
+  )
+
 let () =
     MiniKanren.run q test1
       (fun qs ->
-        let (_:int) = qs in
-        printf "%s\n" (show_intlist @@ Stream.hd qs))
-  ;; *)
+        (* let (_:int) = qs in         *)
+        let first = Stream.hd qs in
+
+        printf "Answer: %s\n" (show_alist_logic first))
+  ;;

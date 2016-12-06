@@ -359,7 +359,9 @@ module Subst :
             | Some xi, _       ->
               let () = printf "unifying var %d with '%s'\n%!" xi (generic_show y) in
               extend xi x y delta subst
-            | _      , Some yi -> extend yi y x delta subst
+            | _      , Some yi ->
+              let () = printf "unifying '%s' with var %d\n%!" (generic_show x) yi in
+              extend yi y x delta subst
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -367,21 +369,21 @@ module Subst :
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
-	  	    then
-		      let rec inner i (delta, subst) =
-			match subst with
+                    then
+                      let rec inner i (delta, subst) =
+                      match subst with
                         | None -> delta, None
                         | Some _ ->
-  	                   if i < sx
-		           then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
-		           else delta, subst
+                          if i < sx
+                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
+                          else delta, subst
                       in
-		      inner 0 (delta, s)
+                      inner 0 (delta, s)
                     else delta, None
                  | Invalid n, _
                  | _, Invalid n -> invalid_arg (Printf.sprintf "Invalid values for unification (%d)" n)
-	         | _ -> delta, None
-	        )
+                 | _ -> delta, None
+                )
       in
       unify x y ([], subst)
 
@@ -555,33 +557,38 @@ module Fmap1 (T : T) = struct
   open T
   (* external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity" *)
   let fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy =
-      (fun x ->
-        let x = !!!x in
-        (* let fi = ref (fun _ _ -> assert false) in *)
-        Obj.magic begin
-        let fi : (('a1->bool) -> 'a1 -> 'c1) ref =  ref (fun _  _ -> failwith "qqq hacking") in
-        let left = T.fmap (fun (z,f) -> fi := f; z) x in
-        printf "left = '%s'\n%!" (generic_show left);
-        let rec right cond y =
-          printf "Inside right: right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
-          printf "Inside right: cond is '%s' with address = %d\n%!" (generic_show cond) (2 * (!!!cond));
-          printf "Inside right: y    is '%s'\n%!" (generic_show y);
-          discr cond @@ T.fmap (fun heck ->
-            printf "Inside T.fmap, heck = '%s'\n%!" (generic_show heck);
-            (* assert false *)
-            !fi cond heck
-          ) y
-        in
-        printf "Right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
-        (left, right)
-        end
-      )
+    (fun x ->
+      Obj.magic begin
+      let fi : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> assert false) in
+      let left = T.fmap (fun (z,f) -> fi := f; z) !!!x in
+      (* printf "left = '%s'\n%!" (generic_show left); *)
+      let right cond y =
+        (* printf "Inside right: right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right));
+        printf "Inside right: cond is '%s' with address = %d\n%!" (generic_show cond) (2 * (!!!cond));
+        printf "Inside right: y    is '%s'\n%!" (generic_show y); *)
+        (*discr cond @@*) T.fmap (fun heck ->
+          (* printf "Inside T.fmap, heck = '%s'\n%!" (generic_show heck); *)
+          !fi cond heck
+        ) y
+      in
+      (* printf "Right is '%s' with address = %d\n%!" (generic_show right) (2 * (!!!right)); *)
+      (left, right)
+      end
+    )
 end
 
 module Fmap2 (T : T2) = struct
   type ('a,'b) t = ('a,'b) T.t
-  external fmap : (('a, 'b, 'c) fancy, ('q, 'w, 'e) fancy) t ->
-                   (('a, 'q) t, ('b, 'w) t, ('c, 'e) t) fancy = "%identity"
+  let fmap : (('a, 'b, 'c) fancy, ('q, 'w, 'e) fancy) t ->
+                   (('a, 'q) t, ('b, 'w) t, ('c, 'e) t) fancy = fun x ->
+    Obj.magic begin
+      let () = print_endline "inside Fmap2.fmap" in
+      let fi1 : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> assert false) in
+      let fi2 : (('a2->bool) -> 'a2 -> 'c2) ref = ref (fun _  _ -> assert false) in
+      let left = T.fmap (fun (z,f) -> fi1 := f; z) (fun (z,f) -> fi2 := f; z) !!!x in
+      let right cond y = T.fmap (!fi1 cond) (!fi2 cond) y in
+      (left,right)
+    end
 end
 
 
