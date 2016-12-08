@@ -193,26 +193,31 @@ let (logic :
      end}
 ;;
 
-@type 'a unlogic = Var of GT.int GT.list * GT.int * 'a logic GT.list
-                     | Value of 'a
-                     with show;;
+(* N.B. internally Obj.repr : 'a -> Obj.t = "%idefntity" *)
+(* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
+exception DelayedRefinement of Obj.t * Obj.t
+let delay f x = raise (DelayedRefinement (Obj.repr f, Obj.repr x));;
+
+@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
+                   | Value of 'a
+                   with show;;
 let discr : ('a->bool) -> 'a -> 'c =
- fun is_logic x ->
-   let () = printf "Discr: %s\n%!" (generic_show x) in
-   if is_logic x then Obj.magic x
-   else Obj.magic @@ Value x
+  fun is_logic x ->
+    let () = printf "Discr: %s\n%!" (generic_show x) in
+    if is_logic x then Obj.magic x
+    else
+      let () = printf "return from discr with Value '%s'\n%!" (generic_show x) in
+      Obj.magic @@ Value x
 ;;
 (* let (_:int) = discr;; *)
 let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> printf "id with '%s'\n%!" (generic_show y); y))
 
 let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
-  (* Obj.magic @@ *)
-  (* fun (a,f) -> (a, fun cond x -> !!!(discr cond @@ f cond !!!x) ) *)
   fun (a,f) ->
     let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
     let new_r cond x =
       let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in
-      discr !!!cond @@ f cond x
+      delay (fun x -> discr !!!cond @@ f cond x) x
     in
     printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(Obj.magic new_r));
     (a, new_r)
@@ -296,36 +301,41 @@ module Env :
     let is_var env v = None <> var env v
   end
 
+let fst3 (x,_,_) = x
+let snd3 (_,x,_) = x
+let trd3 (_,_,x) = x
+
 module Subst :
   sig
     type t
 
     val empty   : t
 
-    val of_list : (int * Obj.t * Obj.t) list -> t
+    (* Screw this.  We need to do (int * (...stuff...)) to save on boxing *)
+    val of_list : (int * Obj.t * Obj.t * (Obj.t option)) list -> t
     val split   : t -> Obj.t list * Obj.t list
     val walk    : Env.t -> 'a logic -> t -> 'a logic
-    val unify   : Env.t -> 'a logic -> 'a logic -> t option -> (int * Obj.t * Obj.t) list * t option
+    val unify   : Env.t -> 'a logic -> 'a logic -> Obj.t option -> t option -> (int * Obj.t * Obj.t * (Obj.t option)) list * t option
     val show    : t -> string
   end =
   struct
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
+    (* map from var indicies to tuples of (actual vars, value, reifier_func) *)
+    type t = (Obj.t * Obj.t * Obj.t) M.t
 
-    type t = (Obj.t * Obj.t) M.t
-
-    let show m = (M.fold (fun i (_, x) s -> s ^ Printf.sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
+    let show m = (M.fold (fun i (_, x, _) s -> s ^ Printf.sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
 
     let empty = M.empty
 
-    let of_list l = List.fold_left (fun s (i, v, t) -> M.add i (v, t) s) empty l
+    let of_list l = List.fold_left (fun s (i, v, t, f) -> M.add i Obj.(repr v, repr t, repr f) s) empty l
 
-    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
+    let split s = M.fold (fun _ (x, t, _func) (xs, ts) -> Obj.(repr x)::xs, Obj.(repr t)::ts) s ([], [])
 
     let rec walk env var subst =
       match Env.var env var with
       | None   -> var
       | Some i ->
-          try walk env (snd (M.find i (!!! subst))) subst with Not_found -> var
+          try walk env (snd3 (M.find i (!!! subst))) subst with Not_found -> var
 
     let rec occurs env xi term subst =
       let y = walk env term subst in
@@ -340,32 +350,32 @@ module Subst :
          | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
-	      else occurs env xi (!!!(f i)) subst || inner (i+1)
-	    in
-	    inner 0
+              else occurs env xi (!!!(f i)) subst || inner (i+1)
+            in
+            inner 0
 
-    let unify env x y subst =
-      let rec unify x y (delta, subst) =
-        let extend xi x term delta subst =
-          if occurs env xi term subst then raise Occurs_check
-          else (xi, !!!x, !!!term)::delta, Some (!!! (M.add xi (!!!x, term) (!!! subst)))
-        in
+    let unify env x y f subst =
+      let extend xi x term f delta subst =
+        if occurs env xi term subst then raise Occurs_check
+        else (xi, !!!x, !!!term, !!!f)::delta, Some (!!! (M.add xi (!!!x, term, !!!f) (!!! subst)))
+      in
+      let rec unify x y f (delta, subst) =
         match subst with
         | None -> delta, None
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
+            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y f delta subst
             | Some xi, _       ->
               let () = printf "unifying var %d with '%s'\n%!" xi (generic_show y) in
-              extend xi x y delta subst
+              extend xi x y f delta subst
             | _      , Some yi ->
               let () = printf "unifying '%s' with var %d\n%!" (generic_show x) yi in
-              extend yi y x delta subst
+              extend yi y x f delta subst
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
-                 | Invalid 247, Invalid 247 -> delta,s
+                 (* | Invalid 247, Invalid 247 -> delta,s *)
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
@@ -375,7 +385,7 @@ module Subst :
                         | None -> delta, None
                         | Some _ ->
                           if i < sx
-                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
+                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) f (delta, subst))
                           else delta, subst
                       in
                       inner 0 (delta, s)
@@ -385,7 +395,7 @@ module Subst :
                  | _ -> delta, None
                 )
       in
-      unify x y ([], subst)
+      unify x y f ([], subst)
 
   end
 
@@ -426,9 +436,11 @@ let (===) x y (env, subst, constr) =
     foo x y;
     foo y x;
   in
-  (* if Env.is_var env *)
+  let (x,f) = x in
+  let (y,_) = y in
+
   try
-    let prefix, subst' = Subst.unify env x y (Some subst) in
+    let prefix, subst' = Subst.unify env x y (Some (!!!f)) (Some subst) in
     begin match subst' with
     | None -> Stream.nil
     | Some s ->
@@ -436,25 +448,25 @@ let (===) x y (env, subst, constr) =
           (* TODO: only apply constraints with the relevant vars *)
           let constr' =
             List.fold_left (fun css' cs ->
-              let x, t  = Subst.split cs in
-	      try
-                let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
+              let x,t = Subst.split cs in
+              try
+                let p, s' = Subst.unify env (!!!x) (!!!t) (Some (Obj.repr f)) subst' in
                 match s' with
-	        | None -> css'
-	        | Some _ ->
+                | None -> css'
+                | Some _ ->
                     match p with
-	            | [] -> raise Disequality_violated
-	            | _  -> (Subst.of_list p)::css'
-	      with Occurs_check -> css'
+                    | [] -> raise Disequality_violated
+                    | _  -> (Subst.of_list p)::css'
+              with Occurs_check -> css'
             )
             []
             constr
-	  in
+            in
           Stream.cons (env, s, constr') Stream.nil
         with Disequality_violated -> Stream.nil
     end
   with Occurs_check -> Stream.nil
-
+(*
 let (=/=) x y ((env, subst, constr) as st) =
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
@@ -487,7 +499,7 @@ let (=/=) x y ((env, subst, constr) as st) =
         | _  -> Stream.cons (env, subst, normalize_store prefix constr) Stream.nil
         )
   with Occurs_check -> Stream.cons st Stream.nil
-
+*)
 let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj

@@ -56,15 +56,18 @@ let _ =
   (* | Dummy5 of int*int *)
   (* | Dummy6 of int*int*string *)
   | Just of 'a  with show;;
+
 module Maybe = Fmap1 (struct
   type 'a t = 'a maybe
   let fmap f x =
     let () = printf "Maybe.fmap of '%s'\n%!" (generic_show x) in
     match x with
-    | Just a  -> print_endline "WWWW"; Just (f a)
-    | Nothing -> print_endline "QQQQ"; Nothing
+    | Just a  -> print_endline "Got    Just"; Just (f a)
+    | Nothing -> print_endline "Got Nothing"; Nothing
     | _ -> assert false
 end)
+
+let show_logic_maybe f x : string = show unlogic (show(maybe) f) x
 
 (* let (_: int) = (inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) ) *)
 (* let (_:int) = (===)
@@ -75,7 +78,41 @@ let (_:_ fancy -> goal) = fun q ->
   q === right
 let (_:int) = MiniKanren.run q *)
 
-let show_logic_maybe f x : string = show unlogic (show(maybe) f) x
+let _flat_int =
+  print_endline " ---------------------------------------------- flat_int";
+  MiniKanren.run q (fun q ->
+    let (right: (int, int  logic, int unlogic) fancy)
+      = inj@@lift 15 in
+    q === right)
+  (fun qs ->
+    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    printf "%s\n" @@ (show unlogic @@ show int) @@ Stream.hd qs)
+;;
+
+let _just_of_int =
+  print_endline " ---------------------------------------------- just_of_int";
+  MiniKanren.run q (fun q ->
+    let (right: (int maybe, int logic maybe logic,
+                 int unlogic maybe unlogic) fancy)
+      = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
+    q === right)
+  (fun qs ->
+    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    printf "%s\n" @@ show_logic_maybe (show(unlogic)@@show(int)) @@ Stream.hd qs)
+;;
+
+let _just_2 =
+  print_endline " ---------------------------------------------- _just_2";
+  MiniKanren.run q (fun q ->
+    let (right: (int maybe, int logic maybe logic,
+                 int unlogic maybe unlogic) fancy)
+      = inj @@ Maybe.fmap @@ (Just (inj@@lift 15)) in
+    (inj @@ Maybe.fmap @@ (Just q)) === right)
+  (fun qs ->
+    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    printf "%s\n" @@ (show(unlogic)@@show(int)) @@ Stream.hd qs)
+;;
+
 
 (* let () =
   MiniKanren.run q
@@ -113,7 +150,7 @@ let _asdf () =
     (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
     printf "%s\n" (show_logic_maybe (show(unlogic)@@show(int)) @@ Stream.hd qs))
 ;;
-
+(*
 (* let rec show_test t = show(test) (show(int)) t *)
 @type ('a,'b) result = OK of 'a | Error of 'b with show
 module Result = Fmap2(struct
@@ -171,4 +208,4 @@ let () =
         let first = Stream.hd qs in
 
         printf "Answer: %s\n" (show_alist_logic first))
-  ;;
+  ;; *)

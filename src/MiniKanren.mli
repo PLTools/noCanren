@@ -476,7 +476,7 @@ val (===) : ('a, 'b, 'c) fancy -> ('a, 'b, 'c) fancy -> goal
 
 (** [x =/= y] creates a goal, which introduces a disequality constraint for
     [x] and [y] *)
-val (=/=) : ('a, 'b) fancier -> ('a, 'b) fancier -> goal
+(* val (=/=) : ('a, 'b) fancier -> ('a, 'b) fancier -> goal *)
 
 (*
 (** Equality as boolean relation *)
