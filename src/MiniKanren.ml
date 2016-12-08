@@ -193,7 +193,7 @@ let (logic :
      end}
 ;;
 
-@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+@type 'a unlogic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
                      with show;;
 let discr : ('a->bool) -> 'a -> 'c =
@@ -205,7 +205,7 @@ let discr : ('a->bool) -> 'a -> 'c =
 (* let (_:int) = discr;; *)
 let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> printf "id with '%s'\n%!" (generic_show y); y))
 
-let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy =
+let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
   (* Obj.magic @@ *)
   (* fun (a,f) -> (a, fun cond x -> !!!(discr cond @@ f cond !!!x) ) *)
   fun (a,f) ->
@@ -399,7 +399,7 @@ module State =
 
 type goal = State.t -> State.t Stream.t
 
-type ('a, 'b) fancier = ('a, 'b logic, 'b inner_logic) fancy
+type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
 
 let dummy_discr _ x = !!!x
 
@@ -1080,7 +1080,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
          | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
         )
     | Some i when recursive ->
-      (var : _ inner_logic)
+      (var : _ unlogic)
       (* invalid_arg "Free variable in refine." *)
 (*
         (match var with
@@ -1161,9 +1161,9 @@ module Uncurry =
     let succ k f (x,y) = k (f x) y
   end
 
-type 'a refiner = State.t Stream.t -> 'a inner_logic Stream.t
+type 'a refiner = State.t Stream.t -> 'a unlogic Stream.t
 
-let refiner : ('a, 'b logic, 'b inner_logic) fancy -> 'b refiner = fun x ans ->
+let refiner : ('a, 'b logic, 'b unlogic) fancy -> 'b refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
 
 module LogicAdder =

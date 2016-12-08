@@ -95,17 +95,17 @@ val logic :
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 
-@type 'a inner_logic = Var of GT.int GT.list * GT.int * 'a logic GT.list
+@type 'a unlogic = Var of GT.int GT.list * GT.int * 'a logic GT.list
                      | Value of 'a
                      with show
 
 val lift : 'a -> ('a, 'a, 'a) fancy
 
 (** Injecting values into logics *)
-val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b inner_logic) fancy
+val (!!) : ('a, 'b, 'b) fancy -> ('a, 'b logic, 'b unlogic) fancy
 
 (** A synonym for [(!!)] *)
-val inj : ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c inner_logic) fancy
+val inj : ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy
 
 (** Exception to raise on a non-value case *)
 exception Not_a_value
@@ -464,7 +464,7 @@ val nil : 'a List.logic
 *)
 (** {2 miniKanren basic primitives} *)
 
-type ('a, 'b) fancier = ('a, 'b logic, 'b inner_logic) fancy
+type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
 
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
@@ -567,7 +567,7 @@ val run : (unit -> ('a -> State.t -> 'c) * ('d -> 'e -> 'f) * (('g -> 'h -> 'e) 
 
 (** Some type to refine a stream of states into the stream of answers (w.r.t. some known
     logic variable *)
-type 'a refiner = State.t Stream.t -> 'a inner_logic Stream.t
+type 'a refiner = State.t Stream.t -> 'a unlogic Stream.t
 
 (** Successor function *)
 val succ :
@@ -629,7 +629,7 @@ val five :
 
 val q :
   unit ->
-  ((('a, 'b, 'r inner_logic) fancy -> State.t -> 'c) -> State.t -> 'r refiner * 'c) *
+  ((('a, 'b, 'r unlogic) fancy -> State.t -> 'c) -> State.t -> 'r refiner * 'c) *
   (('d -> 'e) -> 'd -> 'e) * (('f -> ('f -> 'g) -> 'g) * ('h -> 'h))
 val qr :
   unit ->
