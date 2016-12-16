@@ -193,14 +193,16 @@ let (logic :
      end}
 ;;
 
-(* N.B. internally Obj.repr : 'a -> Obj.t = "%idefntity" *)
-(* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
-exception DelayedRefinement of Obj.t * Obj.t
-let delay f x = raise (DelayedRefinement (Obj.repr f, Obj.repr x));;
-
 @type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
                    | Value of 'a
                    with show;;
+
+(* N.B. internally Obj.repr : 'a -> Obj.t = "%idefntity" *)
+(* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
+type delayed_st = { dfunc: Obj.t; dval: Obj.t }
+exception DelayedRefinement of delayed_st
+let delay f x = raise (DelayedRefinement {dfunc = Obj.repr f; dval = Obj.repr x});;
+
 let discr : ('a->bool) -> 'a -> 'c =
   fun is_logic x ->
     let () = printf "Discr: %s\n%!" (generic_show x) in
@@ -223,6 +225,14 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
     (a, new_r)
 
 let (!!) = inj
+
+let rec do_all_refinements cond (f: Obj.t) (x: Obj.t) =
+  try
+    let f' : ('a -> bool) -> 'a -> 'b = Obj.obj f in
+    f' cond (Obj.obj x)
+  with DelayedRefinement {dfunc;dval} -> do_all_refinements cond dfunc dval
+
+
 
 (*
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
