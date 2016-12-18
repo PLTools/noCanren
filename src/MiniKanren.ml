@@ -197,11 +197,16 @@ let (logic :
                    | Value of 'a
                    with show;;
 
-(* N.B. internally Obj.repr : 'a -> Obj.t = "%idefntity" *)
+(* N.B. internally Obj.repr : 'a -> Obj.t = "%identity" *)
 (* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
 type delayed_st = { dfunc: Obj.t; dval: Obj.t }
 exception DelayedRefinement of delayed_st
 let delay f x = raise (DelayedRefinement {dfunc = Obj.repr f; dval = Obj.repr x});;
+
+let slice cond f x =
+  try ingore @@ (Obj.magic f) cond x;
+      assert false
+  with DelayedRefinement {dfunc;_} -> dfunc
 
 let discr : ('a->bool) -> 'a -> 'c =
   fun is_logic x ->
@@ -327,6 +332,7 @@ module Subst :
     val walk    : Env.t -> 'a logic -> t -> 'a logic
     val unify   : Env.t -> 'a logic -> 'a logic -> Obj.t option -> t option -> (int * Obj.t * Obj.t * (Obj.t option)) list * t option
     val show    : t -> string
+    val reifier : 'a logic -> t -> Obj.t option
   end =
   struct
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
@@ -383,6 +389,12 @@ module Subst :
               let () = printf "unifying '%s' with var %d\n%!" (generic_show x) yi in
               extend yi y x f delta subst
             | _ ->
+                (* When we have two values we need to slice reifier function *)
+                (* let sliced = slice f *)
+                (* Don't know how to slice right
+                   I kind of need to have a value synchronized with a reifier func.
+                   We cannot save value Z which will be eaten before reifier. Or maybe we can...
+                *)
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  (* | Invalid 247, Invalid 247 -> delta,s *)
@@ -405,7 +417,7 @@ module Subst :
                  | _ -> delta, None
                 )
       in
-      unify x y f ([], subst)
+      unify x y (Some f) ([], subst)
 
   end
 
@@ -431,7 +443,7 @@ exception Disequality_violated
 
 let (===) x y (env, subst, constr) =
   let () = printf "(===) '%s' and '%s'\n%!" (generic_show x) (generic_show y) in
-  (* we should always unify two fancy types *)
+  (* we should always unify two fancy types *) (*
   assert Obj.(tag  @@ repr x = 0);
   assert Obj.(tag  @@ repr y = 0);
   assert Obj.(size @@ repr x = 2);
@@ -445,7 +457,7 @@ let (===) x y (env, subst, constr) =
     in
     foo x y;
     foo y x;
-  in
+  in *)
   let (x,f) = x in
   let (y,_) = y in
 
@@ -460,7 +472,7 @@ let (===) x y (env, subst, constr) =
             List.fold_left (fun css' cs ->
               let x,t = Subst.split cs in
               try
-                let p, s' = Subst.unify env (!!!x) (!!!t) (Some (Obj.repr f)) subst' in
+                let p, s' = Subst.unify env (!!!x) (!!!t) f subst' in
                 match s' with
                 | None -> css'
                 | Some _ ->
