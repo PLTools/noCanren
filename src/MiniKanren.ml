@@ -204,7 +204,7 @@ exception DelayedRefinement of delayed_st
 let delay f x = raise (DelayedRefinement {dfunc = Obj.repr f; dval = Obj.repr x});;
 
 let slice cond f x =
-  try ingore @@ (Obj.magic f) cond x;
+  try ignore @@ (Obj.magic f) cond x;
       assert false
   with DelayedRefinement {dfunc;_} -> dfunc
 
@@ -330,16 +330,16 @@ module Subst :
     val of_list : (int * Obj.t * Obj.t * (Obj.t option)) list -> t
     val split   : t -> Obj.t list * Obj.t list
     val walk    : Env.t -> 'a logic -> t -> 'a logic
-    val unify   : Env.t -> 'a logic -> 'a logic -> Obj.t option -> t option -> (int * Obj.t * Obj.t * (Obj.t option)) list * t option
+    val unify   : Env.t -> 'a logic -> 'a logic -> reifier:Obj.t -> t option -> (int * Obj.t * Obj.t * (Obj.t option)) list * t option
     val show    : t -> string
-    val reifier : 'a logic -> t -> Obj.t option
+    (* val reifier : 'a logic -> t -> Obj.t option *)
   end =
   struct
     module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
     (* map from var indicies to tuples of (actual vars, value, reifier_func) *)
     type t = (Obj.t * Obj.t * Obj.t) M.t
 
-    let show m = (M.fold (fun i (_, x, _) s -> s ^ Printf.sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
+    let show m = (M.fold (fun i (_, x, _) s -> s ^ sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
 
     let empty = M.empty
 
@@ -370,7 +370,7 @@ module Subst :
             in
             inner 0
 
-    let unify env x y f subst =
+    let unify env x y ~(reifier: Obj.t) subst =
       let extend xi x term f delta subst =
         if occurs env xi term subst then raise Occurs_check
         else (xi, !!!x, !!!term, !!!f)::delta, Some (!!! (M.add xi (!!!x, term, !!!f) (!!! subst)))
@@ -413,11 +413,11 @@ module Subst :
                       inner 0 (delta, s)
                     else delta, None
                  | Invalid n, _
-                 | _, Invalid n -> invalid_arg (Printf.sprintf "Invalid values for unification (%d)" n)
+                 | _, Invalid n -> invalid_arg (sprintf "Invalid values for unification (%d)" n)
                  | _ -> delta, None
                 )
       in
-      unify x y (Some f) ([], subst)
+      unify x y (Some reifier) ([], subst)
 
   end
 
@@ -441,7 +441,7 @@ let call_fresh f (env, subst, constr) =
 
 exception Disequality_violated
 
-let (===) x y (env, subst, constr) =
+let (===) (x: _ fancy) y (env, subst, constr) =
   let () = printf "(===) '%s' and '%s'\n%!" (generic_show x) (generic_show y) in
   (* we should always unify two fancy types *) (*
   assert Obj.(tag  @@ repr x = 0);
@@ -462,7 +462,7 @@ let (===) x y (env, subst, constr) =
   let (y,_) = y in
 
   try
-    let prefix, subst' = Subst.unify env x y (Some (!!!f)) (Some subst) in
+    let prefix, subst' = Subst.unify env x y (Obj.repr f) (Some subst) in
     begin match subst' with
     | None -> Stream.nil
     | Some s ->
@@ -472,7 +472,7 @@ let (===) x y (env, subst, constr) =
             List.fold_left (fun css' cs ->
               let x,t = Subst.split cs in
               try
-                let p, s' = Subst.unify env (!!!x) (!!!t) f subst' in
+                let p, s' = Subst.unify env (!!!x) (!!!t) (Obj.repr f) subst' in
                 match s' with
                 | None -> css'
                 | Some _ ->
@@ -1137,15 +1137,15 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
       (Obj.magic var)
   in
   let () = printf "going to refine....\n%!" in
-  let pizda = !!!(walk' true e (!!!x) s)in
-  printf "PIZDA\n%!";
+  let wtfp = !!!(walk' true e (!!!x) s)in
+  printf "WTFP\n%!";
   printf "   x  is '%s' with address = %d\n%!" (generic_show x)     (2 * (!!!x));
   printf "func  is '%s' with address = %d\n%!" (generic_show func)  (2 * (!!!func));
-  printf "pizda is '%s' with address = %d\n%!" (generic_show pizda) (2 * (!!!pizda));
+  printf "WTFP is '%s' with address = %d\n%!" (generic_show wtfp) (2 * (!!!wtfp));
 
   (* let ans =
-    match pizda with
-    | Var _ -> pizda
+    match WTFP with
+    | Var _ -> WTFP
     | Value x -> Value (func (fun x ->
           printf "calling isVar of '%s' \n%!" (generic_show x);
           Env.var e x <> None)
@@ -1161,7 +1161,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
       let ans = Env.var e x <> None in
       printf "calling isVar of '%s' says %b\n%!" (generic_show x) ans;
       ans)
-      pizda
+      wtfp
 
 module ExtractDeepest =
   struct
