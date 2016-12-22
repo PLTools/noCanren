@@ -199,14 +199,15 @@ let (logic :
 
 (* N.B. internally Obj.repr : 'a -> Obj.t = "%identity" *)
 (* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
-type delayed_st = { dfunc: Obj.t; dval: Obj.t }
-exception DelayedRefinement of delayed_st
-let delay f x = raise (DelayedRefinement {dfunc = Obj.repr f; dval = Obj.repr x});;
+(* type delayed_st = { dfunc: Obj.t; dval: Obj.t } *)
+(* exception DelayedRefinement of delayed_st *)
+(* let delay f x =  *)
+  (* raise (DelayedRefinement {dfunc = Obj.repr f; dval = Obj.repr x}) *)
 
-let slice cond f x =
+(* let slice cond f x =
   try ignore @@ (Obj.magic f) cond x;
       assert false
-  with DelayedRefinement {dfunc;_} -> dfunc
+  with DelayedRefinement {dfunc;_} -> dfunc *)
 
 let discr : ('a->bool) -> 'a -> 'c =
   fun is_logic x ->
@@ -217,26 +218,28 @@ let discr : ('a->bool) -> 'a -> 'c =
       Obj.magic @@ Value x
 ;;
 (* let (_:int) = discr;; *)
-let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> printf "id with '%s'\n%!" (generic_show y); y))
+let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> (*printf "id with '%s'\n%!" (generic_show y);*) y))
 
 let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
   fun (a,f) ->
-    let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
+    (* let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in *)
     let new_r cond x =
-      let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in
-      delay (fun x -> discr !!!cond @@ f cond x) x
+      (* let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in *)
+      (* if cond x then !!!x
+      else Obj.magic @@ Value (f cond !!!x) *)
+      discr !!!cond @@ f cond x
     in
     printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(Obj.magic new_r));
     (a, new_r)
 
 let (!!) = inj
-
+(*
 let rec do_all_refinements cond (f: Obj.t) (x: Obj.t) =
   try
     let f' : ('a -> bool) -> 'a -> 'b = Obj.obj f in
     f' cond (Obj.obj x)
   with DelayedRefinement {dfunc;dval} -> do_all_refinements cond dfunc dval
-
+ *)
 
 
 (*
@@ -282,6 +285,27 @@ let (!?) = prj
 *)
 exception Occurs_check
 
+module Int = struct type t = int let compare = Pervasives.compare end
+module MultiIntMap : sig
+  type key = Int.t
+  type 'a t
+  val empty: 'a t
+  val add : key -> 'a -> 'a t -> 'a t
+  val find_exn: key -> 'a t -> 'a list
+end = struct
+  module M = Map.Make(Int)
+
+  type key = Int.t
+  type 'a t = 'a list M.t
+
+  let empty : 'a t = M.empty
+  let add k v m =
+    try let vs = M.find k m in
+        M.add k (v::vs) m
+    with Not_found -> M.add k [v] m
+  let find_exn : key -> 'a t -> 'a list = M.find
+end
+
 module Env :
   sig
     type t
@@ -290,21 +314,26 @@ module Env :
     val fresh  : t -> 'a logic * t
     val var    : t -> 'a logic -> int option
     val is_var : t -> 'a logic -> bool
+    val is_toplevel: t -> 'a logic -> bool
+    val mark_toplevel: t -> 'a logic -> unit
   end =
   struct
-    type t = GT.int GT.list * int
+    type t = { token : GT.int GT.list;
+              mutable next: int;
+              mutable reifiers: Obj.t MultiIntMap.t;
+              mutable top_vars: int list }
 
-    let empty () = ([0], 10)
+    let empty () = { token=[0]; next=10; reifiers=MultiIntMap.empty; top_vars=[] }
 
-    let fresh (a, current) =
-      let v = Var (a, current, []) in
-      (!!!v, (a, current+1))
+    let fresh e =
+      let v = Var (e.token, e.next, []) in
+      (!!!v, {e with next=1+e.next})
 
     let var_tag, var_size =
       let v = Var ([], 0, []) in
       Obj.tag (!!! v), Obj.size (!!! v)
 
-    let var (a, _) x =
+    let var {token=a;_} x =
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
@@ -314,44 +343,69 @@ module Env :
       then let Var (_, i, _) = !!! x in Some i
       else None
     let is_var env v = None <> var env v
+
+    let is_toplevel e x =
+      match var e x with
+      | Some n -> List.mem n e.top_vars
+      | None -> false
+
+    let mark_toplevel e x =
+      match var e x with
+      | Some n -> e.top_vars <- n :: e.top_vars
+      | None -> ()
+
   end
 
 let fst3 (x,_,_) = x
 let snd3 (_,x,_) = x
 let trd3 (_,_,x) = x
 
-module Subst :
-  sig
+module Subst : sig
     type t
 
     val empty   : t
 
+    type content = { lvar: Obj.t; new_val: Obj.t(*; reifier: unit*) }
+    val make_content : 'a -> 'b  -> content
     (* Screw this.  We need to do (int * (...stuff...)) to save on boxing *)
-    val of_list : (int * Obj.t * Obj.t * (Obj.t option)) list -> t
+    val of_list : (int * content) list -> t
+    (* splits substitution into two lists of the same length. 1st contains logic vars,
+     * second values to substitute *)
     val split   : t -> Obj.t list * Obj.t list
     val walk    : Env.t -> 'a logic -> t -> 'a logic
-    val unify   : Env.t -> 'a logic -> 'a logic -> reifier:Obj.t -> t option -> (int * Obj.t * Obj.t * (Obj.t option)) list * t option
+    val unify   : Env.t -> 'a logic -> 'a logic (*-> reifier:Obj.t*) -> t option -> (int * content) list * t option
     val show    : t -> string
     (* val reifier : 'a logic -> t -> Obj.t option *)
   end =
   struct
-    module M = Map.Make (struct type t = int let compare = Pervasives.compare end)
-    (* map from var indicies to tuples of (actual vars, value, reifier_func) *)
-    type t = (Obj.t * Obj.t * Obj.t) M.t
+    module M = Map.Make (Int)
 
-    let show m = (M.fold (fun i (_, x, _) s -> s ^ sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}"
+    (* map from var indicies to tuples of (actual vars, value, reifier_func) *)
+    type content = { lvar: Obj.t; new_val: Obj.t (*; reifier: unit*) }
+    type t = content M.t
+    let new_val {new_val=x;_} = Obj.obj x
+    let lvar    {lvar=v;_}    = Obj.obj v
+    let make_content a b = { lvar=Obj.repr a; new_val=Obj.repr b }
+
+    let show m =
+      (* (M.fold (fun i  s -> s ^ sprintf "%d -> %s; " i (generic_show x)) m "subst {") ^ "}" *)
+      let b = Buffer.create 40 in
+      Buffer.add_string b "subst {";
+      M.iter (fun i {lvar;_} -> bprintf b "%d -> %s; " i (generic_show lvar)) m;
+      Buffer.add_string b "}";
+      Buffer.contents b
 
     let empty = M.empty
 
-    let of_list l = List.fold_left (fun s (i, v, t, f) -> M.add i Obj.(repr v, repr t, repr f) s) empty l
+    let of_list l = List.fold_left (fun s (i, cnt) -> M.add i cnt s) empty l
 
-    let split s = M.fold (fun _ (x, t, _func) (xs, ts) -> Obj.(repr x)::xs, Obj.(repr t)::ts) s ([], [])
+    let split s = M.fold (fun _ {lvar;new_val} (xs, ts) -> (lvar::xs, new_val::ts)) s ([], [])
 
-    let rec walk env var subst =
-      match Env.var env var with
+    let rec walk : Env.t -> 'a -> t -> 'a = fun env var subst ->
+      match Env.var env !!!var with
       | None   -> var
       | Some i ->
-          try walk env (snd3 (M.find i (!!! subst))) subst with Not_found -> var
+          try walk env (new_val (M.find i subst)) subst with Not_found -> var
 
     let rec occurs env xi term subst =
       let y = walk env term subst in
@@ -362,7 +416,7 @@ module Subst :
          match wy with
          | Invalid 247
          | Unboxed _ -> false
-         | Invalid n -> invalid_arg (Printf.sprintf "Invalid value in occurs check (%d)" n)
+         | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
          | Boxed (_, s, f) ->
             let rec inner i =
               if i >= s then false
@@ -370,24 +424,26 @@ module Subst :
             in
             inner 0
 
-    let unify env x y ~(reifier: Obj.t) subst =
-      let extend xi x term f delta subst =
+    let unify env x y (*~(reifier: Obj.t)*) subst =
+      let extend xi x term delta subst =
         if occurs env xi term subst then raise Occurs_check
-        else (xi, !!!x, !!!term, !!!f)::delta, Some (!!! (M.add xi (!!!x, term, !!!f) (!!! subst)))
+        else
+          let cnt = make_content x term in
+          ((xi, cnt)::delta, Some (M.add xi cnt (!!! subst)) )
       in
-      let rec unify x y f (delta, subst) =
+      let rec unify x y (delta, subst) =
         match subst with
         | None -> delta, None
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y f delta subst
+            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
             | Some xi, _       ->
               let () = printf "unifying var %d with '%s'\n%!" xi (generic_show y) in
-              extend xi x y f delta subst
+              extend xi x y delta subst
             | _      , Some yi ->
               let () = printf "unifying '%s' with var %d\n%!" (generic_show x) yi in
-              extend yi y x f delta subst
+              extend yi y x delta subst
             | _ ->
                 (* When we have two values we need to slice reifier function *)
                 (* let sliced = slice f *)
@@ -407,7 +463,7 @@ module Subst :
                         | None -> delta, None
                         | Some _ ->
                           if i < sx
-                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) f (delta, subst))
+                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
                           else delta, subst
                       in
                       inner 0 (delta, s)
@@ -417,7 +473,7 @@ module Subst :
                  | _ -> delta, None
                 )
       in
-      unify x y (Some reifier) ([], subst)
+      unify x y (*Some reifier*) ([], subst)
 
   end
 
@@ -442,7 +498,7 @@ let call_fresh f (env, subst, constr) =
 exception Disequality_violated
 
 let (===) (x: _ fancy) y (env, subst, constr) =
-  let () = printf "(===) '%s' and '%s'\n%!" (generic_show x) (generic_show y) in
+  let () = printf "(===) '%s' and '%s'\n%!" (generic_show @@ fst !!!x) (generic_show @@ fst !!!y) in
   (* we should always unify two fancy types *) (*
   assert Obj.(tag  @@ repr x = 0);
   assert Obj.(tag  @@ repr y = 0);
@@ -462,7 +518,7 @@ let (===) (x: _ fancy) y (env, subst, constr) =
   let (y,_) = y in
 
   try
-    let prefix, subst' = Subst.unify env x y (Obj.repr f) (Some subst) in
+    let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
     | None -> Stream.nil
     | Some s ->
@@ -472,7 +528,7 @@ let (===) (x: _ fancy) y (env, subst, constr) =
             List.fold_left (fun css' cs ->
               let x,t = Subst.split cs in
               try
-                let p, s' = Subst.unify env (!!!x) (!!!t) (Obj.repr f) subst' in
+                let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
                 match s' with
                 | None -> css'
                 | Some _ ->
@@ -1094,7 +1150,7 @@ let rec prj_nat_list l =
 let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
   let rec walk' recursive env var subst =
-    let () = printf "walk' for var = '%s'\n%!" (generic_show var) in
+    (* let () = printf "walk' for var = '%s'\n%!" (generic_show var) in *)
     let var = Subst.walk env var subst in
     match Env.var env var with
     | None ->
@@ -1136,12 +1192,12 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
       let () = printf "Got a value '%s'\n%!" (generic_show var) in
       (Obj.magic var)
   in
-  let () = printf "going to refine....\n%!" in
+  (* let () = printf "going to refine....\n%!" in *)
   let wtfp = !!!(walk' true e (!!!x) s)in
-  printf "WTFP\n%!";
+  (* printf "WTFP\n%!";
   printf "   x  is '%s' with address = %d\n%!" (generic_show x)     (2 * (!!!x));
   printf "func  is '%s' with address = %d\n%!" (generic_show func)  (2 * (!!!func));
-  printf "WTFP is '%s' with address = %d\n%!" (generic_show wtfp) (2 * (!!!wtfp));
+  printf "WTFP is '%s' with address = %d\n%!" (generic_show wtfp) (2 * (!!!wtfp)); *)
 
   (* let ans =
     match WTFP with
