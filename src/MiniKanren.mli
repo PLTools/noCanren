@@ -468,7 +468,7 @@ type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
 
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
-val call_fresh : (('a, 'b) fancier -> State.t -> 'c) -> State.t -> 'c
+val call_fresh : (('a, 'b, 'c) fancy -> State.t -> 'r) -> State.t -> 'r
 
 (** [x === y] creates a goal, which performs a unifications of
     [x] and [y] *)

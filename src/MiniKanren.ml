@@ -222,9 +222,9 @@ let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> (*printf "id with '
 
 let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
   fun (a,f) ->
-    (* let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in *)
+    let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
     let new_r cond x =
-      (* let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in *)
+      let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in
       (* if cond x then !!!x
       else Obj.magic @@ Value (f cond !!!x) *)
       discr !!!cond @@ f cond x
@@ -316,12 +316,14 @@ module Env :
     val is_var : t -> 'a logic -> bool
     val is_toplevel: t -> 'a logic -> bool
     val mark_toplevel: t -> 'a logic -> unit
+    val add_reifier: t -> 'a logic -> Obj.t -> unit
+    val get_reifiers: t -> 'a logic -> Obj.t list
   end =
   struct
     type t = { token : GT.int GT.list;
-              mutable next: int;
-              mutable reifiers: Obj.t MultiIntMap.t;
-              mutable top_vars: int list }
+               mutable next: int;
+               mutable reifiers: Obj.t MultiIntMap.t;
+               mutable top_vars: int list }
 
     let empty () = { token=[0]; next=10; reifiers=MultiIntMap.empty; top_vars=[] }
 
@@ -354,6 +356,15 @@ module Env :
       | Some n -> e.top_vars <- n :: e.top_vars
       | None -> ()
 
+    let add_reifier e (v: _ logic) f =
+      match var e v with
+      | Some n -> e.reifiers <- MultiIntMap.add n f e.reifiers
+      | None -> ()
+
+    let get_reifiers e v =
+      match var e v with
+      | None -> assert false
+      | Some n -> MultiIntMap.find_exn n e.reifiers
   end
 
 let fst3 (x,_,_) = x
@@ -482,7 +493,7 @@ module State =
     type t = Env.t * Subst.t * Subst.t list
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
-    let show  (env, subst, constr) = Printf.sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
+    let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
   end
 
 type goal = State.t -> State.t Stream.t
@@ -490,10 +501,21 @@ type goal = State.t -> State.t Stream.t
 type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
 
 let dummy_discr _ x = !!!x
+(*
+let call_fresh_gen ?(is_toplevel=false) : (('a,'b,'c) fancy -> State.t-> 'r) -> State.t -> 'r = fun f (env,s,c) ->
+  let (x, env') = Env.fresh env in
+  let var : ('a,'b,'c) fancy = (x, !!!dummy_discr) in
+  f var (env',s,c) *)
+
+let call_fresh_gen ?(is_toplevel=false) f (env, subst, constr) =
+  let x, env' = Env.fresh env in
+  if is_toplevel then Env.mark_toplevel env' x;
+  f (x, !!!dummy_discr) (env', subst, constr)
 
 let call_fresh f (env, subst, constr) =
   let x, env' = Env.fresh env in
   f (x, !!!dummy_discr) (env', subst, constr)
+(* let (_:int) = call_fresh *)
 
 exception Disequality_violated
 
@@ -515,8 +537,17 @@ let (===) (x: _ fancy) y (env, subst, constr) =
     foo y x;
   in *)
   let (x,f) = x in
-  let (y,_) = y in
+  let (y,g) = y in
 
+  let () =
+    let a = Env.is_toplevel env x in
+    let b = Env.is_toplevel env y in
+    match a,b with
+    | true,true
+    | false,false -> ()
+    | true,false -> Env.add_reifier env x (Obj.repr f)
+    | false,true -> Env.add_reifier env y (Obj.repr g)
+  in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -643,13 +674,15 @@ module type T2 = sig
   val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
 end
 
+exception NotImplemented
+
 module Fmap1 (T : T) = struct
   open T
   (* external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity" *)
   let fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy =
     (fun x ->
       Obj.magic begin
-      let fi : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> assert false) in
+      let fi : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> raise NotImplemented) in
       let left = T.fmap (fun (z,f) -> fi := f; z) !!!x in
       (* printf "left = '%s'\n%!" (generic_show left); *)
       let right cond y =
@@ -657,7 +690,7 @@ module Fmap1 (T : T) = struct
         printf "Inside right: cond is '%s' with address = %d\n%!" (generic_show cond) (2 * (!!!cond));
         printf "Inside right: y    is '%s'\n%!" (generic_show y); *)
         (*discr cond @@*) T.fmap (fun heck ->
-          (* printf "Inside T.fmap, heck = '%s'\n%!" (generic_show heck); *)
+          printf "Inside T.fmap, heck = '%s'\n%!" (generic_show heck);
           !fi cond heck
         ) y
       in
@@ -1147,8 +1180,12 @@ let rec prj_nat_list l =
   | Cons (x, xs) -> prj_nat x :: prj_nat_list xs
 *)
 
+exception ReifiedOk of Obj.t
+
 let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
+
+  let reifiers = Env.get_reifiers e x in
   let rec walk' recursive env var subst =
     (* let () = printf "walk' for var = '%s'\n%!" (generic_show var) in *)
     let var = Subst.walk env var subst in
@@ -1192,12 +1229,12 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
       let () = printf "Got a value '%s'\n%!" (generic_show var) in
       (Obj.magic var)
   in
-  (* let () = printf "going to refine....\n%!" in *)
+  let () = printf "going to refine....\n%!" in
   let wtfp = !!!(walk' true e (!!!x) s)in
-  (* printf "WTFP\n%!";
+  printf "WTFP\n%!";
   printf "   x  is '%s' with address = %d\n%!" (generic_show x)     (2 * (!!!x));
   printf "func  is '%s' with address = %d\n%!" (generic_show func)  (2 * (!!!func));
-  printf "WTFP is '%s' with address = %d\n%!" (generic_show wtfp) (2 * (!!!wtfp)); *)
+  printf "WTFP is '%s' with address = %d\n%!" (generic_show wtfp) (2 * (!!!wtfp));
 
   (* let ans =
     match WTFP with
@@ -1213,11 +1250,26 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
     let zzz = !!!func (fun _ -> print_endline "HERR"; false) 5 in
     printf "zzz is '%s'\n%!" (generic_show zzz)
   in *)
-  func (fun x ->
-      let ans = Env.var e x <> None in
-      printf "calling isVar of '%s' says %b\n%!" (generic_show x) ans;
-      ans)
-      wtfp
+  printf "reifiers collected: %d\n%!" (List.length reifiers);
+  let cond x =
+    let ans = Env.var e x <> None in
+    printf "calling isVar of '%s' says %b\n%!" (generic_show x) ans;
+    ans
+  in
+  try
+    List.iter (fun f ->
+      try let f = !!!f in
+          printf "Trying reifier with address = %d\n%!" (2 * (!!!f));
+          let y = f cond wtfp in
+          printf "=)\n%!";
+          raise (ReifiedOk (Obj.repr y))
+      with NotImplemented -> ()
+      ) reifiers;
+    failwith "Can't find a good reifier "
+  with ReifiedOk x ->
+    printf "ReifiedOk with reuslt  = %s\n%!" (generic_show x);
+    Obj.obj x
+  (* func cond wtfp *)
 
 module ExtractDeepest =
   struct
@@ -1261,7 +1313,7 @@ module LogicAdder =
     let zero f = f
 
     let succ (prev: 'a -> State.t -> 'b) (f: ('c, 'z) fancier -> 'a) : State.t -> 'z refiner * 'b =
-      call_fresh (fun logic st -> (refiner logic, prev (f logic) st))
+      call_fresh_gen ~is_toplevel:true (fun logic st -> (refiner logic, prev (f logic) st))
   end
 
 let one () = (fun x -> LogicAdder.(succ zero) x), (@@), ApplyLatest.two
@@ -1285,3 +1337,6 @@ let run n goalish f =
   let adder, currier, app_num = n () in
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
+
+
+(* let (_:int) = call_fresh *)
