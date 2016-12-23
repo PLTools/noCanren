@@ -174,7 +174,7 @@ let test_result =
 ;;
 
 
-(*
+
 (* Lists ******************************* *)
 @type ('a, 'b) alist = Nil | Cons of 'a * 'b with show;;
 type int_list = (int, int_list) alist
@@ -210,4 +210,4 @@ let () =
         let first = Stream.hd qs in
 
         printf "Answer: %s\n" (show_alist_logic first))
-  ;; *)
+  ;; 

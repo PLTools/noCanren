@@ -318,6 +318,7 @@ module Env :
     val mark_toplevel: t -> 'a logic -> unit
     val add_reifier: t -> 'a logic -> Obj.t -> unit
     val get_reifiers: t -> 'a logic -> Obj.t list
+    val merge_reifiers: t -> int -> int -> unit
   end =
   struct
     type t = { token : GT.int GT.list;
@@ -366,6 +367,7 @@ module Env :
       | None -> assert false
       | Some n -> try MultiIntMap.find_exn n e.reifiers with Not_found -> []
 
+    let merge_reifiers: t -> int -> int -> unit = fun e _ _ -> ()
   end
 
 let fst3 (x,_,_) = x
@@ -377,7 +379,7 @@ module Subst : sig
 
     val empty   : t
 
-    type content = { lvar: Obj.t; new_val: Obj.t(*; reifier: unit*) }
+    type content = { lvar: Obj.t; new_val: Obj.t(*; mutable reifier: Obj.t list*) }
     val make_content : 'a -> 'b  -> content
     (* Screw this.  We need to do (int * (...stuff...)) to save on boxing *)
     val of_list : (int * content) list -> t
@@ -387,7 +389,6 @@ module Subst : sig
     val walk    : Env.t -> 'a logic -> t -> 'a logic
     val unify   : Env.t -> 'a logic -> 'a logic (*-> reifier:Obj.t*) -> t option -> (int * content) list * t option
     val show    : t -> string
-    (* val reifier : 'a logic -> t -> Obj.t option *)
   end =
   struct
     module M = Map.Make (Int)
@@ -417,7 +418,13 @@ module Subst : sig
       match Env.var env !!!var with
       | None   -> var
       | Some i ->
-          try walk env (new_val (M.find i subst)) subst with Not_found -> var
+          (* When a variable is mapped to another variable we need to merge reifiers *)
+          let dest = Obj.magic @@ new_val @@ M.find i subst in
+          let () = match Env.var env dest with
+            | Some n -> Env.merge_reifiers env i n
+            | None -> ()
+          in
+          try walk env dest subst with Not_found -> var
 
     let rec occurs env xi term subst =
       let y = walk env term subst in
@@ -649,7 +656,7 @@ module Fresh =
   end
 
 let success st = Stream.cons st Stream.nil
-let failure _  = Stream.nil
+let failure _  = Stream.nil;;
 
 (* let eqo x y t =
   conde [
@@ -663,8 +670,9 @@ let neqo x y t =
     (x === y) &&& (t === inj@@lift false);
   ];; *)
 
-(* @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
-@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap *)
+
+@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
+(*@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap *)
 
 module type T = sig
   type 'a t
@@ -973,7 +981,9 @@ let rec prj_nat n =
   match prj n with
   | O   -> 0
   | S n -> 1 + prj_nat n
+*)
 
+(*
 module List =
   struct
 
@@ -1170,7 +1180,8 @@ let (%)  = List.(%)
 let (%<) = List.(%<)
 let (!<) = List.(!<)
 let nil  = List.nil
-
+*)
+(*
 let rec inj_nat_list = function
 | []    -> !!Nil
 | x::xs -> inj_nat x % inj_nat_list xs

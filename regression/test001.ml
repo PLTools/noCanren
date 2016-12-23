@@ -2,27 +2,26 @@ open GT
 open MiniKanren
 open Tester
 
-let just_a a = a === !5
+let just_a a = a === inj@@lift 5
 
 let a_and_b a =
-  call_fresh (
-    fun b ->
-      (a === !7) &&&
-      ((b === !6) ||| (b === !5))
+  call_fresh (fun b ->
+      (a === inj@@lift 7) &&&
+      ((b === inj@@lift 6) ||| (b === inj@@lift 5))
   )
 
 let a_and_b' b =
   call_fresh (
     fun a ->
-      (a === !7) &&&
-      ((b === !6) ||| (b === !5))
+      (a === inj@@lift 7) &&&
+      ((b === inj@@lift 6) ||| (b === inj@@lift 5))
   )
 
 let rec fives x =
-  (x === !5) |||
+  (x === inj@@lift 5) |||
   (fun st -> Stream.from_fun (fun () -> fives x st))
 
-let rec appendo a b ab =  
+let rec appendo a b ab =
   ((a === !Nil) &&& (b === ab)) |||
   (call_fresh (fun h ->
     (call_fresh (fun t ->
@@ -32,8 +31,8 @@ let rec appendo a b ab =
        ))
     )))
   ))
-  
-let rec reverso a b = 
+
+let rec reverso a b =
   (conj (a === !Nil) (b === !Nil)) |||
   (call_fresh (fun h ->
     (call_fresh (fun t ->
@@ -63,4 +62,3 @@ let _ =
   run show_int       1  q (REPR (fun q   -> a_and_b q                                          )) qh;
   run show_int       2  q (REPR (fun q   -> a_and_b' q                                         )) qh;
   run show_int      10  q (REPR (fun q   -> fives q                                            )) qh
-
