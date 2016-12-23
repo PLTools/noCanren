@@ -229,7 +229,7 @@ let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
       else Obj.magic @@ Value (f cond !!!x) *)
       discr !!!cond @@ f cond x
     in
-    printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(Obj.magic new_r));
+    printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(!!!new_r));
     (a, new_r)
 
 let (!!) = inj
@@ -364,7 +364,8 @@ module Env :
     let get_reifiers e v =
       match var e v with
       | None -> assert false
-      | Some n -> MultiIntMap.find_exn n e.reifiers
+      | Some n -> try MultiIntMap.find_exn n e.reifiers with Not_found -> []
+
   end
 
 let fst3 (x,_,_) = x
@@ -545,8 +546,8 @@ let (===) (x: _ fancy) y (env, subst, constr) =
     match a,b with
     | true,true
     | false,false -> ()
-    | true,false -> Env.add_reifier env x (Obj.repr f)
-    | false,true -> Env.add_reifier env y (Obj.repr g)
+    | true,false -> Env.add_reifier env x (Obj.repr g)
+    | false,true -> Env.add_reifier env y (Obj.repr f)
   in
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in

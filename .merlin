@@ -1,4 +1,4 @@
-PKG GT oUnit
+PKG GT
 SRC src src_test
 SRC regression
 SRC plugin

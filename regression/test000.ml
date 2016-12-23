@@ -78,18 +78,20 @@ let (_:_ fancy -> goal) = fun q ->
   q === right
 let (_:int) = MiniKanren.run q *)
 
-let _flat_int =
+let _flat_int () =
   print_endline " ---------------------------------------------- flat_int";
   MiniKanren.run q (fun q ->
     let (right: (int, int  logic, int unlogic) fancy)
       = inj@@lift 15 in
+
+    printf "hack is '%s'\n%!" (generic_show @@ (snd @@ Obj.magic right) (fun _ -> false) 15);
     q === right)
   (fun qs ->
-    (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
+    let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in
     printf "%s\n" @@ (show unlogic @@ show int) @@ Stream.hd qs)
 ;;
 
-let _just_of_int =
+let _just_of_int () =
   print_endline " ---------------------------------------------- just_of_int";
   MiniKanren.run q (fun q ->
     let (right: (int maybe, int logic maybe logic,
@@ -101,7 +103,7 @@ let _just_of_int =
     printf "%s\n" @@ show_logic_maybe (show(unlogic)@@show(int)) @@ Stream.hd qs)
 ;;
 
-let _just_2 =
+let _just_2 () =
   print_endline " ---------------------------------------------- _just_2";
   MiniKanren.run q (fun q ->
     let (right: (int maybe, int logic maybe logic,
@@ -150,7 +152,7 @@ let _asdf () =
     (* let () = printf "head is '%s'\n%!" (generic_show @@ Stream.hd qs) in *)
     printf "%s\n" (show_logic_maybe (show(unlogic)@@show(int)) @@ Stream.hd qs))
 ;;
-(*
+
 (* let rec show_test t = show(test) (show(int)) t *)
 @type ('a,'b) result = OK of 'a | Error of 'b with show
 module Result = Fmap2(struct
@@ -160,7 +162,7 @@ end);;
 
 let show_logic_result f g x : string = show unlogic (show(result) f g) x
 
-let test_result () =
+let test_result =
   MiniKanren.run q (fun q ->
     let (right: ((int,string) result, (int logic,string logic) result logic,
                  (int unlogic, string unlogic) result unlogic) fancy)
@@ -172,7 +174,7 @@ let test_result () =
 ;;
 
 
-
+(*
 (* Lists ******************************* *)
 @type ('a, 'b) alist = Nil | Cons of 'a * 'b with show;;
 type int_list = (int, int_list) alist
