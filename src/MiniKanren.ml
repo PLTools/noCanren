@@ -292,6 +292,7 @@ module MultiIntMap : sig
   val empty: 'a t
   val add : key -> 'a -> 'a t -> 'a t
   val find_exn: key -> 'a t -> 'a list
+  val replace: key -> 'a list -> 'a t -> 'a t
 end = struct
   module M = Map.Make(Int)
 
@@ -304,6 +305,7 @@ end = struct
         M.add k (v::vs) m
     with Not_found -> M.add k [v] m
   let find_exn : key -> 'a t -> 'a list = M.find
+  let replace: key -> 'a list -> 'a t -> 'a t = M.add
 end
 
 module Env :
@@ -367,12 +369,14 @@ module Env :
       | None -> assert false
       | Some n -> try MultiIntMap.find_exn n e.reifiers with Not_found -> []
 
-    let merge_reifiers: t -> int -> int -> unit = fun e _ _ -> ()
-  end
+    let merge_reifiers: t -> int -> int -> unit = fun e k1 k2 ->
+      let open MultiIntMap in
+      let v1 = try find_exn k1 e.reifiers with Not_found -> [] in
+      let v2 = try find_exn k2 e.reifiers with Not_found -> [] in
+      let v = v1@v2 in
+      e.reifiers <- replace k1 v (replace k2 v e.reifiers)
 
-let fst3 (x,_,_) = x
-let snd3 (_,x,_) = x
-let trd3 (_,_,x) = x
+  end
 
 module Subst : sig
     type t
@@ -419,12 +423,14 @@ module Subst : sig
       | None   -> var
       | Some i ->
           (* When a variable is mapped to another variable we need to merge reifiers *)
-          let dest = Obj.magic @@ new_val @@ M.find i subst in
-          let () = match Env.var env dest with
-            | Some n -> Env.merge_reifiers env i n
-            | None -> ()
-          in
-          try walk env dest subst with Not_found -> var
+          try
+            let ans = new_val @@ M.find i subst in
+            let () = match Env.var env ans with
+              | Some n -> Env.merge_reifiers env i n
+              | None -> ()
+            in
+            walk env ans subst
+          with Not_found -> var
 
     let rec occurs env xi term subst =
       let y = walk env term subst in
