@@ -162,7 +162,7 @@ end);;
 
 let show_logic_result f g x : string = show unlogic (show(result) f g) x
 
-let test_result =
+let test_result () =
   MiniKanren.run q (fun q ->
     let (right: ((int,string) result, (int logic,string logic) result logic,
                  (int unlogic, string unlogic) result unlogic) fancy)
@@ -210,4 +210,4 @@ let () =
         let first = Stream.hd qs in
 
         printf "Answer: %s\n" (show_alist_logic first))
-  ;; 
+  ;;

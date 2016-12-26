@@ -302,8 +302,10 @@ end = struct
   let empty : 'a t = M.empty
   let add k v m =
     try let vs = M.find k m in
-        M.add k (v::vs) m
+        let vs = if List.memq v vs then vs else v::vs in
+        M.add k vs m
     with Not_found -> M.add k [v] m
+
   let find_exn : key -> 'a t -> 'a list = M.find
   let replace: key -> 'a list -> 'a t -> 'a t = M.add
 end
@@ -321,6 +323,7 @@ module Env :
     val add_reifier: t -> 'a logic -> Obj.t -> unit
     val get_reifiers: t -> 'a logic -> Obj.t list
     val merge_reifiers: t -> int -> int -> unit
+    val merge_reifiers_exn : t -> 'a logic -> 'a logic -> unit
   end =
   struct
     type t = { token : GT.int GT.list;
@@ -373,9 +376,14 @@ module Env :
       let open MultiIntMap in
       let v1 = try find_exn k1 e.reifiers with Not_found -> [] in
       let v2 = try find_exn k2 e.reifiers with Not_found -> [] in
-      let v = v1@v2 in
-      e.reifiers <- replace k1 v (replace k2 v e.reifiers)
+      let v = List.fold_left (fun acc x -> if List.memq x acc then acc else x::acc) v1 v2 in
+      e.reifiers <- replace k1 v (replace k2 v e.reifiers);
+      printf "Setting reifiers count to %d\n%!" (List.length v)
 
+    let merge_reifiers_exn e x y =
+      match var e x, var e y with
+      | Some n, Some m -> merge_reifiers e n m
+      | _ -> failwith "bad arguments of `merge_reifiers_exn`"
   end
 
 module Subst : sig
@@ -425,6 +433,7 @@ module Subst : sig
           (* When a variable is mapped to another variable we need to merge reifiers *)
           try
             let ans = new_val @@ M.find i subst in
+            (* printf "Inside Subst.walk '%s' -> '%s'\n%!" (generic_show var) (generic_show ans); *)
             let () = match Env.var env ans with
               | Some n -> Env.merge_reifiers env i n
               | None -> ()
@@ -554,10 +563,13 @@ let (===) (x: _ fancy) y (env, subst, constr) =
   let (y,g) = y in
 
   let () =
-    let a = Env.is_toplevel env x in
-    let b = Env.is_toplevel env y in
+    let a = Env.is_var env x in
+    let b = Env.is_var env y in
     match a,b with
-    | true,true
+    | true,true ->
+      Env.add_reifier env x (Obj.repr g);
+      Env.add_reifier env y (Obj.repr f);
+      Env.merge_reifiers_exn env x y
     | false,false -> ()
     | true,false -> Env.add_reifier env x (Obj.repr g)
     | false,true -> Env.add_reifier env y (Obj.repr f)
@@ -1203,7 +1215,6 @@ exception ReifiedOk of Obj.t
 let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
 
-  let reifiers = Env.get_reifiers e x in
   let rec walk' recursive env var subst =
     (* let () = printf "walk' for var = '%s'\n%!" (generic_show var) in *)
     let var = Subst.walk env var subst in
@@ -1268,6 +1279,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
     let zzz = !!!func (fun _ -> print_endline "HERR"; false) 5 in
     printf "zzz is '%s'\n%!" (generic_show zzz)
   in *)
+  let reifiers = Env.get_reifiers e x in
   printf "reifiers collected: %d\n%!" (List.length reifiers);
   let cond x =
     let ans = Env.var e x <> None in
