@@ -43,8 +43,12 @@ let rec appendo a b ab =
   )
   ))) *)
 
-let show_int      = show(logic) (show int)
-let show_int_list = show(List.logic) show_int
+(* let (_:int)  = show(List.ground) *)
+
+let show_int      = show(unlogic) (show int)
+let show_int_list xs = show unlogic (show (List.ground) show_int) xs
+let show_int_list2 = show (List.logic) show_int
+(* let (_:int) = show_int_list *)
 
 let _ =
   run show_int_list  1  q (REPR (fun q   -> appendo q (inj_list [3; 4]) (inj_list [1; 2; 3; 4]))) qh;

@@ -123,79 +123,12 @@ let generic_show x =
   inner x;
   Buffer.contents b
 
-type ('a, 'b, 'c) fancy = 'a * (('a->bool) -> 'a -> 'c);;
-type 'a logic = 'a;;
+type 'a logic = 'a (* TODO: remove this *)
+type ('a, 'c) fancy = 'a * (('a->bool) -> 'a -> 'c);;
 
-class type virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
-  object
-    method value :
-      'inh -> ('inh, 'a logic, 'syn, < a : 'ia -> 'a -> 'sa >) GT.a ->
-        ('ia, 'a, 'sa, < a : 'ia -> 'a -> 'sa >) GT.a -> 'syn
-    method t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
-  end
-let (logic :
- (('ia -> 'a -> 'sa) -> ('a, 'ia, 'sa, 'inh, 'syn) #logic_tt -> 'inh ->
-   'a logic -> 'syn, unit)
-   GT.t) =
-  let rec logic_gcata fa trans inh subj =
-    let rec self = logic_gcata fa trans
-    and tpo = object method a = fa end in
-    match subj with
-      p0 ->
-        trans#value inh (GT.make self subj tpo)
-          (let (e0) = p0 in GT.make fa e0 tpo)
-  in
-  {GT.gcata = logic_gcata; GT.plugins = ()}
-class virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_t =
-  object (this)
-    method virtual value :
-      'inh -> ('inh, 'a logic, 'syn, < a : 'ia -> 'a -> 'sa >) GT.a ->
-        ('ia, 'a, 'sa, < a : 'ia -> 'a -> 'sa >) GT.a -> 'syn
-    method t_logic fa = GT.transform logic fa this
-  end
-class type ['a] show_logic_env_tt = object  end
-class type ['a, 'sa] gmap_logic_env_tt = object  end
-class ['a] show_proto_logic env =
-  object (this)
-    inherit ['a, unit, string, unit, string] logic_t
-    method value inh subj p0 =
-      ("(" ^ (let (e0) = p0 in ("(" ^ e0.GT.fx ()) ^ ")")) ^ ")"
-  end
-class ['a, 'sa] gmap_proto_logic env =
-  object (this)
-    inherit ['a, unit, 'sa, unit, 'sa logic] logic_t
-    method value inh subj p0 = (let (e0) = p0 in e0.GT.fx ())
-  end
-class ['a] show_logic_t =
-  let self = Obj.magic (ref ()) in
-  object (this)
-    inherit ['a, unit, string, unit, string] logic_t
-    inherit ['a] show_proto_logic self
-    initializer (:=) self (this :> 'a show_logic_t)
-  end
-class ['a, 'sa] gmap_logic_t =
-  let self = Obj.magic (ref ()) in
-  object (this)
-    inherit ['a, unit, 'sa, unit, 'sa logic] logic_t
-    inherit ['a, 'sa] gmap_proto_logic self
-    initializer (:=) self (this :> ('a, 'sa) gmap_logic_t)
-  end
-let (logic :
- (('ia -> 'a -> 'sa) -> ('a, 'ia, 'sa, 'inh, 'syn) #logic_tt -> 'inh ->
-   'a logic -> 'syn, < show : ('a -> string) -> 'a logic -> string;
- gmap : ('a -> 'sa) -> 'a logic -> 'sa logic >)
-   GT.t) =
-  {GT.gcata = logic.GT.gcata;
-   GT.plugins =
-     object
-       method show a = GT.transform logic (GT.lift a) (new show_logic_t) ()
-       method gmap a = GT.transform logic (GT.lift a) (new gmap_logic_t) ()
-     end}
-;;
-
-@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
+@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a GT.list
                    | Value of 'a
-                   with show;;
+                   with show,gmap;;
 
 (* N.B. internally Obj.repr : 'a -> Obj.t = "%identity" *)
 (* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
@@ -218,9 +151,9 @@ let discr : ('a->bool) -> 'a -> 'c =
       Obj.magic @@ Value x
 ;;
 (* let (_:int) = discr;; *)
-let lift: 'a -> ('a, 'a, 'a) fancy = fun x -> (x,(fun _ y -> (*printf "id with '%s'\n%!" (generic_show y);*) y))
+let lift: 'a -> ('a, 'a) fancy = fun x -> (x,(fun _ y -> (*printf "id with '%s'\n%!" (generic_show y);*) y))
 
-let inj: ('a, 'b, 'c) fancy -> ('a, 'b logic, 'c unlogic) fancy =
+let inj: ('a, 'c) fancy -> ('a, 'c unlogic) fancy =
   fun (a,f) ->
     let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
     let new_r cond x =
@@ -362,7 +295,7 @@ module Env :
       | Some n -> e.top_vars <- n :: e.top_vars
       | None -> ()
 
-    let add_reifier e (v: _ logic) f =
+    let add_reifier e v f =
       match var e v with
       | Some n -> e.reifiers <- MultiIntMap.add n f e.reifiers
       | None -> ()
@@ -521,7 +454,7 @@ module State =
 
 type goal = State.t -> State.t Stream.t
 
-type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
+type ('a, 'b) fancier = ('a, 'b unlogic) fancy
 
 let dummy_discr _ x = !!!x
 (*
@@ -705,8 +638,8 @@ exception NotImplemented
 
 module Fmap1 (T : T) = struct
   open T
-  (* external fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy = "%identity" *)
-  let fmap : ('a, 'b, 'c) fancy t -> ('a t, 'b t, 'c t) fancy =
+
+  let fmap : ('a, 'c) fancy t -> ('a t, 'c t) fancy =
     (fun x ->
       Obj.magic begin
       let fi : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> raise NotImplemented) in
@@ -729,8 +662,8 @@ end
 
 module Fmap2 (T : T2) = struct
   type ('a,'b) t = ('a,'b) T.t
-  let fmap : (('a, 'b, 'c) fancy, ('q, 'w, 'e) fancy) t ->
-                   (('a, 'q) t, ('b, 'w) t, ('c, 'e) t) fancy = fun x ->
+  let fmap : (('a, 'c) fancy, ('q, 'e) fancy) t ->
+                   (('a, 'q) t, ('c, 'e) t) fancy = fun x ->
     Obj.magic begin
       let () = print_endline "inside Fmap2.fmap" in
       let fi1 : (('a1->bool) -> 'a1 -> 'c1) ref = ref (fun _  _ -> assert false) in
@@ -1006,9 +939,9 @@ module List = struct
 
     include List
 
-    type 'a logic' = 'a logic
+    (* type 'a logic' = 'a logic *)
 
-    let logic' = logic
+    (* let logic' = logic *)
 
     type ('a, 'l) t = ('a, 'l) llist
 
@@ -1024,8 +957,8 @@ module List = struct
     let nil ()  = inj (F.fmap Nil)
     let cons x y = inj (F.fmap (Cons (x, y)))
 
-    type 'a ground = ('a, 'a ground) t
-    type 'a logic  = ('a, 'a logic)  t logic'
+    type 'a ground = ('a, 'a ground) t;;
+    type 'a logic  = ('a, 'a logic) t unlogic
 
     let rec of_list = function [] -> nil () | x::xs -> cons x (of_list xs)
     (* let rec to_list = function Nil -> [] | Cons (x, xs) -> x::to_list xs *)
@@ -1079,15 +1012,15 @@ module List = struct
           (* method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b *)
           (* method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l *)
           (* method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l *)
-          method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l
+          method gmap    fa l   = GT.gmap   (unlogic) (GT.gmap   (llist) fa (this#gmap    fa)) l
           method show    fa l =
-            GT.show(logic')
+            GT.show(unlogic)
               (fun l -> "[" ^
                  let rec inner l =
                     GT.transform(llist)
                       (GT.lift fa)
                       (GT.lift (GT.show(unlogic) inner))
-                      (object inherit ['a,'a unlogic] @llist[show]
+                      (object inherit ['a,'a logic] @llist[show]
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                        end)
@@ -1098,6 +1031,8 @@ module List = struct
               l
         end
     }
+
+    (* let (_:int) = GT.show logic *)
 
     (*
     let rec foldro f a xs r =
@@ -1224,7 +1159,7 @@ let rec prj_nat_list l =
 
 exception ReifiedOk of Obj.t
 
-let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
+let rec refine : State.t -> ('a, 'c) fancy -> 'c
   = fun ((e, s, c) as st) (x,func) ->
 
   let rec walk' recursive env var subst =
@@ -1300,7 +1235,7 @@ let rec refine : State.t -> ('a, 'b, 'c) fancy -> 'c
   in
   try
     List.iter (fun f ->
-      try let f = !!!f in
+      try let f : (_ -> bool) -> _ -> _ = !!!f in
           printf "Trying reifier with address = %d\n%!" (2 * (!!!f));
           let y = f cond wtfp in
           printf "=)\n%!";
@@ -1347,7 +1282,7 @@ module Uncurry =
 
 type 'a refiner = State.t Stream.t -> 'a unlogic Stream.t
 
-let refiner : ('a, 'b logic, 'b unlogic) fancy -> 'b refiner = fun x ans ->
+let refiner : ('a, 'b unlogic) fancy -> 'b refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
 
 module LogicAdder =
