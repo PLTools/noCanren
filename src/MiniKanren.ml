@@ -689,7 +689,7 @@ let neqo x y t =
   ];; *)
 
 
-@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap
+@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap(*, html, eq, compare, foldl, foldr *)
 (*@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap *)
 
 module type T = sig
@@ -1001,9 +1001,8 @@ let rec prj_nat n =
   | S n -> 1 + prj_nat n
 *)
 
-(*
-module List =
-  struct
+
+module List = struct
 
     include List
 
@@ -1013,19 +1012,29 @@ module List =
 
     type ('a, 'l) t = ('a, 'l) llist
 
+    module MyFmap = struct
+      type ('a,'b) t = ('a, 'b) llist
+      let fmap f g = function
+      | Nil -> Nil
+      | Cons (x,xs) -> Cons (f x, g xs)
+      (* TODO: rewrite *)
+    end
+    module F = Fmap2(MyFmap)
+
+    let nil ()  = inj (F.fmap Nil)
+    let cons x y = inj (F.fmap (Cons (x, y)))
+
     type 'a ground = ('a, 'a ground) t
     type 'a logic  = ('a, 'a logic)  t logic'
 
-    let rec of_list = function [] -> Nil | x::xs -> Cons (x, of_list xs)
-    let rec to_list = function Nil -> [] | Cons (x, xs) -> x::to_list xs
+    let rec of_list = function [] -> nil () | x::xs -> cons x (of_list xs)
+    (* let rec to_list = function Nil -> [] | Cons (x, xs) -> x::to_list xs *)
 
-    let (%)  x y = !!(Cons (x, y))
-    let (%<) x y = !!(Cons (x, !!(Cons (y, !!Nil))))
-    let (!<) x   = !!(Cons (x, !!Nil))
+    let (%)   = cons
+    let (%<) x y = cons x @@ cons y @@ nil ()
+    let (!<) x   = cons x @@ nil ()
 
-    let nil = inj Nil
-
-    let rec inj fa l = !! (GT.gmap(llist) fa (inj fa) l)
+    (* let rec inj fa l = !! (GT.gmap(llist) fa (inj fa) l)
 
     let prj_k fa k l =
       let rec inner l =
@@ -1033,20 +1042,20 @@ module List =
       in
       inner l
 
-    let prj fa l = prj_k fa (fun _ -> raise Not_a_value) l
+    let prj fa l = prj_k fa (fun _ -> raise Not_a_value) l *)
 
     let ground = {
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    fa l = GT.html   (llist) fa (this#html    fa) l
-          method eq      fa l = GT.eq     (llist) fa (this#eq      fa) l
+          (* method html    fa l = GT.html   (llist) fa (this#html    fa) l *)
+          (* method eq      fa l = GT.eq     (llist) fa (this#eq      fa) l
           method compare fa l = GT.compare(llist) fa (this#compare fa) l
           method foldr   fa l = GT.foldr  (llist) fa (this#foldr   fa) l
-          method foldl   fa l = GT.foldl  (llist) fa (this#foldl   fa) l
+          method foldl   fa l = GT.foldl  (llist) fa (this#foldl   fa) l *)
           method gmap    fa l = GT.gmap   (llist) fa (this#gmap    fa) l
           method show    fa l = "[" ^
-	    let rec inner l =
+            let rec inner l =
               (GT.transform(llist)
                  (GT.lift fa)
                  (GT.lift inner)
@@ -1065,34 +1074,32 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    fa l   = GT.html   (logic') (GT.html   (llist) fa (this#html    fa)) l
-          method eq      fa a b = GT.eq     (logic') (GT.eq     (llist) fa (this#eq      fa)) a b
-          method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b
-          method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l
-          method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l
+          (* method html    fa l   = GT.html   (logic') (GT.html   (llist) fa (this#html    fa)) l *)
+          (* method eq      fa a b = GT.eq     (logic') (GT.eq     (llist) fa (this#eq      fa)) a b *)
+          (* method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b *)
+          (* method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l *)
+          (* method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l *)
           method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l
           method show    fa l =
             GT.show(logic')
               (fun l -> "[" ^
                  let rec inner l =
-                   (GT.transform(llist)
+                    GT.transform(llist)
                       (GT.lift fa)
-                      (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] @llist[show]
+                      (GT.lift (GT.show(unlogic) inner))
+                      (object inherit ['a,'a unlogic] @llist[show]
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                        end)
                       ()
                       l
-                   )
-		 in inner l ^ "]"
+                   in inner l ^ "]"
               )
               l
         end
     }
 
-    let (!) = (!!)
-
+    (*
     let rec foldro f a xs r =
       conde [
         (xs === !Nil) &&& (a === r);
@@ -1183,22 +1190,27 @@ module List =
            (x =/= a) &&& (membero xs a)
          ])
       )
+      *)
   end
 
-let rec inj_list = function
-| []    -> inj Nil
-| x::xs -> inj (Cons (inj x, inj_list xs))
-
-let rec prj_list l =
-  match prj l with
-  | Nil -> []
-  | Cons (x, xs) -> prj x :: prj_list xs
-
-let (%)  = List.(%)
+let (%)  = List.cons
+let cons = List.cons
 let (%<) = List.(%<)
 let (!<) = List.(!<)
 let nil  = List.nil
-*)
+
+let rec inj_list = function
+| []    -> nil ()
+| x::xs -> cons (inj @@ lift x) (inj_list xs)
+
+(* let rec prj_list l =
+  match prj l with
+  | Nil -> []
+  | Cons (x, xs) -> prj x :: prj_list xs *)
+
+
+
+
 (*
 let rec inj_nat_list = function
 | []    -> !!Nil

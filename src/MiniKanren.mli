@@ -95,9 +95,9 @@ val logic :
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 
-@type 'a unlogic = Var of GT.int GT.list * GT.int * 'a logic GT.list
-                     | Value of 'a
-                     with show
+@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
+                   | Value of 'a
+                    with show;;
 
 val lift : 'a -> ('a, 'a, 'a) fancy
 
@@ -125,7 +125,7 @@ val prj_k : (int -> 'a logic list -> 'a) -> 'a logic -> 'a
 (** {3 Support for some predefined types (lists, nats, bools etc.)} *)
 
 (** Abstract list type *)
-(* @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, html, eq, compare, foldl, foldr, gmap *)
+@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap
 
 
 module type T = sig
@@ -348,7 +348,7 @@ val inj_nat : int -> Nat.logic
 
 (** [prj_nat n] is a deforested synonym for projection *)
 val prj_nat : Nat.logic -> int
-
+*)
 module List :
   sig
 
@@ -367,20 +367,21 @@ module List :
     (** GT-compatible typeinfo for ['a ground] *)
     val ground :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> 'a ground -> 'a ground -> GT.comparison;
+       < gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
+         (* compare : ('a -> 'a -> GT.comparison) -> 'a ground -> 'a ground -> GT.comparison;
          eq      : ('a -> 'a -> bool) -> 'a ground -> 'a ground -> bool;
          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
-         gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
-         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
+         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer; *)
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
     (** [of_list l] makes ground list from a regular one *)
-    val of_list : 'a list -> 'a ground
+    val of_list : ('a, 'b, 'c) fancy list ->
+           (('a, 'd) t as 'd, 'e, ('c, 'f) t unlogic as 'f) fancy
 
     (** [to_list l] make regular list from a ground one *)
-    val to_list : 'a ground -> 'a list
+    (* val to_list : 'a ground -> 'a list *)
 
     (** Logic lists (with the tails as logic lists) *)
     type 'a logic  = ('a, 'a logic)  t logic'
@@ -388,15 +389,19 @@ module List :
     (** GT-compatible typeinfo for ['a logic] *)
     val logic :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
+       < gmap    : ('a -> 'b) -> (('a, 'c) t as 'c) -> (('b, 'd) t as 'd);
+         (* compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
          eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
-         gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
-         html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
-         show    : ('a -> string) -> 'a logic -> GT.string >)
+         html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer; *)
+         show    : ((('e, 'e unlogic) t as 'e) -> string) -> 'e -> string >)
       GT.t
 
+    val cons :
+             ('a, 'b, 'c) fancy ->
+             ('d, 'e, 'f) fancy -> (('a, 'd) t, 'g, ('c, 'f) t unlogic) fancy
+(*
     (** List injection *)
     val inj : ('a -> 'b) -> 'a ground -> 'b logic
 
@@ -434,34 +439,42 @@ module List :
     val reverso : 'a logic' logic -> 'a logic' logic -> goal
 
     (** Relational occurrence check (a shortcut) *)
-    val membero : 'a logic' logic -> 'a logic' -> goal
+    val membero : 'a logic' logic -> 'a logic' -> goal *)
 
   end
 
 (** [inj_list l] is a deforested synonym for injection *)
-val inj_list : 'a list -> 'a logic List.logic
+val inj_list : 'a list ->
+           (('a, 'b) llist as 'b, 'c, ('a unlogic, 'd) llist unlogic as 'd) fancy;;
 
 (** [prj_list] is a deforested synonym for projection *)
-val prj_list : 'a logic List.logic -> 'a list
+(* val prj_list : 'a logic List.logic -> 'a list *)
 
 (** [inj_nat_list l] is a deforsted synonym for injection *)
-val inj_nat_list : int list -> Nat.logic List.logic
+(* val inj_nat_list : int list -> Nat.logic List.logic *)
 
 (** [inj_nat_list l] is a deforsted synonym for projection *)
-val prj_nat_list : Nat.logic List.logic -> int list
+(* val prj_nat_list : Nat.logic List.logic -> int list *)
 
 (** Infix synonym for [Cons] *)
-val (%) : 'a -> 'a List.logic -> 'a List.logic
+val (%) : ('a, 'b, 'c) fancy ->
+          ('d, 'e, 'f) fancy ->
+          (('a, 'd) llist, 'g, ('c, 'f) llist unlogic) fancy
 
 (** [x %< y] is a synonym for [Cons (x, !(Cons (y, !Nil)))] *)
-val (%<) : 'a -> 'a -> 'a List.logic
+val (%<) : ('a, 'b, 'c) fancy ->
+           ('d, 'e, 'f) fancy ->
+           (('a, ('d, ('g, 'h) llist) llist) llist, 'i,
+            ('c, ('f, ('j, 'k) llist unlogic) llist unlogic) llist unlogic) fancy
 
 (** [!< x] is a synonym for [Cons (x, !Nil)] *)
-val (!<) : 'a -> 'a List.logic
+val (!<) : ('a, 'b, 'c) fancy ->
+           (('a, ('d, 'e) llist) llist, 'f,
+            ('c, ('g, 'h) llist unlogic) llist unlogic) fancy
 
 (** [nil] is a synonym for [inj Nil] *)
-val nil : 'a List.logic
-*)
+val nil : unit -> (('a, 'b) llist, 'c, ('d, 'e) llist unlogic) fancy
+
 (** {2 miniKanren basic primitives} *)
 
 type ('a, 'b) fancier = ('a, 'b logic, 'b unlogic) fancy
