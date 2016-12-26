@@ -123,13 +123,35 @@ let generic_show x =
   inner x;
   Buffer.contents b
 
-type 'a logic = 'a (* TODO: remove this *)
+(* type 'a logic = 'a (* TODO: remove this *) *)
 type ('a, 'c) fancy = 'a * (('a->bool) -> 'a -> 'c);;
 
-@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a GT.list
+@type 'a logic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
                    | Value of 'a
                    with show,gmap;;
 
+let logic = {logic with
+ gcata = ();
+ plugins =
+   object
+     method gmap    = logic.plugins#gmap
+     method show fa x =
+       GT.transform(logic)
+          (GT.lift fa)
+          (object inherit ['a] @logic[show]
+            method c_Var _ s _ i cs =
+              let c =
+              match cs with
+              | [] -> ""
+              | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
+              in
+              Printf.sprintf "_.%d%s" i c
+            method c_Value _ _ x = x.GT.fx ()
+           end)
+          ()
+          x
+   end
+};;
 (* N.B. internally Obj.repr : 'a -> Obj.t = "%identity" *)
 (* exception DelayedRefinement of ((Obj.t -> bool) -> Obj.t -> Obj.t) * Obj.t;; *)
 (* type delayed_st = { dfunc: Obj.t; dval: Obj.t } *)
@@ -151,16 +173,16 @@ let discr : ('a->bool) -> 'a -> 'c =
       Obj.magic @@ Value x
 ;;
 (* let (_:int) = discr;; *)
-let lift: 'a -> ('a, 'a) fancy = fun x -> (x,(fun _ y -> (*printf "id with '%s'\n%!" (generic_show y);*) y))
+let lift: 'a -> ('a, 'a) fancy = fun x -> (x,(fun _ y -> printf "id with '%s'\n%!" (generic_show y); y))
 
-let inj: ('a, 'c) fancy -> ('a, 'c unlogic) fancy =
+let inj: ('a, 'c) fancy -> ('a, 'c logic) fancy =
   fun (a,f) ->
     let () = printf "Inside inj for a = '%s'\n%!" (generic_show a) in
     let new_r cond x =
       let () = printf "We got into new_r with x = %s\n%!" (generic_show x) in
-      (* if cond x then !!!x
-      else Obj.magic @@ Value (f cond !!!x) *)
-      discr !!!cond @@ f cond x
+       if cond x then !!!x
+      else Obj.magic @@ Value (f cond !!!x) 
+      (* discr !!!cond @@ f cond x *)
     in
     printf "new R = '%s' with address %d\n%!" (generic_show a) (2*(!!!new_r));
     (a, new_r)
@@ -248,15 +270,15 @@ module Env :
     type t
 
     val empty  : unit -> t
-    val fresh  : t -> 'a logic * t
-    val var    : t -> 'a logic -> int option
-    val is_var : t -> 'a logic -> bool
-    val is_toplevel: t -> 'a logic -> bool
-    val mark_toplevel: t -> 'a logic -> unit
-    val add_reifier: t -> 'a logic -> Obj.t -> unit
-    val get_reifiers: t -> 'a logic -> Obj.t list
+    val fresh  : t -> 'a * t
+    val var    : t -> 'a -> int option
+    val is_var : t -> 'a -> bool
+    val is_toplevel: t -> 'a -> bool
+    val mark_toplevel: t -> 'a -> unit
+    val add_reifier: t -> 'a -> Obj.t -> unit
+    val get_reifiers: t -> 'a -> Obj.t list
     val merge_reifiers: t -> int -> int -> unit
-    val merge_reifiers_exn : t -> 'a logic -> 'a logic -> unit
+    val merge_reifiers_exn : t -> 'a -> 'a -> unit
   end =
   struct
     type t = { token : GT.int GT.list;
@@ -331,8 +353,8 @@ module Subst : sig
     (* splits substitution into two lists of the same length. 1st contains logic vars,
      * second values to substitute *)
     val split   : t -> Obj.t list * Obj.t list
-    val walk    : Env.t -> 'a logic -> t -> 'a logic
-    val unify   : Env.t -> 'a logic -> 'a logic (*-> reifier:Obj.t*) -> t option -> (int * content) list * t option
+    val walk    : Env.t -> 'a -> t -> 'a
+    val unify   : Env.t -> 'a -> 'a  (*-> reifier:Obj.t*) -> t option -> (int * content) list * t option
     val show    : t -> string
   end =
   struct
@@ -454,7 +476,7 @@ module State =
 
 type goal = State.t -> State.t Stream.t
 
-type ('a, 'b) fancier = ('a, 'b unlogic) fancy
+type ('a, 'b) fancier = ('a, 'b logic) fancy
 
 let dummy_discr _ x = !!!x
 (*
@@ -939,9 +961,9 @@ module List = struct
 
     include List
 
-    (* type 'a logic' = 'a logic *)
+    type 'a logic' = 'a logic
 
-    (* let logic' = logic *)
+    let logic' = logic
 
     type ('a, 'l) t = ('a, 'l) llist
 
@@ -958,7 +980,7 @@ module List = struct
     let cons x y = inj (F.fmap (Cons (x, y)))
 
     type 'a ground = ('a, 'a ground) t;;
-    type 'a logic  = ('a, 'a logic) t unlogic
+
 
     let rec of_list = function [] -> nil () | x::xs -> cons x (of_list xs)
     (* let rec to_list = function Nil -> [] | Cons (x, xs) -> x::to_list xs *)
@@ -1003,29 +1025,30 @@ module List = struct
         end
     }
 
+
+
+
+    type 'a logic  = ('a, 'a logic) t logic'
+
     let logic = {
       GT.gcata = ();
       GT.plugins =
         object(this)
-          (* method html    fa l   = GT.html   (logic') (GT.html   (llist) fa (this#html    fa)) l *)
-          (* method eq      fa a b = GT.eq     (logic') (GT.eq     (llist) fa (this#eq      fa)) a b *)
-          (* method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b *)
-          (* method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l *)
-          (* method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l *)
-          method gmap    fa l   = GT.gmap   (unlogic) (GT.gmap   (llist) fa (this#gmap    fa)) l
-          method show    fa l =
-            GT.show(unlogic)
+          method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l
+          method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
+            GT.show(logic')
               (fun l -> "[" ^
                  let rec inner l =
                     GT.transform(llist)
                       (GT.lift fa)
-                      (GT.lift (GT.show(unlogic) inner))
+                      (GT.lift (GT.show(logic) inner))
                       (object inherit ['a,'a logic] @llist[show]
                          method c_Nil   _ _      = ""
-                         method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
+                         method c_Cons  i s x xs =
+                           x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                        end)
-                      ()
-                      l
+
+                    () l
                    in inner l ^ "]"
               )
               l
@@ -1182,8 +1205,7 @@ let rec refine : State.t -> ('a, 'c) fancy -> 'c
            (Obj.magic var)
          | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
         )
-    | Some i when recursive ->
-      (var : _ unlogic)
+    | Some i when recursive -> var
       (* invalid_arg "Free variable in refine." *)
 (*
         (match var with
@@ -1280,9 +1302,9 @@ module Uncurry =
     let succ k f (x,y) = k (f x) y
   end
 
-type 'a refiner = State.t Stream.t -> 'a unlogic Stream.t
+type 'a refiner = State.t Stream.t -> 'a logic Stream.t
 
-let refiner : ('a, 'b unlogic) fancy -> 'b refiner = fun x ans ->
+let refiner : ('a, 'b logic) fancy -> 'b refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
 
 module LogicAdder =
@@ -1314,6 +1336,3 @@ let run n goalish f =
   let adder, currier, app_num = n () in
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
-
-
-(* let (_:int) = call_fresh *)

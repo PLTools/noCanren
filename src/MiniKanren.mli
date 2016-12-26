@@ -75,17 +75,27 @@ type goal = State.t -> State.t Stream.t
 type ('a, 'reified) fancy;;
 
 (** A type of abstract logic values *)
-@type 'a unlogic = | Var of GT.int GT.list * GT.int * 'a GT.list
-                   | Value of 'a
-                    with show,gmap;;
+type 'a logic = | Var of GT.int GT.list * GT.int * 'a logic GT.list
+                | Value of 'a
+
+val logic :
+  (unit,
+   < show    : ('a -> string) -> 'a logic -> string;
+     (* html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+     eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
+     compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
+     foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
+     foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn; *)
+     gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
+>) GT.t
 
 val lift : 'a -> ('a, 'a) fancy
 
 (** Injecting values into logics *)
-val (!!) : ('a, 'r) fancy -> ('a, 'r unlogic) fancy
+val (!!) : ('a, 'r) fancy -> ('a, 'r logic) fancy
 
 (** A synonym for [(!!)] *)
-val inj : ('a, 'c) fancy -> ('a, 'c unlogic) fancy
+val inj : ('a, 'c) fancy -> ('a, 'c logic) fancy
 
 (** Exception to raise on a non-value case *)
 exception Not_a_value
@@ -336,7 +346,7 @@ module List :
     include module type of struct include List end
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
-    (* type 'a logic' = 'a logic *)
+    type 'a logic' = 'a logic
 
     (** Synonym for abstract list type *)
     type ('a, 'l) t = ('a, 'l) llist
@@ -358,29 +368,29 @@ module List :
 
     (** [of_list l] makes ground list from a regular one *)
     val of_list : ('a, 'c) fancy list ->
-           (('a, 'd) t as 'd, ('c, 'f) t unlogic as 'f) fancy
+           (('a, 'd) t as 'd, ('c, 'f) t logic as 'f) fancy
 
     (** [to_list l] make regular list from a ground one *)
     (* val to_list : 'a ground -> 'a list *)
 
     (** Logic lists (with the tails as logic lists) *)
-    (* type 'a logic  = ('a, 'a logic)  t logic' *)
+    type 'a logic  = ('a, 'a logic)  t logic'
 
     (** GT-compatible typeinfo for ['a logic] *)
     val logic :
       (unit,
-       < gmap    : ('a -> 'b) -> (('a, 'c) t unlogic as 'c) -> (('b, 'd) t unlogic as 'd);
+       < gmap    : ('a -> 'b) -> (('a, 'c) t logic' as 'c) -> (('b, 'd) t logic' as 'd);
          (* compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
          eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer; *)
-         show    : ((('e, 'e unlogic) t as 'e) -> string) -> 'e unlogic -> string >)
+         show    : ('a -> string) -> 'a logic -> GT.string  >)
       GT.t
 
     val cons :
              ('a, 'c) fancy ->
-             ('d, 'f) fancy -> (('a, 'd) t, ('c, 'f) t unlogic) fancy
+             ('d, 'f) fancy -> (('a, 'd) t, ('c, 'f) t logic') fancy
 (*
     (** List injection *)
     val inj : ('a -> 'b) -> 'a ground -> 'b logic
@@ -425,7 +435,7 @@ module List :
 
 (** [inj_list l] is a deforested synonym for injection *)
 val inj_list : 'a list ->
-           (('a, 'b) llist as 'b, ('a unlogic, 'd) llist unlogic as 'd) fancy;;
+           (('a, 'b) llist as 'b, ('a logic, 'd) llist logic as 'd) fancy;;
 
 (** [prj_list] is a deforested synonym for projection *)
 (* val prj_list : 'a logic List.logic -> 'a list *)
@@ -439,25 +449,25 @@ val inj_list : 'a list ->
 (** Infix synonym for [Cons] *)
 val (%) : ('a, 'c) fancy ->
           ('d, 'f) fancy ->
-          (('a, 'd) llist, ('c, 'f) llist unlogic) fancy
+          (('a, 'd) llist, ('c, 'f) llist logic) fancy
 
 (** [x %< y] is a synonym for [Cons (x, !(Cons (y, !Nil)))] *)
 val (%<) : ('a, 'c) fancy ->
            ('d, 'f) fancy ->
            (('a, ('d, ('g, 'h) llist) llist) llist,
-            ('c, ('f, ('j, 'k) llist unlogic) llist unlogic) llist unlogic) fancy
+            ('c, ('f, ('j, 'k) llist logic) llist logic) llist logic) fancy
 
 (** [!< x] is a synonym for [Cons (x, !Nil)] *)
 val (!<) : ('a, 'c) fancy ->
            (('a, ('d, 'e) llist) llist,
-            ('c, ('g, 'h) llist unlogic) llist unlogic) fancy
+            ('c, ('g, 'h) llist logic) llist logic) fancy
 
 (** [nil] is a synonym for [inj Nil] *)
-val nil : unit -> (('a, 'b) llist, ('d, 'e) llist unlogic) fancy
+val nil : unit -> (('a, 'b) llist, ('d, 'e) llist logic) fancy
 
 (** {2 miniKanren basic primitives} *)
 
-type ('a, 'b) fancier = ('a, 'b unlogic) fancy
+type ('a, 'b) fancier = ('a, 'b logic) fancy
 
 (** [call_fresh f] creates a fresh logical variable and passes it to the
     parameter *)
@@ -560,7 +570,7 @@ val run : (unit -> ('a -> State.t -> 'c) * ('d -> 'e -> 'f) * (('g -> 'h -> 'e) 
 
 (** Some type to refine a stream of states into the stream of answers (w.r.t. some known
     logic variable *)
-type 'a refiner = State.t Stream.t -> 'a unlogic Stream.t
+type 'a refiner = State.t Stream.t -> 'a logic Stream.t
 
 (** Successor function *)
 val succ :
@@ -622,7 +632,7 @@ val five :
 
 val q :
   unit ->
-  ((('a, 'r unlogic) fancy -> State.t -> 'c) -> State.t -> 'r refiner * 'c) *
+  ((('a, 'r logic) fancy -> State.t -> 'c) -> State.t -> 'r refiner * 'c) *
   (('d -> 'e) -> 'd -> 'e) * (('f -> ('f -> 'g) -> 'g) * ('h -> 'h))
 val qr :
   unit ->
