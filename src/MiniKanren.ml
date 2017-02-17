@@ -46,6 +46,7 @@ module Stream =
     let tl s = snd @@ retrieve ~n:1 s
 
     let rec mplus fs gs =
+<<<<<<< HEAD
       from_fun (fun () ->
          match fs with
          | Nil           -> gs
@@ -60,6 +61,19 @@ module Stream =
 	| Nil          -> nil
         | Lazy z       -> bind (Lazy.force z) f
      )
+=======
+      match fs with
+      | Nil           -> gs
+      | Cons (hd, tl) -> cons hd @@ from_fun (fun () -> mplus gs tl)
+      | Lazy z        -> from_fun (fun () -> mplus gs (Lazy.force z) )
+
+    let rec bind xs f =
+      match xs with
+      | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
+      | Nil          -> nil
+      | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f)
+
+>>>>>>> 781fb3d... Create thunks in `bind` and `mplus` more rarely
 
     let rec map f = function
     | Nil -> Nil
