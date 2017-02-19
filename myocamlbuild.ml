@@ -164,6 +164,7 @@ let () = dispatch (function
      init_js_of_ocaml ();
      (* miniKanren related stuff*)
      (* flag ["ocamldep"; "use_mkshow"] (S [A"-ppopt";A"-I";A"-ppopt";A"plugin"; A"-ppopt";A"mkshow.cmo" ]); *)
+     flag ["ocaml";"compile";"native";"keep_asm"] (S [A "-S"]);
      flag ["compile"; "use_pa_minikanren"]
        (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" ]);
 
