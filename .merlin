@@ -1,4 +1,5 @@
 PKG GT
+PKG ppx_deriving.show
 SRC src src_test
 SRC regression
 SRC plugin

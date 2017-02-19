@@ -6,13 +6,15 @@ true: short_paths
 <ppx/pa_minikanren*>: package(ppx_tools.metaquot)
 <ppx/ppx_repr*>: package(ppx_tools.metaquot)
 
-<regression/test5*.ml>: package(ppx_deriving.show), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
-<regression/test5*.*>: package(GT)
+<regression/Quine_decls.ml> or <regression/test5*.ml>: package(ppx_deriving.show), ppx(ppx/pa_minikanren_bin.native), ppx(ppx/ppx_repr_bin.native)
+<regression/test5*.*> : package(GT)
+<regression/test5*.native> : package(ppx_deriving.runtime)
+<regression/Quine_decls.*>: package(GT,ppx_deriving.show)
 
 # camlp5 syntax extension
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
 
-<src/MiniKanren.*>: package(GT)
+<src/MiniKanren.*>: package(GT,ppx_deriving.show)
 #<src/MiniKanren.mli>: hack_pr_o
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)

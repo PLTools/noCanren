@@ -48,7 +48,7 @@ clean: clean_tests
 ######################## Tests related stuff  ##########################
 REGRES_CASES :=
 CAMLP5_TESTS := #000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-PPX_TESTS := 501arith
+PPX_TESTS := 501arith 502thrines
 REGRES_CASES := $(CAMLP5_TESTS) $(PPX_TESTS)
 
 define TESTRULES

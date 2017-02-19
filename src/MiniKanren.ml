@@ -84,12 +84,6 @@ let is_valid_tag t =
     [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
      abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag])
 
-let is_valid_tag t =
-  let open Obj in
-  not (List.mem t
-    [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
-     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag])
-
 let rec wrap (x : Obj.t) =
   Obj.(
     let is_unboxed obj =
@@ -127,8 +121,8 @@ let generic_show x =
   in
   inner x; Buffer.contents b
 type 'a logic =
-    Var of GT.int * 'a logic GT.list
-  | Value of 'a
+    Var of int * 'a logic list
+  | Value of 'a [@@deriving show { with_path = false }]
 class type virtual ['a, 'ia, 'sa, 'inh, 'syn] logic_tt =
   object
     method c_Var :
@@ -1102,7 +1096,7 @@ module ManualReifiers =
 (* ***************************** a la relational StdLib here ***************  *)
 type ('a, 'l) llist =
     Nil
-  | Cons of 'a * 'l
+  | Cons of 'a * 'l  [@@deriving show { with_path = false }]
 class type virtual ['a, 'ia, 'sa, 'l, 'il, 'sl, 'inh, 'syn] llist_tt =
   object
     method c_Nil :
@@ -1717,8 +1711,9 @@ module List =
   struct
     include List
     type 'a logic' = 'a logic
+    let pp_logic' = pp_logic
     let logic' = logic
-    type ('a, 'l) t = ('a, 'l) llist
+    type ('a, 'l) t = ('a, 'l) llist  [@@deriving show { with_path = false }]
     module X =
       struct
         type ('a, 'b) t = ('a, 'b) llist
@@ -1730,8 +1725,10 @@ module List =
     module F = Fmap2 (X)
     let nil () = inj (F.distrib Nil)
     let cons x y = inj (F.distrib (Cons (x, y)))
-    type 'a ground = ('a, 'a ground) t
-    type 'a logic = ('a, 'a logic) t logic'
+    type 'a ground = ('a, 'a ground) t [@@deriving show { with_path = false }]
+
+
+    type 'a logic = ('a, 'a logic) t logic' [@@deriving show { with_path = false }]
     let rec reifier : _ -> var_checker -> (_ ground, 'b logic) fancy -> 'b logic =
       fun arg_r c x ->
         if c#isVar x then var_of_fancy_exn c x (reifier arg_r)

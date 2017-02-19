@@ -5,6 +5,7 @@
 *.swp
 _build
 /perf.data*
+/spacetime-*
 
 # ocamldoc related
 /style.css

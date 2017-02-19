@@ -55,6 +55,7 @@ type 'a logic =
     Var of int * 'a logic list
   | Value of 'a
 
+val pp_logic: (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a logic -> unit
 val bprintf_logic : Buffer.t -> ('a -> unit) -> 'a logic -> unit
 val show_logic : ('a -> string) -> 'a logic -> string
 val logic :
@@ -700,7 +701,9 @@ module List :
     type 'a logic' = 'a logic
     type ('a, 'l) t = ('a, 'l) llist
     type 'a ground = ('a, 'a ground) t
-    type 'a logic = ('a, 'a logic) t logic'
+    val pp_ground: (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a ground -> unit
+
+    type 'a logic = ('a, 'a logic) t logic' [@@deriving show ]
     val ground :
       (unit, < gmap : ('a -> 'b) -> 'a ground -> 'b ground;
       compare :
