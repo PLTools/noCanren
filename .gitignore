@@ -1,8 +1,10 @@
+/Makefile
 \ *undo-tree*
 *.native
 *.byte
 *.swp
 _build
+/perf.data*
 
 # ocamldoc related
 /style.css

@@ -156,10 +156,8 @@ let init_js_of_ocaml () =
 open Command;;
 
 let () = dispatch (function
- | Before_rules ->
-     ()
-
- | After_rules ->
+  | Before_rules -> ()
+  | After_rules ->
      ocaml_lib "src/MiniKanren";
      init_js_of_ocaml ();
      (* miniKanren related stuff*)
@@ -167,12 +165,13 @@ let () = dispatch (function
      flag ["compile"; "use_pa_minikanren"]
        (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo"]);
 
-     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]); 
+     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]);
      (* flag ["compile"; "link_minikanren"] *)
      (*   (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" *)
      (*      ; A"-ppopt";A"-L";A"-ppopt";A"plugin" *)
      (*      ] *)
      (*   ); *)
+     flag ["ocaml";"compile";"native";"keep_asm"] (S [A "-S"]);
 
      (* cppo-related stuff *)
      let cppo_rules ext =
