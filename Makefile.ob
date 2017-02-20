@@ -21,7 +21,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 all: minikanren_stuff plugin bundle 
 
 minikanren_stuff:
-	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
+	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS) regression/tester.cmo regression/tester.cmx
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
@@ -80,9 +80,10 @@ test: tests
 
 ######################## Installation related stuff ##########################
 INSTALL_TARGETS=META \
-	$(wildcard _build/regression/tester.cmi) \
-	$(wildcard _build/regression/tester.cmo) \
-	$(wildcard _build/regression/tester.cmx) \
+	_build/regression/tester.cmi \
+	_build/regression/tester.cmo \
+	_build/regression/tester.cmx \
+	_build/regression/tester.o \
 	$(wildcard _build/src/*.cmi) \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
