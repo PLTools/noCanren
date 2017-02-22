@@ -3,5 +3,6 @@
 *.byte
 *.swp
 _build
+/Makefile
 
 
