@@ -148,11 +148,12 @@ exception Occurs_check
 
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
-let is_valid_tag t =
-  let open Obj in
-  not (List.mem t
+let is_valid_tag x =
+  (* let open Obj in
+  not (List.mem x
     [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
-     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag])
+     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag]) *)
+  not (x>=246 && x<=251 && x<>255 && x<>1001 && x<>1002)
 
 let rec wrap (x : Obj.t) =
   Obj.(
