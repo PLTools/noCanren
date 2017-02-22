@@ -9,8 +9,7 @@ OB += -verbose 6
 endif
 
 CMA_TARGETS=src/MiniKanren.cma
-CMO_TARGETS=regression/tester.cmo
-#TESTER_TARGETS=regression/tester.cmo regression/tester.cmx
+TESTER_TARGETS=regression/tester.cmo regression/tester.cmx
 BYTE_TARGETS=$(CMA_TARGETS) $(CMO_TARGETS)
 NATIVE_TARGETS= $(CMA_TARGETS:.cma=.cmxa) $(CMO_TARGETS:.cmo=.cmx)
 TESTS_ENVIRONMENT=./test.sh
@@ -22,10 +21,11 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .DEFAULT_GOAL: all
 
-all: minikanren_stuff plugin bundle
+all: minikanren_stuff plugin
+	$(MAKE) bundle
 
 minikanren_stuff:
-	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
+	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS) $(TESTER_TARGETS)
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
