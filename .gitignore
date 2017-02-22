@@ -3,6 +3,7 @@
 *.byte
 *.swp
 _build
+/Makefile
 
 # ocamldoc related
 /style.css
