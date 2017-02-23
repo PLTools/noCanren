@@ -284,7 +284,24 @@ module Env :
             )
       else None
 
-    let is_var env v = None <> var env v
+    let var_exn {token=env_token;_} x =
+      (* There we detect if x is a logic variable and then that it belongs to current env *)
+      let t = !!! x in
+      if Obj.tag  t = var_tag  &&
+         Obj.size t = var_size &&
+         (let q = Obj.field t 0 in
+          (Obj.is_block q) && q == (!!!global_token)
+         )
+      then (let q = Obj.field t 1 in
+            if (Obj.is_int q) && q == (!!!env_token)
+            then let InnerVar (_,_,i,_) = !!! x in i
+            else failwith "You hacked everything and pass logic variables into wrong environment"
+            )
+      else raise Not_found
+
+    let is_var env v =
+      try let (_: int) = var_exn env v in true
+      with Not_found -> false
 
     (* Some tests for to check environment self-correctness *)
     (*
@@ -348,6 +365,7 @@ module Subst :
           try walk env (new_val @@ M.find i subst) subst
           with Not_found -> var
 
+(*
     let rec occurs env xi term subst =
       let y = walk env term subst in
       match Env.var env y with
@@ -364,6 +382,28 @@ module Subst :
               else occurs env xi (!!!(f i)) subst || inner (i+1)
             in
             inner 0
+*)
+
+    let rec occurs env xi term subst =
+      let y = walk env term subst in
+      match Env.var env y with
+      | Some yi -> xi = yi
+      | None ->
+        if Obj.(is_int @@ repr y) then false
+        else
+          let tag = Obj.(tag @@ repr y) in
+          if tag == Obj.string_tag then false
+          else if not (is_valid_tag tag) then invalid_arg (sprintf "Invalid value in occurs check (%d)" tag)
+          else (
+            (* valid boxed type *)
+            let s = Obj.(size @@ repr y) in
+            let rec inner i =
+              if i >= s then false
+              else occurs env xi Obj.(magic @@ field (repr y) i) subst || inner (i+1)
+            in
+            inner 0
+            )
+
 
     let unify env x y subst =
       let extend xi x term delta subst =
@@ -382,26 +422,37 @@ module Subst :
             | Some xi, _       -> extend xi x y delta subst
             | _      , Some yi -> extend yi y x delta subst
             | _ ->
-                let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
-                (match wx, wy with
-                 | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
-                 | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
-                    if tx = ty && sx = sy
-                    then
-                      let rec inner i (delta, subst) =
-                      match subst with
-                        | None -> delta, None
-                        | Some _ ->
-                          if i < sx
-                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
-                          else delta, subst
-                      in
-                      inner 0 (delta, s)
-                    else delta, None
-                 | Invalid n, _
-                 | _, Invalid n -> invalid_arg (sprintf "Invalid values for unification (%d)" n)
-                 | _ -> delta, None
-                )
+              let is_int1 = Obj.(is_int @@ repr x) in
+              let is_int2 = Obj.(is_int @@ repr y) in
+
+              if is_int1 && is_int2 then
+                (if x == y then (delta,s) else (delta,None) )
+              else if not is_int1 && not is_int2 then begin
+                (* two blocks *)
+                let t1 = Obj.(tag @@ repr x) in
+                let t2 = Obj.(tag @@ repr y) in
+                if t1 <> t2 then (delta,None)
+                else if t1 == Obj.string_tag then
+                  (* we compare strings as integers *)
+                  (if x == y then (delta,s) else (delta,None) )
+                else
+                  let s1 = Obj.(size @@ repr x) in
+                  let s2 = Obj.(size @@ repr y) in
+                  if s1 <> s2 then (delta,None)
+                  else
+                    let rec inner i (delta, subst) =
+                    match subst with
+                      | None -> delta, None
+                      | Some _ ->
+                        if i < s1 (* or s2 because they are equal *)
+                        then inner (i+1) (unify
+                                            Obj.(magic @@ field (repr x) i)
+                                            Obj.(magic @@ field (repr y) i)
+                                            (delta, subst))
+                        else delta, subst
+                    in
+                    inner 0 (delta, s)
+              end else (delta,None)
       in
       unify x y ([], subst)
 
