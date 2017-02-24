@@ -135,7 +135,7 @@ val conder : goal list -> goal
 val condel : goal list -> goal
 
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a
-    non-empty list of goals *)
+    non-empty list of goals; evaluation from left to right *)
 val (?&) : goal list -> goal
 
 (** {2 Some predefined goals} *)
