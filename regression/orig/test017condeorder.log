@@ -1,0 +1,5 @@
+fun q -> (&&&) ((===) q (inj_int 1)) (conde [f1; f2; f3]), all answers {
+f3
+f2
+f1
+}

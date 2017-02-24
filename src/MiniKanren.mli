@@ -126,11 +126,17 @@ val disj : goal -> goal -> goal
 val (|||) : goal -> goal -> goal
 
 (** [?| [s1; s2; ...; sk]] calculates [s1 ||| s2 ||| ... ||| sk] for a
-    non-empty list of goals *)
+    non-empty list of goals. Calculations are performed from right to left. *)
 val (?|) : goal list -> goal
 
 (** [conde] is a synonym for [?|] *)
 val conde : goal list -> goal
+
+(** [conder] is a synonym for [?|] and [conde] *)
+val conder : goal list -> goal
+
+(** [condel] is the same as (?|) but calculation from left to right *)
+val condel : goal list -> goal
 
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a
     non-empty list of goals *)
