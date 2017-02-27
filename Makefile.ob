@@ -29,7 +29,7 @@ minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS) regression/tester.cmo regression/tester.cmx
 =======
 all: minikanren_stuff plugin
-	$(MAKE) bundle
+	$(MAKE) -f Makefile.ob bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS) $(TESTER_TARGETS)
