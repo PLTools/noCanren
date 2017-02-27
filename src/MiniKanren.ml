@@ -259,7 +259,7 @@ module Env :
     let fresh e =
       let v = InnerVar (global_token, e.token, e.next, []) in
       e.next <- 1+e.next;
-      (* printf "new fresh var with index=%d\n" e.next; *)
+      printf "ocanren: new fresh var with index=%d\n" e.next;
       (!!!v, e)
 
     let var_tag, var_size =
