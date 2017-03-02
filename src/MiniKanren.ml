@@ -47,15 +47,39 @@ module Stream =
     let hd s = List.hd @@ take ~n:1 s
     let tl s = snd @@ retrieve ~n:1 s
 
+(*
+let rec mplus fs gs =
+  from_fun (fun () ->
+    match fs with
+    | Nil           -> gs
+    | Cons (hd, tl) -> cons hd @@ mplus gs tl
+    | Lazy z        -> mplus gs (Lazy.force z)
+  )
+
+let rec bind xs f =
+  from_fun (fun () ->
+    match xs with
+    | Cons (x, xs) -> mplus (f x) (bind xs f)
+    | Nil          -> nil
+    | Lazy z       -> bind (Lazy.force z) f
+  )
+*)
     let rec mplus fs gs =
       match fs with
       | Nil           -> gs
       | Cons (hd, tl) -> cons hd @@ from_fun (fun () -> mplus gs tl)
       | Lazy z        -> from_fun (fun () -> mplus gs (Lazy.force z) )
+      (*
+      | Lazy z        -> mplus (Lazy.force z) gs
+      *)
 
     let rec bind xs f =
       match xs with
-      | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
+      | Cons (x, Nil) -> from_fun (fun () -> f x)
+      | Cons (x, xs)  -> from_fun (fun () -> mplus (f x) (bind xs f))
+      (*
+      | Cons (x, xs) -> mplus (f x) @@ from_fun (fun () ->  (bind xs f))
+      *)
       | Nil          -> nil
       | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f)
 
@@ -255,12 +279,12 @@ module Env :
     let last_token : token_env ref = ref 0
     let empty () =
       incr last_token;
-      { token= !last_token; next=10 }
+      { token= !last_token; next=11 }
 
     let fresh e =
       let v = InnerVar (global_token, e.token, e.next, []) in
+      (* printf "\tnew fresh var with index=%d\n" e.next; *)
       e.next <- 1+e.next;
-      (* printf "new fresh var with index=%d\n" e.next; *)
       (!!!v, e)
 
     let var_tag, var_size =
@@ -469,6 +493,12 @@ module State =
 type goal = State.t -> State.t Stream.t
 
 let call_fresh f (env, subst, constr)  =
+  (* printf "          "; *)
+  let x, env' = Env.fresh env in
+  f x (env', subst, constr)
+
+let call_fresh_named name f (env, subst, constr)  =
+  (* printf "name = '%s'" name; *)
   let x, env' = Env.fresh env in
   f x (env', subst, constr)
 
@@ -476,7 +506,7 @@ exception Disequality_violated
 
 let (===) (x: _ injected) y (env, subst, constr) =
   (* we should always unify two injected types *)
-
+  (* printf "  unify '%s' '%s'\n%!" (generic_show x) (generic_show y); *)
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -540,11 +570,16 @@ let (=/=) x y ((env, subst, constr) as st) =
         )
   with Occurs_check -> Stream.cons st Stream.nil
 
-let conj f g st = Stream.bind (f st) g
+let conj f g st =
+  match f st with
+  | Stream.Nil -> Stream.Nil
+  | Stream.Cons (x, Stream.Nil) -> g x
+  | else_ -> Stream.bind else_ g
 
 let (&&&) = conj
 
-let disj f g st = Stream.mplus (f st) (g st)
+let disj f g st =
+  Stream.mplus (f st) @@ Stream.from_fun (fun () -> g st)
 
 let (|||) = disj
 
@@ -559,9 +594,9 @@ let rec (?&) = function
 let conde = (?|)
 let conder = conde
 
-let rec condel = function
-| [h]  -> h
-| h::t -> (condel t) ||| h
+let rec condel  = function
+  | [h]  -> h
+  | h::t -> (condel t) ||| h
 
 
 module Fresh =

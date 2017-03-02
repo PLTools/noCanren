@@ -103,6 +103,9 @@ val (!!) : 'a -> ('a, 'a logic) injected
     parameter *)
 val call_fresh : (('a, 'b) injected -> State.t -> 'r) -> State.t -> 'r
 
+val call_fresh_named : string -> (('a, 'b) injected -> State.t -> 'r) -> State.t -> 'r
+
+
 (** [x === y] creates a goal, which performs a unifications of [x] and [y] *)
 val (===) : ('a, 'b) injected -> ('a, 'b) injected -> goal
 
