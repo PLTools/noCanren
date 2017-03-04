@@ -1,17 +1,17 @@
 (*
  * MiniKanren: miniKanren implementation.
  * Copyright (C) 2015-2016
- * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, 
+ * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin,
  * St.Petersburg State University, JetBrains Research
- * 
+ *
  * This software is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
  * License version 2, as published by the Free Software Foundation.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * See the GNU Library General Public License version 2 for more details
  * (enclosed in the file COPYING).
  *)
@@ -38,7 +38,7 @@ module Stream =
       else match s with
            | Nil          -> [], s
            | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
-	   | Lazy  z      -> retrieve ~n:n (Lazy.force z)            
+	   | Lazy  z      -> retrieve ~n:n (Lazy.force z)
 
     let take ?(n=(-1)) s = fst @@ retrieve ~n:n s
 
@@ -46,34 +46,20 @@ module Stream =
     let tl s = snd @@ retrieve ~n:1 s
 
     let rec mplus fs gs =
-<<<<<<< HEAD
       from_fun (fun () ->
-         match fs with
-         | Nil           -> gs
-         | Cons (hd, tl) -> cons hd (mplus gs tl) 
-	 | Lazy z        -> mplus gs (Lazy.force z)
+        match fs with
+        | Nil           -> gs
+        | Cons (hd, tl) -> cons hd (mplus gs tl)
+        | Lazy z        -> mplus gs (Lazy.force z)
       )
 
     let rec bind xs f =
       from_fun (fun () ->
         match xs with
         | Cons (x, xs) -> mplus (f x) (bind xs f)
-	| Nil          -> nil
+        | Nil          -> nil
         | Lazy z       -> bind (Lazy.force z) f
-     )
-=======
-      match fs with
-      | Nil           -> gs
-      | Cons (hd, tl) -> cons hd @@ from_fun (fun () -> mplus gs tl)
-      | Lazy z        -> from_fun (fun () -> mplus gs (Lazy.force z) )
-
-    let rec bind xs f =
-      match xs with
-      | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
-      | Nil          -> nil
-      | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f)
-
->>>>>>> 781fb3d... Create thunks in `bind` and `mplus` more rarely
+      )
 
     let rec map f = function
     | Nil -> Nil
@@ -99,31 +85,31 @@ let (!!!) = Obj.magic;;
 
 @type 'a logic = Var of GT.int GT.list * GT.int * 'a logic GT.list | Value of 'a with show, html, eq, compare, foldl, foldr, gmap
 
-let logic = {logic with 
-  gcata = (); 
-  plugins = 
-    object 
+let logic = {logic with
+  gcata = ();
+  plugins =
+    object
       method html    = logic.plugins#html
       method eq      = logic.plugins#eq
       method compare = logic.plugins#compare
       method foldr   = logic.plugins#foldr
       method foldl   = logic.plugins#foldl
-      method gmap    = logic.plugins#gmap    
-      method show fa x = 
-        GT.transform(logic) 
-           (GT.lift fa) 
-           (object inherit ['a] @logic[show]              
-              method c_Var _ s _ i cs = 
+      method gmap    = logic.plugins#gmap
+      method show fa x =
+        GT.transform(logic)
+           (GT.lift fa)
+           (object inherit ['a] @logic[show]
+              method c_Var _ s _ i cs =
                 let c =
-		  match cs with 
+		  match cs with
 		  | [] -> ""
                   | _  -> Printf.sprintf " %s" (GT.show(GT.list) (fun l -> "=/= " ^ s.GT.f () l) cs)
 		in
                 Printf.sprintf "_.%d%s" i c
-                
+
               method c_Value _ _ x = x.GT.fx ()
-            end) 
-           () 
+            end)
+           ()
            x
     end
 };;
@@ -134,7 +120,7 @@ let destruct = function
 | Var (_, i, c) -> `Var (i, c)
 | Value x       -> `Value x
 
-exception Not_a_value 
+exception Not_a_value
 
 let (!!) x = Value x
 let inj = (!!)
@@ -148,16 +134,8 @@ exception Occurs_check
 
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
-let is_valid_tag x =
-  (* let open Obj in
-  not (List.mem x
-    [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
-     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag]) *)
-  not (x>=246 && x<=251 && x<>255 && x<>1001 && x<>1002)
-
 let rec wrap (x : Obj.t) =
   Obj.(
-<<<<<<< HEAD
     let is_valid_tag =
       List.fold_left
       (fun f t tag -> tag <> t && f tag)
@@ -167,8 +145,6 @@ let rec wrap (x : Obj.t) =
        final_tag  ; unaligned_tag; out_of_heap_tag
       ]
     in
-=======
->>>>>>> efc28b0... Speeding up  wrap funcion
     let is_unboxed obj =
       is_int obj ||
       (fun t -> t = string_tag || t = double_tag) (tag obj)
@@ -210,9 +186,9 @@ module Env :
     val empty  : unit -> t
     val fresh  : t -> 'a logic * t
     val var    : t -> 'a logic -> int option
-  end = 
+  end =
   struct
-    type t = GT.int GT.list * int 
+    type t = GT.int GT.list * int
 
     let empty () = ([0], 10)
 
@@ -242,8 +218,8 @@ module Subst :
 
     val empty   : t
 
-    val of_list : (int * Obj.t * Obj.t) list -> t 
-    val split   : t -> Obj.t list * Obj.t list 
+    val of_list : (int * Obj.t * Obj.t) list -> t
+    val split   : t -> Obj.t list * Obj.t list
     val walk    : Env.t -> 'a logic -> t -> 'a logic
     val unify   : Env.t -> 'a logic -> 'a logic -> t option -> (int * Obj.t * Obj.t) list * t option
     val show    : t -> string
@@ -259,7 +235,7 @@ module Subst :
 
     let of_list l = List.fold_left (fun s (i, v, t) -> M.add i (v, t) s) empty l
 
-    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], []) 
+    let split s = M.fold (fun _ (x, t) (xs, ts) -> x::xs, t::ts) s ([], [])
 
     let rec walk env var subst =
       match Env.var env var with
@@ -271,7 +247,7 @@ module Subst :
       let y = walk env term subst in
       match Env.var env y with
       | Some yi -> xi = yi
-      | None -> 
+      | None ->
          let wy = wrap (Obj.repr y) in
 	 match wy with
 	 | Unboxed _ -> false
@@ -284,7 +260,7 @@ module Subst :
 	    inner 0
 
     let unify env x y subst =
-      let rec unify x y (delta, subst) = 
+      let rec unify x y (delta, subst) =
         let extend xi x term delta subst =
           if occurs env xi term subst then raise Occurs_check
           else (xi, !!!x, !!!term)::delta, Some (!!! (M.add xi (!!!x, term) (!!! subst)))
@@ -294,9 +270,9 @@ module Subst :
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst 
-            | Some xi, _       -> extend xi x y delta subst 
-	    | _      , Some yi -> extend yi y x delta subst 
+            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
+            | Some xi, _       -> extend xi x y delta subst
+	    | _      , Some yi -> extend yi y x delta subst
 	    | _ ->
 	        let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -304,7 +280,7 @@ module Subst :
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
 	  	    then
-		      let rec inner i (delta, subst) = 
+		      let rec inner i (delta, subst) =
 			match subst with
                         | None -> delta, None
                         | Some _ ->
@@ -324,7 +300,7 @@ module Subst :
   end
 
 module State =
-  struct  
+  struct
     type t = Env.t * Subst.t * Subst.t list
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
@@ -344,11 +320,11 @@ let (===) x y (env, subst, constr) =
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
     | None -> Stream.nil
-    | Some s -> 
+    | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
           let constr' =
-            List.fold_left (fun css' cs -> 
+            List.fold_left (fun css' cs ->
               let x, t  = Subst.split cs in
 	      try
                 let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
@@ -359,7 +335,7 @@ let (===) x y (env, subst, constr) =
 	            | [] -> raise Disequality_violated
 	            | _  -> (Subst.of_list p)::css'
 	      with Occurs_check -> css'
-            ) 
+            )
             []
             constr
 	  in
@@ -372,8 +348,8 @@ let (=/=) x y ((env, subst, constr) as st) =
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
     let prefix = List.split (List.map (fun (_, x, t) -> (x, t)) prefix) in
-    let subsumes subst (vs, ts) = 
-      try 
+    let subsumes subst (vs, ts) =
+      try
         match Subst.unify env !!!vs !!!ts (Some subst) with
 	| [], Some _ -> true
         | _ -> false
@@ -381,7 +357,7 @@ let (=/=) x y ((env, subst, constr) as st) =
     in
     let rec traverse = function
     | [] -> [subst]
-    | (c::cs) as ccs -> 
+    | (c::cs) as ccs ->
 	if subsumes subst (Subst.split c)
 	then ccs
         else if subsumes c prefix
@@ -390,11 +366,11 @@ let (=/=) x y ((env, subst, constr) as st) =
     in
     traverse constr
   in
-  try 
+  try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     match subst' with
     | None -> Stream.cons st Stream.nil
-    | Some s -> 
+    | Some s ->
         (match prefix with
         | [] -> Stream.nil
         | _  -> Stream.cons (env, subst, normalize_store prefix constr) Stream.nil
@@ -407,7 +383,7 @@ let (&&&) = conj
 
 let disj f g st = Stream.mplus (f st) (g st)
 
-let (|||) = disj 
+let (|||) = disj
 
 let rec (?|) = function
 | [h]  -> h
@@ -423,14 +399,14 @@ module Fresh =
   struct
 
     let succ prev f = call_fresh (fun x -> prev (f x))
- 
-    let zero  f = f 
+
+    let zero  f = f
     let one   f = succ zero f
     let two   f = succ one f
     let three f = succ two f
     let four  f = succ three f
     let five  f = succ four f
- 
+
     let q     = one
     let qr    = two
     let qrs   = three
@@ -441,7 +417,7 @@ module Fresh =
 
 let success st = Stream.cons st Stream.nil
 let failure _  = Stream.nil
- 
+
 let eqo x y t =
   conde [
     (x === y) &&& (t === !!true);
@@ -460,15 +436,15 @@ let neqo x y t =
 module Bool =
   struct
 
-    type 'a logic' = 'a logic 
+    type 'a logic' = 'a logic
     let logic' = logic
 
     type ground = bool
 
     let ground = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    n   = GT.html   (GT.bool) n
           method eq      n m = GT.eq     (GT.bool) n m
           method compare n m = GT.compare(GT.bool) n m
@@ -483,8 +459,8 @@ module Bool =
 
     let logic = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    n   = GT.html   (logic') (GT.html   (ground)) n
           method eq      n m = GT.eq     (logic') (GT.eq     (ground)) n m
           method compare n m = GT.compare(logic') (GT.compare(ground)) n m
@@ -509,14 +485,14 @@ module Bool =
 
     let noto a = noto' a !true
 
-    let oro a b c = 
-      Fresh.two (fun aa bb ->      
+    let oro a b c =
+      Fresh.two (fun aa bb ->
         ((a  |^ a) aa) &&&
         ((b  |^ b) bb) &&&
         ((aa |^ bb) c)
       )
 
-    let ando a b c = 
+    let ando a b c =
       Fresh.one (fun ab ->
         ((a  |^ b) ab) &&&
         ((ab |^ ab) c)
@@ -539,8 +515,8 @@ module Nat =
 
     let ground = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    n = GT.html   (lnat) this#html    n
           method eq      n = GT.eq     (lnat) this#eq      n
           method compare n = GT.compare(lnat) this#compare n
@@ -555,8 +531,8 @@ module Nat =
 
     let logic = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    n   = GT.html   (logic') (GT.html   (lnat) this#html   ) n
           method eq      n m = GT.eq     (logic') (GT.eq     (lnat) this#eq     ) n m
           method compare n m = GT.compare(logic') (GT.compare(lnat) this#compare) n m
@@ -571,7 +547,7 @@ module Nat =
     let rec to_int   = function O -> 0 | S n -> 1 + to_int n
 
     let (!) = (!!)
-    
+
     let rec inj n = ! (GT.gmap(lnat) inj n)
 
     let prj_k k n =
@@ -610,11 +586,11 @@ module Nat =
       conde [
         (x === !O) &&& (b === !true);
         (x =/= !O) &&& (y === !O) &&& (b === !false);
-        Fresh.two (fun x' y' ->	
+        Fresh.two (fun x' y' ->
           conde [
-            (x === !(S x')) &&& (y === !(S y')) &&& (leo x' y' b)           
+            (x === !(S x')) &&& (y === !(S y')) &&& (leo x' y' b)
           ]
-        )        
+        )
       ]
 
     let geo x y b = leo y x b
@@ -627,14 +603,14 @@ module Nat =
 
     let (>) x y = gto x y !true
     let (<) x y = lto x y !true
-    
+
   end
 
-let rec inj_nat n = 
+let rec inj_nat n =
   if n <= 0 then inj O
   else inj (S (inj_nat @@ n-1))
 
-let rec prj_nat n = 
+let rec prj_nat n =
   match prj n with
   | O   -> 0
   | S n -> 1 + prj_nat n
@@ -663,7 +639,7 @@ module List =
     let nil = inj Nil
 
     let rec inj fa l = !! (GT.gmap(llist) fa (inj fa) l)
-    
+
     let prj_k fa k l =
       let rec inner l =
         GT.gmap(llist) fa inner (prj_k k l)
@@ -674,8 +650,8 @@ module List =
 
     let ground = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    fa l = GT.html   (llist) fa (this#html    fa) l
           method eq      fa l = GT.eq     (llist) fa (this#eq      fa) l
           method compare fa l = GT.compare(llist) fa (this#compare fa) l
@@ -684,46 +660,46 @@ module List =
           method gmap    fa l = GT.gmap   (llist) fa (this#gmap    fa) l
           method show    fa l = "[" ^
 	    let rec inner l =
-              (GT.transform(llist) 
+              (GT.transform(llist)
                  (GT.lift fa)
                  (GT.lift inner)
                  (object inherit ['a,'a ground] @llist[show]
                     method c_Nil   _ _      = ""
                     method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                  end) 
-                 () 
+                  end)
+                 ()
                  l
-              ) 
+              )
             in inner l ^ "]"
         end
     }
 
     let logic = {
       GT.gcata = ();
-      GT.plugins = 
-        object(this) 
+      GT.plugins =
+        object(this)
           method html    fa l   = GT.html   (logic') (GT.html   (llist) fa (this#html    fa)) l
           method eq      fa a b = GT.eq     (logic') (GT.eq     (llist) fa (this#eq      fa)) a b
           method compare fa a b = GT.compare(logic') (GT.compare(llist) fa (this#compare fa)) a b
-          method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l 
-          method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l 
-          method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l 
-          method show    fa l = 
+          method foldr   fa a l = GT.foldr  (logic') (GT.foldr  (llist) fa (this#foldr   fa)) a l
+          method foldl   fa a l = GT.foldl  (logic') (GT.foldl  (llist) fa (this#foldl   fa)) a l
+          method gmap    fa l   = GT.gmap   (logic') (GT.gmap   (llist) fa (this#gmap    fa)) l
+          method show    fa l =
             GT.show(logic')
-              (fun l -> "[" ^            
+              (fun l -> "[" ^
                  let rec inner l =
-                   (GT.transform(llist) 
+                   (GT.transform(llist)
                       (GT.lift fa)
                       (GT.lift (GT.show(logic) inner))
                       (object inherit ['a,'a logic] @llist[show]
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
-                       end) 
-                      () 
+                       end)
+                      ()
                       l
-                   ) 
+                   )
 		 in inner l ^ "]"
-              ) 
+              )
               l
         end
     }
@@ -786,23 +762,23 @@ module List =
       conde [
         (l === !Nil) &&& (n === !O);
         Fresh.three (fun x xs n' ->
-          (l === x % xs)  &&& 
+          (l === x % xs)  &&&
           (n === !(S n')) &&&
           (lengtho xs n')
         )
       ]
-	
+
     let rec appendo a b ab =
       conde [
         (a === !Nil) &&& (b === ab);
         Fresh.three (fun h t ab' ->
   	  (a === h%t) &&&
 	  (h%ab' === ab) &&&
-	  (appendo t b ab') 
-        )   
+	  (appendo t b ab')
+        )
       ]
-  
-    let rec reverso a b = 
+
+    let rec reverso a b =
       conde [
         (a === !Nil) &&& (b === !Nil);
         Fresh.three (fun h t a' ->
@@ -845,7 +821,7 @@ let rec prj_nat_list l =
   | Nil -> []
   | Cons (x, xs) -> prj_nat x :: prj_nat_list xs
 
-let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->  
+let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->
   let rec walk' recursive env var subst =
     let var = Subst.walk env var subst in
     match Env.var env var with
@@ -865,16 +841,16 @@ let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->
            !!!var
          | Invalid n -> invalid_arg (Printf.sprintf "Invalid value for reconstruction (%d)" n)
         )
-    | Some i when recursive ->        
+    | Some i when recursive ->
         (match var with
-         | Var (a, i, _) -> 
-            let cs = 
-	      List.fold_left 
-		(fun acc s -> 
+         | Var (a, i, _) ->
+            let cs =
+	      List.fold_left
+		(fun acc s ->
 		   match walk' false env (!!!var) s with
 		   | Var (_, j, _) when i = j -> acc
 		   | t -> (refine st t) :: acc
-		)	
+		)
 		[]
 		c
 	    in
@@ -884,23 +860,23 @@ let rec refine : State.t -> 'a logic -> 'a logic = fun ((e, s, c) as st) x ->
   in
   walk' true e (!!!x) s
 
-module ExtractDeepest = 
+module ExtractDeepest =
   struct
-    let ext2 x = x 
+    let ext2 x = x
 
     let succ prev (a, z) =
       let foo, base = prev z in
       ((a, foo), base)
   end
 
-module ApplyTuple = 
+module ApplyTuple =
   struct
     let one arg x = x arg
 
     let succ prev = fun arg (x, y) -> (x arg, prev arg y)
   end
 
-module ApplyLatest = 
+module ApplyLatest =
   struct
     let two = (ApplyTuple.one, ExtractDeepest.ext2)
 
@@ -908,10 +884,10 @@ module ApplyLatest =
       let x, base = extf tup in
       appf base x
 
-    let succ (appf, extf) = (ApplyTuple.succ appf, ExtractDeepest.succ extf) 
+    let succ (appf, extf) = (ApplyTuple.succ appf, ExtractDeepest.succ extf)
   end
 
-module Uncurry = 
+module Uncurry =
   struct
     let succ k f (x,y) = k (f x) y
   end
@@ -921,17 +897,17 @@ type 'a refiner = State.t Stream.t -> 'a logic Stream.t
 let refiner : 'a logic -> 'a refiner = fun x ans ->
   Stream.map (fun st -> refine st x) ans
 
-module LogicAdder = 
+module LogicAdder =
   struct
     let zero f = f
- 
+
     let succ (prev: 'a -> State.t -> 'b) (f: 'c logic -> 'a) : State.t -> 'c refiner * 'b =
       call_fresh (fun logic st -> (refiner logic, prev (f logic) st))
   end
 
 let one () = (fun x -> LogicAdder.(succ zero) x), (@@), ApplyLatest.two
 
-let succ n () = 
+let succ n () =
   let adder, currier, app = n () in
   (LogicAdder.succ adder, Uncurry.succ currier, ApplyLatest.succ app)
 
@@ -950,4 +926,3 @@ let run n goalish f =
   let adder, currier, app_num = n () in
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
-
