@@ -1,6 +1,4 @@
-type token_env = int [@@deriving gt {show; gmap} ]
-
-let () = print_endline @@ GT.(show token_env) 5
+@type token_env = int with show,gmap
 
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list

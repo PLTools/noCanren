@@ -1,8 +1,12 @@
 true: debug, rectypes, color(always), bin_annot, keep_asm
 true: short_paths
 
-<ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std)
+#<ppx/*>: package(compiler-libs.common,ppx_deriving,ppx_deriving.runtime,ppx_tools.metaquot)
 <ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
+<ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std),open(Ast_convenience_405),open(Ppx_tools_405),open(Ast_405)
+#<ppx/*.cma>: package(ppx_deriving.api,ppx_deriving.runtime)
+
+<regression/test100ppxgt*>: package(GT)
 
 <samples>: not_hygienic
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)

@@ -33,7 +33,6 @@ open Location
 open Asttypes
 open Parsetree
 open Ast_helper
-open Ast_convenience
 open Ppx_deriving
 
 let deriver = "gt"
@@ -294,10 +293,43 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     make_params_lambda_fa right
   in
 
+  let gmap_decls root_type =
+    let show_typename_t = "gmap_" ^ typename_t in
+    match root_type.ptype_kind with
+    | Ptype_abstract -> begin
+        match root_type.ptype_manifest with
+        | Some [%type: int] ->
+          [ (* [%stri class [%p Pat.var "asdf" ] = object inherit GT.show_int_t end ] *)
+            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc show_typename_t) @@
+                           Cl.structure (Cstr.mk (Pat.any ())
+                            [ Cf.inherit_ Fresh (Cl.constr (lid "GT.gmap_int_t") []) None
+                            ])
+                       ]
+          ]
+
+
+        | _ -> raise_errorf "not implemented?"
+      end
+    | Ptype_variant constrs -> raise_errorf  "not implemented?"
+    | _ -> raise_errorf "not implemented?"
+  in
+
   let show_decls root_type =
     let show_typename_t = "show_" ^ typename_t in
 
     match root_type.ptype_kind with
+    | Ptype_abstract -> begin
+        match root_type.ptype_manifest with
+        | Some [%type: int] ->
+          [ (* [%stri class [%p Pat.var "asdf" ] = object inherit GT.show_int_t end ] *)
+            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc show_typename_t) @@
+                          Cl.structure (Cstr.mk (Pat.any ())
+                            [ Cf.inherit_ Fresh (Cl.constr (lid "GT.show_int_t") []) None
+                            ])
+                       ]
+          ]
+        | _ -> raise_errorf "not implemented?"
+      end
     | Ptype_variant constrs ->
         let inherit_field =
           let prefix = List.concat @@ List.map
@@ -319,7 +351,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
               let expr_of_arg reprname typ =
                 let rec helper = function
                 | {ptyp_desc=Ptyp_var _alpha; _} ->
-                   [%expr [%e Exp.(send [%expr subj.GT.t] _alpha) ] ]
+                   [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
                 | [%type: int]
                 | [%type: GT.int] ->
                    [%expr GT.transform GT.int (new GT.show_int_t) ]
@@ -338,7 +370,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                         (fun acc (tparam,_) ->
                            match tparam with
                            | {ptyp_desc=Ptyp_var alpha; _} ->
-                               [%expr [%e acc] [%e Exp.send [%expr subj.GT.t] alpha ] ]
+                               [%expr [%e acc] [%e Exp.send [%expr subj.GT.t] (mknoloc alpha) ] ]
                            | _ -> assert false
                         )
                         [%expr GT.transform [%e Exp.ident@@lid argname]]
@@ -431,6 +463,11 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   in
 
   match root_type.ptype_kind with
+  | Ptype_abstract -> begin
+      match root_type.ptype_manifest with
+      | Some [%type: int] -> [ ] @ show_decls root_type @ gmap_decls root_type
+      | _ -> raise_errorf "not implemented?"
+    end
   | Ptype_variant constrs ->
       (* let _fields = *)
       (*   constrs |> List.map (fun { pcd_name = { txt = name' }; pcd_args } -> *)
@@ -492,7 +529,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         let open Typ in
         match t.ptyp_desc with
         | Ptyp_var n ->
-            (n, [], [%type: [%t var@@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]] )
+            (mknoloc n, [], [%type: [%t var@@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]] )
         | _ ->
             raise_errorf "arr_of_param: not all type params are supported" deriver
       in
@@ -540,7 +577,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           let args2 = [Typ.var "inh"] @ args2 in
           let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
 
-          (Ctf.method_ constr_name Public Concrete ts,
+          (Ctf.method_ (mknoloc constr_name) Public Concrete ts,
            Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts) )
         ) constrs
         in
@@ -551,7 +588,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                     let init =
                       [%type: 'inh -> [%t using_type] -> 'syn ]
                     in
-                    Ctf.method_ ("t_" ^ typename)  Public Concrete
+                    Ctf.method_ (mknoloc ("t_" ^ typename))  Public Concrete
                       (List.fold_right (fun (_,_,x) acc -> Typ.arrow Nolabel x acc) ts init)
                   ]
         in
@@ -612,7 +649,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
             in
 
             Exp.case (Pat.construct (lid name') args_tuple) @@
-            Exp.(apply (send (ident @@ lid "trans") ("c_"^name') )
+            Exp.(apply (send (ident @@ lid "trans") (mknoloc ("c_"^name')) )
                  @@ List.map (fun x -> (Nolabel,x))
                    ([ [%expr inh]; [%expr (GT.make self subj tpo)] ] @ app_args)
                 )
@@ -665,7 +702,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       let ans = if not gt_show then ans else ans @ (show_decls root_type) in
       ans @ [footer]
 
-  | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error" deriver
+  | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
   (*
   let prettyprinter =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
