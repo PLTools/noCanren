@@ -1,6 +1,9 @@
 true: debug, rectypes, color(always), bin_annot
 true: short_paths
 
+<ppx/*>: package(compiler-libs.common,ppx_deriving,ppx_deriving.runtime,ppx_tools.metaquot)
+<ppx/*.native>: package(ppx_deriving.api,ppx_deriving.runtime)
+
 <samples>: not_hygienic
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
 
