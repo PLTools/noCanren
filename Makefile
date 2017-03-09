@@ -24,7 +24,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 all: minikanren_stuff plugin bundle
 
-minikanren_stuff:
+minikanren_stuff: ppx
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
@@ -34,6 +34,9 @@ ppx:
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
+
+ppx:
+	$(OB) -Is src ppx/ppx_deriving_gt.native
 
 celan: clean
 
