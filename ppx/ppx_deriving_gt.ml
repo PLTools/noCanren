@@ -231,7 +231,7 @@ let default_params root_type =
 
 
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
-  let { gt_show; _ } = parse_options options in
+  let { gt_show; gt_gmap } = parse_options options in
   let _quoter = Ppx_deriving.create_quoter () in
   let path = Ppx_deriving.path_of_type_decl ~path root_type in
 
@@ -293,14 +293,14 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     make_params_lambda_fa right
   in
 
+  let gmap_typename_t = "gmap_" ^ typename_t in
   let gmap_decls root_type =
-    let show_typename_t = "gmap_" ^ typename_t in
     match root_type.ptype_kind with
     | Ptype_abstract -> begin
         match root_type.ptype_manifest with
         | Some [%type: int] ->
           [ (* [%stri class [%p Pat.var "asdf" ] = object inherit GT.show_int_t end ] *)
-            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc show_typename_t) @@
+            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc gmap_typename_t) @@
                            Cl.structure (Cstr.mk (Pat.any ())
                             [ Cf.inherit_ Fresh (Cl.constr (lid "GT.gmap_int_t") []) None
                             ])
@@ -312,11 +312,10 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       end
     | Ptype_variant constrs -> raise_errorf  "not implemented?"
     | _ -> raise_errorf "not implemented?"
-  in
+  in (* end of gmap_decls *)
 
+  let show_typename_t = "show_" ^ typename_t in
   let show_decls root_type =
-    let show_typename_t = "show_" ^ typename_t in
-
     match root_type.ptype_kind with
     | Ptype_abstract -> begin
         match root_type.ptype_manifest with
@@ -347,19 +346,53 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
             let Pcstr_tuple pcd_args = pcd_args in
             let args = List.mapi (fun n _ -> sprintf "p%d" n) pcd_args in
 
+            let are_the_same (typ: core_type) (tdecl: type_declaration) =
+              (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
+              Format.pp_force_newline Format.std_formatter ();
+              Format.pp_print_flush Format.std_formatter (); *)
+
+              (match typ.ptyp_desc with
+              | Ptyp_constr ({txt=Lident xxx},_) ->
+                let b = (xxx = tdecl.ptype_name.txt) in
+                (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
+                b
+              | _ ->
+                (* print_endline "PIZDA";  *)
+                false
+              )
+
+            in
             let body =
               let expr_of_arg reprname typ =
-                let rec helper = function
+                let rec helper ?(toplevel=false) xxx =
+                  (* printf "helper with ~toplevel=%b\n%!" toplevel; *)
+                  let maybe_apply e =
+                    if toplevel then [%expr [%e e] [%e Exp.ident @@ lid reprname ] ]
+                    else e
+                  in
+                match xxx with
+                | x when are_the_same x root_type ->
+                  (* assert false; *)
+                  if toplevel
+                  then [%expr GT.([%e Exp.(field (ident @@ lid reprname) (lid "fx")) ]) () ]
+                  else [%expr GT.transform logic subj.GT.t#a this () ]
+                  (* then [%expr 1 ]
+                  else [%expr 2 ] *)
                 | {ptyp_desc=Ptyp_var _alpha; _} ->
-                   [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
+                  [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
                 | [%type: int]
                 | [%type: GT.int] ->
-                   [%expr GT.transform GT.int (new GT.show_int_t) ]
+                   (* [%expr GT.transform GT.int (new GT.show_int_t) ] *)
+                   let e = [%expr GT.lift GT.int.GT.plugins#show () ] in
+                   maybe_apply e
                 | [%type: string]
                 | [%type: GT.string] ->
-                  [%expr GT.transform GT.string (new GT.show_string_t) ]
+                  maybe_apply [%expr GT.transform GT.string (new GT.show_string_t) () ]
+                | [%type: [%t? t] GT.list]
                 | [%type: [%t? t] list] ->
-                    [%expr GT.(transform list [%e helper t] (new show_list_t) ) ]
+                    (* [%expr GT.(transform list [%e helper t] (new show_list_t) ) ] *)
+                    let e = [%expr GT.lift (GT.list.GT.plugins#show [%e helper t]) () ] in
+                    maybe_apply e
 
                 | {ptyp_desc=Ptyp_constr ({txt=Lident cname;_},
                                           [{ptyp_desc=Ptyp_constr({txt=Lident argname;_},
@@ -376,21 +409,23 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                         [%expr GT.transform [%e Exp.ident@@lid argname]]
                         root_type.ptype_params
                     in
-                    [%expr GT.transform
-                             [%e Exp.ident @@ lid cname]
-                             ([%e head] this)
-                             [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
-                    ]
-
+                    maybe_apply
+                      [%expr  GT.transform
+                              [%e Exp.ident @@ lid cname]
+                              ([%e head] this)
+                              [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
+                              ()
+                      ]
                 | {ptyp_desc=Ptyp_constr ({txt=Lident cname;_},
                                           [typ_arg1]); }
                   ->
-                    [%expr GT.transform
-                             [%e Exp.ident @@ lid cname]
-                             [%e helper  typ_arg1 ]
-                             [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
+                  maybe_apply
+                    [%expr  GT.transform
+                              [%e Exp.ident @@ lid cname]
+                              [%e helper  typ_arg1 ]
+                              [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
+                              ()
                     ]
-
                 | _ ->
                   [%expr [%e Exp.(field (ident @@ lid reprname) (lid "GT.fx")) ] ]
                 in
@@ -398,7 +433,10 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                 match typ with
                 | {ptyp_desc=Ptyp_var _alpha; _} ->
                   [%expr [%e Exp.(field (ident @@ lid reprname) (lid "GT.fx")) ] () ]
-                | _ -> [%expr [%e helper typ] () [%e Exp.ident @@ lid reprname] ]
+                (* | _ when are_the_same typ root_type -> *)
+                | _ -> [%expr [%e helper ~toplevel:true typ ]
+                        (* () [%e Exp.ident @@ lid reprname ] *)
+                        ]
               in
 
               match List.combine args pcd_args with
@@ -460,12 +498,40 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                      ]
         ]
     | _ -> failwith "Type is not supported. show not happend"
+  in (* end of show_decls *)
+
+  let derivers_bunch =
+    let wrap_meth mname cname =
+      let typname = root_type.ptype_name.txt in
+      let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
+        ([%e Exp.new_ @@ lid cname]) ()
+        ]
+      in
+      Cf.method_ (Location.mknoloc mname) Public (Cfk_concrete (Fresh, body))
+    in
+    [%stri let [%p Pat.var @@ mknoloc typename] =
+      { GT.gcata = ()
+      ; GT.plugins = [%e Exp.object_ @@ Cstr.mk (Pat.any()) @@
+        (if gt_show then [wrap_meth "show" show_typename_t] else []) @
+        (if gt_gmap then [wrap_meth "gmap" gmap_typename_t] else []) @
+        []
+        ]
+      }
+    ]
+  in
+
+  let make_primitive_bunch name prim_gcata =
+    [%stri let [%p Pat.var @@ mknoloc name ] = { GT.gcata = [%e prim_gcata]; GT.plugins = [] }]
   in
 
   match root_type.ptype_kind with
   | Ptype_abstract -> begin
       match root_type.ptype_manifest with
-      | Some [%type: int] -> [ ] @ show_decls root_type @ gmap_decls root_type
+      | Some [%type: int] ->
+        [ make_primitive_bunch root_type.ptype_name.txt [%expr GT.(int.gcata)]] @
+        show_decls root_type @
+        gmap_decls root_type @
+        [derivers_bunch]
       | _ -> raise_errorf "not implemented?"
     end
   | Ptype_variant constrs ->
@@ -697,10 +763,11 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
            (*           end } *)
            (*   ] *) ]
       in
-
+      (* let footer = [%stri external aaa: int -> int = "%identity"] in *)
 
       let ans = if not gt_show then ans else ans @ (show_decls root_type) in
-      ans @ [footer]
+      ans @ [derivers_bunch]
+
 
   | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
   (*
