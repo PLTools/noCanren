@@ -6,7 +6,7 @@ true: short_paths
 <ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std),open(Ast_convenience_405),open(Ppx_tools_405),open(Ast_405)
 #<ppx/*.cma>: package(ppx_deriving.api,ppx_deriving.runtime)
 
-<regression/test100ppxgt*>: package(GT)
+<regression/test100ppxgt*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
 
 <samples>: not_hygienic
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
