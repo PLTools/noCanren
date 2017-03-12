@@ -52,7 +52,7 @@ let parse_options options =
     { gt_show=false; gt_eq=false; gt_gmap=false }
     options
 
-let attr_nobuiltin attrs =
+(* let attr_nobuiltin attrs =
   Ppx_deriving.(attrs |> attr ~deriver "nobuiltin" |> Arg.get_flag ~deriver)
 
 let attr_printer attrs =
@@ -62,7 +62,7 @@ let attr_polyprinter attrs =
   Ppx_deriving.(attrs |> attr ~deriver "polyprinter" |> Arg.(get_attr ~deriver expr))
 
 let attr_opaque attrs =
-  Ppx_deriving.(attrs |> attr ~deriver "opaque" |> Arg.get_flag ~deriver)
+  Ppx_deriving.(attrs |> attr ~deriver "opaque" |> Arg.get_flag ~deriver) *)
 
 let argn = Printf.sprintf "a%d"
 (*
@@ -270,7 +270,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let make_params_lambda_generic namer expr =
     List.fold_right (fun ({ptyp_desc},_) acc ->
       match ptyp_desc with
-      | Ptyp_var name -> [%expr fun [%p  pvar @@ namer name] -> [%e acc ] ]
+      | Ptyp_var name -> [%expr fun [%p pvar @@ namer name] -> [%e acc ] ]
       | _ -> assert false
     ) root_type.ptype_params expr
   in
@@ -292,6 +292,25 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     let right = Exp.apply func right in
     make_params_lambda_fa right
   in
+
+  (* Used when we need to check that type we working on references himself in
+    it's body *)
+  let are_the_same (typ: core_type) (tdecl: type_declaration) =
+    (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
+    Format.pp_force_newline Format.std_formatter ();
+    Format.pp_print_flush Format.std_formatter (); *)
+
+    (match typ.ptyp_desc with
+    | Ptyp_constr ({txt=Lident xxx},_) ->
+      let b = (xxx = tdecl.ptype_name.txt) in
+      (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
+      b
+    | _ ->
+      (* print_endline "PIZDA";  *)
+      false
+    )
+  in
+
 
   let gmap_typename_t = "gmap_" ^ typename_t in
   let gmap_decls root_type =
@@ -346,22 +365,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
             let Pcstr_tuple pcd_args = pcd_args in
             let args = List.mapi (fun n _ -> sprintf "p%d" n) pcd_args in
 
-            let are_the_same (typ: core_type) (tdecl: type_declaration) =
-              (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
-              Format.pp_force_newline Format.std_formatter ();
-              Format.pp_print_flush Format.std_formatter (); *)
-
-              (match typ.ptyp_desc with
-              | Ptyp_constr ({txt=Lident xxx},_) ->
-                let b = (xxx = tdecl.ptype_name.txt) in
-                (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
-                b
-              | _ ->
-                (* print_endline "PIZDA";  *)
-                false
-              )
-
-            in
             let body =
               let expr_of_arg reprname typ =
                 let rec helper ?(toplevel=false) xxx =
@@ -503,14 +506,19 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let derivers_bunch =
     let wrap_meth mname cname =
       let typname = root_type.ptype_name.txt in
-      let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
+      let body =
+        wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]]
+          [ Exp.new_ @@ lid cname; [%expr () ] ]
+      in
+      (* let body = [%expr [%e body] ()] in *)
+      (* let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
         ([%e Exp.new_ @@ lid cname]) ()
         ]
-      in
+      in *)
       Cf.method_ (Location.mknoloc mname) Public (Cfk_concrete (Fresh, body))
     in
     [%stri let [%p Pat.var @@ mknoloc typename] =
-      { GT.gcata = ()
+      { GT.gcata = [%e Exp.(field (ident @@ lid typename) (lid "GT.gcata")) ]
       ; GT.plugins = [%e Exp.object_ @@ Cstr.mk (Pat.any()) @@
         (if gt_show then [wrap_meth "show" show_typename_t] else []) @
         (if gt_gmap then [wrap_meth "gmap" gmap_typename_t] else []) @
@@ -618,8 +626,11 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           let Pcstr_tuple pcd_args = pcd_args in
           (* for every type constructor *)
           let constr_name = "c_" ^ name' in
+          (* type that will be used for derivied type *)
+          let arg_for_myself = [%type: ('inh,[%t using_type],'syn, [%t params_obj]) GT.a ] in
           let args2 = pcd_args |> List.map (fun ({ ptyp_desc; _ } as typ) ->
             match ptyp_desc with
+            | _ when are_the_same typ root_type -> arg_for_myself
             | Ptyp_var a  ->
                 [%type: ([%t Typ.var @@ "i"^a],
                          [%t typ ],
@@ -636,11 +647,14 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
             | _ -> raise_errorf "Some cases are not supported when we look at constructor's params"
           )
           in
-          let args2 = [%type: ('inh,[%t using_type],'syn, [%t params_obj]) GT.a ]
-                      (* [Typ.constr (lid "GT.a") [[%typ]] *)
-                      :: args2
+          let args2 =
+            (* some additional arguments should be prepended to list of types
+               generated from constructor arhuments *)
+            (Typ.var "inh") ::
+            arg_for_myself ::
+            args2
           in
-          let args2 = [Typ.var "inh"] @ args2 in
+
           let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
 
           (Ctf.method_ (mknoloc constr_name) Public Concrete ts,
@@ -702,6 +716,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
 
             let app_args = List.map2 (fun argname arg ->
               match arg.ptyp_desc with
+              | _ when are_the_same arg root_type -> [%expr GT.make self [%e Exp.ident @@ lid argname] tpo]
               | Ptyp_var v -> [%expr GT.make [%e Exp.ident @@ lid @@ "f"^v] [%e Exp.ident @@ lid argname] tpo]
               | Ptyp_constr ({txt=Ldot (Lident "GT", "int"); _},[]) ->
                   [%expr [%e Exp.ident @@ lid argname]]
@@ -710,7 +725,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
               | Ptyp_constr _ ->
                  [%expr [%e Exp.ident @@ lid argname]]
                  (* [%expr GT.make [%e Exp.ident @@ lid "self"] [%e Exp.ident @@ lid argname] tpo] *)
-              | _ -> raise_errorf "Some cases are not supported when gnerating application in gcata"
+              | _ -> raise_errorf "Some cases are not supported when generating application in gcata"
             ) argnames pcd_args
             in
 
