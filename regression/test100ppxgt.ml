@@ -3,7 +3,7 @@
 *)
 type token_env = int
 (* let () = print_endline @@ GT.show token_env 5 *)
-(*
+
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list  (* * 'a logic *)
 | Value of 'a
@@ -34,7 +34,7 @@ let () =
   let s = Var (2,[q;r]) in
   let open GT in
   List.iter (fun l -> print_endline @@ (show logic) (show string) l) [q;r;s]
-
+(*
 type ('a, 'l) llist = Nil | Cons of 'a * 'l
 [@@deriving gt {show} ]
 
@@ -47,9 +47,9 @@ let () =
   let open GT in
   List.iter (fun xs -> print_endline @@ show_llist (show string) xs) [q;r;s]
 *)
-
+(*
 type 'a lnat = O | S of 'a
- [@@deriving gt { show } ]
+[@@deriving gt { show } ]
 
 let () =
   let q = O in
@@ -57,4 +57,4 @@ let () =
   let s = S (S O) in
   let rec show_nat n = GT.(show lnat show_nat) n in
   let open GT in
-  List.iter (fun n -> print_endline @@ show_nat n) [q;r;s]
+  List.iter (fun n -> print_endline @@ show_nat n) [q;r;s] *)
