@@ -228,7 +228,223 @@ let default_params root_type =
   let ps = ps @ [ [%type: 'inh]; [%type: 'syn] ] in
   List.map (fun x -> (x,Invariant) ) ps
 
+let using_type ~typename root_type =
+  (* generation type specification by type declaration *)
+  Typ.constr (lid typename) (List.map fst @@ root_type.ptype_params)
 
+let arr_of_param t =
+  (* does from 'a the 'ia -> 'a -> 'sa *)
+  let open Typ in
+  match t.ptyp_desc with
+  | Ptyp_var n ->
+      (mknoloc n, [],
+        [%type: [%t var @@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]] )
+  | _ ->
+      raise_errorf "arr_of_param: not all type params are supported" deriver
+
+
+let params_obj root_type =
+  (* converts 'a, 'b to
+     < a: 'ia -> 'a -> 'sa ; b: 'ib -> 'b -> 'sb >
+   *)
+  let f (t,_) = arr_of_param t in
+  Typ.object_ (List.map f root_type.ptype_params) Closed
+
+(* Used when we need to check that type we working on references himself in
+  it's body *)
+let are_the_same (typ: core_type) (tdecl: type_declaration) =
+  (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
+  Format.pp_force_newline Format.std_formatter ();
+  Format.pp_print_flush Format.std_formatter (); *)
+
+  (match typ.ptyp_desc with
+  | Ptyp_constr ({txt=Lident xxx},_) ->
+    let b = (xxx = tdecl.ptype_name.txt) in
+    (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
+    b
+  | _ ->
+    (* print_endline "PIZDA";  *)
+    false
+  )
+
+let make_params_lambda_generic ~root_type namer expr  =
+  List.fold_right (fun ({ptyp_desc},_) acc ->
+    match ptyp_desc with
+    | Ptyp_var name -> [%expr fun [%p pvar @@ namer name] -> [%e acc ] ]
+    | _ -> assert false
+  ) root_type.ptype_params expr
+
+let make_params_lambda_a  = make_params_lambda_generic (fun name -> name)
+let make_params_lambda_fa = make_params_lambda_generic ((^)"f")
+
+let wrap_with_fa ?(use_lift=false) ~root_type func lasts =
+  let right =
+    List.map (function ({ptyp_desc; _ },_) ->
+      match ptyp_desc with
+      | Ptyp_var name ->
+         (Nolabel,
+          if use_lift then [%expr GT.lift [%e Exp.ident @@ lid ("f"^ name)]]
+          else  Exp.ident @@ lid ("f"^ name)
+            )
+      | _ -> assert false) root_type.ptype_params
+  in
+  let right = right @ (List.map (fun typ -> (Nolabel, typ)) lasts) in
+  let right = Exp.apply func right in
+  make_params_lambda_fa ~root_type right
+
+let generate_some_methods ~typename root_type constrs =
+  let t_typename = typename ^ "_t" in
+  let xs = List.map (fun { pcd_name = { txt = name' }; pcd_args } ->
+    let Pcstr_tuple pcd_args = pcd_args in
+    (* for every type constructor *)
+    let constr_name = "c_" ^ name' in
+    (* type that will be used for derivied type *)
+    let arg_for_myself =
+      [%type: ('inh,
+              [%t using_type ~typename root_type],
+              'syn,
+              [%t params_obj root_type]) GT.a ]
+    in
+    let args2 = pcd_args |> List.map (fun ({ ptyp_desc; _ } as typ) ->
+      match ptyp_desc with
+      | _ when are_the_same typ root_type -> arg_for_myself
+      | Ptyp_var a  ->
+          [%type: ([%t Typ.var @@ "i"^a],
+                   [%t typ ],
+                   [%t Typ.var @@ "s"^a],
+                   [%t params_obj root_type]) GT.a ]
+      | Ptyp_constr _ -> typ
+      | Ptyp_constr ({txt=Lident "int"; _},[]) ->              [%type: int]
+      | Ptyp_constr ({txt=Ldot (Lident "GT", "int"); _},[]) -> [%type: GT.int]
+      | Ptyp_constr _ ->
+          [%type: ([%t Typ.var @@ "inh"],
+                   [%t typ],
+                   [%t Typ.var @@ "syn"],
+                   [%t params_obj root_type ]) GT.a ]
+      | _ -> raise_errorf "Some cases are not supported when we look at constructor's params"
+    )
+    in
+    let args2 =
+      (* some additional arguments should be prepended to list of types
+         generated from constructor arhuments *)
+      (Typ.var "inh") ::
+      arg_for_myself ::
+      args2
+    in
+
+    let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
+
+    (Ctf.method_ (mknoloc constr_name) Public Concrete ts,
+     Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts) )
+  ) constrs
+  in
+  let (tts, ts) = List.split xs in
+  let tts = tts @
+            [
+              let ts = List.map (fun (t,_) -> arr_of_param t) root_type.ptype_params in
+              let init =
+                [%type: 'inh -> [%t using_type ~typename root_type] -> 'syn ]
+              in
+              Ctf.method_ (mknoloc ("t_" ^ typename))  Public Concrete
+                (List.fold_right (fun (_,_,x) acc -> Typ.arrow Nolabel x acc) ts init)
+            ]
+  in
+
+  let main_mapper_body =
+    wrap_with_fa ~use_lift:false
+      [%expr GT.transform [%e Exp.ident @@ lid typename]]
+      [  [%expr this] ]
+
+
+    (* make_params_lambda_a [%expr GT.transform [%e Exp.ident @@ lid typename] *)
+    (*                                        [%e make_params_lambda_a [%expr this] ] *)
+
+  in
+  let ts = ts @ [ Cf.method_ (mknoloc t_typename) Public
+                    (Cfk_concrete (Fresh, main_mapper_body ~root_type))
+                ]
+  in
+  (tts, ts)
+
+let make_tt_class_type ~params typename_tt tt_methods =
+  Str.class_type [Ci.mk ~virt:Virtual ~params
+                    (Location.mknoloc typename_tt) @@
+                  Cty.signature (Csig.mk [%type: _] tt_methods) ]
+
+let make_params_longarrow ~root_type typ =
+  List.fold_right (fun ({ptyp_desc},_) acc ->
+    match ptyp_desc with
+    | Ptyp_var n ->
+       Typ.(arrow Nolabel
+                  [%type: [%t var@@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]]
+                  acc)
+    | _ -> assert false) root_type.ptype_params typ
+
+let subclass_obj typename_tt xs =
+  (* makes ('a,'ia,'sa,...,'inh,'syn)#typename_tt  *)
+  Typ.class_ (lid typename_tt) xs
+  (* (List.map fst (default_params root_type)) *)
+
+let any_typ = [%type: _]
+
+let gt_repr_typ_wrap ~typename ~root_type arg =
+  let typename_tt = typename ^ "_tt" in
+  let tail = [%type: 'inh -> [%t using_type ~typename root_type ] -> 'syn ] in
+  let subclass = subclass_obj typename_tt @@
+    List.map fst (default_params root_type) in
+  [%type: ([%t make_params_longarrow ~root_type
+              [%type: [%t subclass] -> [%t tail]]],
+           [%t arg]) GT.t ]
+
+
+let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
+  let { gt_show; gt_gmap } = parse_options options in
+
+  let typename    = root_type.ptype_name.txt in
+  let typename_t  = typename ^ "_t"  in
+  let typename_tt = typename ^ "_tt" in
+  let t_typename  = "t_" ^ typename  in
+
+  let _gmap_decls root_type = [] in
+  let show_decls root_type =
+    [ Sig.class_type [Ci.mk ~virt:Concrete ~params:root_type.ptype_params
+                        (mknoloc @@ sprintf "show_%s_env_tt" typename) @@
+                      Cty.signature (Csig.mk [%type: _ ] [])]
+    (* two more *)
+    ]
+  in
+
+  match root_type.ptype_kind with
+  | Ptype_abstract -> begin
+      match root_type.ptype_manifest with
+      | Some [%type: int] -> []
+        (* [ make_primitive_bunch root_type.ptype_name.txt [%expr GT.(int.gcata)]] @
+        show_decls root_type @
+        gmap_decls root_type @
+        [derivers_bunch] *)
+      | _ -> raise_errorf "not implemented?"
+    end
+  | Ptype_variant constrs ->
+    let (tt_methods, t_methods) =
+      generate_some_methods root_type constrs ~typename in
+    let ans =
+      [ Sig.class_type [Ci.mk ~virt:Virtual ~params:(default_params root_type)
+                        (Location.mknoloc typename_tt) @@
+                      Cty.signature (Csig.mk [%type: _] tt_methods) ]
+      ; Sig.value @@ Val.mk (mknoloc typename)
+          (gt_repr_typ_wrap ~root_type ~typename [%type: unit])
+      ; Sig.class_
+          [ Ci.mk ~virt:Virtual ~params:(default_params root_type)
+              (mknoloc typename_t) @@
+              Cty.signature
+                (Csig.mk any_typ tt_methods)
+          ]
+
+      ]
+    in
+    let ans = if not gt_show then ans else ans @ (show_decls root_type) in
+    ans
+  | _ -> raise_errorf "Some cases are not supported"
 
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
@@ -239,78 +455,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let typename_t  = typename ^ "_t"  in
   let typename_tt = typename ^ "_tt" in
   let t_typename  = "t_" ^ typename  in
-
-  let using_type =
-    (* generation type specification by type declaration *)
-    Typ.constr (lid typename) (List.map fst @@ root_type.ptype_params)
-  in
-
-  let make_params_longarrow typ =
-    List.fold_right (fun ({ptyp_desc},_) acc ->
-      match ptyp_desc with
-      | Ptyp_var n ->
-         Typ.(arrow Nolabel
-                    [%type: [%t var@@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]]
-                    acc)
-      | _ -> assert false) root_type.ptype_params typ
-  in
-
-  let subclass_obj =
-    (* makes ('a,'ia,'sa,...,'inh,'syn)#typename_tt  *)
-    Typ.class_ (lid typename_tt) (List.map fst (default_params root_type))
-  in
-
-  let gt_repr_typ_wrap arg =
-    let tail = [%type: 'inh -> [%t using_type ] -> 'syn ] in
-    [%type: ([%t make_params_longarrow [%type: [%t subclass_obj] -> [%t tail]]],
-             [%t arg]) GT.t ]
-  in
-  let any_typ = { ptyp_desc=Ptyp_any; ptyp_loc=Location.none; ptyp_attributes=[] } in
-
-  let make_params_lambda_generic namer expr =
-    List.fold_right (fun ({ptyp_desc},_) acc ->
-      match ptyp_desc with
-      | Ptyp_var name -> [%expr fun [%p pvar @@ namer name] -> [%e acc ] ]
-      | _ -> assert false
-    ) root_type.ptype_params expr
-  in
-  let make_params_lambda_a  = make_params_lambda_generic (fun name -> name) in
-  let make_params_lambda_fa = make_params_lambda_generic ((^)"f") in
-
-  let wrap_with_fa ?(use_lift=false) func lasts =
-    let right =
-      List.map (function ({ptyp_desc; _ },_) ->
-        match ptyp_desc with
-        | Ptyp_var name ->
-           (Nolabel,
-            if use_lift then [%expr GT.lift [%e Exp.ident @@ lid ("f"^ name)]]
-            else  Exp.ident @@ lid ("f"^ name)
-              )
-        | _ -> assert false) root_type.ptype_params
-    in
-    let right = right @ (List.map (fun typ -> (Nolabel, typ)) lasts) in
-    let right = Exp.apply func right in
-    make_params_lambda_fa right
-  in
-
-  (* Used when we need to check that type we working on references himself in
-    it's body *)
-  let are_the_same (typ: core_type) (tdecl: type_declaration) =
-    (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
-    Format.pp_force_newline Format.std_formatter ();
-    Format.pp_print_flush Format.std_formatter (); *)
-
-    (match typ.ptyp_desc with
-    | Ptyp_constr ({txt=Lident xxx},_) ->
-      let b = (xxx = tdecl.ptype_name.txt) in
-      (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
-      b
-    | _ ->
-      (* print_endline "PIZDA";  *)
-      false
-    )
-  in
-
 
   let gmap_typename_t = "gmap_" ^ typename_t in
   let gmap_decls root_type =
@@ -352,13 +496,12 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         let inherit_field =
           let prefix = List.concat @@ List.map
             (fun ({ptyp_desc; _},_) -> match ptyp_desc with
-             | Ptyp_var name ->
-                 Typ.[var name; constr (lid "unit") []; constr (lid "string") []]
+             | Ptyp_var name -> Typ.[var name; [%type: unit]; [%type: string] ]
              | _ -> assert false
             ) root_type.ptype_params
           in
           Cf.inherit_ Fresh (Cl.constr (lid typename_t)
-            Typ.(prefix @ [constr (lid "unit") []; constr (lid "string") [] ])) None
+            Typ.(prefix @ [ [%type: unit]; [%type: string] ])) None
         in
         let show_proto_meths =
           let f { pcd_name = { txt = name' }; pcd_args } =
@@ -368,7 +511,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
             let body =
               let expr_of_arg reprname typ =
                 let rec helper ?(toplevel=false) xxx =
-                  (* printf "helper with ~toplevel=%b\n%!" toplevel; *)
                   let maybe_apply e =
                     if toplevel then [%expr [%e e] [%e Exp.ident @@ lid reprname ] ]
                     else e
@@ -474,7 +616,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                            | _ -> assert false
                          )
                           root_type.ptype_params
-                          [%type: [%t using_type ] -> string ]
+                          [%type: [%t using_type ~typename root_type] -> string ]
                     ]
                     >
             ]
@@ -510,7 +652,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     let wrap_meth mname cname =
       let typname = root_type.ptype_name.txt in
       let body =
-        wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]]
+        wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]] ~root_type
           [ Exp.new_ @@ lid cname; [%expr () ] ]
       in
       (* let body = [%expr [%e body] ()] in *)
@@ -601,15 +743,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
            Exp.apply res [(Nolabel, last)]
       in
 
-      let arr_of_param t =
-        (* does from 'a the 'ia -> 'a -> 'sa *)
-        let open Typ in
-        match t.ptyp_desc with
-        | Ptyp_var n ->
-            (mknoloc n, [], [%type: [%t var@@ "i"^n] -> [%t var n] -> [%t var @@ "s"^n]] )
-        | _ ->
-            raise_errorf "arr_of_param: not all type params are supported" deriver
-      in
          (* let res = List.fold_left (fun acc -> function *)
          (*   | Ptyp_var name ->  *)
          (*       Exp.apply acc (Exp.ident @@ lid name) *)
@@ -617,83 +750,8 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
          (*                          ) first root_type.ptype_params *)
          (* in *)
          (* Exp.apply  *)
-      let params_obj =
-        (* converts 'a, 'b to
-           < a: 'ia -> 'a -> 'sa ; b: 'ib -> 'b -> 'sb >
-         *)
-        let f (t,_) = arr_of_param t in
-        Typ.object_ (List.map f root_type.ptype_params) Closed
-      in
-      let (tt_methods, t_methods) =
-        let xs = List.map (fun { pcd_name = { txt = name' }; pcd_args } ->
-          let Pcstr_tuple pcd_args = pcd_args in
-          (* for every type constructor *)
-          let constr_name = "c_" ^ name' in
-          (* type that will be used for derivied type *)
-          let arg_for_myself = [%type: ('inh,[%t using_type],'syn, [%t params_obj]) GT.a ] in
-          let args2 = pcd_args |> List.map (fun ({ ptyp_desc; _ } as typ) ->
-            match ptyp_desc with
-            | _ when are_the_same typ root_type -> arg_for_myself
-            | Ptyp_var a  ->
-                [%type: ([%t Typ.var @@ "i"^a],
-                         [%t typ ],
-                         [%t Typ.var @@ "s"^a],
-                         [%t params_obj]) GT.a ]
-            | Ptyp_constr _ -> typ
-            | Ptyp_constr ({txt=Lident "int"; _},[]) ->              [%type: int]
-            | Ptyp_constr ({txt=Ldot (Lident "GT", "int"); _},[]) -> [%type: GT.int]
-            | Ptyp_constr _ ->
-                [%type: ([%t Typ.var @@ "inh"],
-                         [%t typ],
-                         [%t Typ.var @@ "syn"],
-                         [%t params_obj]) GT.a ]
-            | _ -> raise_errorf "Some cases are not supported when we look at constructor's params"
-          )
-          in
-          let args2 =
-            (* some additional arguments should be prepended to list of types
-               generated from constructor arhuments *)
-            (Typ.var "inh") ::
-            arg_for_myself ::
-            args2
-          in
 
-          let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
-
-          (Ctf.method_ (mknoloc constr_name) Public Concrete ts,
-           Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts) )
-        ) constrs
-        in
-        let (tts, ts) = List.split xs in
-        let tts = tts @
-                  [
-                    let ts = List.map (fun (t,_) -> arr_of_param t) root_type.ptype_params in
-                    let init =
-                      [%type: 'inh -> [%t using_type] -> 'syn ]
-                    in
-                    Ctf.method_ (mknoloc ("t_" ^ typename))  Public Concrete
-                      (List.fold_right (fun (_,_,x) acc -> Typ.arrow Nolabel x acc) ts init)
-                  ]
-        in
-
-        let main_mapper_body =
-          wrap_with_fa ~use_lift:false
-            [%expr GT.transform [%e Exp.ident @@ lid typename]]
-            [  [%expr this] ]
-
-
-          (* make_params_lambda_a [%expr GT.transform [%e Exp.ident @@ lid typename] *)
-          (*                                        [%e make_params_lambda_a [%expr this] ] *)
-
-        in
-        let ts = ts @ [ Cf.method_ (mknoloc t_typename) Public
-                          (Cfk_concrete (Fresh, main_mapper_body))
-                      ]
-        in
-        (tts, ts)
-      in
-
-      let gt_repr_typ = gt_repr_typ_wrap [%type: unit] in
+      let gt_repr_typ = gt_repr_typ_wrap ~typename ~root_type [%type: unit] in
       let gt_repr_body =
         let typename_gcata = typename^"_gcata" in
         let tpo_meths =
@@ -741,7 +799,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         in
         [%expr
           let rec [%p (Pat.var @@ mknoloc typename_gcata) ] =
-            [%e make_params_lambda_fa
+            [%e make_params_lambda_fa ~root_type
               [%expr
               fun trans inh subj ->
                 let rec self = [%e make_params_app_fa (Exp.ident @@ lid typename_gcata)
@@ -754,12 +812,13 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         ]
       in
 
+      let (tt_methods, t_methods) = generate_some_methods root_type constrs ~typename in
       let ans =
-        [ Str.class_type [Ci.mk ~virt:Virtual ~params:(default_params root_type)
-                            (Location.mknoloc typename_tt) @@
-                          Cty.signature (Csig.mk any_typ tt_methods) ]
-        ; Str.value Nonrecursive [Vb.mk (Pat.(constraint_ (var @@ mknoloc typename)
-                                                gt_repr_typ)) gt_repr_body ]
+        [ make_tt_class_type ~params:(default_params root_type) typename_tt tt_methods
+        ; Str.value Nonrecursive [Vb.mk
+            (Pat.(constraint_ (var @@ mknoloc typename) gt_repr_typ))
+            gt_repr_body
+          ]
         ; Str.class_ [Ci.mk ~virt:Virtual ~params:(default_params root_type) (mknoloc typename_t) @@
                       Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") t_methods)
                      ]
@@ -858,10 +917,12 @@ let register () =
   Ppx_deriving.(register (create deriver
     (* ~core_type: (Ppx_deriving.with_quoter (fun quoter typ -> *)
     (*   [%expr fun x -> Format.asprintf "%a" (fun fmt -> [%e expr_of_typ quoter typ]) x])) *)
+
+    (* TODO: maybe we not yet support recursive type definitions *)
     ~type_decl_str: (fun ~options ~path type_decls ->
       List.concat (List.map (str_of_type ~options ~path) type_decls))
-    (* ~type_decl_sig: (fun ~options ~path type_decls -> *)
-    (*   List.concat (List.map (sig_of_type ~options ~path) type_decls)) *)
+    ~type_decl_sig: (fun ~options ~path type_decls ->
+       List.concat (List.map (sig_of_type ~options ~path) type_decls))
     ()
   ))
 
