@@ -64,6 +64,31 @@ let attr_polyprinter attrs =
 let attr_opaque attrs =
   Ppx_deriving.(attrs |> attr ~deriver "opaque" |> Arg.get_flag ~deriver) *)
 
+
+(*
+(* Probably need to invent api for GT plugins like *)
+val register_gt_plugin : (module type GT_PLUGIN_IMPL) -> unit
+
+module type GT_PLUGIN_IMPL = sig
+  (* "show", "gmap", etc. *)
+  val name: string
+
+  (* To generate some code to be placed to ml file *)
+  val for_str: type_declaration -> structure_item list
+  (* ... to mli file *)
+  val for_sig: type_declaration -> signature_item list
+
+  (* To get something like
+     method show a = GT.transform logic (GT.lift a) (new show_logic_t) () *)
+  val plugin_cf: type_declaration -> class_field list
+
+  (* To get something like
+      show : ('a -> string) -> 'a logic -> string               *)
+  val plugin_cf: type_declaration -> class_type_field list
+
+  (* maybe something else *)
+end
+*)
 let argn = Printf.sprintf "a%d"
 (*
 let pp_type_of_decl ~options ~path type_decl =
@@ -263,7 +288,6 @@ let are_the_same (typ: core_type) (tdecl: type_declaration) =
     (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
     b
   | _ ->
-    (* print_endline "PIZDA";  *)
     false
   )
 
@@ -292,8 +316,8 @@ let wrap_with_fa ?(use_lift=false) ~root_type func lasts =
   let right = Exp.apply func right in
   make_params_lambda_fa ~root_type right
 
-let generate_some_methods ~typename root_type constrs =
-  let t_typename = typename ^ "_t" in
+let generate_some_methods ~typename ?(t_virtual=false) root_type constrs =
+  let t_typename = "t_" ^ typename in
   let xs = List.map (fun { pcd_name = { txt = name' }; pcd_args } ->
     let Pcstr_tuple pcd_args = pcd_args in
     (* for every type constructor *)
@@ -333,9 +357,11 @@ let generate_some_methods ~typename root_type constrs =
     in
 
     let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
-
-    (Ctf.method_ (mknoloc constr_name) Public Concrete ts,
-     Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts) )
+    (* let virt_of_bool = function | true -> Virtual | false -> Concrete in *)
+    ( Ctf.method_ (mknoloc constr_name) Public Concrete ts,
+      (* Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts)  *)
+      Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts)
+    )
   ) constrs
   in
   let (tts, ts) = List.split xs in
@@ -396,6 +422,21 @@ let gt_repr_typ_wrap ~typename ~root_type arg =
               [%type: [%t subclass] -> [%t tail]]],
            [%t arg]) GT.t ]
 
+let inherit_field_gen ~name ~root_type wrap =
+  let prefix = List.concat @@ List.map
+    (fun ({ptyp_desc; _},_) -> match ptyp_desc with
+    | Ptyp_var name -> Typ.[var name; [%type: unit]; [%type: string] ]
+    | _ -> assert false
+    ) root_type.ptype_params
+  in
+  wrap Typ.(prefix @ [ [%type: unit]; [%type: string] ])
+
+
+let inherit_cf ~name ~root_type =
+  inherit_field_gen ~name ~root_type (fun t -> Cf.inherit_ Fresh (Cl.constr (lid name) t) None)
+
+let inherit_ctf ~name ~root_type =
+  inherit_field_gen ~name ~root_type (fun t -> Ctf.inherit_ @@ Cty.constr (lid name) t)
 
 let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
@@ -403,14 +444,42 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let typename    = root_type.ptype_name.txt in
   let typename_t  = typename ^ "_t"  in
   let typename_tt = typename ^ "_tt" in
-  let t_typename  = "t_" ^ typename  in
+  (* let t_typename  = "t_" ^ typename  in *)
+  let show_env_tt = sprintf "show_%s_env_tt" typename in
 
   let _gmap_decls root_type = [] in
   let show_decls root_type =
+    let proto_class_name = "show_proto_" ^ typename in
+    let show_t = sprintf "show_%s_t" typename in
     [ Sig.class_type [Ci.mk ~virt:Concrete ~params:root_type.ptype_params
-                        (mknoloc @@ sprintf "show_%s_env_tt" typename) @@
+                        (mknoloc show_env_tt) @@
                       Cty.signature (Csig.mk [%type: _ ] [])]
-    (* two more *)
+    ; Sig.class_
+        [ let tt_ref =
+            [%type: [%t Typ.constr (lid show_env_tt) (List.map fst root_type.ptype_params) ] ref]
+          in
+          Ci.mk ~virt:Concrete ~params:root_type.ptype_params
+            (mknoloc proto_class_name)
+            (Cty.arrow Nolabel tt_ref @@
+              Cty.signature (Csig.mk [%type: _ ]
+                [ inherit_ctf ~root_type ~name:typename_tt
+                (* ; Ctf.inherit_ @@ Cty.constr (lid show_env_tt) (List.map fst root_type.ptype_params) *)
+                ])
+            )
+      ]
+    (* ; Sig.class_
+        [ let tt_ref =
+            [%type: [%t Typ.constr (lid show_env_tt) (List.map fst root_type.ptype_params) ] ref]
+          in
+          Ci.mk ~virt:Concrete ~params:root_type.ptype_params
+            (mknoloc show_t) @@
+            (Cty.arrow Nolabel tt_ref @@
+              Cty.signature (Csig.mk [%type: _ ]
+                [ inherit_ctf ~root_type ~name:typename_tt
+                ; Ctf.inherit_ @@ Cty.constr (lid show_env_tt) (List.map fst root_type.ptype_params)
+                ])
+            )
+        ] *)
     ]
   in
 
@@ -426,13 +495,13 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     end
   | Ptype_variant constrs ->
     let (tt_methods, t_methods) =
-      generate_some_methods root_type constrs ~typename in
+      generate_some_methods ~typename ~t_virtual:true root_type constrs  in
     let ans =
       [ Sig.class_type [Ci.mk ~virt:Virtual ~params:(default_params root_type)
-                        (Location.mknoloc typename_tt) @@
+                        (mknoloc typename_tt) @@
                       Cty.signature (Csig.mk [%type: _] tt_methods) ]
-      ; Sig.value @@ Val.mk (mknoloc typename)
-          (gt_repr_typ_wrap ~root_type ~typename [%type: unit])
+      (* ; Sig.value @@ Val.mk (mknoloc typename)
+          (gt_repr_typ_wrap ~root_type ~typename [%type: unit]) *)
       ; Sig.class_
           [ Ci.mk ~virt:Virtual ~params:(default_params root_type)
               (mknoloc typename_t) @@
@@ -443,7 +512,46 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       ]
     in
     let ans = if not gt_show then ans else ans @ (show_decls root_type) in
-    ans
+    (* TODO: add gmap here *)
+
+    let derivers_bunch =
+      let wrap_meth mname cname =
+        let typname = root_type.ptype_name.txt in
+        let body =
+          wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]] ~root_type
+            [ Exp.new_ @@ lid cname; [%expr () ] ]
+        in
+        (* let body = [%expr [%e body] ()] in *)
+        (* let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
+          ([%e Exp.new_ @@ lid cname]) ()
+          ]
+        in *)
+        Cf.method_ (Location.mknoloc mname) Public (Cfk_concrete (Fresh, body))
+      in
+      let gcata_part =
+        let args2 = List.map (fun (t,_) -> let (_,_,x) = arr_of_param t in x) type_params in
+        List.fold_right (Typ.arrow Nolabel) args2
+          [%type: [%t subclass_obj typename_tt (List.map fst @@ default_params root_type) ] ->
+            'inh -> [%t using_type ~typename root_type ] -> 'syn ]
+      in
+      let plugins_part =
+        let for_show =
+          if not gt_show then [] else
+          let xs = List.map (fun (typ,_) -> [%type: [%t typ] -> string]) type_params in
+          [ (mknoloc "show", [],
+            List.fold_right (fun x acc -> [%type: [%t x] -> [%t acc]]) xs
+              [%type: [%t using_type ~typename root_type ] -> string ])
+          ]
+        in
+        let for_gmap = [] in
+        Typ.object_ (for_show @ for_gmap) Closed
+      in
+      Sig.value (Val.mk (mknoloc typename) [%type: ([%t gcata_part], [%t plugins_part]) GT.t])
+      (* [%sigi: val asdf (*[%p Pat.var @@ mknoloc typename] *):
+        int
+      ] *)
+    in
+    ans @ [derivers_bunch]
   | _ -> raise_errorf "Some cases are not supported"
 
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
@@ -454,7 +562,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let typename    = root_type.ptype_name.txt in
   let typename_t  = typename ^ "_t"  in
   let typename_tt = typename ^ "_tt" in
-  let t_typename  = "t_" ^ typename  in
+  let _t_typename  = "t_" ^ typename  in
 
   let gmap_typename_t = "gmap_" ^ typename_t in
   let gmap_decls root_type =
@@ -493,16 +601,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         | _ -> raise_errorf "not implemented?"
       end
     | Ptype_variant constrs ->
-        let inherit_field =
-          let prefix = List.concat @@ List.map
-            (fun ({ptyp_desc; _},_) -> match ptyp_desc with
-             | Ptyp_var name -> Typ.[var name; [%type: unit]; [%type: string] ]
-             | _ -> assert false
-            ) root_type.ptype_params
-          in
-          Cf.inherit_ Fresh (Cl.constr (lid typename_t)
-            Typ.(prefix @ [ [%type: unit]; [%type: string] ])) None
-        in
         let show_proto_meths =
           let f { pcd_name = { txt = name' }; pcd_args } =
             let Pcstr_tuple pcd_args = pcd_args in
@@ -603,7 +701,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
 
             Cf.method_ (mknoloc @@ "c_"^name') Public (Cfk_concrete (Fresh, e))
           in
-          inherit_field :: List.map f (List.rev constrs)
+          (inherit_cf ~name:typename_t ~root_type) :: List.map f (List.rev constrs)
         in
 
         let gt_repr_typ_show =
@@ -635,7 +733,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         ; Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc show_typename_t)
                         (Cl.let_ Nonrecursive [Vb.mk (Pat.var @@ mknoloc "self") [%expr Obj.magic (ref ())] ] @@
                          Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this")
-                            [ inherit_field
+                            [ inherit_cf ~root_type ~name:typename_t
                             ; Cf.inherit_ Fresh (Cl.apply (Cl.constr (lid proto_class_name)
                                                     @@ List.map fst root_type.ptype_params)
                                 [(Nolabel,[%expr self])]) None
@@ -695,7 +793,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       (*       (Cfk_concrete (Fresh, *)
       (*                      [%expr 1]))) *)
       (* in *)
-      let make_params_app_with_lift first lasts =
+      let _make_params_app_with_lift first lasts =
         let first_part =
           List.map (function ({ptyp_desc; _ },_) ->
             match ptyp_desc with
@@ -720,7 +818,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         Exp.apply first (first_part @ second_part)
       in
 
-      let make_params_app = make_params_app_namer ~namer:(fun name -> Exp.ident @@ lid name)
+      let _make_params_app = make_params_app_namer ~namer:(fun name -> Exp.ident @@ lid name)
       in
       let make_params_app_lift =
         make_params_app_namer ~use_lift:true
@@ -730,7 +828,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         make_params_app_namer ~namer:(fun name -> Exp.ident @@ lid ("f"^name))
       in
 
-      let make_params_app first last =
+      let _make_params_app first last =
          match root_type.ptype_params with
          | [] -> Exp.apply first [ (Nolabel, last) ]
          | params ->
@@ -825,7 +923,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         ]
       in
 
-      let footer =
+      let _footer =
         (* gcata for show *)
         Str.value Nonrecursive
           [(* Vb.mk (Pat.(constraint_ (var @@ mknoloc typename) gt_repr_typ_show)) *)

@@ -6,7 +6,7 @@ type token_env = int
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list (* * 'a logic *)
 | Value of 'a
-with show,gmap
+with show
 ;;
 
 type ('a, 'l) llist = Nil | Cons of 'a * 'l

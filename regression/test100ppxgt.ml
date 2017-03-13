@@ -9,7 +9,7 @@ type 'a logic =
 | Value of 'a
 [@@deriving gt {show} ]
 
-let logic = {GT.gcata = (); plugins =
+let logic = {GT.gcata = logic.GT.gcata; plugins =
   object
     (* method gmap    = logic.plugins#gmap *)
     method show fa x =
