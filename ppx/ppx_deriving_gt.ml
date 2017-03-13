@@ -353,7 +353,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           let prefix = List.concat @@ List.map
             (fun ({ptyp_desc; _},_) -> match ptyp_desc with
              | Ptyp_var name ->
-                 Typ.[var "a"; constr (lid "unit") []; constr (lid "string") []]
+                 Typ.[var name; constr (lid "unit") []; constr (lid "string") []]
              | _ -> assert false
             ) root_type.ptype_params
           in
@@ -484,19 +484,22 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                             (mknoloc @@ sprintf "show_%s_env_tt" typename) @@
                           Cty.signature (Csig.mk any_typ [])
                          ]
-        ; Str.class_ [Ci.mk ~virt:Concrete ~params:[Typ.var "a",Invariant] (mknoloc proto_class_name)
+        ; Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc proto_class_name)
                         (Cl.fun_ Nolabel None (Pat.var @@ mknoloc "env") @@
                          Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") show_proto_meths)
                         )
                      ]
 
-        ; Str.class_ [Ci.mk ~virt:Concrete ~params:[Typ.var "a",Invariant] (mknoloc show_typename_t)
+        ; Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc show_typename_t)
                         (Cl.let_ Nonrecursive [Vb.mk (Pat.var @@ mknoloc "self") [%expr Obj.magic (ref ())] ] @@
                          Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this")
-                                         [ inherit_field
-                                         ; Cf.inherit_ Fresh (Cl.apply (Cl.constr (lid proto_class_name) [Typ.var "a"]) [(Nolabel,[%expr self])]) None
-                                         ; Cf.initializer_ [%expr self := (this :> [%t Typ.constr (lid show_typename_t) [Typ.var "a"] ]) ]
-                                         ])
+                            [ inherit_field
+                            ; Cf.inherit_ Fresh (Cl.apply (Cl.constr (lid proto_class_name)
+                                                    @@ List.map fst root_type.ptype_params)
+                                [(Nolabel,[%expr self])]) None
+                            ; Cf.initializer_ [%expr self := (this :> [%t Typ.constr (lid show_typename_t) @@
+                                                                            List.map fst root_type.ptype_params ])]
+                            ])
                         )
                      ]
         ]

@@ -3,12 +3,13 @@
 *)
 type token_env = int
 
-@type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list * 'a logic
 | Value of 'a
-with show,gmap
 
+(* with show,gmap *)
+;;
 
-type ('a, 'l) llist = Nil | Cons of 'a * 'l
+@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show
 
 type 'a lnat = O | S of 'a
