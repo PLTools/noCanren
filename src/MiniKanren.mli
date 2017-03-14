@@ -64,7 +64,7 @@ module State :
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal' 
+type 'a goal'
 type goal = State.t Stream.t goal'
 
 (** {3 Logical values and injections} *)
@@ -73,20 +73,22 @@ type goal = State.t Stream.t goal'
 type ('a, 'b) injected
 
 (** A type of abstract logic values *)
-@type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a
+[@@deriving gt { show } ]
+(* with show, gmap, html, eq, compare, foldl, foldr *)
 
 (** GT-compatible typeinfo for logics *)
 val logic :
   (unit,
    < show    : ('a -> string) -> 'a logic -> string;
-     html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+     (* html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
      eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
      compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
      foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
-     gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
+     gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic *)
    >) GT.t
 
 (** [lift x] injects [x] into itself *)
@@ -206,7 +208,7 @@ val succ :
 (*
 val succ :
   (unit -> ('a -> 'b goal') * ('c -> 'd -> 'e) * ((State.t Stream.t -> 'f -> 'g) * ('h -> 'i * 'j))) ->
-   unit -> 
+   unit ->
       (('k -> 'a) -> (('k, 'l) refiner * 'b) goal') * (('m -> 'c) -> 'm * 'd -> 'e) * ((State.t Stream.t -> ('n, 'o) refiner * 'f -> ('n, 'o) reification_rez Stream.t * 'g) *
       ('p * 'h -> ('p * 'i) * 'j))
 *)
@@ -383,14 +385,18 @@ module ManualReifiers :
 (** {3 Predefined types (lists, nats, bools etc.)} *)
 
 (** Abstract list type *)
-@type ('a, 'l) llist =
+type ('a, 'l) llist =
 | Nil
-| Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr
+| Cons of 'a * 'l
+(* with show, gmap, html, eq, compare, foldl, foldr *)
+[@@deriving gt { show } ]
 
 (** Abstract nat type *)
-@type 'a lnat =
+type 'a lnat =
 | O
-| S of 'a with show, html, eq, compare, foldl, foldr, gmap
+| S of 'a
+(* with show, html, eq, compare, foldl, foldr, gmap *)
+[@@deriving gt { show } ]
 
 (** {3 Relations on booleans} *)
 module Bool :
@@ -407,25 +413,26 @@ module Bool :
     (** GT-compatible typeinfo for [ground] *)
     val ground :
       (unit,
-       < compare : ground -> ground -> GT.comparison;
+       <
+         (* compare : ground -> ground -> GT.comparison;
          eq      : ground -> ground -> bool;
          foldl   : 'a -> ground -> 'a;
          foldr   : 'a -> ground -> 'a;
          gmap    : ground -> ground;
-         html    : ground -> HTML.viewer;
+         html    : ground -> HTML.viewer; *)
          show    : ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
-      (unit,
-       < compare : logic -> logic -> GT.comparison;
-         eq      : logic -> logic -> bool;
-         foldl   : 'a -> logic -> 'a;
-         foldr   : 'a -> logic -> 'a;
-         gmap    : logic -> logic;
-         html    : logic -> HTML.viewer;
-         show    : logic -> string >)
+      (unit, <
+          (* compare : logic -> logic -> GT.comparison;
+          eq      : logic -> logic -> bool;
+          foldl   : 'a -> logic -> 'a;
+          foldr   : 'a -> logic -> 'a;
+          gmap    : logic -> logic;
+          html    : logic -> HTML.viewer; *)
+          show    : logic -> string >)
       GT.t
 
     (** A synonym for injected boolean *)
@@ -483,26 +490,26 @@ module Nat :
 
     (** GT-compatible typeinfo for [ground] *)
     val ground :
-      (unit,
-       < compare : ground -> ground -> GT.comparison;
-         eq      : ground -> ground -> bool;
-         foldl   : 'a -> ground -> 'a;
-         foldr   : 'a -> ground -> 'a;
-         gmap    : ground -> ground;
-         html    : ground -> HTML.viewer;
-         show    : ground -> string >)
+      (unit, <
+            (* compare : ground -> ground -> GT.comparison;
+            eq      : ground -> ground -> bool;
+            foldl   : 'a -> ground -> 'a;
+            foldr   : 'a -> ground -> 'a;
+            gmap    : ground -> ground;
+            html    : ground -> HTML.viewer; *)
+            show    : ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
-      (unit,
-       < compare : logic -> logic -> GT.comparison;
-         eq      : logic -> logic -> bool;
-         foldl   : 'a -> logic -> 'a;
-         foldr   : 'a -> logic -> 'a;
-         gmap    : logic -> logic;
-         html    : logic -> HTML.viewer;
-         show    : logic -> string >)
+      (unit, <
+          (* compare : logic -> logic -> GT.comparison;
+          eq      : logic -> logic -> bool;
+          foldl   : 'a -> logic -> 'a;
+          foldr   : 'a -> logic -> 'a;
+          gmap    : logic -> logic;
+          html    : logic -> HTML.viewer; *)
+          show    : logic -> string >)
       GT.t
 
     (** [of_int n] converts integer [n] into [ground]; negative integers become [O] *)
@@ -562,13 +569,13 @@ module List :
 
     (** GT-compatible typeinfo for ['a ground] *)
     val ground :
-      (unit,
-       < gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
+      (unit, <
+         (* gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
          compare : ('a -> 'a -> GT.comparison) -> 'a ground -> 'a ground -> GT.comparison;
          eq      : ('a -> 'a -> bool) -> 'a ground -> 'a ground -> bool;
          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
-         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
+         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer; *)
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
@@ -577,13 +584,13 @@ module List :
 
     (** GT-compatible typeinfo for ['a logic] *)
     val logic :
-      (unit,
-        < gmap    : ('a -> 'b) -> (('a, 'c) t logic' as 'c) -> (('b, 'd) t logic' as 'd);
+      (unit, <
+          (* gmap    : ('a -> 'b) -> (('a, 'c) t logic' as 'c) -> (('b, 'd) t logic' as 'd);
           compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
           eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
           foldr   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
           foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
-          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer; *)
           show    : ('a -> string) -> 'a logic -> GT.string  >)
         GT.t
 
@@ -664,4 +671,3 @@ val (!<) : ('a, 'b) injected -> ('a, 'b) List.groundi
 
 (** [nil] is a synonym for [inj Nil] *)
 val nil : unit -> (_, _) List.groundi
-

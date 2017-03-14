@@ -11,8 +11,9 @@ true: short_paths
 <samples>: not_hygienic
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
 
-<src/MiniKanren.*>: syntax(camlp5o),package(GT,GT.syntax.all)
-<src/MiniKanren.mli>: hack_pr_o
+<src/MiniKanren.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+#<src/MiniKanren.mli>: hack_pr_o
+
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)
 <regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)

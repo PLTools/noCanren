@@ -505,7 +505,7 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         show_decls root_type @
         gmap_decls root_type @
         [derivers_bunch] *)
-      | _ -> raise_errorf "not implemented?"
+      | _ -> raise_errorf "not implemented?6"
     end
   | Ptype_variant constrs ->
     let (tt_methods, t_methods, t_meth_sigs) =
@@ -593,10 +593,10 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           ]
 
 
-        | _ -> raise_errorf "not implemented?"
+        | _ -> raise_errorf "not implemented?1"
       end
-    | Ptype_variant constrs -> raise_errorf  "not implemented?"
-    | _ -> raise_errorf "not implemented?"
+    | Ptype_variant constrs -> raise_errorf  "not implemented?2"
+    | _ -> raise_errorf "not implemented?3"
   in (* end of gmap_decls *)
 
   let show_typename_t = "show_" ^ typename_t in
@@ -612,7 +612,14 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                             ])
                        ]
           ]
-        | _ -> raise_errorf "not implemented?"
+        | Some t ->
+          let b = Buffer.create 40 in
+          let fmt = Format.formatter_of_buffer b in
+          Pprintast.core_type fmt (Obj.magic t);
+          Format.pp_flush_formatter fmt;
+
+          raise_errorf "%s\n%s" "not implemented?4 " (Buffer.contents b)
+        | None -> assert false
       end
     | Ptype_variant constrs ->
         let show_proto_meths =
@@ -629,28 +636,20 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                   in
                 match xxx with
                 | x when are_the_same x root_type ->
-                  (* assert false; *)
                   if toplevel
                   then [%expr GT.([%e Exp.(field (ident @@ lid reprname) (lid "fx")) ]) () ]
                   else [%expr GT.transform logic subj.GT.t#a this () ]
-                  (* then [%expr 1 ]
-                  else [%expr 2 ] *)
                 | {ptyp_desc=Ptyp_var _alpha; _} ->
                   [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
                 | [%type: int]
                 | [%type: GT.int] ->
-                   (* [%expr GT.transform GT.int (new GT.show_int_t) ] *)
-                   let e = [%expr GT.lift GT.int.GT.plugins#show () ] in
-                   maybe_apply e
+                  maybe_apply [%expr GT.lift GT.int.GT.plugins#show () ]
                 | [%type: string]
                 | [%type: GT.string] ->
                   maybe_apply [%expr GT.transform GT.string (new GT.show_string_t) () ]
                 | [%type: [%t? t] GT.list]
                 | [%type: [%t? t] list] ->
-                    (* [%expr GT.(transform list [%e helper t] (new show_list_t) ) ] *)
-                    let e = [%expr GT.lift (GT.list.GT.plugins#show [%e helper t]) () ] in
-                    maybe_apply e
-
+                  maybe_apply [%expr GT.lift (GT.list.GT.plugins#show [%e helper t]) () ]
                 | {ptyp_desc=Ptyp_constr ({txt=Lident cname;_},
                                           [{ptyp_desc=Ptyp_constr({txt=Lident argname;_},
                                                                   _)
@@ -697,10 +696,10 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
               in
 
               match List.combine args pcd_args with
-              | [] -> Exp.constant (Pconst_string (name', None))
+              | [] -> Exp.constant (Pconst_string (name' ^ " ()", None))
               | [(name,argt)] -> [%expr
-                            [%e Exp.constant (Pconst_string (name'^" ", None)) ] ^
-                            [%e expr_of_arg name argt]
+                            [%e Exp.constant (Pconst_string (name'^" (", None)) ] ^
+                            [%e expr_of_arg name argt] ^ ")"
                                  ]
               | args ->
                  let xs = List.map (fun (name,arg) -> expr_of_arg name arg) args in
@@ -797,7 +796,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         show_decls root_type @
         gmap_decls root_type @
         [derivers_bunch]
-      | _ -> raise_errorf "not implemented?"
+      | _ -> raise_errorf "%s %s" "not implemented?5" root_type.ptype_name.txt
     end
   | Ptype_variant constrs ->
       (* let _fields = *)

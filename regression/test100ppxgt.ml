@@ -1,8 +1,10 @@
 (* to get source:
   mkae ppx && ocamlfind ppx_tools/rewriter "`ocamlfind query ppx_deriving`/ppx_deriving -deriving-plugin _build/ppx/ppx_deriving_gt.cma" regression/test100ppxgt.ml
 *)
-type token_env = int
+type token_env = int [@@deriving gt { show } ]
 (* let () = print_endline @@ GT.show token_env 5 *)
+
+(* type inner_var = Var of token_env * int [@@deriving gt {show} ] *)
 
 (*
 type 'a logic =
@@ -64,7 +66,7 @@ let () =
   List.iter (fun n -> print_endline @@ show_nat n) [q;r;s]
 *)
 
-
+(*
 type ('varname, 'self) lam =
 | V of 'varname
 | App of 'self * 'self
@@ -79,3 +81,4 @@ let () =
   let rec show_lam l = GT.(show lam (show string) show_lam) l in
   let open GT in
   List.iter (fun n -> print_endline @@ show_lam n) [q;r;s]
+*)
