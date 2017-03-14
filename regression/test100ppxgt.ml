@@ -6,7 +6,7 @@ type token_env = int [@@deriving gt { show } ]
 
 (* type inner_var = Var of token_env * int [@@deriving gt {show} ] *)
 
-(*
+
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list  (* * 'a logic *)
 | Value of 'a
@@ -37,7 +37,7 @@ let () =
   let s = Var (2,[q;r]) in
   let open GT in
   List.iter (fun l -> print_endline @@ (show logic) (show string) l) [q;r;s]
-*)
+
 
 (*
 type ('a, 'l) llist = Nil | Cons of 'a * 'l

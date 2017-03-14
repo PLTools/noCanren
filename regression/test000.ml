@@ -4,26 +4,26 @@ open Printf
 open ManualReifiers
 open GT
 
-module Option = 
+module Option =
   struct
 
-    module T = 
-      struct    
+    module T =
+      struct
         type 'a t = 'a option
-        let fmap f x = gmap(option) f x 
+        let fmap f x = gmap(option) f x
       end
 
-  include T 
+  include T
   include Fmap1(T)
 
   let some x  = inj @@ distrib (Some x)
-  let none () = inj @@ distrib None 
+  let none () = inj @@ distrib None
 end
 
 let show_int       = show(int)
 let show_int_opt   = show(option) (show(int))
 let show_intl      = show(logic)  (show(int))
-let show_intl_optl = show(logic)  (show(option) (show(logic) (show(int)))) 
+let show_intl_optl = show(logic)  (show(option) (show(logic) (show(int))))
 
 let int_opt_reifier = Option.reify int_reifier
 
@@ -33,15 +33,19 @@ let _ =
   runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === some !!5));
   runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === none ()));
   runR int_reifier     show_int     show_intl      1 q qh (REPR(fun q -> some q === some !!5 ));
-  runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> call_fresh (fun w -> q === some w)))  
+  runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> call_fresh (fun w -> q === some w)))
 
-module Result = 
+module Result =
   struct
 
-    module X = 
+    module X =
       struct
-        @type ('a,'b) t = Ok of 'a | Error of 'b with show, gmap
-        let fmap f g x = gmap(t) f g x
+        type ('a,'b) t = Ok of 'a | Error of 'b [@@deriving gt { show; } ]
+        (* with show, gmap *)
+        (* let fmap f g x = gmap(t) f g x *)
+        let fmap f g = function
+        | Ok a -> Ok (f a)
+        | Error b -> Error (g b)
       end
 
   include X
@@ -63,6 +67,5 @@ let _ =
   runResult   (-1) q qh (REPR(fun q -> Fresh.two (fun r s -> conde
                                                                 [ (q === Result.ok    s) &&& (s =/= !!4)
                                                                 ; (q === Result.error r)
-                                                                ]) 
+                                                                ])
                         ))
-
