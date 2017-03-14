@@ -35,6 +35,13 @@ open Parsetree
 open Ast_helper
 open Ppx_deriving
 
+module List = struct
+  include List
+  let split3 xs =
+    List.fold_right (fun (a,b,c) (ac,bc,cc) -> (a::ac,b::bc,c::cc))
+      xs ([],[],[])
+end
+
 let deriver = "gt"
 let raise_errorf = Ppx_deriving.raise_errorf
 
@@ -316,6 +323,11 @@ let wrap_with_fa ?(use_lift=false) ~root_type func lasts =
   let right = Exp.apply func right in
   make_params_lambda_fa ~root_type right
 
+(* There we generate three lists
+  1. Method signature for tt class type
+  2. Virtual methods for t class structure
+  3. Virtual methods for t class signature
+  *)
 let generate_some_methods ~typename ?(t_virtual=false) root_type constrs =
   let t_typename = "t_" ^ typename in
   let xs = List.map (fun { pcd_name = { txt = name' }; pcd_args } ->
@@ -357,22 +369,24 @@ let generate_some_methods ~typename ?(t_virtual=false) root_type constrs =
     in
 
     let ts = List.fold_right (Typ.arrow Nolabel) args2 (Typ.var "syn") in
-    (* let virt_of_bool = function | true -> Virtual | false -> Concrete in *)
     ( Ctf.method_ (mknoloc constr_name) Public Concrete ts,
       (* Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts)  *)
-      Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts)
+      Cf.method_  (mknoloc constr_name) Public (Cfk_virtual ts),
+      Ctf.method_ (mknoloc constr_name) Public Virtual ts
     )
   ) constrs
   in
-  let (tts, ts) = List.split xs in
+  let (tts, ts, ts_sigs) = List.split3 xs in
+  let meth_main_mapper_typ =
+    let ts = List.map (fun (t,_) -> arr_of_param t) root_type.ptype_params in
+    let init =
+      [%type: 'inh -> [%t using_type ~typename root_type] -> 'syn ]
+    in
+    List.fold_right (fun (_,_,x) acc -> Typ.arrow Nolabel x acc) ts init
+  in
   let tts = tts @
-            [
-              let ts = List.map (fun (t,_) -> arr_of_param t) root_type.ptype_params in
-              let init =
-                [%type: 'inh -> [%t using_type ~typename root_type] -> 'syn ]
-              in
-              Ctf.method_ (mknoloc ("t_" ^ typename))  Public Concrete
-                (List.fold_right (fun (_,_,x) acc -> Typ.arrow Nolabel x acc) ts init)
+            [ Ctf.method_ (mknoloc ("t_" ^ typename))  Public Concrete
+                meth_main_mapper_typ
             ]
   in
 
@@ -380,17 +394,17 @@ let generate_some_methods ~typename ?(t_virtual=false) root_type constrs =
     wrap_with_fa ~use_lift:false
       [%expr GT.transform [%e Exp.ident @@ lid typename]]
       [  [%expr this] ]
-
-
-    (* make_params_lambda_a [%expr GT.transform [%e Exp.ident @@ lid typename] *)
-    (*                                        [%e make_params_lambda_a [%expr this] ] *)
-
   in
   let ts = ts @ [ Cf.method_ (mknoloc t_typename) Public
                     (Cfk_concrete (Fresh, main_mapper_body ~root_type))
                 ]
   in
-  (tts, ts)
+  let ts_sigs = ts_sigs @
+    [ Ctf.method_ (mknoloc t_typename) Public Concrete
+        meth_main_mapper_typ
+    ]
+  in
+  (tts, ts, ts_sigs)
 
 let make_tt_class_type ~params typename_tt tt_methods =
   Str.class_type [Ci.mk ~virt:Virtual ~params
@@ -494,7 +508,7 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       | _ -> raise_errorf "not implemented?"
     end
   | Ptype_variant constrs ->
-    let (tt_methods, t_methods) =
+    let (tt_methods, t_methods, t_meth_sigs) =
       generate_some_methods ~typename ~t_virtual:true root_type constrs  in
     let ans =
       [ Sig.class_type [Ci.mk ~virt:Virtual ~params:(default_params root_type)
@@ -506,7 +520,7 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           [ Ci.mk ~virt:Virtual ~params:(default_params root_type)
               (mknoloc typename_t) @@
               Cty.signature
-                (Csig.mk any_typ tt_methods)
+                (Csig.mk any_typ t_meth_sigs)
           ]
 
       ]
@@ -910,7 +924,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         ]
       in
 
-      let (tt_methods, t_methods) = generate_some_methods root_type constrs ~typename in
+      let (tt_methods, t_methods, _) = generate_some_methods root_type constrs ~typename in
       let ans =
         [ make_tt_class_type ~params:(default_params root_type) typename_tt tt_methods
         ; Str.value Nonrecursive [Vb.mk
