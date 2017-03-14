@@ -99,9 +99,10 @@ type goal = MKStream.t goal'
 
 
 (** A type of abstract logic values *)
-@type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a
+[@@deriving gt {show}]
 
 (** GT-compatible typeinfo for logics *)
 val logic :

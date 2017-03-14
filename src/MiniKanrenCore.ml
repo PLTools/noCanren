@@ -238,9 +238,10 @@ module Stream =
 ;;
 
 (* ************************************************ *)
-@type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a
+[@@derving gt {show} ]
 
 let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x ->
   let rec helper = function
@@ -264,7 +265,7 @@ let logic = {logic with
      method show fa x =
        GT.transform(logic)
           (GT.lift fa)
-          (object inherit ['a] @logic[show]
+          (object inherit ['a] logic_t[show]
             method c_Var _ s i cs =
               (* I have some issues with callign show_logic there, so copy-paste*)
               (* show_logic (fun _ -> assert false) (Var(_token,i,cs)) *)
@@ -283,7 +284,7 @@ let logic = {logic with
 (* miniKanren-related stuff starts here *)
 
 (* The [token_t] type is use to connect logic variables with environment where they were created *)
-@type token_env = GT.int;;
+type token_env = GT.int;;
 
 (* Scope there are just ints but in faster-MK they use reference equality *)
 type scope_t = int

@@ -21,14 +21,16 @@ end;;
 (** {3 Predefined types (lists, nats, bools etc.)} *)
 
 (** Abstract list type *)
-@type ('a, 'l) llist =
+type ('a, 'l) llist =
 | Nil
-| Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr
+| Cons of 'a * 'l
+[@@derving gt {show} ]
 
 (** Abstract nat type *)
-@type 'a lnat =
+type 'a lnat =
 | O
-| S of 'a with show, html, eq, compare, foldl, foldr, gmap
+| S of 'a 
+[@@derving gt {show} ]
 
 module Option : sig
   type 'a t = 'a option

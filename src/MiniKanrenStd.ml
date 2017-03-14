@@ -34,8 +34,10 @@ module ManualReifiers = struct
   let triple = Tuple3.reify
 end;;
 
-@type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
-@type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap;;
+type ('a, 'l) llist = Nil | Cons of 'a * 'l
+[@@deriving gt {show}]
+type 'a lnat = O | S of 'a
+[@@deriving gt {show}]
 
 module Option = struct
   module T =
@@ -142,7 +144,6 @@ let neqo x y t =
     (x === y) &&& (t === Bool.false_);
   ]
 
-
 module Nat = struct
     type 'a logic' = 'a logic
     let logic' = logic
@@ -170,12 +171,13 @@ module Nat = struct
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n = GT.html   (lnat) this#html    n
-          method eq      n = GT.eq     (lnat) this#eq      n
-          method compare n = GT.compare(lnat) this#compare n
-          method foldr   n = GT.foldr  (lnat) this#foldr   n
-          method foldl   n = GT.foldl  (lnat) this#foldl   n
-          method gmap    n = GT.gmap   (lnat) this#gmap    n
+          method gmap    n =
+          object (this)
+            (* inherit  ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) llist] llist_t *)
+            method c_Cons inh subj p0 p1 = Cons ((p0.GT.fx ()), (p1.GT.fx ()))
+            method c_Nil inh subj = Nil
+          end
+
           method show    n = GT.show   (lnat) this#show    n
         end
     }
@@ -184,12 +186,7 @@ module Nat = struct
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (logic') (GT.html   (lnat) this#html   ) n
-          method eq      n m = GT.eq     (logic') (GT.eq     (lnat) this#eq     ) n m
-          method compare n m = GT.compare(logic') (GT.compare(lnat) this#compare) n m
-          method foldr   a n = GT.foldr  (logic') (GT.foldr  (lnat) this#foldr  ) a n
-          method foldl   a n = GT.foldl  (logic') (GT.foldl  (lnat) this#foldl  ) a n
-          method gmap    n   = GT.gmap   (logic') (GT.gmap   (lnat) this#gmap   ) n
+          (* method gmap    n   = GT.gmap   (logic') (GT.gmap   (lnat) this#gmap   ) n *)
           method show    n   = GT.show   (logic') (GT.show   (lnat) this#show   ) n
         end
     }
@@ -315,7 +312,7 @@ module List =
               (GT.transform(llist)
                  (GT.lift fa)
                  (GT.lift inner)
-                 (object inherit ['a,'a ground] @llist[show]
+                 (object inherit ['a,'a ground] llist_t[show]
                     method c_Nil   _ _      = ""
                     method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                   end)
@@ -345,7 +342,7 @@ module List =
                     GT.transform(llist)
                       (GT.lift fa)
                       (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] @llist[show]
+                      (object inherit ['a,'a logic] llist_t[show]
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs =
                            x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())

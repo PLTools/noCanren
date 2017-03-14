@@ -3,6 +3,9 @@
 *)
 type token_env = int
 
+type inner_var = Var of token_env * int [@@deriving gt {show} ]
+
+(*
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list (* * 'a logic *)
 | Value of 'a
@@ -13,3 +16,4 @@ type ('a, 'l) llist = Nil | Cons of 'a * 'l
 (* with show *)
 
 type 'a lnat = O | S of 'a
+*)
