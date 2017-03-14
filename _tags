@@ -20,15 +20,21 @@ true: short_paths
 
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)
-<regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
+#<regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
+<regression/stlc.*>:  package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
 #<regression/test003.ml>: use_pa_minikanren
 
 <regression/test0*.*>: package(GT), ppx(ppx/ppx_repr.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+
+#Some tests require syntax extensions with freshes
+<regression/test014.*> or <regression/test013.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test006.*> or <regression/test007.*>: ppx(ppx/pa_minikanren_bin.native --as-ppx)
+
+#camlp5 stuff
 #<regression/test0*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
 #<regression/test004.ml> or <regression/test009.ml> or <regression/test005.ml> or <regression/test000.ml> : use_pa_minkanren
 #<regression/test004.*>:
-<regression/test016*.*> or <regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or <regression/test010.*> or <regression/test009.*> or <regression/test011.*> or <regression/test007.*> or <regression/test006.*> or <regression/test005.*> or <regression/test004.*> or <regression/test001.*>: syntax(camlp5o), package(logger.syntax)
-<regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test007.*> or <regression/test006.*> or <regression/test005.*> or <regression/test004.*> or <regression/test003.*>: use_pa_minikanren, package(GT.syntax.all)
+#<regression/test016*.*> or <regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or  <regression/test011.*> or <regression/test001.*>: syntax(camlp5o), package(logger.syntax)
+# <regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test007.*> or <regression/test006.*> or <regression/test005.*> or <regression/test004.*> or <regression/test003.*>: use_pa_minikanren, package(GT.syntax.all)
 
 ####################################################################
 # JSOO toplevel related stuff

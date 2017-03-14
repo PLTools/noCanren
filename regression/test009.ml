@@ -3,7 +3,9 @@ open GT
 open MiniKanren
 open Tester
 
-@type token = Id | Add | Mul with show
+type token = Id | Add | Mul
+(* with show *)
+[@@deriving gt {show}]
 
 let show_token = show(token)
 
@@ -12,9 +14,15 @@ module GExpr =
 
     module T =
       struct
-        @type 'self t  = I | A of 'self * 'self | M of 'self * 'self with show, gmap
+        type 'self t  = I | A of 'self * 'self | M of 'self * 'self
+        (* with show, gmap *)
+        [@@deriving gt {show}]
 
-        let fmap f x = gmap(t) f x
+        (* let fmap f x = gmap(t) f x *)
+        let fmap f = function
+        | I -> I
+        | A (a,b) -> A (f a, f b)
+        | M (a,b) -> M (f a, f b)
      end
 
   include T
