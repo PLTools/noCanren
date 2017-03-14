@@ -3,14 +3,16 @@ open Tester
 open Printf
 open GT
 
-module Peano = 
+module Peano =
   struct
 
-    module T = 
-      struct    
-        @type 'a t = O | S of 'a with show, gmap
+    module T =
+      struct
+        type 'a t = O | S of 'a [@@deriving gt {show}]
+        (* with show, gmap *)
 
-        let fmap f x = gmap(t) f x
+        (* let fmap f x = gmap(t) f x *)
+        let fmap f = function O -> O | S n -> S (f n)
      end
 
   include T

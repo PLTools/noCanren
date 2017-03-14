@@ -2,17 +2,22 @@ open Printf
 open GT
 open MiniKanren
 
-module GLam = 
+module GLam =
   struct
-    module T = 
+    module T =
       struct
-        @type ('varname, 'self) t =
+        type ('varname, 'self) t =
         | V of 'varname
         | App of 'self * 'self
         | Abs of 'varname * 'self
-        with show, gmap
+        [@@deriving gt {show}]
+        (* with show, gmap *)
 
-        let fmap f g x = gmap(t) f g x
+        (* let fmap f g x = gmap(t) f g x *)
+        let fmap f g = function
+        | V s -> V (f s)
+        | App (a,b) -> App (g a, g b)
+        | Abs (s,x) -> Abs (f s, g x)
       end
 
   include T
