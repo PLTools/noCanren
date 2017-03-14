@@ -36,7 +36,7 @@ plugin:
 	$(OB) camlp5/pa_minikanren.cmo
 
 ppx:
-	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs
+	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs ppx/ppx_repr.native
 
 celan: clean
 
