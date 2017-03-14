@@ -4,5 +4,5 @@ B ../_build/regression
 B ../_build/ppx
 FLG -rectypes
 FLG -short-paths
-FLG -ppx ' /home/kakadu/.opam/4.04.0+fp+flambda/lib/ppx_deriving/ppx_deriving -deriving-plugin _build/ppx/ppx_deriving_gt.cma'
+FLG -ppx " /home/kakadu/.opam/4.04.0+fp+flambda/lib/ppx_deriving/ppx_deriving -deriving-plugin /home/kakadu/asp/ocanren-antiphantom/_build/ppx/ppx_deriving_gt.cma"
 PKG GT
