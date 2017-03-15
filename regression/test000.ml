@@ -23,12 +23,8 @@ module Result =
 
     module X =
       struct
-        type ('a,'b) t = Ok of 'a | Error of 'b [@@deriving gt { show; } ]
-        (* with show, gmap *)
-        (* let fmap f g x = gmap(t) f g x *)
-        let fmap f g = function
-        | Ok a -> Ok (f a)
-        | Error b -> Error (g b)
+        @type ('a,'b) t = Ok of 'a | Error of 'b with show, gmap
+        let fmap f g x = gmap(t) f g x
       end
 
   include X
