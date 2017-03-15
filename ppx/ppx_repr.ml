@@ -21,14 +21,9 @@ let mapper _config _cookies =
            function
            | { pexp_desc=Pexp_construct ({txt=Lident "REPR";_}, Some e); _} as expr ->
               let text = string_of_expression e in
-              (* let text = "" in *)
               { expr with pexp_desc =
                             Pexp_tuple [Ast_helper.Exp.constant (Pconst_string (text,None)); e] }
            | e -> default_mapper.expr mapper e
   }
 
-let () = Driver.register ~name:"logger_repr" Versions.ocaml_405
-  mapper
-  (* (fun  _ _ -> Ast_mapper.default_mapper) *)
-
-let _ = Driver.run_main ()
+let register () = Driver.register ~name:"repr" Versions.ocaml_405 mapper

@@ -35,6 +35,7 @@ let is_conj = need_insert_fname ~name:"conj"
 let is_disj e =
   need_insert_fname ~name:"disj" e || need_insert_fname ~name:"|||" e
 
+(*
 let rec walkthrough ~fname (expr: expression) =
 
   let add_fname () =
@@ -82,7 +83,7 @@ let smart_logger =
         { sitem with pstr_desc = Pstr_value (_rec, List.map vbs ~f:map_value_binding) }
       | x -> default_mapper.structure_item mapper sitem
   }
-
+*)
 
 let option_map ~f = function Some x -> Some (f x) | None -> None
 let option_bind ~f = function Some x -> f x | None -> None
@@ -177,3 +178,5 @@ let rec pamk_e mapper e : expression =
 let pa_minikanren =
   { default_mapper with expr = fun mapper e -> pamk_e mapper e
   }
+
+let register () = Driver.register ~name:"pa_minikanren" Versions.ocaml_405 (fun _ _ -> pa_minikanren)

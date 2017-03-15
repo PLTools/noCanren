@@ -1,8 +1,5 @@
 S .
-S ../ppx
 B ../_build/regression
-B ../_build/ppx
-B ../_build/src
 
 FLG -rectypes
 FLG -short-paths

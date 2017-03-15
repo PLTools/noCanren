@@ -31,7 +31,9 @@ plugin:
 	$(OB) camlp5/pa_minikanren.cmo
 
 ppx:
-	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs ppx/ppx_repr.native ppx/pa_minikanren_bin.native
+	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs \
+		ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native \
+		ppx/ppx_ocanren_all.native
 
 celan: clean
 
@@ -39,8 +41,11 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
-REGRES_CASES := 000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
+# camlp5-based tests
+#REGRES_CASES := 000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
 REGRES_CASES += 100ppxgt
+#ppx-based tests
+REGRES_CASES += 205infero 206evalo
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
