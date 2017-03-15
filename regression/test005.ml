@@ -4,21 +4,17 @@ open MiniKanren
 open Tester
 open Stlc
 
-module GTyp =
+module GTyp = 
   struct
 
-    module T =
-      struct
-        type ('a, 'b) t =
-        | P   of 'a      (* primitive *)
+    module T = 
+      struct    
+        @type ('a, 'b) t = 
+	| P   of 'a      (* primitive *)
         | Arr of 'b * 'b (* arrow *)
-        [@@deriving gt {show}]
-        (* with gmap, show *)
+        with gmap, show
 
-       (* let fmap f g x = gmap(t) f g x *)
-        let fmap f g = function
-        | P x -> P (f x)
-        | Arr (a,b) -> Arr (g a, g b)
+       let fmap f g x = gmap(t) f g x
      end
 
   include T
