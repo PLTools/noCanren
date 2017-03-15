@@ -1,10 +1,7 @@
-REC
 SRC .
 SRC ../src
 B ../_build/src
 B ../_build/regression
-B ../_build/ppx
-B ../_build/src
 
 FLG -rectypes
 FLG -short-paths

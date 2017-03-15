@@ -26,8 +26,4 @@ let mapper _config _cookies =
            | e -> default_mapper.expr mapper e
   }
 
-let () = Driver.register ~name:"logger_repr" Versions.ocaml_405
-  mapper
-  (* (fun  _ _ -> Ast_mapper.default_mapper) *)
-
-let _ = Driver.run_main ()
+let register () = Driver.register ~name:"repr" Versions.ocaml_405 mapper

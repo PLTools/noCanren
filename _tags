@@ -1,6 +1,8 @@
 true: debug, rectypes, color(always), bin_annot, keep_asm
 true: short_paths
 
+<src/MiniKanren.*> or <regression/test*.*>: rectypes
+
 #<ppx/*>: package(compiler-libs.common,ppx_deriving,ppx_deriving.runtime,ppx_tools.metaquot)
 <ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
 <ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std),open(Ast_convenience_405),open(Ppx_tools_405),open(Ast_405)
@@ -18,23 +20,20 @@ true: short_paths
 <src/MiniKanren*.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
 <src/*.ml*>: package(GT)
 
+# regression tests related stuff
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)
-#<regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
-<regression/stlc.*>:  package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
-#<regression/test003.ml>: use_pa_minikanren
 
-<regression/test0*.*>: package(GT), ppx(ppx/ppx_repr.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/stlcPPX.*>:  package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
 
+#PPX tests are like 2xx
 #Some tests require syntax extensions with freshes
-<regression/test014.*> or <regression/test013.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test006.*> or <regression/test007.*>: ppx(ppx/pa_minikanren_bin.native --as-ppx)
+<regression/stlcPPX.*>: rectypes
+<regression/test2*.*>: package(GT), ppx(ppx/ppx_ocanren_all.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
 
-#camlp5 stuff
-#<regression/test0*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
-#<regression/test004.ml> or <regression/test009.ml> or <regression/test005.ml> or <regression/test000.ml> : use_pa_minkanren
-#<regression/test004.*>:
-#<regression/test016*.*> or <regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or  <regression/test011.*> or <regression/test001.*>: syntax(camlp5o), package(logger.syntax)
-# <regression/test015*.*> or <regression/test014.*> or <regression/test013.*> or <regression/test012.*> or <regression/test011.*> or <regression/test010.*> or <regression/test009.*> or <regression/test007.*> or <regression/test006.*> or <regression/test005.*> or <regression/test004.*> or <regression/test003.*>: use_pa_minikanren, package(GT.syntax.all)
+#camlp5 stuff for tests that start from 0
+<regression/test0*.*> or <regression/stlc.*>: syntax(camlp5o), package(logger.syntax), package(GT,GT.syntax.all), use_pa_minikanren
+<regression/stlc.*>: rectypes
 
 ####################################################################
 # JSOO toplevel related stuff
