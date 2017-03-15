@@ -1,31 +1,10 @@
 (*
- * Copyright (c) 2014, TU Berlin
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of the TU Berlin nor the
- *     names of its contributors may be used to endorse or promote products
- *     derived from this software without specific prior written permission.
-
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL TU Berlin BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * OCanren: syntax extension.
+ * Copyright (C) 2016-2017
+ * Dmitrii Kosarev aka Kakadu
+ * St.Petersburg State University, JetBrains Research
  *
  *)
-
 
 open Printf
 open Longident
@@ -420,18 +399,16 @@ let make_params_longarrow ~root_type typ =
                   acc)
     | _ -> assert false) root_type.ptype_params typ
 
-let subclass_obj typename_tt xs =
+let subclass_obj ~root_type typename_tt =
   (* makes ('a,'ia,'sa,...,'inh,'syn)#typename_tt  *)
-  Typ.class_ (lid typename_tt) xs
-  (* (List.map fst (default_params root_type)) *)
+  Typ.class_ (lid typename_tt) @@ List.map fst (default_params root_type)
 
 let any_typ = [%type: _]
 
 let gt_repr_typ_wrap ~typename ~root_type arg =
   let typename_tt = typename ^ "_tt" in
   let tail = [%type: 'inh -> [%t using_type ~typename root_type ] -> 'syn ] in
-  let subclass = subclass_obj typename_tt @@
-    List.map fst (default_params root_type) in
+  let subclass = subclass_obj typename_tt ~root_type in
   [%type: ([%t make_params_longarrow ~root_type
               [%type: [%t subclass] -> [%t tail]]],
            [%t arg]) GT.t ]
@@ -535,17 +512,12 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
           wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]] ~root_type
             [ Exp.new_ @@ lid cname; [%expr () ] ]
         in
-        (* let body = [%expr [%e body] ()] in *)
-        (* let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
-          ([%e Exp.new_ @@ lid cname]) ()
-          ]
-        in *)
         Cf.method_ (Location.mknoloc mname) Public (Cfk_concrete (Fresh, body))
       in
       let gcata_part =
         let args2 = List.map (fun (t,_) -> let (_,_,x) = arr_of_param t in x) type_params in
         List.fold_right (Typ.arrow Nolabel) args2
-          [%type: [%t subclass_obj typename_tt (List.map fst @@ default_params root_type) ] ->
+          [%type: [%t subclass_obj ~root_type typename_tt  ] ->
             'inh -> [%t using_type ~typename root_type ] -> 'syn ]
       in
       let plugins_part =
@@ -561,9 +533,6 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         Typ.object_ (for_show @ for_gmap) Closed
       in
       Sig.value (Val.mk (mknoloc typename) [%type: ([%t gcata_part], [%t plugins_part]) GT.t])
-      (* [%sigi: val asdf (*[%p Pat.var @@ mknoloc typename] *):
-        int
-      ] *)
     in
     ans @ [derivers_bunch]
   | _ -> raise_errorf "Some cases are not supported"
@@ -629,12 +598,12 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
 
             let body =
               let expr_of_arg reprname typ =
-                let rec helper ?(toplevel=false) xxx =
+                let rec helper ?(toplevel=false) =
                   let maybe_apply e =
                     if toplevel then [%expr [%e e] [%e Exp.ident @@ lid reprname ] ]
                     else e
                   in
-                match xxx with
+                function
                 | x when are_the_same x root_type ->
                   if toplevel
                   then [%expr GT.([%e Exp.(field (ident @@ lid reprname) (lid "fx")) ]) () ]
@@ -766,11 +735,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         wrap_with_fa ~use_lift:true [%expr GT.transform [%e Exp.ident @@ lid typname]] ~root_type
           [ Exp.new_ @@ lid cname; [%expr () ] ]
       in
-      (* let body = [%expr [%e body] ()] in *)
-      (* let body = [%expr GT.transform [%e Exp.ident @@ lid typname]
-        ([%e Exp.new_ @@ lid cname]) ()
-        ]
-      in *)
       Cf.method_ (Location.mknoloc mname) Public (Cfk_concrete (Fresh, body))
     in
     [%stri let [%p Pat.var @@ mknoloc typename] =
@@ -799,13 +763,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       | _ -> raise_errorf "%s %s" "not implemented?5" root_type.ptype_name.txt
     end
   | Ptype_variant constrs ->
-      (* let _fields = *)
-      (*   constrs |> List.map (fun { pcd_name = { txt = name' }; pcd_args } -> *)
-      (*     let constr_name = Ppx_deriving.expand_path ~path name' in *)
-      (*     Ast_helper.Cf.method_ (Location.mknoloc constr_name) Public *)
-      (*       (Cfk_concrete (Fresh, *)
-      (*                      [%expr 1]))) *)
-      (* in *)
       let _make_params_app_with_lift first lasts =
         let first_part =
           List.map (function ({ptyp_desc; _ },_) ->
@@ -853,14 +810,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
            in
            Exp.apply res [(Nolabel, last)]
       in
-
-         (* let res = List.fold_left (fun acc -> function *)
-         (*   | Ptyp_var name ->  *)
-         (*       Exp.apply acc (Exp.ident @@ lid name) *)
-         (*   | _ -> assert false *)
-         (*                          ) first root_type.ptype_params *)
-         (* in *)
-         (* Exp.apply  *)
 
       let gt_repr_typ = gt_repr_typ_wrap ~typename ~root_type [%type: unit] in
       let gt_repr_body =
@@ -936,95 +885,12 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
         ]
       in
 
-      let _footer =
-        (* gcata for show *)
-        Str.value Nonrecursive
-          [(* Vb.mk (Pat.(constraint_ (var @@ mknoloc typename) gt_repr_typ_show)) *)
-           (*   [%expr *)
-           (*         { GT.gcata = [%e Exp.(field (ident @@ lid typename) (lid "GT.gcata")) ]; *)
-           (*           GT.plugins = object  *)
-           (*              method show = *)
-           (*                [%e wrap_with_fa ~use_lift:true *)
-           (*                      [%expr GT.transform [%e Exp.ident @@ lid typename]] *)
-           (*                      [ (Exp.new_ (lid show_typename_t)); [%expr ()] ] *)
-           (*                ] *)
-           (*           end } *)
-           (*   ] *) ]
-      in
-      (* let footer = [%stri external aaa: int -> int = "%identity"] in *)
-
       let ans = if not gt_show then ans else ans @ (show_decls root_type) in
       ans @ [derivers_bunch]
 
-
   | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
-  (*
-  let prettyprinter =
-    match type_decl.ptype_kind, type_decl.ptype_manifest with
-    | Ptype_abstract, Some manifest ->
-      [%expr fun fmt -> [%e expr_of_typ quoter manifest]]
-    | Ptype_variant constrs, _ ->
-      let cases =
-        constrs |> List.map (fun { pcd_name = { txt = name' }; pcd_args } ->
-          let constr_name = Ppx_deriving.expand_path ~path name' in
-          let args =
-            List.mapi (fun i typ -> app (expr_of_typ quoter typ) [evar (argn i)]) pcd_args
-          in
-          let result =
-            match args with
-            | []   -> [%expr Format.pp_print_string fmt [%e str constr_name]]
-            | [arg] ->
-              [%expr
-                Format.fprintf fmt [%e str ("(@[<hov2>" ^  constr_name ^ "@ ")];
-                [%e arg];
-                Format.fprintf fmt "@])"]
-            | args ->
-              [%expr Format.fprintf fmt [%e str ("@[<hov2>" ^  constr_name ^ " (@,")];
-              [%e args |> Ppx_deriving.(fold_exprs
-                    (seq_reduce ~sep:[%expr Format.fprintf fmt ",@ "]))];
-              Format.fprintf fmt "@])"]
-          in
-          Exp.case (pconstr name' (List.mapi (fun i _ -> pvar (argn i)) pcd_args)) result)
-      in
-      [%expr fun fmt -> [%e Exp.function_ cases]]
-    | Ptype_record labels, _ ->
-      let fields =
-        labels |> List.mapi (fun i { pld_name = { txt = name }; pld_type; pld_attributes } ->
-          let field_name = if i = 0 then Ppx_deriving.expand_path ~path name else name in
-          let pld_type = {pld_type with ptyp_attributes=pld_attributes@pld_type.ptyp_attributes} in
-          [%expr Format.pp_print_string fmt [%e str (field_name ^ " = ")];
-            [%e expr_of_typ quoter pld_type] [%e Exp.field (evar "x") (mknoloc (Lident name))]])
-      in
-      [%expr fun fmt x ->
-        Format.fprintf fmt "{ @[<hov>";
-        [%e fields |> Ppx_deriving.(fold_exprs
-              (seq_reduce ~sep:[%expr Format.fprintf fmt ";@ "]))];
-        Format.fprintf fmt "@] }"]
-    | Ptype_abstract, None ->
-      raise_errorf ~loc "%s cannot be derived for fully abstract types" deriver
-    | Ptype_open, _        ->
-      raise_errorf ~loc "%s cannot be derived for open types" deriver
-  in
-  let pp_poly_apply = Ppx_deriving.poly_apply_of_type_decl type_decl (evar
-                        (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl)) in
-  let stringprinter = [%expr fun x -> Format.asprintf "%a" [%e pp_poly_apply] x] in
-  let polymorphize  = Ppx_deriving.poly_fun_of_type_decl type_decl in
-  let pp_type =
-    Ppx_deriving.strong_type_of_type @@ pp_type_of_decl ~options ~path type_decl in
-  let show_type =
-    Ppx_deriving.strong_type_of_type @@
-      show_type_of_decl ~options ~path type_decl in
-  let pp_var =
-    pvar (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl) in
-  let show_var =
-    pvar (Ppx_deriving.mangle_type_decl (`Prefix "show") type_decl) in
-  [Vb.mk (Pat.constraint_ pp_var pp_type)
-         (Ppx_deriving.sanitize ~quoter (polymorphize prettyprinter));
-   Vb.mk (Pat.constraint_ show_var show_type) (polymorphize stringprinter);]
-  *)
 
 let register () =
-  (* TODO: generate signatures too *)
   Ppx_deriving.(register (create deriver
     (* ~core_type: (Ppx_deriving.with_quoter (fun quoter typ -> *)
     (*   [%expr fun x -> Format.asprintf "%a" (fun fmt -> [%e expr_of_typ quoter typ]) x])) *)
