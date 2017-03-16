@@ -435,44 +435,6 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let typename    = root_type.ptype_name.txt in
   let typename_t  = typename ^ "_t"  in
   let typename_tt = typename ^ "_tt" in
-  (* let t_typename  = "t_" ^ typename  in *)
-  let show_env_tt = sprintf "show_%s_env_tt" typename in
-
-  let _gmap_decls root_type = [] in
-  let show_decls root_type =
-    let proto_class_name = "show_proto_" ^ typename in
-    let show_t = sprintf "show_%s_t" typename in
-    [ Sig.class_type [Ci.mk ~virt:Concrete ~params:root_type.ptype_params
-                        (mknoloc show_env_tt) @@
-                      Cty.signature (Csig.mk [%type: _ ] [])]
-    ; Sig.class_
-        [ let tt_ref =
-            [%type: [%t Typ.constr (lid show_env_tt) (List.map fst root_type.ptype_params) ] ref]
-          in
-          Ci.mk ~virt:Concrete ~params:root_type.ptype_params
-            (mknoloc proto_class_name)
-            (Cty.arrow Nolabel tt_ref @@
-              Cty.signature (Csig.mk [%type: _ ]
-                [ inherit_ctf ~root_type ~name:typename_tt
-                (* ; Ctf.inherit_ @@ Cty.constr (lid show_env_tt) (List.map fst root_type.ptype_params) *)
-                ])
-            )
-      ]
-    (* ; Sig.class_
-        [ let tt_ref =
-            [%type: [%t Typ.constr (lid show_env_tt) (List.map fst root_type.ptype_params) ] ref]
-          in
-          Ci.mk ~virt:Concrete ~params:root_type.ptype_params
-            (mknoloc show_t) @@
-            (Cty.arrow Nolabel tt_ref @@
-              Cty.signature (Csig.mk [%type: _ ]
-                [ inherit_ctf ~root_type ~name:typename_tt
-                ; Ctf.inherit_ @@ Cty.constr (lid show_env_tt) (List.map fst root_type.ptype_params)
-                ])
-            )
-        ] *)
-    ]
-  in
 
   match root_type.ptype_kind with
   | Ptype_abstract -> begin
@@ -502,7 +464,7 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
 
       ]
     in
-    let ans = if not gt_show then ans else ans @ (show_decls root_type) in
+    (* let ans = if not gt_show then ans else ans @ (show_decls root_type) in *)
     (* TODO: add gmap here *)
 
     let derivers_bunch =
@@ -701,28 +663,8 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                     >
             ]
         in
-        let proto_class_name = "show_proto_" ^ typename in
-        [ Str.class_type [Ci.mk ~virt:Concrete ~params: root_type.ptype_params
-                            (mknoloc @@ sprintf "show_%s_env_tt" typename) @@
-                          Cty.signature (Csig.mk any_typ [])
-                         ]
-        ; Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc proto_class_name)
-                        (Cl.fun_ Nolabel None (Pat.var @@ mknoloc "env") @@
-                         Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") show_proto_meths)
-                        )
-                     ]
-
-        ; Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc show_typename_t)
-                        (Cl.let_ Nonrecursive [Vb.mk (Pat.var @@ mknoloc "self") [%expr Obj.magic (ref ())] ] @@
-                         Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this")
-                            [ inherit_cf ~root_type ~name:typename_t
-                            ; Cf.inherit_ Fresh (Cl.apply (Cl.constr (lid proto_class_name)
-                                                    @@ List.map fst root_type.ptype_params)
-                                [(Nolabel,[%expr self])]) None
-                            ; Cf.initializer_ [%expr self := (this :> [%t Typ.constr (lid show_typename_t) @@
-                                                                            List.map fst root_type.ptype_params ])]
-                            ])
-                        )
+        [ Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc show_typename_t)
+                         (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") show_proto_meths))
                      ]
         ]
     | _ -> failwith "Type is not supported. show not happend"
