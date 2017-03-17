@@ -108,6 +108,10 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cmx \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
+	_build/ppx/ppx_deriving_gt.cma \
+	_build/ppx/ppx_deriving_gt.cmxa \
+	_build/ppx/ppx_deriving_gt.cmxs \
+	_build/ppx/ppx_ocanren_all.native \
 	$(wildcard _build/src/MiniKanren.[oa]) \
 	$(wildcard _build/camlp5/pa_minikanren.cm[oi]) \
 

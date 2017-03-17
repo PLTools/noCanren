@@ -16,3 +16,17 @@ package "tester" (
   archive(byte)  ="tester.cmo"
   archive(native)="tester.cmx"
 )
+package "ppx" (
+  description="PPX extension for fresh and REPR"
+  ppx = "ppx_ocanren_all.native --as-ppx"
+)
+package "ppx_gt" (
+  version = "4.1"
+  description = "[@@deriving gt { .. stuff .. } ]"
+  requires(-ppx_driver) = "ppx_deriving"
+  ppxopt(-ppx_driver,-custom_ppx) = "ppx_deriving,-deriving-plugin,./ppx_deriving_gt.cma"
+  requires(ppx_driver) = "ppx_deriving.api"
+  archive(ppx_driver, byte) = "ppx_deriving_gt.cma"
+  archive(ppx_driver, native) = "ppx_deriving_gt.cmxa"
+  exists_if = "ppx_deriving_gt.cma"
+)
