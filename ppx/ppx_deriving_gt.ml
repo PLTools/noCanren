@@ -832,6 +832,39 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
 
   | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
 
+module type Plugin =
+  sig
+    val name : string
+    val core : core_type -> structure
+    val constructor : type_declaration -> string Location.loc -> constructor_arguments -> class_field
+
+  end
+
+let register_plugin (module P: Plugin) =
+  let type_decl_handler ~options ~path type_decl =
+    let typename    = type_decl.ptype_name.txt in
+    let typename_t  = typename ^ "_t"  in
+    match type_decl.ptype_kind with
+    | Ptype_abstract -> (match type_decl.ptype_manifest with
+      | Some manifest -> P.core manifest
+      | None -> failwith "Not implemented")
+    | Ptype_variant constrs ->
+      let body =
+        (inherit_cf ~name:typename_t ~root_type:type_decl) ::
+        List.map (fun p -> P.constructor type_decl p.pcd_name p.pcd_args) (List.rev constrs)
+      in
+      [ Str.class_ [Ci.mk ~virt:Concrete ~params:type_decl.ptype_params (mknoloc P.name)
+                       (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") body))
+                   ]
+      ]
+    | _ -> failwith "Some shit happend"
+  in
+  Ppx_deriving.(register (create deriver
+    ~type_decl_str: (fun ~options ~path type_decls ->
+      List.concat (List.map (type_decl_handler ~options ~path) type_decls))
+      ()
+  ))
+
 let register () =
   Ppx_deriving.(register (create deriver
     (* ~core_type: (Ppx_deriving.with_quoter (fun quoter typ -> *)
