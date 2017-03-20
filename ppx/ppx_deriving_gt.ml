@@ -499,6 +499,37 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     ans @ [derivers_bunch]
   | _ -> raise_errorf "Some cases are not supported"
 
+  module type Plugin =
+    sig
+      val name : string
+      val core : core_type -> class_expr
+      val constructor : type_declaration -> constructor_declaration -> class_field
+    end
+
+let plugin_decls (module P: Plugin) type_decl =
+  let type_decl_handler type_decl =
+    let typename    = type_decl.ptype_name.txt in
+    let typename_t  = typename ^ "_t"  in
+    let plugin_name = P.name ^ "_" ^ typename ^ "_t" in
+    match type_decl.ptype_kind with
+    | Ptype_abstract -> (match type_decl.ptype_manifest with
+      | Some manifest ->
+          [Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc plugin_name) (P.core manifest) ]]
+        (* P.core manifest *)
+      | None -> failwith "Not implemented")
+    | Ptype_variant constrs ->
+      let body =
+        (inherit_cf ~name:typename_t ~root_type:type_decl) ::
+        List.map (fun constr -> P.constructor type_decl constr) (List.rev constrs)
+      in
+      [ Str.class_ [Ci.mk ~virt:Concrete ~params:type_decl.ptype_params (mknoloc plugin_name)
+                       (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") body))
+                   ]
+      ]
+    | _ -> failwith "Some shit happend"
+  in
+  type_decl_handler type_decl
+
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
   let _quoter = Ppx_deriving.create_quoter () in
@@ -531,144 +562,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   in (* end of gmap_decls *)
 
   let show_typename_t = "show_" ^ typename_t in
-  let show_decls root_type =
-    match root_type.ptype_kind with
-    | Ptype_abstract -> begin
-        match root_type.ptype_manifest with
-        | Some [%type: int] ->
-          [ (* [%stri class [%p Pat.var "asdf" ] = object inherit GT.show_int_t end ] *)
-            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc show_typename_t) @@
-                          Cl.structure (Cstr.mk (Pat.any ())
-                            [ Cf.inherit_ Fresh (Cl.constr (lid "GT.show_int_t") []) None
-                            ])
-                       ]
-          ]
-        | Some t ->
-          let b = Buffer.create 40 in
-          let fmt = Format.formatter_of_buffer b in
-          Pprintast.core_type fmt (Obj.magic t);
-          Format.pp_flush_formatter fmt;
-
-          raise_errorf "%s\n%s" "not implemented?4 " (Buffer.contents b)
-        | None -> assert false
-      end
-    | Ptype_variant constrs ->
-        let show_proto_meths =
-          let f { pcd_name = { txt = name' }; pcd_args } =
-            let Pcstr_tuple pcd_args = pcd_args in
-            let args = List.mapi (fun n _ -> sprintf "p%d" n) pcd_args in
-
-            let body =
-              let expr_of_arg reprname typ =
-                let rec helper ?(toplevel=false) =
-                  let maybe_apply e =
-                    if toplevel then [%expr [%e e] [%e Exp.ident @@ lid reprname ] ]
-                    else e
-                  in
-                function
-                | x when are_the_same x root_type ->
-                  if toplevel
-                  then [%expr GT.([%e Exp.(field (ident @@ lid reprname) (lid "fx")) ]) () ]
-                  else [%expr GT.transform logic subj.GT.t#a this () ]
-                | {ptyp_desc=Ptyp_var _alpha; _} ->
-                  [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
-                | [%type: int]
-                | [%type: GT.int] ->
-                  maybe_apply [%expr GT.lift GT.int.GT.plugins#show () ]
-                | [%type: string]
-                | [%type: GT.string] ->
-                  maybe_apply [%expr GT.transform GT.string (new GT.show_string_t) () ]
-                | [%type: [%t? t] GT.list]
-                | [%type: [%t? t] list] ->
-                  maybe_apply [%expr GT.lift (GT.list.GT.plugins#show [%e helper t]) () ]
-                | {ptyp_desc=Ptyp_constr ({txt=Lident cname;_},
-                                          [{ptyp_desc=Ptyp_constr({txt=Lident argname;_},
-                                                                  _)
-                                           }]); _ }
-                  when argname = typename ->
-                    let head = List.fold_left
-                        (fun acc (tparam,_) ->
-                           match tparam with
-                           | {ptyp_desc=Ptyp_var alpha; _} ->
-                               [%expr [%e acc] [%e Exp.send [%expr subj.GT.t] (mknoloc alpha) ] ]
-                           | _ -> assert false
-                        )
-                        [%expr GT.transform [%e Exp.ident@@lid argname]]
-                        root_type.ptype_params
-                    in
-                    maybe_apply
-                      [%expr  GT.transform
-                              [%e Exp.ident @@ lid cname]
-                              ([%e head] this)
-                              [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
-                              ()
-                      ]
-                | {ptyp_desc=Ptyp_constr ({txt=Lident cname;_},
-                                          [typ_arg1]); }
-                  ->
-                  maybe_apply
-                    [%expr  GT.transform
-                              [%e Exp.ident @@ lid cname]
-                              [%e helper  typ_arg1 ]
-                              [%e Exp.(new_ @@ lid @@ sprintf "show_%s_t" cname) ]
-                              ()
-                    ]
-                | _ ->
-                  [%expr [%e Exp.(field (ident @@ lid reprname) (lid "GT.fx")) ] ]
-                in
-
-                match typ with
-                | {ptyp_desc=Ptyp_var _alpha; _} ->
-                  [%expr [%e Exp.(field (ident @@ lid reprname) (lid "GT.fx")) ] () ]
-                (* | _ when are_the_same typ root_type -> *)
-                | _ -> [%expr [%e helper ~toplevel:true typ ]
-                        (* () [%e Exp.ident @@ lid reprname ] *)
-                        ]
-              in
-
-              match List.combine args pcd_args with
-              | [] -> Exp.constant (Pconst_string (name' ^ " ()", None))
-              | [(name,argt)] -> [%expr
-                            [%e Exp.constant (Pconst_string (name'^" (", None)) ] ^
-                            [%e expr_of_arg name argt] ^ ")"
-                                 ]
-              | args ->
-                 let xs = List.map (fun (name,arg) -> expr_of_arg name arg) args in
-                 (* [%expr 1] *)
-                 [%expr
-                     [%e Exp.constant (Pconst_string (name'^" (", None)) ] ^
-                     (String.concat ", " [%e Exp.make_list xs ] ^ ")")
-                 ]
-            in
-            let e = List.fold_right (fun name acc -> Exp.fun_ Nolabel None (Pat.var @@ mknoloc name) acc) args body in
-            let e = [%expr fun inh subj -> [%e e] ] in
-
-            Cf.method_ (mknoloc @@ "c_"^name') Public (Cfk_concrete (Fresh, e))
-          in
-          (inherit_cf ~name:typename_t ~root_type) :: List.map f (List.rev constrs)
-        in
-
-        let gt_repr_typ_show =
-          gt_repr_typ_wrap
-            [%type: < show:
-                    [%t List.fold_right (fun ({ptyp_desc; _},_) acc ->
-                           match ptyp_desc with
-                           | Ptyp_var name ->
-                             [%type: ([%t Typ.var name] -> string) -> [%t acc]]
-                           | _ -> assert false
-                         )
-                          root_type.ptype_params
-                          [%type: [%t using_type ~typename root_type] -> string ]
-                    ]
-                    >
-            ]
-        in
-        [ Str.class_ [Ci.mk ~virt:Concrete ~params: root_type.ptype_params (mknoloc show_typename_t)
-                         (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") show_proto_meths))
-                     ]
-        ]
-    | _ -> failwith "Type is not supported. show not happend"
-  in (* end of show_decls *)
 
   let derivers_bunch =
     let wrap_meth mname cname =
@@ -694,14 +587,16 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
     [%stri let [%p Pat.var @@ mknoloc name ] = { GT.gcata = [%e prim_gcata]; GT.plugins = [] }]
   in
 
+  let show_decls = if gt_show then plugin_decls (module Show: Plugin) root_type else [] in
+
   match root_type.ptype_kind with
   | Ptype_abstract -> begin
       match root_type.ptype_manifest with
       | Some [%type: int] ->
         [ make_primitive_bunch root_type.ptype_name.txt [%expr GT.(int.gcata)]] @
-        show_decls root_type @
         gmap_decls root_type @
-        [derivers_bunch]
+
+        show_decls @ [derivers_bunch]
       | _ -> raise_errorf "%s %s" "not implemented?5" root_type.ptype_name.txt
     end
   | Ptype_variant constrs ->
@@ -826,44 +721,12 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                      ]
         ]
       in
-
-      let ans = if not gt_show then ans else ans @ (show_decls root_type) in
+      let ans = ans @ show_decls in
       ans @ [derivers_bunch]
 
   | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
 
-module type Plugin =
-  sig
-    val name : string
-    val core : core_type -> structure
-    val constructor : type_declaration -> string Location.loc -> constructor_arguments -> class_field
 
-  end
-
-let register_plugin (module P: Plugin) =
-  let type_decl_handler ~options ~path type_decl =
-    let typename    = type_decl.ptype_name.txt in
-    let typename_t  = typename ^ "_t"  in
-    match type_decl.ptype_kind with
-    | Ptype_abstract -> (match type_decl.ptype_manifest with
-      | Some manifest -> P.core manifest
-      | None -> failwith "Not implemented")
-    | Ptype_variant constrs ->
-      let body =
-        (inherit_cf ~name:typename_t ~root_type:type_decl) ::
-        List.map (fun p -> P.constructor type_decl p.pcd_name p.pcd_args) (List.rev constrs)
-      in
-      [ Str.class_ [Ci.mk ~virt:Concrete ~params:type_decl.ptype_params (mknoloc P.name)
-                       (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") body))
-                   ]
-      ]
-    | _ -> failwith "Some shit happend"
-  in
-  Ppx_deriving.(register (create deriver
-    ~type_decl_str: (fun ~options ~path type_decls ->
-      List.concat (List.map (type_decl_handler ~options ~path) type_decls))
-      ()
-  ))
 
 let register () =
   Ppx_deriving.(register (create deriver
@@ -872,7 +735,11 @@ let register () =
 
     (* TODO: maybe we not yet support recursive type definitions *)
     ~type_decl_str: (fun ~options ~path type_decls ->
-      List.concat (List.map (str_of_type ~options ~path) type_decls))
+      let t_descls = List.concat (List.map (str_of_type ~options ~path) type_decls) in
+      t_descls
+      (* t_descls @  *)
+      (* logic_t -> logic_tt -> show_logic_t -> logic *)
+    )
     ~type_decl_sig: (fun ~options ~path type_decls ->
        List.concat (List.map (sig_of_type ~options ~path) type_decls))
     ()
