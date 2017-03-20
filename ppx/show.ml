@@ -7,10 +7,10 @@
  *)
 
 open Printf
-open Location
 open Asttypes
 open Parsetree
 open Ast_helper
+open Location
 open Ppx_deriving
 
 module Exp =
@@ -23,6 +23,22 @@ module Exp =
                                               (Exp.construct (lid "[]") None)
   end
 
+(* Used when we need to check that type we working on references himself in
+  it's body *)
+let are_the_same (typ: core_type) (tdecl: type_declaration) =
+  (* Pprintast.core_type Format.std_formatter (Obj.magic typ);
+  Format.pp_force_newline Format.std_formatter ();
+  Format.pp_print_flush Format.std_formatter (); *)
+
+  (match typ.ptyp_desc with
+  | Ptyp_constr ({txt=Lident xxx},_) ->
+    let b = (xxx = tdecl.ptype_name.txt) in
+    (* printf "xxx = %s, tdecl.ptype_name.txt = %s, %b\n%!" xxx tdecl.ptype_name.txt b; *)
+    b
+  | _ ->
+    false
+  )
+
 let expr_of_arg reprname typ root_type =
   let rec helper ?(toplevel=false) =
    let maybe_apply e =
@@ -33,7 +49,7 @@ let expr_of_arg reprname typ root_type =
   | x when are_the_same x root_type ->
    if toplevel
    then [%expr GT.([%e Exp.(field (ident @@ lid reprname) (lid "fx")) ]) () ]
-   else [%expr GT.transform logic subj.GT.t#a this () ]
+   else [%expr GT.transform [%e Exp.ident@@lid root_type.ptype_name.txt] subj.GT.t#a this () ]
   | {ptyp_desc=Ptyp_var _alpha; _} ->
    [%expr [%e Exp.(send [%expr subj.GT.t] (mknoloc _alpha)) ] ]
   | [%type: int]
@@ -89,22 +105,35 @@ let expr_of_arg reprname typ root_type =
          (* () [%e Exp.ident @@ lid reprname ] *)
          ]
 
-let constructor root_type name args =
-  match args with
+let name = "show"
+
+let core = function
+  | [%type: int] ->
+    Cl.structure (Cstr.mk (Pat.any ()) [ Cf.inherit_ Fresh (Cl.constr (lid "GT.show_int_t") []) None ])
+  | t ->
+    let b = Buffer.create 40 in
+    let fmt = Format.formatter_of_buffer b in
+    Pprintast.core_type fmt (Obj.magic t);
+    Format.pp_flush_formatter fmt;
+    raise_errorf "%s\n%s" "not implemented?4 " (Buffer.contents b)
+
+let constructor root_type constr =
+  let name = constr.pcd_name in
+  match constr.pcd_args with
   | Pcstr_tuple arg_types ->
     let arg_names = List.mapi (fun n _ -> sprintf "p%d" n) arg_types in
     let body =
       match List.combine arg_names arg_types with
       | [] -> Exp.constant (Pconst_string (name.txt ^ " ()", None))
       | [(argn,argt)] -> [%expr
-                            [%e Exp.constant (Pconst_string (name.txt ^ "(", None)) ] ^
+                            [%e Exp.constant (Pconst_string (name.txt ^ " (", None)) ] ^
                             [%e expr_of_arg argn argt root_type] ^ ")"
                          ]
       | args ->
          let xs = List.map (fun (argn,argt) -> expr_of_arg argn argt root_type) args in
          (* [%expr 1] *)
          [%expr
-             [%e Exp.constant (Pconst_string (name.txt ^" (", None)) ] ^
+             [%e Exp.constant (Pconst_string (name.txt ^ " (", None)) ] ^
              (String.concat ", " [%e Exp.make_list xs ] ^ ")")
          ]
     in

@@ -1,4 +1,5 @@
 S .
+S ./plugins/
 B ../_build/ppx
 
 FLG -open Ast_405

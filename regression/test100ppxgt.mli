@@ -5,10 +5,10 @@
 
 (* type token_env = int *)
 
-(* type 'a logic =
+type 'a logic =
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a
-[@@deriving gt {show} ] *)
+[@@deriving gt {show} ]
 
 (* Next line because we override logic *)
 (* val logic : (unit,< show: ('a ->  string) -> 'a logic -> string > ) GT.t *)
