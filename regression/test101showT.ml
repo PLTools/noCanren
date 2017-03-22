@@ -1,24 +1,41 @@
-type 'a logic = Var of int
+type 'a logic = Var of int (* * 'a logic list *)
               | Value of 'a
-[@@deriving showT]
+[@@deriving showT {with_path=false}]
 ;;
-let pppt_logic : string * (Format.formatter -> 'a -> unit) ->
+
+
+(*
+let rec pppt_logic : string * (Format.formatter -> 'a -> unit) ->
   string *  (Format.formatter -> 'a logic -> unit) = fun (argname, pp_arg) ->
   ( Printf.sprintf "%s logic" argname
   , fun fmt -> function
-    | Var n -> Format.fprintf fmt "(_.%d : %s)" n argname
+    | Var (n,cs) -> Format.fprintf fmt "(_.%d %a: %s)" n
+        (fun fmt -> function
+          | [] -> ()
+          | xs -> Format.fprintf fmt "{{";
+                  List.iter (snd (pppt_logic (argname, pp_arg)) fmt) xs;
+                  Format.fprintf fmt "}}"
+          )
+        cs
+        argname
     | Value x ->
         Format.fprintf fmt "Value (";
         pp_arg fmt x;
         Format.fprintf fmt ")"
   )
-(*
+*)
 let pppt_int : string * (Format.formatter -> int -> unit) =
   ("int", (fun fmt -> Format.fprintf fmt "%d"))
 
 let pppt_string : string * (Format.formatter -> string -> unit) =
   ("string", (fun fmt -> Format.fprintf fmt "%s" ))
 
+let () =
+  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_int    |> snd ) (Value 1);
+  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_int    |> snd ) (Var   (2));
+  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_string |> snd ) (Var  (33));
+  ()
+(*
 type ('a, 'b) glist = Nil | Cons of 'a * 'b
 (* [@@deriving showT] *)
 
@@ -52,13 +69,10 @@ let rec pppt_intlogic_llist : string * (Format.formatter -> int logic llist -> u
 
 
 let () =
-  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_int    |> snd ) (Value 1);
-  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_int    |> snd ) (Var   2);
-  Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_string |> snd ) (Var  33);
   Format.fprintf Format.std_formatter "%a\n%!" (pppt_list  pppt_string |> snd )
     (Cons ("a", Cons ("b", Nil)));
   Format.fprintf Format.std_formatter "%a\n%!" (pppt_intlogic_list |> snd )
-    (Cons (Value 10, Cons (Var 1, Nil)));
+    (Cons (Value 10, Cons (Var (1,[]), Nil)));
   Format.fprintf Format.std_formatter "%a\n%!" (pppt_intlogic_llist |> snd )
-    (Value (Cons (Value 10, Value (Cons (Value 20, Var 21)))));
+    (Value (Cons (Value 10, Value (Cons (Value 20, Var (21,[Var (20,[])]))))));
 *)

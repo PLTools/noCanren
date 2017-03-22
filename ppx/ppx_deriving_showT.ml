@@ -54,13 +54,13 @@ let show_type_of_decl ~options ~path type_decl =
   let _ = parse_options options in
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
   Ppx_deriving.poly_arrow_of_type_decl
-    (fun var -> [%type: Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit])
+    (fun var -> [%type: string * (Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit)])
     type_decl
     [%type: [%t typ] -> Ppx_deriving_runtime.string]
 
 let sig_of_type ~options ~path type_decl =
   let _ = parse_options options in
-  [Sig.value (Val.mk (mknoloc (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl))
+  [Sig.value (Val.mk (mknoloc (Ppx_deriving.mangle_type_decl (`Prefix "pppt") type_decl))
               (pp_type_of_decl ~options ~path type_decl));
    Sig.value (Val.mk (mknoloc (Ppx_deriving.mangle_type_decl (`Prefix "show") type_decl))
               (show_type_of_decl ~options ~path type_decl))]
@@ -90,8 +90,8 @@ let rec expr_of_typ quoter typ =
     | { ptyp_desc = Ptyp_constr _ } ->
       let builtin = not (attr_nobuiltin typ.ptyp_attributes) in
       begin match builtin, typ with
-      | true, [%type: unit]        -> [%expr fun () -> Format.pp_print_string fmt "()"]
-      | true, [%type: int]         -> format "%d"
+      | true, [%type: unit]        -> [%expr ("unit", fun fmt () -> Format.pp_print_string fmt "()") ]
+      | true, [%type: int]         -> [%expr ("int", fun fmt -> [%e format "%d"]) ]
       | true, [%type: int32]
       | true, [%type: Int32.t]     -> format "%ldl"
       | true, [%type: int64]
@@ -142,10 +142,11 @@ let rec expr_of_typ quoter typ =
           match attr_polyprinter typ.ptyp_attributes with
           | Some printer -> wrap_printer quoter printer
           | None ->
-            let printer = Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "pp") lid)) in
+            let printer = Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "pppt") lid)) in
             Ppx_deriving.quote quoter printer
         in
-        app printer (args_pp @ [[%expr fmt]])
+        app [%expr snd [%e app printer args_pp]] [[%expr fmt]]
+        (* app [%expr snd [%e printer]] (args_pp @ [[%expr fmt]]) *)
       | _ -> assert false
       end
     | { ptyp_desc = Ptyp_tuple typs } ->
@@ -189,7 +190,7 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
   let prettyprinter =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_abstract, Some manifest ->
-      [%expr fun fmt -> [%e expr_of_typ quoter manifest]]
+      expr_of_typ quoter manifest
     | Ptype_variant constrs, _ ->
       let cases =
         constrs |> List.map (fun { pcd_name = { txt = name' }; pcd_args; pcd_attributes } ->
@@ -279,14 +280,20 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
     | Ptype_open, _        ->
       raise_errorf ~loc "%s cannot be derived for open types" deriver
   in
-  let pp_poly_apply = Ppx_deriving.poly_apply_of_type_decl type_decl (evar
-                        (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl)) in
-  let stringprinter = [%expr fun x -> Format.asprintf "%a" [%e pp_poly_apply] x] in
-  let polymorphize  =
-    let hack t =
-    (* Ppx_deriving.poly_fun_of_type_decl *)
-    in
-    hack type_decl
+  let pp_poly_apply =
+    (* Ppx_deriving.poly_apply_of_type_decl type_decl *)
+      (* (evar (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl)) *)
+
+    Ppx_deriving.fold_left_type_decl (fun acc name -> [%expr [%e acc]
+        ([%e evar @@ Printf.sprintf "typ_%s" name],[%e evar @@ Printf.sprintf "poly_%s" name ])
+      ])
+      (evar (Ppx_deriving.mangle_type_decl (`Prefix "pppt") type_decl))
+      type_decl
+  in
+  let stringprinter = [%expr fun x -> Format.asprintf "%a" (snd [%e pp_poly_apply]) x] in
+  let polymorphize =
+    Ppx_deriving.fold_right_type_decl (fun name expr ->
+      [%expr fun ([%p pvar ("typ_"^name)],[%p pvar ("poly_"^name)]) -> [%e expr] ]) type_decl
   in
   let pp_type =
     Ppx_deriving.strong_type_of_type @@ pp_type_of_decl ~options ~path type_decl in
@@ -294,9 +301,28 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
     Ppx_deriving.strong_type_of_type @@
       show_type_of_decl ~options ~path type_decl in
   let pp_var =
-    pvar (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl) in
+    pvar (Ppx_deriving.mangle_type_decl (`Prefix "pppt") type_decl) in
   let show_var =
     pvar (Ppx_deriving.mangle_type_decl (`Prefix "show") type_decl) in
+  let newname =
+    match type_decl.ptype_params with
+    | [] -> str type_decl.ptype_name.txt
+    (* | (param1,_)::[] -> [%expr Printf.sprintf "%s" [%e str type_decl.ptype_name.txt]] *)
+    | ns ->
+        let ns = List.map (fun ({ptyp_desc = Ptyp_var n}, _) -> n) ns in
+        let format_string = Printf.sprintf "(%s) %s"
+          (String.concat ", " @@ List.map (fun _ -> "%s") ns)
+          type_decl.ptype_name.txt
+        in
+        List.fold_left (fun acc x -> [%expr [%e acc] [%e evar @@ ("typ_" ^ x)]])
+          [%expr Printf.sprintf [%e str format_string]]
+          ns
+  in
+  let prettyprinter =
+    [%expr let full_typ_name = [%e newname] in
+      (full_typ_name, [%e prettyprinter])
+    ]
+  in
   [Vb.mk (Pat.constraint_ pp_var pp_type)
          (Ppx_deriving.sanitize ~quoter (polymorphize prettyprinter));
    Vb.mk (Pat.constraint_ show_var show_type) (polymorphize stringprinter);]
