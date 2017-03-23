@@ -198,6 +198,7 @@ exception Not_a_value
 exception Occurs_check
 
 module Int = struct type t = int let compare : int -> int -> int = Pervasives.compare end
+(*
 module MultiIntMap : sig
   type key = Int.t
   type 'a t
@@ -221,7 +222,7 @@ end = struct
   let find_exn : key -> 'a t -> 'a list = M.find
   let replace: key -> 'a list -> 'a t -> 'a t = M.add
 end
-
+*)
 module Env :
   sig
     type t
@@ -234,7 +235,6 @@ module Env :
   struct
     type t = { token : token_env;
                mutable next: int;
-               (* mutable reifiers: Obj.t MultiIntMap.t; *)
               }
 
     let last_token : token_env ref = ref 0
@@ -304,7 +304,7 @@ module Subst :
     val show    : t -> string
   end =
   struct
-    module M = Map.Make (Int)
+    module M = Ptmap
 
     (* map from var indicies to tuples of (actual vars, value) *)
     type content = { lvar: Obj.t; new_val: Obj.t }
@@ -423,7 +423,11 @@ let (===) (x: _ injected) y (env, subst, constr) =
             List.fold_left (fun css' cs ->
               let x,t = Subst.split cs in
               try
-                let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
+                let p, s' = Subst.unify env (!!!x) (!!
+
+
+
+!t) subst' in
                 match s' with
                 | None -> css'
                 | Some _ ->
