@@ -96,7 +96,13 @@ let expr_of_arg reprname typ root_type =
 
 let name = "gmap"
 
-let extra_params root_type = [([%type: 'sa], Invariant)]
+let extra_params root_type =
+  root_type.ptype_params |> List.map (fun (typ,v) ->
+    match typ.ptyp_desc with
+    | Ptyp_var name -> (Typ.var @@ "s" ^ name), v
+    | _ -> assert false
+    )
+
 
 let inh _  = [%type: unit]
 let synh s = Typ.var @@ "s" ^s

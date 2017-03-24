@@ -1,7 +1,7 @@
 (* to get source:
-  mkae ppx && ocamlfind ppx_tools/rewriter "`ocamlfind query ppx_deriving`/ppx_deriving -deriving-plugin _build/ppx/ppx_deriving_gt.cma" regression/test100ppxgt.ml
+  make ppx && ocamlfind ppx_tools/rewriter "`ocamlfind query ppx_deriving`/ppx_deriving -deriving-plugin _build/ppx/ppx_deriving_gt.cma" regression/test100ppxgt.ml
 *)
-type token_env = int [@@deriving gt { show } ]
+type token_env = int [@@deriving gt { show; gmap } ]
 (* let () = print_endline @@ GT.show token_env 5 *)
 
 (* type inner_var = Var of token_env * int [@@deriving gt {show} ] *)
@@ -10,7 +10,7 @@ type token_env = int [@@deriving gt { show } ]
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list  (* * 'a logic *)
 | Value of 'a
-[@@deriving gt {show} ]
+[@@deriving gt {show; gmap} ]
 
 let logic = {GT.gcata = logic.GT.gcata; plugins =
   object
@@ -39,19 +39,29 @@ let () =
   List.iter (fun l -> print_endline @@ (show logic) (show string) l) [q;r;s]
 
 
-(*
-type ('a, 'l) llist = Nil | Cons of 'a * 'l
-[@@deriving gt {show} ]
 
-let rec show_llist arg xs = GT.(show llist arg (show_llist arg)) xs
+type ('a, 'l) glist = Nil | Cons of 'a * 'l
+[@@deriving gt {show; gmap} ]
+
+type 'a list  = ('a, 'a list) glist
+type 'a llist = ('a logic, 'a llist) glist logic
+let rec to_logic_list : 'a list -> 'a llist = fun xs ->
+  Value (GT.gmap glist (fun x -> Value x) (to_logic_list) xs)
+
+(* let (_:int) = to_logic_list *)
+
+let rec show_list  arg xs = GT.(show glist arg (show_list arg)) xs
+let rec show_llist arg xs =
+  GT.(show logic) GT.(show glist (GT.show logic arg) (show_llist arg)) xs
+
 
 let () =
-  let q = Nil in
-  let r = Cons ("s", Nil) in
-  let s = Cons ("a", Cons ("b", Nil)) in
+  let q = to_logic_list Nil in
+  let r = to_logic_list @@ Cons ("s", Nil) in
+  let s = to_logic_list @@ Cons ("a", Cons ("b", Nil)) in
   let open GT in
   List.iter (fun xs -> print_endline @@ show_llist (show string) xs) [q;r;s]
-*)
+
 
 (*
 type 'a lnat = O | S of 'a
