@@ -516,30 +516,30 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       val constructor : type_declaration -> constructor_declaration -> class_field
     end
 
-let plugin_decls (module P: Plugin) type_decl =
-  let type_decl_handler type_decl =
-    let typename    = type_decl.ptype_name.txt in
+let plugin_decls (module P: Plugin) root_type =
+  let type_decl_handler root_type =
+    let typename    = root_type.ptype_name.txt in
     let typename_t  = typename ^ "_t"  in
     let plugin_name = P.name ^ "_" ^ typename ^ "_t" in
-    match type_decl.ptype_kind with
-    | Ptype_abstract -> (match type_decl.ptype_manifest with
+    match root_type.ptype_kind with
+    | Ptype_abstract -> (match root_type.ptype_manifest with
       | Some manifest ->
           [Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc plugin_name) (P.core manifest) ]]
         (* P.core manifest *)
       | None -> failwith "Not implemented")
     | Ptype_variant constrs ->
       let body =
-        (inherit_cf ~name:typename_t ~root_type:type_decl ~inh:P.inh ~synh:P.synh ~synh_root:P.synh_root) ::
-        List.map (fun constr -> P.constructor type_decl constr) (List.rev constrs)
+        (inherit_cf ~name:typename_t ~root_type ~inh:P.inh ~synh:P.synh ~synh_root:P.synh_root) ::
+        List.map (fun constr -> P.constructor root_type constr) (List.rev constrs)
       in
-      [ Str.class_ [Ci.mk ~virt:Concrete ~params:(type_decl.ptype_params @ (P.extra_params type_decl))
+      [ Str.class_ [Ci.mk ~virt:Concrete ~params:(root_type.ptype_params @ (P.extra_params root_type))
                        (mknoloc plugin_name)
                        (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") body))
                    ]
       ]
     | _ -> failwith "Some shit happend"
   in
-  type_decl_handler type_decl
+  type_decl_handler root_type
 
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
