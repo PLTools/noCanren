@@ -30,7 +30,7 @@ let show_logic_list h xs = show_intl_list @@ List.reify ManualReifiers.int_reifi
 
 let rec appendo a b ab =
   (* trace "appendo" @@ *)
-  let (===) = unitrace show_logic_list in
+  let (===) ?loc = unitrace ?loc show_logic_list in
   conde
     [ (*project3 "appendo simple (a,b,ab): " show_logic_list a b ab &&&*)
       ((a === nil ()) &&& (b === ab))

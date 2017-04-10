@@ -3,7 +3,7 @@ open Tester
 open Printf
 open ManualReifiers
 
-let (===) = unitrace (fun h x ->
+let (===) ?loc = unitrace ?loc (fun h x ->
   GT.show logic string_of_int @@ ManualReifiers.int_reifier h x)
 
 
