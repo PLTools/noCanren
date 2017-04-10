@@ -145,7 +145,7 @@ type token_mk = int list
 let global_token: token_mk = [8];;
 
 type inner_logic =
-| InnerVar of token_mk * token_env * int * Obj.t list
+| InnerVar of token_mk * token_env * int
 
 let (!!!) = Obj.magic
 
@@ -243,7 +243,7 @@ module Env :
       { token= !last_token; next=10 }
 
     let fresh e =
-      let v = InnerVar (global_token, e.token, e.next, []) in
+      let v = InnerVar (global_token, e.token, e.next) in
       e.next <- 1+e.next;
       (* printf "new fresh var with index=%d\n" e.next; *)
       (!!!v, e)
@@ -251,7 +251,7 @@ module Env :
     let var_tag, var_size =
       let dummy_index = 0 in
       let dummy_token = 0 in
-      let v = InnerVar (global_token, dummy_token, dummy_index, []) in
+      let v = InnerVar (global_token, dummy_token, dummy_index) in
       Obj.tag (!!! v), Obj.size (!!! v)
 
     let var {token=env_token;_} x =
@@ -264,7 +264,7 @@ module Env :
          )
       then (let q = Obj.field t 1 in
             if (Obj.is_int q) && q == (!!!env_token)
-            then let InnerVar (_,_,i,_) = !!! x in Some i
+            then let InnerVar (_,_,i) = !!! x in Some i
             else failwith "You hacked everything and pass logic variables into wrong environment"
             )
       else None
@@ -392,58 +392,55 @@ module Subst :
 
   end
 
-module State =
-  struct
-    type t = Env.t * Subst.t * Subst.t list
-    let empty () = (Env.empty (), Subst.empty, [])
-    let env   (env, _, _) = env
-    let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
-  end
+let rec refine : Env.t -> Subst.t -> Obj.t -> Obj.t = fun env subst x ->
+  let rec walk' term =
+    let var = Subst.walk env term subst in
+    match Env.var env var with
+    | None ->
+        (match wrap (Obj.repr var) with
+          | Unboxed _ -> Obj.repr var
+          | Boxed (t, s, f) ->
+            let copy = Obj.dup (Obj.repr var) in (* not a shallow copy *)
+            let sf =
+              if t = Obj.double_array_tag
+              then !!! Obj.set_double_field
+              else Obj.set_field
+            in
 
-type 'a goal' = State.t -> 'a
-type goal = State.t Stream.t goal'
-
-let call_fresh f (env, subst, constr)  =
-  let x, env' = Env.fresh env in
-  f x (env', subst, constr)
+            for i = 0 to s-1 do
+              sf copy i @@ walk' (!!!(f i))
+            done;
+            copy
+          | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
+        )
+    | Some _ -> var
+  in
+  walk' x
 
 exception Disequality_violated
 
-let (===) (x: _ injected) y (env, subst, constr) =
-  (* we should always unify two injected types *)
+module Constraints : sig
+  type t
+  val empty: t
+  val show: t -> string
 
-  try
-    let prefix, subst' = Subst.unify env x y (Some subst) in
-    begin match subst' with
-    | None -> Stream.nil
-    | Some s ->
-        try
-          (* TODO: only apply constraints with the relevant vars *)
-          let constr' =
-            List.fold_left (fun css' cs ->
-              let x,t = Subst.split cs in
-              try
-                let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
-                match s' with
-                | None -> css'
-                | Some _ ->
-                    match p with
-                    | [] -> raise Disequality_violated
-                    | _  -> (Subst.of_list p)::css'
-              with Occurs_check -> css'
-            )
-            []
-            constr
-            in
-          Stream.cons (env, s, constr') Stream.nil
-        with Disequality_violated -> Stream.nil
-    end
-  with Occurs_check -> Stream.nil
+  (** [refine env c x] refines [x] and maybe changes constraints [c].
+    It returns a list of term that [x] should not be equal
+   *)
+  val refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list
 
-let (=/=) x y ((env, subst, constr) as st) =
-  let normalize_store prefix constr =
+  val extend : prefix:(int * Subst.content) list -> Env.t -> t -> t
+
+  val check  : prefix:(int * Subst.content) list -> Env.t -> Subst.t option -> t -> t
+end = struct
+  type t = Subst.t list
+
+  let empty = []
+
+  let normalize_store ~prefix env constr =
     let subst  = Subst.of_list prefix in
-    let prefix = List.split (List.map Subst.(fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix) in
+    let open Subst in
+    let prefix = List.split @@ List.map (fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix in
     let subsumes subst (vs, ts) =
       try
         match Subst.unify env !!!vs !!!ts (Some subst) with
@@ -461,16 +458,87 @@ let (=/=) x y ((env, subst, constr) as st) =
              else c :: traverse cs
     in
     traverse constr
-  in
+
+  let extend ~prefix env cs : t = normalize_store ~prefix env cs
+
+  let refine_in_subst = refine
+
+  let refine_everywhere env x sub1 sub2 =
+    (* we make a long walk in two substitutions *)
+    let rec helper prev_is_ok cur_sub prev_sub term =
+      let dest = refine_in_subst env cur_sub term in
+      match (dest = term), prev_is_ok with
+      | true, true  -> dest
+      | true, false -> helper true  prev_sub cur_sub term
+      | false, _    -> helper false prev_sub cur_sub dest
+    in
+    helper false sub1 sub2 x
+
+  let refine env base_subs c term =
+    ListLabels.fold_left ~init:[] ~f:(fun acc csubst ->
+        let dest = refine_everywhere env term base_subs csubst in
+        if dest == term then acc
+        else dest :: acc
+      ) c
+
+  let check ~prefix env subst' cstr =
+    ListLabels.fold_left cstr ~init:[] ~f:(fun css' cs_sub ->
+      let x,t = Subst.split cs_sub in
+      try
+        let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
+        match s' with
+        | None -> css'
+        | Some _ ->
+            match p with
+            | [] -> raise Disequality_violated
+            | _  -> (Subst.of_list p)::css'
+      with Occurs_check -> css'
+    )
+
+  let show c = GT.show(GT.list) Subst.show c
+end
+
+module State =
+  struct
+    type t = Env.t * Subst.t * Constraints.t
+    let empty () = (Env.empty (), Subst.empty, Constraints.empty)
+    let env   (env, _, _) = env
+    let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (Constraints.show constr)
+  end
+
+type 'a goal' = State.t -> 'a
+type goal = State.t Stream.t goal'
+
+let call_fresh f (env, subst, constr)  =
+  let x, env' = Env.fresh env in
+  f x (env', subst, constr)
+
+let (===) (x: _ injected) y (env, subst, constr) =
+  (* we should always unify two injected types *)
+
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
+    begin match subst' with
+    | None -> Stream.nil
+    | (Some s) as subst ->
+        try
+          let constr' = Constraints.check ~prefix env subst constr in
+          Stream.cons (env, s, constr') Stream.nil
+        with Disequality_violated -> Stream.nil
+    end
+  with Occurs_check -> Stream.nil
+
+let (=/=) x y ((env, subst, constrs) as st) =
+  try
+    let prefix, subst' = Subst.unify env x y (Some subst) in
+    (* prefix is a delta between subst and subst' *)
     match subst' with
     | None -> Stream.cons st Stream.nil
     | Some s ->
         (match prefix with
         | [] -> Stream.nil
         | _  ->
-          let new_constrs = normalize_store prefix constr in
+          let new_constrs = Constraints.extend ~prefix env constrs in
           Stream.cons (env, subst, new_constrs) Stream.nil
         )
   with Occurs_check -> Stream.cons st Stream.nil
@@ -533,45 +601,6 @@ let has_free_vars is_var x =
 
 exception WithFreeVars of (Obj.t -> bool) * Obj.t
 
-let rec refine : State.t -> ('a,'b) injected -> ('a,'b) injected = fun ((e, s, c) as st) x ->
-  let rec walk' recursive env var subst =
-    let var = Subst.walk env var subst in
-    match Env.var env var with
-    | None ->
-        (match wrap (Obj.repr var) with
-         | Unboxed _ -> !!!var
-         | Boxed (t, s, f) ->
-            let var = Obj.dup (Obj.repr var) in
-            let sf =
-              if t = Obj.double_array_tag
-              then !!! Obj.set_double_field
-              else Obj.set_field
-            in
-            for i = 0 to s - 1 do
-              sf var i (!!!(walk' true env (!!!(f i)) subst))
-           done;
-           !!!var
-         | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
-        )
-    | Some i when recursive ->
-        (match var with
-        | InnerVar (token1, token2, i, _) ->
-            (* We do not add extra Value here: they will be added on manual reification stage *)
-            let cs =
-              List.fold_left (fun acc s ->
-                match walk' false env (!!!var) s with
-                | maybeVar when Some i = Env.var env maybeVar -> acc
-                | t -> (!!!(refine st !!!t)) :: acc
-                )
-                []
-                c
-            in
-            Obj.magic @@ InnerVar (token1, token2, i, cs)
-        )
-    | _ -> var
-  in
-  !!!(walk' true e (!!!x) s)
-
 module ExtractDeepest =
   struct
     let ext2 x = x
@@ -582,7 +611,7 @@ module ExtractDeepest =
   end
 
 
-type helper = < isVar : 'a . 'a -> bool >
+type helper = < isVar : 'a . 'a -> bool; walk_cstrs: Obj.t -> Obj.t list >
 
 class type ['a,'b] refined = object
   method is_open: bool
@@ -590,10 +619,14 @@ class type ['a,'b] refined = object
   method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
 end
 
-let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x st ->
-  let ans = refine st x in
-  let is_open = has_free_vars (Env.is_var @@ State.env st) (Obj.repr ans) in
-  let c: helper = !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end) in
+let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs) as st) ->
+  let ans = !!!(refine env s (Obj.repr x)) in
+  let is_open = has_free_vars (Env.is_var env) (Obj.repr ans) in
+  let c: helper = !!!(object
+      method isVar y = Env.is_var (State.env st) (Obj.repr y)
+      method walk_cstrs = Constraints.refine env s cs
+    end) in
+
   object(self)
     method is_open = is_open
     method prj = if self#is_open then raise Not_a_value else !!!ans
@@ -651,24 +684,22 @@ module LogicAdder :
       call_fresh (fun logic st -> (R.refiner logic, prev (f logic) st))
   end
 
-let one () = (fun x -> LogicAdder.(succ zero) x), (@@), ApplyLatest.two
 
 let succ n () =
   let adder, currier, app = n () in
   (LogicAdder.succ adder, Uncurry.succ currier, ApplyLatest.succ app)
 
-let succ = (*!!!*)succ
-let one = (*!!!*)one
+let one   () = (fun x -> LogicAdder.(succ zero) x), (@@), ApplyLatest.two
 let two   () = succ one   ()
 let three () = succ two   ()
 let four  () = succ three ()
 let five  () = succ four  ()
 
-let q     = (*!!!*)one
-let qr    = (*!!!*)two
-let qrs   = (*!!!*)three
-let qrst  = (*!!!*)four
-let pqrst = (*!!!*)five
+let q     = one
+let qr    = two
+let qrs   = three
+let qrst  = four
+let pqrst = five
 
 let run n goalish f =
   let adder, currier, app_num = n () in
@@ -706,7 +737,9 @@ end
 
 let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injected -> 'b) -> 'b = fun c x r ->
   if c#isVar x
-  then let InnerVar (_,_,n,cstr) = !!!x in !!!(Var (n, List.map (!!!(r c)) !!!cstr))
+  then
+    let InnerVar (_,_,n) = !!!x in
+    !!!(Var (n, List.map (!!!(r c)) @@ c#walk_cstrs !!!x))
   else failwith "Bad argument of var_of_injected: it should be logic variable"
 
 module Fmap1 (T : T1) = struct
