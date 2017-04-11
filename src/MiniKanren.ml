@@ -49,7 +49,7 @@ module Stream =
       else match s with
           | Nil          -> [], s
           | Thunk f      -> retrieve ~n (f ())
-          | Single a     -> [a], s
+          | Single a     -> [a], Nil
           | Compoz (a,f) -> let xs,s2 = retrieve ~n:(n-1) @@ f () in a::xs, s2
           (* | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
           | Lazy  z      -> retrieve ~n (Lazy.force z) *)
