@@ -63,7 +63,7 @@ let _ =
 let _withFree =
   runL          1  q  qh (REPR (fun q   -> reverso (ilist []) (ilist [])                ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL          2 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
+  runL          4 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
   runL          1  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          3  q  qh (REPR (fun q   -> reverso q q                                  ));
