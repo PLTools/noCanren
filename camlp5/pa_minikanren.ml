@@ -47,6 +47,7 @@ EXTEND
       | h::t -> f h (fold f t)
       in
       let body = fold (fun l r -> <:expr< conj $l$ $r$ >>) clauses in
+      let body = <:expr< delay (fun () -> $body$) >> in
       List.fold_right (fun x e ->
         let p = <:patt< $lid:x$ >> in
         <:expr< call_fresh (fun $p$ -> $e$) >>

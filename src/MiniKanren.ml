@@ -18,7 +18,8 @@
 
 open Printf
 
-module Stream =
+(* miniKanren-like stream, more generator than a stream *)
+module MKStream =
   struct
 
     type 'a t = Nil
@@ -28,14 +29,9 @@ module Stream =
 
     let from_fun (f: unit -> 'a t) : 'a t = Thunk f
 
-    (* type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
-    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f) *)
-
     let nil = Nil
 
     let single x = Single x
-
-    (* let cons h t = Cons (h, t) *)
 
     let rec is_empty = function
     | Nil      -> true
@@ -43,7 +39,7 @@ module Stream =
     | Single _
     | Compoz _ -> false
 
-    let rec retrieve ?(n=(-1)) s =
+    (* let rec retrieve ?(n=(-1)) s =
       if n = 0
       then [], s
       else match s with
@@ -51,16 +47,13 @@ module Stream =
           | Thunk f      -> retrieve ~n (f ())
           | Single a     -> [a], Nil
           | Compoz (a,f) -> let xs,s2 = retrieve ~n:(n-1) @@ f () in a::xs, s2
-          (* | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
-          | Lazy  z      -> retrieve ~n (Lazy.force z) *)
 
-    let take ?(n=(-1)) s = fst @@ retrieve ~n s
+    let take ?(n=(-1)) s = fst @@ retrieve ~n s *)
 
-    let hd s = List.hd @@ take ~n:1 s
-    let tl s = snd @@ retrieve ~n:1 s
+    (* let hd s = List.hd @@ take ~n:1 s
+    let tl s = snd @@ retrieve ~n:1 s *)
 
     let choice a f = Compoz (a, f)
-    (* let lambdafat f = Thunk f *)
 
     let rec mplus fs gs =
       match fs with
@@ -75,37 +68,88 @@ module Stream =
       | Thunk f -> Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
       | Single a -> g a
       | Compoz (a, f) -> mplus (g a) (Thunk (fun () -> bind (Thunk f) g))
-      (* | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
-      | Nil          -> nil
-      | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f) *)
 
-    let rec map f = function
+    (* let rec map f = function
     | Nil          -> Nil
     | Thunk g      -> Thunk (fun () -> map f @@ g ())
     | Single a     -> Single (f a)
     | Compoz (a, g) -> Compoz (f a, (fun () -> map f (Thunk g) ) )
-    (* | Cons (x, xs) -> Cons (f x, map f xs)
-    | Lazy s       -> Lazy (Lazy.from_fun (fun () -> map f @@ Lazy.force s)) *)
 
     let rec iter f = function
     | Nil          -> ()
     | Thunk g      -> iter f (g ())
     | Single a     -> f a
-    | Compoz (a,g) -> f a; iter f (g ())
-    (* | Cons (x, xs) -> f x; iter f xs
-    | Lazy s       -> iter f @@ Lazy.force s *)
+    | Compoz (a,g) -> f a; iter f (g ()) *)
 
-    (* let rec zip fs gs =
+  end
+
+module Stream =
+  struct
+    type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
+
+    let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
+
+    let nil = Nil
+
+    let cons h t = Cons (h, t)
+
+    let rec of_mkstream = function
+    | MKStream.Nil -> Nil
+    | MKStream.Thunk f -> from_fun (fun () -> of_mkstream @@ f ())
+    | MKStream.Single a -> Cons (a, Nil)
+    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
+
+    let rec is_empty = function
+    | Nil    -> true
+    | Lazy s -> is_empty @@ Lazy.force s
+    | _      -> false
+
+    let rec retrieve ?(n=(-1)) s =
+      if n = 0
+      then [], s
+      else match s with
+          | Nil          -> [], s
+          | Cons (x, xs) -> let xs', s' = retrieve ~n:(n-1) xs in x::xs', s'
+          | Lazy  z      -> retrieve ~n (Lazy.force z)
+
+    let take ?(n=(-1)) s = fst @@ retrieve ~n s
+
+    let hd s = List.hd @@ take ~n:1 s
+    let tl s = snd @@ retrieve ~n:1 s
+
+    (* let rec mplus fs gs =
+      match fs with
+      | Nil           -> gs
+      | Cons (hd, tl) -> cons hd @@ from_fun (fun () -> mplus gs tl)
+      | Lazy z        -> from_fun (fun () -> mplus gs (Lazy.force z) )
+
+    let rec bind xs f =
+      match xs with
+      | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
+      | Nil          -> nil
+      | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f) *)
+
+
+    let rec map f = function
+    | Nil          -> Nil
+    | Cons (x, xs) -> Cons (f x, map f xs)
+    | Lazy s       -> Lazy (Lazy.from_fun (fun () -> map f @@ Lazy.force s))
+
+    let rec iter f = function
+    | Nil          -> ()
+    | Cons (x, xs) -> f x; iter f xs
+    | Lazy s       -> iter f @@ Lazy.force s
+
+    let rec zip fs gs =
       match (fs, gs) with
       | Nil         , Nil          -> Nil
       | Cons (x, xs), Cons (y, ys) -> Cons ((x, y), zip xs ys)
       | _           , Lazy s       -> Lazy (Lazy.from_fun (fun () -> zip fs (Lazy.force s)))
       | Lazy s      , _            -> Lazy (Lazy.from_fun (fun () -> zip (Lazy.force s) gs))
-      | Nil, _      | _, Nil       -> failwith "MiniKanren.Stream.zip: streams have different lengths" *)
+      | Nil, _      | _, Nil       -> failwith "MiniKanren.Stream.zip: streams have different lengths"
 
   end
 
-(* let (_:int) = Stream.bind *)
 
 let (!!!) = Obj.magic
 
@@ -428,7 +472,7 @@ module State =
   end
 
 type 'a goal' = State.t -> 'a
-type goal = State.t Stream.t goal'
+type goal = State.t MKStream.t goal'
 
 let call_fresh f = fun (env, subst, constr) ->
   let x, env' = Env.fresh env in
@@ -442,7 +486,7 @@ let (===) (x: _ injected) y (env, subst, constr) =
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
-    | None -> Stream.nil
+    | None -> MKStream.nil
     | Some s ->
         try
           (* TODO: only apply constraints with the relevant vars *)
@@ -462,10 +506,10 @@ let (===) (x: _ injected) y (env, subst, constr) =
             []
             constr
           in
-          Stream.single (env, s, constr')
-        with Disequality_violated -> Stream.nil
+          MKStream.single (env, s, constr')
+        with Disequality_violated -> MKStream.nil
     end
-  with Occurs_check -> Stream.nil
+  with Occurs_check -> MKStream.nil
 
 let (=/=) x y ((env, subst, constr) as st) =
   let normalize_store prefix constr =
@@ -492,21 +536,21 @@ let (=/=) x y ((env, subst, constr) as st) =
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     match subst' with
-    | None -> Stream.single st
+    | None -> MKStream.single st
     | Some s ->
         (match prefix with
-        | [] -> Stream.nil
+        | [] -> MKStream.nil
         | _  ->
           let new_constrs = normalize_store prefix constr in
-          Stream.single (env, subst, new_constrs)
+          MKStream.single (env, subst, new_constrs)
         )
-  with Occurs_check -> Stream.single st
+  with Occurs_check -> MKStream.single st
 
-let conj f g st = Stream.bind (f st) g
+let conj f g st = MKStream.bind (f st) g
 
 let (&&&) = conj
 
-let disj f g st = Stream.mplus (f st) (g st)
+let disj f g st = MKStream.mplus (f st) (Thunk (fun () -> g st))
 
 let (|||) = disj
 
@@ -540,8 +584,8 @@ module Fresh =
 
   end
 
-let success st = Stream.single st
-let failure _  = Stream.nil;;
+let success st = MKStream.single st
+let failure _  = MKStream.nil
 
 exception FreeVarFound
 let has_free_vars is_var x =
@@ -654,7 +698,7 @@ module ApplyLatest =
 
     let apply (appf, extf) tup =
       let x, base = extf tup in
-      appf base x
+      appf (Stream.of_mkstream base) x
 
     let succ (appf, extf) = (ApplyTuple.succ appf, ExtractDeepest.succ extf)
   end
@@ -702,8 +746,14 @@ let run n goalish f =
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
 
+(* let (_:int) = run q (fun q -> inj@@lift 1 === q) *)
+
 let delay : (unit -> goal) -> goal = fun g ->
-  fun st -> Stream.from_fun (fun () -> g () st)
+  fun st -> MKStream.from_fun (fun () -> g () st)
+
+let trace msg g = fun state ->
+  printf "%s: %s\n%!" msg (State.show state);
+  g state
 
 (* ************************************************************************** *)
 module type T1 = sig

@@ -24,6 +24,7 @@ let rec fives x =
   defer (fives x)
 
 let rec appendo a b ab =
+  (* trace "appendo" @@ *)
   ((a === nil ()) &&& (b === ab)) |||
   Fresh.two (fun h t ->
       (a === h%t) &&&
@@ -33,6 +34,7 @@ let rec appendo a b ab =
     )
 
 let rec reverso a b =
+  (* trace "reverso" @@ *)
   conde
     [ ((a === nil ()) &&& (b === nil ()))
     ; Fresh.two (fun h t ->
@@ -61,8 +63,9 @@ let _ =
 let _withFree =
   runL          1  q  qh (REPR (fun q   -> reverso (ilist []) (ilist [])                ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL          4 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
+  runL          2 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
   runL          1  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          3  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL         10  q  qh (REPR (fun q   -> reverso q q                                  ))
+  runL         10  q  qh (REPR (fun q   -> reverso q q                                  ));
+  ()

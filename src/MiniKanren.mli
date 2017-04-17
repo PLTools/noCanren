@@ -21,6 +21,12 @@
 (** {2 Basic modules and types} *)
 
 (** {3 Lazy streams} *)
+module MKStream :
+  sig
+    (** Stream type *)
+    type 'a t
+  end
+
 module Stream :
   sig
     (** Stream type *)
@@ -65,7 +71,7 @@ module State :
 
 (** Goal converts a state into a lazy stream of states *)
 type 'a goal'
-type goal = State.t Stream.t goal'
+type goal = State.t MKStream.t goal'
 
 (** {3 Logical values and injections} *)
 
@@ -176,7 +182,9 @@ module Fresh :
     - [run two        (fun q r -> q === !!5 ||| r === !!6) (fun qs rs -> ]{i here [qs], [rs] --- streams of all values, associated with the variable [q] and [r], respectively}[)]
     - [run (succ one) (fun q r -> q === !!5 ||| r === !!6) (fun qs rs -> ]{i the same as the above}[)]
  *)
-val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) * (('g -> 'h -> 'e) * ('c -> 'h * 'g))) -> 'a -> 'd -> 'f
+val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
+                      (('g Stream.t -> 'h -> 'e) * ('c -> 'h * 'g MKStream.t))) ->
+          'a -> 'd -> 'f
 
 (**
   The primitive [delay] helps to construct recursive goals that depend on themselves. For example,
@@ -186,6 +194,8 @@ val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) * (('g -> 'h -> 'e) * ('c
   See also syntax extension which simplifies the syntax.
 *)
 val delay: (unit -> goal) -> goal
+
+val trace: string -> goal -> goal
 
 (** Reification helper *)
 type helper
