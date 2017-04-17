@@ -27,34 +27,46 @@ q=2; r=3;
 q=3; r=2;
 }
 fun q ->
-  call_fresh (fun x -> call_fresh (fun y -> conj ((===) x y) ((=/=) x y))), all answers {
+  call_fresh
+    (fun x ->
+       call_fresh (fun y -> delay (fun () -> conj ((===) x y) ((=/=) x y)))), all answers {
 }
 fun q ->
-  call_fresh (fun x -> call_fresh (fun y -> conj ((=/=) x y) ((===) x y))), all answers {
+  call_fresh
+    (fun x ->
+       call_fresh (fun y -> delay (fun () -> conj ((=/=) x y) ((===) x y)))), all answers {
 }
 fun q ->
   call_fresh
     (fun x ->
        call_fresh
-         (fun y -> conj ((=/=) x y) (conj ((===) !3 x) ((===) !3 y)))), all answers {
+         (fun y ->
+            delay
+              (fun () -> conj ((=/=) x y) (conj ((===) !3 x) ((===) !3 y))))), all answers {
 }
 fun q ->
   call_fresh
     (fun x ->
        call_fresh
-         (fun y -> conj ((===) !3 x) (conj ((=/=) x x) ((===) !3 y)))), all answers {
+         (fun y ->
+            delay
+              (fun () -> conj ((===) !3 x) (conj ((=/=) x x) ((===) !3 y))))), all answers {
 }
 fun q ->
   call_fresh
     (fun x ->
        call_fresh
-         (fun y -> conj ((===) !3 x) (conj ((===) !3 y) ((=/=) x y)))), all answers {
+         (fun y ->
+            delay
+              (fun () -> conj ((===) !3 x) (conj ((===) !3 y) ((=/=) x y))))), all answers {
 }
 fun q ->
   call_fresh
     (fun x ->
        call_fresh
-         (fun y -> conj ((===) !3 x) (conj ((===) !3 y) ((=/=) y x)))), all answers {
+         (fun y ->
+            delay
+              (fun () -> conj ((===) !3 x) (conj ((===) !3 y) ((=/=) y x))))), all answers {
 }
 fun q ->
   call_fresh
@@ -63,9 +75,11 @@ fun q ->
          (fun y ->
             call_fresh
               (fun z ->
-                 conj ((===) x y)
-                   (conj ((===) y z)
-                      (conj ((=/=) x !4) ((===) z !(2 + 2))))))), all answers {
+                 delay
+                   (fun () ->
+                      conj ((===) x y)
+                        (conj ((===) y z)
+                           (conj ((=/=) x !4) ((===) z !(2 + 2)))))))), all answers {
 }
 fun q ->
   call_fresh
@@ -74,9 +88,11 @@ fun q ->
          (fun y ->
             call_fresh
               (fun z ->
-                 conj ((===) x y)
-                   (conj ((===) y z)
-                      (conj ((===) z !(2 + 2)) ((=/=) x !4)))))), all answers {
+                 delay
+                   (fun () ->
+                      conj ((===) x y)
+                        (conj ((===) y z)
+                           (conj ((===) z !(2 + 2)) ((=/=) x !4))))))), all answers {
 }
 fun q ->
   call_fresh
@@ -85,8 +101,11 @@ fun q ->
          (fun y ->
             call_fresh
               (fun z ->
-                 conj ((=/=) x !4)
-                   (conj ((===) y z) (conj ((===) x y) ((===) z !(2 + 2))))))), all answers {
+                 delay
+                   (fun () ->
+                      conj ((=/=) x !4)
+                        (conj ((===) y z)
+                           (conj ((===) x y) ((===) z !(2 + 2)))))))), all answers {
 }
 fun q -> (=/=) q !5, all answers {
 q=_.10 [=/= 5];
