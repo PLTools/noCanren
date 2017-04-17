@@ -654,6 +654,8 @@ module ExtractDeepest =
 
 
 type helper = < isVar : 'a . 'a -> bool >
+let helper_of_state st : helper =
+  !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end)
 
 class type ['a,'b] refined = object
   method is_open: bool
@@ -664,7 +666,7 @@ end
 let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x st ->
   let ans = refine st x in
   let is_open = has_free_vars (Env.is_var @@ State.env st) (Obj.repr ans) in
-  let c: helper = !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end) in
+  let c: helper = helper_of_state st in
   object(self)
     method is_open = is_open
     method prj = if self#is_open then raise Not_a_value else !!!ans
@@ -754,6 +756,26 @@ let delay : (unit -> goal) -> goal = fun g ->
 let trace msg g = fun state ->
   printf "%s: %s\n%!" msg (State.show state);
   g state
+
+let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal = fun shower q st ->
+  printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine st q);
+  success st
+
+let project2 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> goal = fun shower q r st ->
+  printf "%s '%s' and '%s'\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
+                                    (shower (helper_of_state st) @@ Obj.magic @@ refine st r);
+  success st
+
+let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> 'v -> goal = fun shower q r s st ->
+  printf "%s '%s' and '%s' and '%s'\n%!" msg
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st r)
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
+  success st
+
+let unitrace shower x y = fun st ->
+  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (x === y) st
 
 (* ************************************************************************** *)
 module type T1 = sig
