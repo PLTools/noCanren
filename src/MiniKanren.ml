@@ -66,7 +66,7 @@ module MKStream =
       match xs with
       | Nil -> Nil
       | Thunk f -> Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
-      | Single a -> g a
+      | Single a -> Thunk (fun () -> g a)
       | Compoz (a, f) -> mplus (g a) (Thunk (fun () -> bind (Thunk f) g))
 
     (* let rec map f = function
@@ -546,6 +546,9 @@ let (=/=) x y ((env, subst, constr) as st) =
         )
   with Occurs_check -> MKStream.single st
 
+let delay : (unit -> goal) -> goal = fun g ->
+  fun st -> MKStream.from_fun (fun () -> g () st)
+
 let conj f g st = MKStream.bind (f st) g
 
 let (&&&) = conj
@@ -562,7 +565,7 @@ let rec (?&) = function
 | [h]  -> h
 | h::t -> h &&& ?& t
 
-let conde = (?|)
+let conde xs = delay @@ fun () -> ?| xs
 
 module Fresh =
   struct
@@ -747,11 +750,6 @@ let run n goalish f =
   let adder, currier, app_num = n () in
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
-
-(* let (_:int) = run q (fun q -> inj@@lift 1 === q) *)
-
-let delay : (unit -> goal) -> goal = fun g ->
-  fun st -> MKStream.from_fun (fun () -> g () st)
 
 let trace msg g = fun state ->
   printf "%s: %s\n%!" msg (State.show state);
