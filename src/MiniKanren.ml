@@ -298,7 +298,7 @@ module Env :
     type t
 
     val empty  : unit -> t
-    val fresh  : t -> 'a * t
+    val fresh  : ?name:string -> t -> 'a * t
     val var    : t -> 'a -> int option
     val is_var : t -> 'a -> bool
   end =
@@ -313,10 +313,12 @@ module Env :
       incr last_token;
       { token= !last_token; next=10 }
 
-    let fresh e =
+    let fresh ?name e =
       let v = InnerVar (global_token, e.token, e.next, []) in
+      printf "new fresh var %swith index=%d\n"
+        (match name with None -> "" | Some n -> sprintf "'%s' " n)
+        e.next;
       e.next <- 1+e.next;
-      (* printf "new fresh var with index=%d\n" e.next; *)
       (!!!v, e)
 
     let var_tag, var_size =
@@ -476,6 +478,10 @@ type goal = State.t MKStream.t goal'
 
 let call_fresh f = fun (env, subst, constr) ->
   let x, env' = Env.fresh env in
+  f x (env', subst, constr)
+
+let call_fresh_named name f = fun (env, subst, constr) ->
+  let x, env' = Env.fresh ~name env in
   f x (env', subst, constr)
 
 exception Disequality_violated
