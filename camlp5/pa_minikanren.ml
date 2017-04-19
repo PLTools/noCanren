@@ -51,7 +51,7 @@ EXTEND
       List.fold_right (fun x e ->
         let p = <:patt< $lid:x$ >> in
         <:expr< call_fresh (fun $p$ -> $e$) >>
-      ) vars body
+      ) (List.rev vars) body
     ] |
     [ "defer"; subj=expr LEVEL "." ->
       <:expr< delay (fun () -> $subj$) >>
