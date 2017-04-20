@@ -16,6 +16,8 @@
  * (enclosed in the file COPYING).
  *)
 
+module OldList : (module type of List)
+
 (** {1 Implementation of miniKanren primitives} *)
 
 (** {2 Basic modules and types} *)
@@ -139,6 +141,8 @@ val conde : goal list -> goal
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a non-empty list of goals *)
 val (?&) : goal list -> goal
 
+val bind_star : goal list -> goal
+
 (** {2 Some predefined goals} *)
 
 (** [success] always succeeds *)
@@ -196,6 +200,8 @@ val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
   See also syntax extension which simplifies the syntax.
 *)
 val delay: (unit -> goal) -> goal
+
+val delay_goal: goal -> goal
 
 val trace: string -> goal -> goal
 

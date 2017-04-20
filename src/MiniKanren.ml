@@ -18,6 +18,8 @@
 
 open Printf
 
+module OldList = List
+
 (* miniKanren-like stream, more generator than a stream *)
 module MKStream =
   struct
@@ -25,7 +27,7 @@ module MKStream =
     type 'a t = Nil
               | Thunk of (unit -> 'a t)
               | Single of 'a
-              | Compoz of 'a * (unit -> 'a t)
+              | Compoz of 'a * 'a t
 
     let from_fun (f: unit -> 'a t) : 'a t = Thunk f
 
@@ -39,47 +41,26 @@ module MKStream =
     | Single _
     | Compoz _ -> false
 
-    (* let rec retrieve ?(n=(-1)) s =
-      if n = 0
-      then [], s
-      else match s with
-          | Nil          -> [], s
-          | Thunk f      -> retrieve ~n (f ())
-          | Single a     -> [a], Nil
-          | Compoz (a,f) -> let xs,s2 = retrieve ~n:(n-1) @@ f () in a::xs, s2
-
-    let take ?(n=(-1)) s = fst @@ retrieve ~n s *)
-
-    (* let hd s = List.hd @@ take ~n:1 s
-    let tl s = snd @@ retrieve ~n:1 s *)
-
     let choice a f = Compoz (a, f)
 
     let rec mplus fs gs =
       match fs with
       | Nil           -> gs
-      | Thunk f       -> Thunk (fun () -> mplus gs (f ()))
-      | Single a      -> choice a (fun () -> gs)
-      | Compoz (a, f) -> choice a @@ (fun () -> mplus gs (Thunk f))
+      | Thunk f       ->
+          (* Printf.printf " mplus got a thunk. Forcing\n%!"; *)
+          let r = f () in
+          (* Printf.printf " mplus gives an answer\n%!"; *)
+          Thunk (fun () -> mplus gs r)
+      | Single a      -> choice a gs
+      | Compoz (a, f) -> choice a @@ Thunk (fun () -> mplus gs f)
+      (* | Compoz (a, f) -> choice a @@ mplus gs f *)
 
     let rec bind xs g =
       match xs with
       | Nil -> Nil
       | Thunk f -> Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
-      | Single a -> Thunk (fun () -> g a)
-      | Compoz (a, f) -> mplus (g a) (Thunk (fun () -> bind (Thunk f) g))
-
-    (* let rec map f = function
-    | Nil          -> Nil
-    | Thunk g      -> Thunk (fun () -> map f @@ g ())
-    | Single a     -> Single (f a)
-    | Compoz (a, g) -> Compoz (f a, (fun () -> map f (Thunk g) ) )
-
-    let rec iter f = function
-    | Nil          -> ()
-    | Thunk g      -> iter f (g ())
-    | Single a     -> f a
-    | Compoz (a,g) -> f a; iter f (g ()) *)
+      | Single a -> g a
+      | Compoz (a, f) -> mplus (g a) (Thunk (fun () -> bind f g))
 
   end
 
@@ -97,7 +78,7 @@ module Stream =
     | MKStream.Nil -> Nil
     | MKStream.Thunk f -> from_fun (fun () -> of_mkstream @@ f ())
     | MKStream.Single a -> Cons (a, Nil)
-    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
+    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream f))
 
     let rec is_empty = function
     | Nil    -> true
@@ -555,23 +536,46 @@ let (=/=) x y ((env, subst, constr) as st) =
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
 
+let delay_goal : goal -> goal = fun g st -> Thunk (fun () -> g st)
+let inc = delay_goal
+
+
 let conj f g st = MKStream.bind (f st) g
 
 let (&&&) = conj
 
-let disj f g st = MKStream.mplus (f st) (Thunk (fun () -> g st))
+let disj f g st =
+  (* printf "inside disj\n%!"; *)
+  MKStream.mplus (Thunk (fun () -> f st)) (Thunk (fun () ->
+    (* printf "calling sencond part of disj\n%!"; *)
+    g st))
 
 let (|||) = disj
 
+(* mplus_star *)
 let rec (?|) = function
 | [h]  -> h
-| h::t -> h ||| ?| t
+| h::t ->
+          (* Printf.printf "mplus* calls mplus \n%!"; *)
+          (fun st ->
+            MKStream.mplus (h st) (delay_goal (?| t) st))
+            (* MKStream.mplus (h st) ((?| t) st)) *)
 
+(* | h::t -> h ||| (delay_goal (?| t)) *)
+(* | h::t -> h ||| (?| t) *)
+
+(* "bind*" *)
 let rec (?&) = function
+| [] -> failwith "wrong argument of ?&"
 | [h]  -> h
-| h::t -> h &&& ?& t
+| x::y::tl -> ?& ((conj x y)::tl)
+(* | h::t -> h &&& ?& t *)
 
-let conde xs = delay @@ fun () -> ?| xs
+let bind_star = (?&)
+
+let conde xs =
+  printf "inc in conde\n%!";
+  inc ( ?| xs)
 
 module Fresh =
   struct

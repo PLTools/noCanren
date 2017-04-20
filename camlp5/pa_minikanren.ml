@@ -37,21 +37,42 @@
 open Pcaml
 open Printf
 
+let rec fold f = function
+| [h]  -> h
+| h::t -> f h (fold f t)
+;;
+
 EXTEND
   GLOBAL: expr;
 
   expr: LEVEL "expr1" [
     [ "fresh"; "("; vars=LIST0 LIDENT; ")"; clauses=LIST1 expr LEVEL "." ->
-      let rec fold f = function
-      | [h]  -> h
-      | h::t -> f h (fold f t)
+      let listed_clauses = List.fold_right
+        (fun x acc -> <:expr< (MiniKanren.OldList.cons $x$ $acc$) >>)
+        clauses <:expr< [] >>
       in
-      let body = fold (fun l r -> <:expr< conj $l$ $r$ >>) clauses in
-      let body = <:expr< delay (fun () -> $body$) >> in
-      List.fold_right (fun x e ->
-        let p = <:patt< $lid:x$ >> in
-        <:expr< call_fresh_named $str:x$ (fun $p$ -> $e$) >>
-      ) (List.rev vars) body
+      let herr0 = String.concat " " vars in
+
+      let body = <:expr< bind_star $listed_clauses$ >> in
+      let body = <:expr< delay (fun () ->
+        let () = Printf.printf "inc after creating %s is called\n%!"
+          $str:herr0$ in
+        $body$) >>
+      in
+      let ans =
+        List.fold_right (fun x e ->
+          let p = <:patt< $lid:x$ >> in
+          <:expr< call_fresh_named $str:x$ (fun $p$ -> $e$) >>
+        ) (List.rev vars) body
+      in
+      (* let rec ans = <:expr<
+        let () = Printf.printf "create inc in fresh ====== (%s)\n%!"
+          $str:herr0$ in
+        delay (fun () -> $body$) (* it is inc *)
+      >>
+
+      in *)
+      ans
     ] |
     [ "defer"; subj=expr LEVEL "." ->
       <:expr< delay (fun () -> $subj$) >>
