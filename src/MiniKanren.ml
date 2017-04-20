@@ -17,6 +17,7 @@
  *)
 
 open Printf
+let printfn fmt = kprintf (printf "%s\n%!") fmt
 
 module OldList = List
 
@@ -47,9 +48,9 @@ module MKStream =
       match fs with
       | Nil           -> gs
       | Thunk f       ->
-          (* Printf.printf " mplus got a thunk. Forcing\n%!"; *)
+          (* printfn " mplus got a 2n case (f). Forcing"; *)
           let r = f () in
-          (* Printf.printf " mplus gives an answer\n%!"; *)
+          (* printfn " mplus gives an answer"; *)
           Thunk (fun () -> mplus gs r)
       | Single a      -> choice a gs
       | Compoz (a, f) -> choice a @@ Thunk (fun () -> mplus gs f)
@@ -58,9 +59,15 @@ module MKStream =
     let rec bind xs g =
       match xs with
       | Nil -> Nil
-      | Thunk f -> Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
-      | Single a -> g a
-      | Compoz (a, f) -> mplus (g a) (Thunk (fun () -> bind f g))
+      | Thunk f ->
+          (* printfn "bind got 2nd case (f)"; *)
+          Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
+      | Single a ->
+          (* printfn "bind got 3rd case (a)"; *)
+          g a
+      | Compoz (a, f) ->
+          (* printfn "bind got 4th case (a f)"; *)
+          mplus (g a) (Thunk (fun () -> bind f g))
 
   end
 
@@ -296,9 +303,9 @@ module Env :
 
     let fresh ?name e =
       let v = InnerVar (global_token, e.token, e.next, []) in
-      printf "new fresh var %swith index=%d\n"
+      (* printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
-        e.next;
+        e.next; *)
       e.next <- 1+e.next;
       (!!!v, e)
 
@@ -467,9 +474,12 @@ let call_fresh_named name f = fun (env, subst, constr) ->
 
 exception Disequality_violated
 
+let unif_counter = ref 0
+let report_unif_counter () = !unif_counter
+
 let (===) (x: _ injected) y (env, subst, constr) =
   (* we should always unify two injected types *)
-
+  (* incr unif_counter; *)
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -546,9 +556,13 @@ let (&&&) = conj
 
 let disj f g st =
   (* printf "inside disj\n%!"; *)
-  MKStream.mplus (Thunk (fun () -> f st)) (Thunk (fun () ->
-    (* printf "calling sencond part of disj\n%!"; *)
-    g st))
+  MKStream.mplus
+    (Thunk (fun () ->
+      (* printfn "  first  part of disj is executed"; *)
+      f st))
+    (Thunk (fun () ->
+      (* printfn "  second part of disj is executed"; *)
+      g st))
 
 let (|||) = disj
 
@@ -574,7 +588,7 @@ let rec (?&) = function
 let bind_star = (?&)
 
 let conde xs =
-  printf "inc in conde\n%!";
+  (* printf "inc in conde\n%!"; *)
   inc ( ?| xs)
 
 module Fresh =
@@ -1221,6 +1235,7 @@ module List =
     let rec inj_ground : ('a -> 'b) -> 'a ground -> 'b logic = fun f xs ->
       Value (GT.(gmap llist) f (inj_ground f) xs)
 
+    let to_logic = inj_ground
     let rec prj_ground : ('a -> 'b) -> 'a ground -> 'b list = fun f -> function
     | Nil -> []
     | Cons (x,xs) -> (f x)::(prj_ground f xs)

@@ -673,6 +673,7 @@ module List :
 
     (** Inject plain ground list to logic list *)
     val inj_ground : ('a -> 'b) -> 'a ground -> 'b logic
+    val to_logic   : ('a -> 'b) -> 'a ground -> 'b logic
 
     (** Project ground lists to normal OCaml lists *)
     val prj_ground : ('a -> 'b) -> 'a ground -> 'b list
@@ -755,3 +756,5 @@ val (!<) : ('a, 'b) injected -> ('a, 'b) List.groundi
 
 (** [nil] is a synonym for [inj Nil] *)
 val nil : unit -> (_, _) List.groundi
+
+val report_unif_counter: unit -> int

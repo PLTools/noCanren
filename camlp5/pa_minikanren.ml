@@ -55,8 +55,8 @@ EXTEND
 
       let body = <:expr< bind_star $listed_clauses$ >> in
       let body = <:expr< delay (fun () ->
-        let () = Printf.printf "inc after creating %s is called\n%!"
-          $str:herr0$ in
+        (* let () = Printf.printf "inc after creating %s is called\n%!"
+          $str:herr0$ in *)
         $body$) >>
       in
       let ans =
