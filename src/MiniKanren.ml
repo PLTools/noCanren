@@ -303,9 +303,9 @@ module Env :
 
     let fresh ?name e =
       let v = InnerVar (global_token, e.token, e.next, []) in
-      (* printf "new fresh var %swith index=%d\n"
+      printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
-        e.next; *)
+        e.next;
       e.next <- 1+e.next;
       (!!!v, e)
 
@@ -557,9 +557,9 @@ let (&&&) = conj
 let disj f g st =
   (* printf "inside disj\n%!"; *)
   MKStream.mplus
-    (Thunk (fun () ->
+    (
       (* printfn "  first  part of disj is executed"; *)
-      f st))
+      f st)
     (Thunk (fun () ->
       (* printfn "  second part of disj is executed"; *)
       g st))
@@ -799,6 +799,9 @@ let unitrace shower x y = fun st ->
   printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (x === y) st
 
+
+
+
 (* ************************************************************************** *)
 module type T1 = sig
   type 'a t
@@ -927,6 +930,41 @@ module ManualReifiers = struct
       else Pair.reify r1 r2 c p
 
 end;;
+
+let disj2 g1 g2 st =
+  MKStream.mplus
+    (g1 st)
+    (Thunk(fun () -> g2 st))
+
+let () =
+  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
+    @@ ManualReifiers.int_reifier h t) in
+  let goal1 _ st =
+    MKStream.mplus
+      (call_fresh_named "t" (fun t -> delay_goal (t === !!1)) st )
+      (Thunk (fun () ->
+        MKStream.mplus
+          (call_fresh_named "es" (fun t ->delay_goal (t=== !!2)) st)
+          (Thunk (fun () ->
+           call_fresh_named "zz" (fun t ->delay_goal (t=== !!3)) st)
+          )
+      ))
+  in
+  (* let goal1 _ st =
+    disj2
+      (call_fresh_named "t" (fun t -> (t === !!1)) )
+      (fun st ->
+        MKStream.mplus
+          (call_fresh_named "es" (fun t -> t=== !!2) st)
+          (Thunk (fun () ->
+            call_fresh_named "zz" (fun t -> t=== !!3) st)
+          )
+      ) st
+  in *)
+  run q goal1 (fun qs -> Stream.take ~n:2 qs |> List.iter (fun _ -> ()))
+;;
+
+
 
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
