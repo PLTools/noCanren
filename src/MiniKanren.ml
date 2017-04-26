@@ -28,10 +28,12 @@ module MKStream =
     type 'a t = Nil
               | Thunk of (unit -> 'a t)
               | Single of 'a
-              | Compoz of 'a * 'a t
+              | Compoz of 'a * (unit -> 'a t)
 
     let from_fun (f: unit -> 'a t) : 'a t = Thunk f
+    let inc = from_fun
 
+    let inc2 thunk = fun st -> inc (fun () -> thunk () st)
     let nil = Nil
 
     let single x = Single x
@@ -44,30 +46,39 @@ module MKStream =
 
     let choice a f = Compoz (a, f)
 
+    let force = function
+    | Nil -> Nil
+    | Thunk f -> f ()
+    | Single a -> Single a
+    | Compoz (a,f) -> assert false
+
     let rec mplus fs gs =
       match fs with
       | Nil           -> gs
       | Thunk f       ->
-          (* printfn " mplus got a 2n case (f). Forcing"; *)
-          let r = f () in
-          (* printfn " mplus gives an answer"; *)
-          Thunk (fun () -> mplus gs r)
-      | Single a      -> choice a gs
-      | Compoz (a, f) -> choice a @@ Thunk (fun () -> mplus gs f)
-      (* | Compoz (a, f) -> choice a @@ mplus gs f *)
+          (* The we force 2nd argument and left 1st one for later
+            ... because fasterMK does that
+          *)
+          (* printfn " mplus: 2n case "; *)
+          Thunk (fun () -> let r = force gs in mplus r fs)
+      | Single a      -> choice a (fun () -> gs)
+      | Compoz (a, f) ->
+          (* printfn " mplus: 4th case "; *)
+          choice a (fun () -> mplus gs @@ f ())
 
     let rec bind xs g =
+      (* printfn "pizda"; *)
       match xs with
       | Nil -> Nil
       | Thunk f ->
-          (* printfn "bind got 2nd case (f)"; *)
+          printfn "bind: 2nd case";
           Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
       | Single a ->
           (* printfn "bind got 3rd case (a)"; *)
           g a
       | Compoz (a, f) ->
           (* printfn "bind got 4th case (a f)"; *)
-          mplus (g a) (Thunk (fun () -> bind f g))
+          mplus (g a) (Thunk (fun () -> bind (Thunk f) g))
 
   end
 
@@ -85,7 +96,7 @@ module Stream =
     | MKStream.Nil -> Nil
     | MKStream.Thunk f -> from_fun (fun () -> of_mkstream @@ f ())
     | MKStream.Single a -> Cons (a, Nil)
-    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream f))
+    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
 
     let rec is_empty = function
     | Nil    -> true
@@ -555,41 +566,30 @@ let conj f g st = MKStream.bind (f st) g
 let (&&&) = conj
 
 let disj f g st =
-  (* printf "inside disj\n%!"; *)
-  MKStream.mplus
-    (
-      (* printfn "  first  part of disj is executed"; *)
-      f st)
-    (Thunk (fun () ->
-      (* printfn "  second part of disj is executed"; *)
-      g st))
+  let open MKStream in
+  mplus (f st) (Thunk (fun () -> g st))
 
 let (|||) = disj
 
 (* mplus_star *)
 let rec (?|) = function
-| [h]  -> h
-| h::t ->
+| []    -> failwith "wrong argument of ?|"
+| [h]   -> h
+| h::tl -> h ||| (?| tl)
           (* Printf.printf "mplus* calls mplus \n%!"; *)
-          (fun st ->
-            MKStream.mplus (h st) (delay_goal (?| t) st))
+          (* (fun st ->
+            MKStream.mplus (h st) (delay_goal (?| t) st)) *)
             (* MKStream.mplus (h st) ((?| t) st)) *)
-
-(* | h::t -> h ||| (delay_goal (?| t)) *)
-(* | h::t -> h ||| (?| t) *)
 
 (* "bind*" *)
 let rec (?&) = function
-| [] -> failwith "wrong argument of ?&"
+| []   -> failwith "wrong argument of ?&"
 | [h]  -> h
-| x::y::tl -> ?& ((conj x y)::tl)
-(* | h::t -> h &&& ?& t *)
+| x::y::tl -> ?& ((x &&& y)::tl)
 
 let bind_star = (?&)
 
-let conde xs =
-  (* printf "inc in conde\n%!"; *)
-  inc ( ?| xs)
+let conde xs = inc (?| xs)
 
 module Fresh =
   struct
@@ -930,40 +930,60 @@ module ManualReifiers = struct
       else Pair.reify r1 r2 c p
 
 end;;
-
-let disj2 g1 g2 st =
-  MKStream.mplus
-    (g1 st)
-    (Thunk(fun () -> g2 st))
-
+(*
 let () =
   let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
     @@ ManualReifiers.int_reifier h t) in
-  let goal1 _ st =
+  let goal1 exp st =
     MKStream.mplus
-      (call_fresh_named "t" (fun t -> delay_goal (t === !!1)) st )
+      (call_fresh_named "t" (fun t st ->
+        MKStream.inc (fun () ->
+          ?& [ exp === !!0
+             ; exp === !!1 ] st )) st)
       (Thunk (fun () ->
+        (* printfn "herr"; *)
         MKStream.mplus
-          (call_fresh_named "es" (fun t ->delay_goal (t=== !!2)) st)
+          (call_fresh_named "es" (fun t st ->
+            MKStream.inc (fun () -> (exp=== !!2) st)) st)
           (Thunk (fun () ->
-           call_fresh_named "zz" (fun t ->delay_goal (t=== !!3)) st)
-          )
+           call_fresh_named "zz" (fun t st ->
+             MKStream.inc (fun () -> (exp=== !!3) st)) st))
       ))
   in
-  (* let goal1 _ st =
-    disj2
-      (call_fresh_named "t" (fun t -> (t === !!1)) )
-      (fun st ->
-        MKStream.mplus
-          (call_fresh_named "es" (fun t -> t=== !!2) st)
-          (Thunk (fun () ->
-            call_fresh_named "zz" (fun t -> t=== !!3) st)
-          )
+  (* let goal2 exp st =
+    disj
+      (call_fresh_named "t" (fun _t  ->
+        MKStream.inc2 (fun () -> exp === !!1 )) )
+      (disj
+          (call_fresh_named "es" (fun _t ->
+            MKStream.inc2 (fun () -> exp === !!2  )) )
+          (call_fresh_named "zz" (fun _t ->
+            MKStream.inc2 (fun () -> exp === !!3 )) )
       ) st
   in *)
-  run q goal1 (fun qs -> Stream.take ~n:2 qs |> List.iter (fun _ -> ()))
-;;
+  let goal2 exp =
+    conde
+      [ call_fresh_named "t" (fun _t  ->
+          MKStream.inc2 (fun () ->
+          ?&  [ exp === !!0
+              ; exp === !!1
+              ])
+        )
+      ; call_fresh_named "es" (fun _t ->
+            MKStream.inc2 (fun () -> exp === !!2 ))
+      ; call_fresh_named "zz" (fun _t ->
+            MKStream.inc2 (fun () -> exp === !!3 ))
+      ]
+  in
 
+  run q goal1 (fun qs -> Stream.take ~n:2 qs
+      |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d"));
+  print_newline ();
+  run q goal2 (fun qs -> Stream.take ~n:2 qs
+      |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d"));
+  ()
+;;
+*)
 
 
 (* ***************************** a la relational StdLib here ***************  *)
