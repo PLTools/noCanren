@@ -51,13 +51,16 @@ EXTEND
         (fun x acc -> <:expr< (MiniKanren.OldList.cons $x$ $acc$) >>)
         clauses <:expr< [] >>
       in
-      let herr0 = String.concat " " vars in
+      let __herr0 = String.concat " " vars in
 
       let body = <:expr< bind_star $listed_clauses$ >> in
-      let body = <:expr< delay (fun () ->
-        (* let () = Printf.printf "inc after creating %s is called\n%!"
-          $str:herr0$ in *)
-        $body$) >>
+      let body = <:expr<
+        let () = Printf.printf "create inc in fresh ==== (%s)\n%!"
+                    $str:__herr0$ in
+        delay2 (fun () ->
+          let () = Printf.printf "inc in fresh forced: (%s)\n%!"
+                    $str:__herr0$ in
+          $body$) >>
       in
       let ans =
         List.fold_right (fun x e ->
@@ -67,7 +70,7 @@ EXTEND
       in
       (* let rec ans = <:expr<
         let () = Printf.printf "create inc in fresh ====== (%s)\n%!"
-          $str:herr0$ in
+          $str:__herr0$ in
         delay (fun () -> $body$) (* it is inc *)
       >>
 

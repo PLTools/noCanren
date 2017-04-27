@@ -33,7 +33,11 @@ module MKStream =
     let from_fun (f: unit -> 'a t) : 'a t = Thunk f
     let inc = from_fun
 
-    let inc2 thunk = fun st -> inc (fun () -> thunk () st)
+    let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
+      fun st -> inc (fun () ->
+        (* printfn " inc2 forced"; *)
+        thunk () st)
+
     let nil = Nil
 
     let single x = Single x
@@ -54,31 +58,37 @@ module MKStream =
 
     let rec mplus fs gs =
       match fs with
-      | Nil           -> gs
+      | Nil           ->
+          printfn " mplus: 1st case";
+          force gs
       | Thunk f       ->
           (* The we force 2nd argument and left 1st one for later
             ... because fasterMK does that
           *)
-          (* printfn " mplus: 2n case "; *)
+          printfn " mplus: 2nd case";
           Thunk (fun () -> let r = force gs in mplus r fs)
-      | Single a      -> choice a (fun () -> gs)
+      | Single a      ->
+          printfn " mplus: 3rd case";
+          choice a (fun () -> gs)
       | Compoz (a, f) ->
-          (* printfn " mplus: 4th case "; *)
+          printfn " mplus: 4th case ";
           choice a (fun () -> mplus gs @@ f ())
 
     let rec bind xs g =
       (* printfn "pizda"; *)
       match xs with
-      | Nil -> Nil
+      | Nil ->
+            printfn " bind: 1std case";
+            Nil
       | Thunk f ->
-          printfn "bind: 2nd case";
+          printfn " bind: 2nd case";
           Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
-      | Single a ->
-          (* printfn "bind got 3rd case (a)"; *)
-          g a
-      | Compoz (a, f) ->
-          (* printfn "bind got 4th case (a f)"; *)
-          mplus (g a) (Thunk (fun () -> bind (Thunk f) g))
+      | Single c ->
+          printfn " bind: 3rd case";
+          g c
+      | Compoz (c, f) ->
+          printfn " bind: 4th case";
+          mplus (g c) (Thunk (fun () -> bind (f ()) g))
 
   end
 
@@ -557,6 +567,8 @@ let (=/=) x y ((env, subst, constr) as st) =
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
 
+let delay2 : (unit -> goal) -> goal = MKStream.inc2
+
 let delay_goal : goal -> goal = fun g st -> Thunk (fun () -> g st)
 let inc = delay_goal
 
@@ -567,7 +579,10 @@ let (&&&) = conj
 
 let disj f g st =
   let open MKStream in
-  mplus (f st) (Thunk (fun () -> g st))
+  mplus (f st)
+    (Thunk (fun () ->
+      printfn " force inc from mplus*";
+      g st))
 
 let (|||) = disj
 
@@ -576,10 +591,11 @@ let rec (?|) = function
 | []    -> failwith "wrong argument of ?|"
 | [h]   -> h
 | h::tl -> h ||| (?| tl)
-          (* Printf.printf "mplus* calls mplus \n%!"; *)
-          (* (fun st ->
-            MKStream.mplus (h st) (delay_goal (?| t) st)) *)
-            (* MKStream.mplus (h st) ((?| t) st)) *)
+
+let rec my_mplus_star xs st = match xs with
+| []    -> failwith "wrong argument of my_mplus_star|"
+| [h]   -> h st
+| h::tl -> disj h (my_mplus_star tl) st
 
 (* "bind*" *)
 let rec (?&) = function
@@ -589,7 +605,11 @@ let rec (?&) = function
 
 let bind_star = (?&)
 
-let conde xs = inc (?| xs)
+let conde xs : goal = fun st ->
+  printfn " creaded inc in conde";
+  MKStream.inc2 (fun () ->
+    printfn " force a conde";
+    my_mplus_star xs) st
 
 module Fresh =
   struct
@@ -985,7 +1005,69 @@ let () =
 ;;
 *)
 
+let ____ () =
+  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
+    @@ ManualReifiers.int_reifier h t) in
 
+  let goal1 exp =
+    conde [ call_fresh_named "t1" (fun t1 ->
+              MKStream.inc2 @@ fun () ->
+              ?&  [ (exp === !!0) ]
+              )
+          ; call_fresh_named "t2" (fun t2 ->
+              MKStream.inc2 @@ fun () ->
+              ?&  [ (exp === !!3) ]
+              )
+          ; call_fresh_named "t3" (fun t3 ->
+              MKStream.inc2 @@ fun () ->
+              ?&  [ (exp === !!6) ]
+              )
+          ]
+  in
+  run q goal1 (fun qs -> Stream.take ~n:(-1) qs
+    |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
+  ()
+;;
+
+let  () =
+  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
+    @@ ManualReifiers.int_reifier h t) in
+
+  let rec evalo m n =
+        (* fresh (f f') *)
+        call_fresh_named "f" (fun f ->
+        call_fresh_named "f2" (fun f2 ->
+          let () = printfn "create inc in fresh ==== (f f2)" in
+          delay2 @@ fun () ->
+            printfn "inc in fresh forced: (f f2)" ;
+            ?&
+          [ conde
+              [ call_fresh_named "x" (fun _x ->
+                  printfn "create inc in fresh ==== (x)";
+                  delay2 @@ fun () ->
+                    printfn "inc in fresh forced: (x)" ;
+                    (* (f' === abs x l) *)
+                    (f2 === !!1)
+                )
+              (* ; fresh (p) *)
+              ; call_fresh_named "p" (fun _p ->
+                  printfn "create inc in fresh ==== (p)";
+                  delay2 @@ fun () ->
+                    printfn "inc in fresh forced: (p)" ;
+                    (* (f' === app p p) *)
+                    (f2 === !!2)
+                )
+              ]
+          ; (evalo f f2)
+          ]
+        ))
+  in
+  run qr evalo (fun qs _rs -> Stream.take ~n:1 qs
+    |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
+  ()
+;;
+
+let () = ();;
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
 @type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap;;

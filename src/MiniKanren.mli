@@ -199,7 +199,8 @@ val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
 
   See also syntax extension which simplifies the syntax.
 *)
-val delay: (unit -> goal) -> goal
+val delay  : (unit -> goal) -> goal
+val delay2 : (unit -> goal) -> goal
 
 val delay_goal: goal -> goal
 
