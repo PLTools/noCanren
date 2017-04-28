@@ -1033,36 +1033,65 @@ let  () =
   let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
     @@ ManualReifiers.int_reifier h t) in
 
-  let rec evalo m n =
-        (* fresh (f f') *)
-        call_fresh_named "f" (fun f ->
-        call_fresh_named "f2" (fun f2 ->
-          let () = printfn "create inc in fresh ==== (f f2)" in
-          delay2 @@ fun () ->
-            printfn "inc in fresh forced: (f f2)" ;
-            ?&
-          [ conde
-              [ call_fresh_named "x" (fun _x ->
-                  printfn "create inc in fresh ==== (x)";
-                  delay2 @@ fun () ->
-                    printfn "inc in fresh forced: (x)" ;
-                    (* (f' === abs x l) *)
-                    (f2 === !!1)
-                )
-              (* ; fresh (p) *)
-              ; call_fresh_named "p" (fun _p ->
-                  printfn "create inc in fresh ==== (p)";
-                  delay2 @@ fun () ->
-                    printfn "inc in fresh forced: (p)" ;
-                    (* (f' === app p p) *)
-                    (f2 === !!2)
-                )
-              ]
-          ; (evalo f f2)
+  (* let rec evalo m =
+    printfn " applying evalo to m";
+    call_fresh_named "f2" (fun f2 ->
+      let () = printfn "create inc in fresh ==== (f2)" in
+      delay2 @@ fun () ->
+        printfn "inc in fresh forced: (f2)";
+        (fun st ->
+          MKStream.bind
+            ( printfn " creaded inc in conde";
+              MKStream.inc2 (fun () ->
+                printfn " force a conde";
+                fun st ->
+                MKStream.mplus
+                  (call_fresh_named "x" (fun _x ->
+                      printfn "create inc in fresh ==== (x)";
+                      MKStream.inc2 @@ fun () ->
+                        printfn "inc in fresh forced: (x)" ;
+                        (f2 === !!1)
+                    ) st)
+                  (Thunk (fun () ->
+                    printfn " force inc from mplus*";
+                    call_fresh_named "p" (fun _p ->
+                        printfn "create inc in fresh ==== (p)";
+                        MKStream.inc2 @@ fun () ->
+                          printfn "inc in fresh forced: (p)" ;
+                          (f2 === !!2)
+                      ) st))
+              ) st
+            )
+            (evalo !!4 )
+        )
+    )
+  in *)
+  let rec evalo m =
+    printfn " applying evalo to m";
+    call_fresh_named "f2" (fun f2 ->
+      let () = printfn "create inc in fresh ==== (f2)" in
+      delay2 @@ fun () ->
+        printfn "inc in fresh forced: (f2)" ;
+        ?&
+      [ conde
+          [ call_fresh_named "x" (fun _x ->
+              printfn "create inc in fresh ==== (x)";
+              delay2 @@ fun () ->
+                printfn "inc in fresh forced: (x)" ;
+                (f2 === !!1)
+            )
+          ; call_fresh_named "p" (fun _p ->
+              printfn "create inc in fresh ==== (p)";
+              delay2 @@ fun () ->
+                printfn "inc in fresh forced: (p)" ;
+                (f2 === !!2)
+            )
           ]
-        ))
+      ; (evalo !!4 )
+      ]
+    )
   in
-  run qr evalo (fun qs _rs -> Stream.take ~n:1 qs
+  run q evalo (fun qs -> Stream.take ~n:1 qs
     |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
   ()
 ;;
