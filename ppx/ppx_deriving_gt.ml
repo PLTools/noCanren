@@ -413,21 +413,22 @@ let gt_repr_typ_wrap ~typename ~root_type arg =
               [%type: [%t subclass] -> [%t tail]]],
            [%t arg]) GT.t ]
 
-let inherit_field_gen ~name ~root_type wrap =
-  let prefix = List.concat @@ List.map
+let inherit_field_gen ~name ~root_type ~inh ~synh ~synh_root wrap =
+  let synhs, types = List.split @@ List.map
     (fun ({ptyp_desc; _},_) -> match ptyp_desc with
-    | Ptyp_var name -> Typ.[var name; [%type: unit]; [%type: string] ]
+    | Ptyp_var name -> (synh name, Typ.[var name; inh name; synh name ])
     | _ -> assert false
     ) root_type.ptype_params
   in
-  wrap Typ.(prefix @ [ [%type: unit]; [%type: string] ])
+  let types = List.concat types in
+  wrap Typ.(types @ [ [%type: unit]; synh_root root_type synhs ])
 
+let inherit_cf ~name ~root_type ~inh ~synh ~synh_root =
+  inherit_field_gen ~name ~root_type ~inh ~synh ~synh_root
+    (fun t -> Cf.inherit_ Fresh (Cl.constr (lid name) t) None)
 
-let inherit_cf ~name ~root_type =
-  inherit_field_gen ~name ~root_type (fun t -> Cf.inherit_ Fresh (Cl.constr (lid name) t) None)
-
-let inherit_ctf ~name ~root_type =
-  inherit_field_gen ~name ~root_type (fun t -> Ctf.inherit_ @@ Cty.constr (lid name) t)
+(* let inherit_ctf ~name ~root_type =
+  inherit_field_gen ~name ~root_type (fun t -> Ctf.inherit_ @@ Cty.constr (lid name) t) *)
 
 let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
@@ -502,33 +503,43 @@ let sig_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   module type Plugin =
     sig
       val name : string
+
+      (* Extended parameters that must be appended to class parameters *)
+      val extra_params : type_declaration -> (core_type * variance) list
+
+      val inh  : string -> core_type
+      val synh : string -> core_type
+
+      val synh_root : type_declaration -> core_type list -> core_type
+
       val core : core_type -> class_expr
       val constructor : type_declaration -> constructor_declaration -> class_field
     end
 
-let plugin_decls (module P: Plugin) type_decl =
-  let type_decl_handler type_decl =
-    let typename    = type_decl.ptype_name.txt in
+let plugin_decls (module P: Plugin) root_type =
+  let type_decl_handler root_type =
+    let typename    = root_type.ptype_name.txt in
     let typename_t  = typename ^ "_t"  in
     let plugin_name = P.name ^ "_" ^ typename ^ "_t" in
-    match type_decl.ptype_kind with
-    | Ptype_abstract -> (match type_decl.ptype_manifest with
+    match root_type.ptype_kind with
+    | Ptype_abstract -> (match root_type.ptype_manifest with
       | Some manifest ->
           [Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc plugin_name) (P.core manifest) ]]
         (* P.core manifest *)
       | None -> failwith "Not implemented")
     | Ptype_variant constrs ->
       let body =
-        (inherit_cf ~name:typename_t ~root_type:type_decl) ::
-        List.map (fun constr -> P.constructor type_decl constr) (List.rev constrs)
+        (inherit_cf ~name:typename_t ~root_type ~inh:P.inh ~synh:P.synh ~synh_root:P.synh_root) ::
+        List.map (fun constr -> P.constructor root_type constr) (List.rev constrs)
       in
-      [ Str.class_ [Ci.mk ~virt:Concrete ~params:type_decl.ptype_params (mknoloc plugin_name)
+      [ Str.class_ [Ci.mk ~virt:Concrete ~params:(root_type.ptype_params @ (P.extra_params root_type))
+                       (mknoloc plugin_name)
                        (Cl.structure (Cstr.mk (Pat.var @@ mknoloc "this") body))
                    ]
       ]
     | _ -> failwith "Some shit happend"
   in
-  type_decl_handler type_decl
+  type_decl_handler root_type
 
 let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let { gt_show; gt_gmap } = parse_options options in
@@ -540,28 +551,8 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   let typename_tt = typename ^ "_tt" in
   let _t_typename  = "t_" ^ typename  in
 
-  let gmap_typename_t = "gmap_" ^ typename_t in
-  let gmap_decls root_type =
-    match root_type.ptype_kind with
-    | Ptype_abstract -> begin
-        match root_type.ptype_manifest with
-        | Some [%type: int] ->
-          [ (* [%stri class [%p Pat.var "asdf" ] = object inherit GT.show_int_t end ] *)
-            Str.class_ [Ci.mk ~virt:Concrete ~params:[] (mknoloc gmap_typename_t) @@
-                           Cl.structure (Cstr.mk (Pat.any ())
-                            [ Cf.inherit_ Fresh (Cl.constr (lid "GT.gmap_int_t") []) None
-                            ])
-                       ]
-          ]
-
-
-        | _ -> raise_errorf "not implemented?1"
-      end
-    | Ptype_variant constrs -> raise_errorf  "not implemented?2"
-    | _ -> raise_errorf "not implemented?3"
-  in (* end of gmap_decls *)
-
   let show_typename_t = "show_" ^ typename_t in
+  let gmap_typename_t = "gmap_" ^ typename_t in
 
   let derivers_bunch =
     let wrap_meth mname cname =
@@ -588,14 +579,14 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
   in
 
   let show_decls = if gt_show then plugin_decls (module Show: Plugin) root_type else [] in
+  let gmap_decls = if gt_gmap then plugin_decls (module Gmap: Plugin) root_type else [] in
 
   match root_type.ptype_kind with
   | Ptype_abstract -> begin
       match root_type.ptype_manifest with
       | Some [%type: int] ->
         [ make_primitive_bunch root_type.ptype_name.txt [%expr GT.(int.gcata)]] @
-        gmap_decls root_type @
-
+        gmap_decls @
         show_decls @ [derivers_bunch]
       | _ -> raise_errorf "%s %s" "not implemented?5" root_type.ptype_name.txt
     end
@@ -721,7 +712,7 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
                      ]
         ]
       in
-      let ans = ans @ show_decls in
+      let ans = ans @ show_decls @ gmap_decls in
       ans @ [derivers_bunch]
 
   | _ -> raise_errorf ~loc:root_type.ptype_loc "%s: some error2" deriver
