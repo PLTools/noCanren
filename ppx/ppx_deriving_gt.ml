@@ -587,7 +587,6 @@ let str_of_type ~options ~path ({ ptype_params=type_params } as root_type) =
       | Some [%type: int] ->
         [ make_primitive_bunch root_type.ptype_name.txt [%expr GT.(int.gcata)]] @
         gmap_decls @
-
         show_decls @ [derivers_bunch]
       | _ -> raise_errorf "%s %s" "not implemented?5" root_type.ptype_name.txt
     end

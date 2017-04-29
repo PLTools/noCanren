@@ -22,7 +22,8 @@ true: short_paths
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)
 
-<regression/stlcPPX.*>:  package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/stlcPPX.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_showT.cma), package(ppx_deriving)
 
 #PPX tests are like 2xx
 #Some tests require syntax extensions with freshes

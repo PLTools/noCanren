@@ -32,6 +32,7 @@ plugin:
 
 ppx:
 	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs \
+		ppx/ppx_deriving_showT.cma ppx/ppx_deriving_showT.cmxs \
 		ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native \
 		ppx/ppx_ocanren_all.native
 
@@ -43,7 +44,7 @@ clean: clean_tests
 ######################## Tests related stuff  ##########################
 # camlp5-based tests
 #REGRES_CASES := 000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-REGRES_CASES += 100ppxgt
+REGRES_CASES += 100ppxgt 101showT
 #ppx-based tests
 REGRES_CASES += 205infero 206evalo
 
@@ -108,6 +109,10 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cmx \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
+	_build/ppx/ppx_deriving_gt.cma \
+	_build/ppx/ppx_deriving_gt.cmxa \
+	_build/ppx/ppx_deriving_gt.cmxs \
+	_build/ppx/ppx_ocanren_all.native \
 	$(wildcard _build/src/MiniKanren.[oa]) \
 	$(wildcard _build/camlp5/pa_minikanren.cm[oi]) \
 

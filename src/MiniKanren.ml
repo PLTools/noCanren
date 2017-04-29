@@ -168,9 +168,9 @@ let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x 
   in
   helper x
 
-let logic = {logic with
- gcata = ();
- plugins =
+let logic = {
+ GT.gcata = ();
+ GT.plugins =
    object
      (* method gmap    = logic.plugins#gmap
      method html    = logic.plugins#html
@@ -485,6 +485,7 @@ let (=/=) x y ((env, subst, constr) as st) =
         )
   with Occurs_check -> Stream.cons st Stream.nil
 
+      
 let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj
@@ -494,10 +495,12 @@ let disj f g st = Stream.mplus (f st) (g st)
 let (|||) = disj
 
 let rec (?|) = function
+| [] -> failwith "(?|): bad argument"
 | [h]  -> h
 | h::t -> h ||| ?| t
 
 let rec (?&) = function
+| [] -> failwith "(?&): bad argument"
 | [h]  -> h
 | h::t -> h &&& ?& t
 
