@@ -24,15 +24,23 @@ let rec fives x =
   defer (fives x)
 
 let rec appendo a b ab =
-  ((a === nil ()) &&& (b === ab)) |||
-  Fresh.two (fun h t ->
-      (a === h%t) &&&
-      Fresh.one (fun ab' ->
-          (h%ab' === ab) &&& (appendo t b ab')
+  (* let (===) = unitrace (fun h t -> GT.(show List.logic @@ show logic (show int)) @@
+    List.reify ManualReifiers.int_reifier h t)
+  in *)
+  conde
+    [ ((a === nil ()) &&& (b === ab))
+    ; Fresh.two (fun h t ->
+        (a === h%t) &&&
+        Fresh.one (fun ab' ->
+            (h%ab' === ab) &&& (appendo t b ab')
+        )
       )
-    )
+    ]
 
 let rec reverso a b =
+  (* let (===) = unitrace (fun h t -> GT.(show List.logic @@ show logic (show int)) @@
+    List.reify ManualReifiers.int_reifier h t)
+  in *)
   conde
     [ ((a === nil ()) &&& (b === nil ()))
     ; Fresh.two (fun h t ->
@@ -49,16 +57,18 @@ let show_intl_list = (show(List.logic ) (show(logic) (show int)))
 let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list show_intl_list n
 
 let _ =
-  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist []) (ilist [1])   )); *)
+run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
   run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
   run_exn show_int       2  q qh (REPR (fun q   -> a_and_b' q                                      ));
-  run_exn show_int      10  q qh (REPR (fun q   -> fives q                                         ))
+  run_exn show_int      10  q qh (REPR (fun q   -> fives q                                         ));
+  ()
 
-let _withFree =
+let _withFree () =
   runL          1  q  qh (REPR (fun q   -> reverso (ilist []) (ilist [])                ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          4 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));

@@ -18,6 +18,8 @@
 
 open Printf
 
+let printfn fmt = kprintf (printf "%s\n%!") fmt
+
 module Stream =
   struct
 
@@ -107,10 +109,11 @@ let rec wrap (x : Obj.t) =
       else Invalid t
     )
 
-let generic_show x =
+let generic_show ?(maxdepth= 99999) x =
   let x = Obj.repr x in
   let b = Buffer.create 1024 in
-  let rec inner o =
+  let rec inner depth o =
+    if depth > maxdepth then Buffer.add_string b "..." else
     match wrap o with
     | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
     | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
@@ -118,10 +121,10 @@ let generic_show x =
     | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
     | Boxed  (t, l, f) ->
         Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-        for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
+        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
         Buffer.add_string b ">"
   in
-  inner x;
+  inner 0 x;
   Buffer.contents b
 ;;
 
@@ -135,19 +138,6 @@ type ('a, 'b) injected = 'a
 external lift: 'a -> ('a, 'a) injected = "%identity"
 external inj: ('a, 'b) injected -> ('a, 'b logic) injected = "%identity"
 ;;
-
-(* The [token_t] type is use to connect logic variables with environment where they were created *)
-@type token_env = GT.int with show,gmap,html,eq,compare,foldl,foldr;;
-
-(* Global token will not be exported outside and will be used to detect the value
- * was actually created by us *)
-type token_mk = int list
-let global_token: token_mk = [8];;
-
-type inner_logic =
-| InnerVar of token_mk * token_env * int
-
-let (!!!) = Obj.magic
 
 let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x ->
   let rec helper = function
@@ -222,12 +212,44 @@ end = struct
   let replace: key -> 'a list -> 'a t -> 'a t = M.add
 end
 
+
+(* The [token_t] type is use to connect logic variables with environment where they were created *)
+@type token_env = GT.int (* with show,gmap,html,eq,compare,foldl,foldr *);;
+
+(* Scope there are just ints but in faster-MK they use reference equality *)
+type scope_t = int
+let non_local_scope : scope_t = -8
+
+let new_scope : unit -> scope_t =
+  let scope = ref 0 in
+  fun () -> (incr scope; !scope)
+
+(* Global token will not be exported outside and will be used to detect the value
+ * was actually created by us *)
+type token_mk = int list
+let global_token: token_mk = [8];;
+
+type inner_logic =
+  { token_mk: token_mk; token_env: token_env; index: int
+  ; mutable subst: Obj.t; scope: scope_t (* set-var-val! stuff *)
+  (* in the substitution we will store pair the same as in subst *)
+  }
+
+let unbound : Obj.t = Obj.repr [13]
+
+let make_inner_logic ~envt ~scope index = { token_env = envt; token_mk = global_token
+  ; index; subst = unbound; scope }
+
+let is_inner_unbound x = (x.subst == unbound)
+let scope_of_inner { scope; _ } : scope_t =  scope
+let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
+
 module Env :
   sig
     type t
 
     val empty  : unit -> t
-    val fresh  : t -> 'a * t
+    val fresh  : scope:scope_t -> t -> 'a * t
     val var    : t -> 'a -> int option
     val is_var : t -> 'a -> bool
   end =
@@ -237,24 +259,27 @@ module Env :
                (* mutable reifiers: Obj.t MultiIntMap.t; *)
               }
 
-    let last_token : token_env ref = ref 0
+    let last_token : token_env ref = ref 11
     let empty () =
       incr last_token;
       { token= !last_token; next=10 }
 
-    let fresh e =
-      let v = InnerVar (global_token, e.token, e.next) in
+    let fresh ~scope e =
+      let v = make_inner_logic ~envt:e.token ~scope e.next in
       e.next <- 1+e.next;
-      (* printf "new fresh var with index=%d\n" e.next; *)
+      (* printfn "new fresh var with index=%d" e.next; *)
+      (* printfn " it is%!               %s" (generic_show v); *)
       (!!!v, e)
 
     let var_tag, var_size =
-      let dummy_index = 0 in
-      let dummy_token = 0 in
-      let v = InnerVar (global_token, dummy_token, dummy_index) in
+      let index = 0 in (* dummy index *)
+      let envt  = 0 in (* dummy env token *)
+      let scope = 0 in (* dummy scope *)
+      let v = make_inner_logic ~envt ~scope index in
       Obj.tag (!!! v), Obj.size (!!! v)
 
     let var {token=env_token;_} x =
+      (* printfn " checking for var a%! '%s'" (generic_show x); *)
       (* There we detect if x is a logic variable and then that it belongs to current env *)
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
@@ -263,8 +288,11 @@ module Env :
           (Obj.is_block q) && q == (!!!global_token)
          )
       then (let q = Obj.field t 1 in
+            (* let () = printfn " Obj.is_int%! '%s' = %b" (generic_show q) (Obj.is_int q) in
+            let () = printfn " env_token is %!'%s'" (generic_show env_token) in
+            let () = printfn " q == (!!!env_token) = %!'%b'" (q == (!!!env_token)) in *)
             if (Obj.is_int q) && q == (!!!env_token)
-            then let InnerVar (_,_,i) = !!! x in Some i
+            then Some (!!!x : inner_logic).index
             else failwith "You hacked everything and pass logic variables into wrong environment"
             )
       else None
@@ -272,18 +300,19 @@ module Env :
     let is_var env v = None <> var env v
 
     (* Some tests for to check environment self-correctness *)
-    (*
-    let () =
+
+    (* let () =
+      let scope = new_scope () in
       let e1 = empty () in
       let e2 = empty () in
       assert (e1 != e2);
       assert (e1.token != e2.token);
-      let (q1,e11) = fresh e1 in
+      let (q1,e11) = fresh ~scope e1 in
       assert (is_var e1  q1);
       assert (is_var e11 q1);
       assert (is_var e2  q1);
-      ()
-    *)
+      () *)
+
   end
 
 module Subst :
@@ -296,11 +325,12 @@ module Subst :
     val make_content : 'a -> 'b  -> content
 
     val of_list : (int * content) list -> t
+
     (* splits substitution into two lists of the same length. 1st contains logic vars,
      * second values to substitute *)
     val split   : t -> Obj.t list * Obj.t list
     val walk    : Env.t -> 'a -> t -> 'a
-    val unify   : Env.t -> 'a -> 'a -> t option -> (int * content) list * t option
+    val unify   : Env.t -> 'a -> 'a -> scope_t -> t option -> (int * content) list * t option
     val show    : t -> string
   end =
   struct
@@ -309,6 +339,7 @@ module Subst :
     (* map from var indicies to tuples of (actual vars, value) *)
     type content = { lvar: Obj.t; new_val: Obj.t }
     type t = content M.t
+
     let new_val {new_val=x;_} = Obj.obj x
     let lvar    {lvar=v;_}    = Obj.obj v
     let make_content a b = { lvar=Obj.repr a; new_val=Obj.repr b }
@@ -322,15 +353,21 @@ module Subst :
 
     let empty = M.empty
 
-    let of_list l = List.fold_left (fun s (i, cnt) -> M.add i cnt s) empty l
+    let of_list ts = List.fold_left (fun s (i, cnt) -> M.add i cnt s) M.empty ts
 
-    let split s = M.fold (fun _ {lvar;new_val} (xs, ts) -> (lvar::xs, new_val::ts)) s ([], [])
+    let split s =
+      M.fold (fun _ {lvar;new_val} (xs, ts) -> (lvar::xs, new_val::ts)) s ([], [])
+
+    let subst_lookup_exn ui (u: inner_logic) map : content =
+      if is_inner_unbound u
+      then M.find !!!ui map
+      else !!!(u.subst)
 
     let rec walk : Env.t -> 'a -> t -> 'a = fun env var subst ->
       match Env.var env !!!var with
       | None   -> var
       | Some i ->
-          try walk env (new_val @@ M.find i subst) subst
+          try walk env (new_val @@ subst_lookup_exn i !!!var subst) subst
           with Not_found -> var
 
     let rec occurs env xi term subst =
@@ -350,15 +387,25 @@ module Subst :
             in
             inner 0
 
-    let unify env x y subst =
-      let extend xi x term delta subst =
-        if occurs env xi term subst then raise Occurs_check
+    let subst_add (m,scope) xi (x: inner_logic) xi_and_term =
+      (* printfn " subst_add to %!  '%s'" (generic_show x);
+      printfn "            what: '%s'" (generic_show xi_and_term); *)
+      if scope_eq scope (scope_of_inner x)
+      then  let () = x.subst <- Obj.repr xi_and_term in
+            (* printfn " variable adjusted by%! '%s'" (generic_show xi_and_term); *)
+            m
+      else  M.add xi xi_and_term m
+
+    let unify env x y scope subst =
+      let extend xi x term delta subst_map =
+        if occurs env xi term subst_map then raise Occurs_check
         else
           let cnt = make_content x term in
-          ((xi, cnt)::delta, Some (M.add xi cnt (!!! subst)) )
+          let new_m = subst_add (subst_map, scope) xi x cnt in
+          ((xi, cnt)::delta, Some new_m)
       in
-      let rec unify x y (delta, subst) =
-        match subst with
+      let rec unify x y (delta, subst_map) =
+        match subst_map with
         | None -> delta, None
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
@@ -388,15 +435,20 @@ module Subst :
                  | _ -> delta, None
                 )
       in
-      unify x y ([], subst)
+      match unify !!!x !!!y ([], subst) with
+      | (delta, None) as ans -> ans
+      | (delta, Some map) -> (delta, Some map)
 
   end
 
 let rec refine : Env.t -> Subst.t -> Obj.t -> Obj.t = fun env subst x ->
+  (* printfn "refine"; *)
   let rec walk' term =
+    (* printfn "walk' of %!'%s'\n%!" (generic_show term); *)
     let var = Subst.walk env term subst in
     match Env.var env var with
     | None ->
+        (* printfn " nota var but %s" (generic_show ~maxdepth:3 var); *)
         (match wrap (Obj.repr var) with
           | Unboxed _ -> Obj.repr var
           | Boxed (t, s, f) ->
@@ -408,7 +460,9 @@ let rec refine : Env.t -> Subst.t -> Obj.t -> Obj.t = fun env subst x ->
             in
 
             for i = 0 to s-1 do
-              sf copy i @@ walk' (!!!(f i))
+              (* print_endline "0"; *)
+              let q = walk' (!!!(f i)) in
+              sf copy i q
             done;
             copy
           | Invalid n -> invalid_arg (sprintf "Invalid value for reconstruction (%d)" n)
@@ -443,7 +497,7 @@ end = struct
     let prefix = List.split @@ List.map (fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix in
     let subsumes subst (vs, ts) =
       try
-        match Subst.unify env !!!vs !!!ts (Some subst) with
+        match Subst.unify env !!!vs !!!ts non_local_scope (Some subst) with
         | [], Some _ -> true
         | _ -> false
       with Occurs_check -> false
@@ -485,7 +539,7 @@ end = struct
     ListLabels.fold_left cstr ~init:[] ~f:(fun css' cs_sub ->
       let x,t = Subst.split cs_sub in
       try
-        let p, s' = Subst.unify env (!!!x) (!!!t) subst' in
+        let p, s' = Subst.unify env (!!!x) (!!!t) non_local_scope subst' in
         match s' with
         | None -> css'
         | Some _ ->
@@ -500,37 +554,38 @@ end
 
 module State =
   struct
-    type t = Env.t * Subst.t * Constraints.t
-    let empty () = (Env.empty (), Subst.empty, Constraints.empty)
-    let env   (env, _, _) = env
-    let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (Constraints.show constr)
+    type t = Env.t * Subst.t * Constraints.t * scope_t
+    let empty () = (Env.empty (), Subst.empty, Constraints.empty, new_scope ())
+    let env   (env, _, _, _) = env
+    let show  (env, subst, constr, scp) =
+      sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show constr) scp
   end
 
 type 'a goal' = State.t -> 'a
 type goal = State.t Stream.t goal'
 
-let call_fresh f (env, subst, constr)  =
-  let x, env' = Env.fresh env in
-  f x (env', subst, constr)
+let call_fresh f : State.t -> _ = fun (env, subst, constr, scope) ->
+  let x, env' = Env.fresh ~scope env in
+  f x (env', subst, constr, scope)
 
-let (===) (x: _ injected) y (env, subst, constr) =
+let (===) (x: _ injected) y : goal = fun (env, subst, constr, scope) ->
   (* we should always unify two injected types *)
-
+  (* printfn " unify '%s' and '%s'" (generic_show x) (generic_show y); *)
   try
-    let prefix, subst' = Subst.unify env x y (Some subst) in
+    let prefix, subst' = Subst.unify env x y scope (Some subst) in
     begin match subst' with
     | None -> Stream.nil
     | (Some s) as subst ->
         try
           let constr' = Constraints.check ~prefix env subst constr in
-          Stream.cons (env, s, constr') Stream.nil
+          Stream.cons (env, s, constr', scope) Stream.nil
         with Disequality_violated -> Stream.nil
     end
   with Occurs_check -> Stream.nil
 
-let (=/=) x y ((env, subst, constrs) as st) =
+let (=/=) x y ((env, subst, constrs, scope) as st) =
   try
-    let prefix, subst' = Subst.unify env x y (Some subst) in
+    let prefix, subst' = Subst.unify env x y scope (Some subst) in
     (* prefix is a delta between subst and subst' *)
     match subst' with
     | None -> Stream.cons st Stream.nil
@@ -539,7 +594,7 @@ let (=/=) x y ((env, subst, constrs) as st) =
         | [] -> Stream.nil
         | _  ->
           let new_constrs = Constraints.extend ~prefix env constrs in
-          Stream.cons (env, subst, new_constrs) Stream.nil
+          Stream.cons (env, subst, new_constrs, scope) Stream.nil
         )
   with Occurs_check -> Stream.cons st Stream.nil
 
@@ -547,6 +602,7 @@ let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj
 
+(* let disj f g st = Stream.mplus (f st) (Stream.from_fun (fun () -> g st)) *)
 let disj f g st = Stream.mplus (f st) (g st)
 
 let (|||) = disj
@@ -559,7 +615,8 @@ let rec (?&) = function
 | [h]  -> h
 | h::t -> h &&& ?& t
 
-let conde = (?|)
+let conde goals = fun (e,subs,cs,scope) ->
+  (?|) goals (e, subs, cs, new_scope ())
 
 module Fresh =
   struct
@@ -612,6 +669,9 @@ module ExtractDeepest =
 
 
 type helper = < isVar : 'a . 'a -> bool; walk_cstrs: Obj.t -> Obj.t list >
+let helper_of_state st : helper =
+  !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end)
+
 
 class type ['a,'b] refined = object
   method is_open: bool
@@ -619,7 +679,7 @@ class type ['a,'b] refined = object
   method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
 end
 
-let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs) as st) ->
+let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs, scp) as st) ->
   let ans = !!!(refine env s (Obj.repr x)) in
   let is_open = has_free_vars (Env.is_var env) (Obj.repr ans) in
   let c: helper = !!!(object
@@ -709,6 +769,28 @@ let run n goalish f =
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> Stream.from_fun (fun () -> g () st)
 
+
+let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal =
+  fun shower q ((env,subst,_,_) as st) ->
+    printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine env subst !!!q);
+    success st
+
+(* let project2 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> goal = fun shower q r st ->
+  printf "%s '%s' and '%s'\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
+                                    (shower (helper_of_state st) @@ Obj.magic @@ refine st r);
+  success st
+
+let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> 'v -> goal = fun shower q r s st ->
+  printf "%s '%s' and '%s' and '%s'\n%!" msg
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st r)
+    (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
+  success st *)
+
+let unitrace shower x y = fun st ->
+  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (x === y) st
+
 (* ************************************************************************** *)
 module type T1 = sig
   type 'a t
@@ -738,8 +820,9 @@ end
 let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injected -> 'b) -> 'b = fun c x r ->
   if c#isVar x
   then
-    let InnerVar (_,_,n) = !!!x in
-    !!!(Var (n, List.map (!!!(r c)) @@ c#walk_cstrs !!!x))
+    let n = (!!!x : inner_logic).index in
+    (* !!!(Var (n, List.map (!!!(r c)) @@ c#walk_cstrs !!!x)) *)
+    !!!(Var (n, []))
   else failwith "Bad argument of var_of_injected: it should be logic variable"
 
 module Fmap1 (T : T1) = struct
