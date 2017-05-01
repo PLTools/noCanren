@@ -585,7 +585,7 @@ let (===) (x: _ injected) y : goal = fun (env, subst, constr, scope) ->
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
   try
-    let prefix, subst' = Subst.unify env x y scope (Some subst) in
+    let prefix, subst' = Subst.unify env x y non_local_scope (Some subst) in
     (* prefix is a delta between subst and subst' *)
     match subst' with
     | None -> Stream.cons st Stream.nil
@@ -821,8 +821,8 @@ let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injec
   if c#isVar x
   then
     let n = (!!!x : inner_logic).index in
-    (* !!!(Var (n, List.map (!!!(r c)) @@ c#walk_cstrs !!!x)) *)
-    !!!(Var (n, []))
+    !!!(Var (n, List.map (!!!(r c)) @@ c#walk_cstrs !!!x))
+    (* !!!(Var (n, [])) *)
   else failwith "Bad argument of var_of_injected: it should be logic variable"
 
 module Fmap1 (T : T1) = struct

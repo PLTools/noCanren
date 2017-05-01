@@ -117,10 +117,10 @@ val conj : goal -> goal -> goal
 val (&&&) : goal -> goal -> goal
 
 (** [disj s1 s2] creates a goal, which is a disjunction of its arguments *)
-val disj : goal -> goal -> goal
+(* val disj : goal -> goal -> goal *)
 
 (** [|||] is left-associative infix synonym for [disj] *)
-val (|||) : goal -> goal -> goal
+(* val (|||) : goal -> goal -> goal *)
 
 (** [?| [s1; s2; ...; sk]] calculates [s1 ||| s2 ||| ... ||| sk] for a non-empty list of goals *)
 val (?|) : goal list -> goal

@@ -9,19 +9,20 @@ let just_a a = a === !!5
 let a_and_b a =
   call_fresh (fun b ->
       (a === !!7) &&&
-      ((b === !!6) ||| (b === !!5))
+      conde [ (b === !!6) ; (b === !!5) ]
   )
 
 let a_and_b' b =
   call_fresh (
     fun a ->
       (a === !!7) &&&
-      ((b === !!6) ||| (b === !!5))
+      conde [ (b === !!6) ; (b === !!5) ]
   )
 
 let rec fives x =
-  (x === !!5) |||
-  defer (fives x)
+  conde
+    [ (x === !!5)
+    ; defer (fives x) ]
 
 let rec appendo a b ab =
   (* let (===) = unitrace (fun h t -> GT.(show List.logic @@ show logic (show int)) @@
@@ -58,17 +59,17 @@ let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list 
 
 let _ =
   (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist []) (ilist [1])   )); *)
-run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
   run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
   run_exn show_int       2  q qh (REPR (fun q   -> a_and_b' q                                      ));
   run_exn show_int      10  q qh (REPR (fun q   -> fives q                                         ));
   ()
 
-let _withFree () =
+let _withFree =
   runL          1  q  qh (REPR (fun q   -> reverso (ilist []) (ilist [])                ));
   runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          4 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
