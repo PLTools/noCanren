@@ -55,17 +55,17 @@ EXTEND
 
       let body = <:expr< bind_star $listed_clauses$ >> in
       let body = <:expr<
-        let () = Printf.printf "create inc in fresh ==== (%s)\n%!"
-                    $str:__herr0$ in
+(*        let () = Printf.printf "create inc in fresh ==== (%s)\n%!"
+                    $str:__herr0$ in *)
         delay2 (fun () ->
-          let () = Printf.printf "inc in fresh forced: (%s)\n%!"
-                    $str:__herr0$ in
+      (*    let () = Printf.printf "inc in fresh forced: (%s)\n%!"
+                    $str:__herr0$ in *)
           $body$) >>
       in
       let ans =
         List.fold_right (fun x e ->
           let p = <:patt< $lid:x$ >> in
-          <:expr< call_fresh_named $str:x$ (fun $p$ -> $e$) >>
+          <:expr< call_fresh (fun $p$ -> $e$) >>
         ) (List.rev vars) body
       in
       (* let rec ans = <:expr<

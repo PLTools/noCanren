@@ -59,35 +59,35 @@ module MKStream =
     let rec mplus fs gs =
       match fs with
       | Nil           ->
-          printfn " mplus: 1st case";
+          (* printfn " mplus: 1st case"; *)
           force gs
       | Thunk f       ->
           (* The we force 2nd argument and left 1st one for later
             ... because fasterMK does that
           *)
-          printfn " mplus: 2nd case";
+          (* printfn " mplus: 2nd case"; *)
           Thunk (fun () -> let r = force gs in mplus r fs)
       | Single a      ->
-          printfn " mplus: 3rd case";
+          (* printfn " mplus: 3rd case"; *)
           choice a (fun () -> gs)
       | Compoz (a, f) ->
-          printfn " mplus: 4th case ";
+          (* printfn " mplus: 4th case "; *)
           choice a (fun () -> mplus gs @@ f ())
 
     let rec bind xs g =
       (* printfn "pizda"; *)
       match xs with
       | Nil ->
-            printfn " bind: 1std case";
+            (* printfn " bind: 1std case"; *)
             Nil
       | Thunk f ->
-          printfn " bind: 2nd case";
+          (* printfn " bind: 2nd case"; *)
           Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
       | Single c ->
-          printfn " bind: 3rd case";
+          (* printfn " bind: 3rd case"; *)
           g c
       | Compoz (c, f) ->
-          printfn " bind: 4th case";
+          (* printfn " bind: 4th case"; *)
           mplus (g c) (Thunk (fun () -> bind (f ()) g))
 
   end
@@ -324,9 +324,9 @@ module Env :
 
     let fresh ?name e =
       let v = InnerVar (global_token, e.token, e.next, []) in
-      printf "new fresh var %swith index=%d\n"
+      (* printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
-        e.next;
+        e.next; *)
       e.next <- 1+e.next;
       (!!!v, e)
 
@@ -581,7 +581,7 @@ let disj f g st =
   let open MKStream in
   mplus (f st)
     (Thunk (fun () ->
-      printfn " force inc from mplus*";
+      (* printfn " force inc from mplus*"; *)
       g st))
 
 let (|||) = disj
@@ -606,9 +606,9 @@ let rec (?&) = function
 let bind_star = (?&)
 
 let conde xs : goal = fun st ->
-  printfn " creaded inc in conde";
+  (* printfn " creaded inc in conde"; *)
   MKStream.inc2 (fun () ->
-    printfn " force a conde";
+    (* printfn " force a conde"; *)
     my_mplus_star xs) st
 
 module Fresh =
@@ -1029,7 +1029,7 @@ let ____ () =
   ()
 ;;
 
-let  () =
+let __ () =
   let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
     @@ ManualReifiers.int_reifier h t) in
 
