@@ -37,9 +37,10 @@ plugin:
 
 ppx:
 	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs \
-		ppx/ppx_deriving_showT.cma ppx/ppx_deriving_showT.cmxs \
+		ppx/ppx_deriving_showT.cmxs \
 		ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native \
-		ppx/ppx_ocanren_all.native
+		ppx/ppx_ocanren_all.native \
+		ppx/ppx_deriving_showT.cma
 
 celan: clean
 

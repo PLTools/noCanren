@@ -10,7 +10,7 @@ true: short_paths
 
 #<ppx/*.cma>: package(ppx_deriving.api,ppx_deriving.runtime)
 
-<regression/test100ppxgt*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/test100ppxgt*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
 
 <samples>: not_hygienic
 <camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
@@ -24,13 +24,13 @@ true: short_paths
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)
 
-<regression/stlcPPX.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
-<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_showT.cma), package(ppx_deriving)
+<regression/stlcPPX.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_showT.cma), package(ppx_deriving)
 
 #PPX tests are like 2xx
 #Some tests require syntax extensions with freshes
 <regression/stlcPPX.*>: rectypes
-<regression/test2*.*>: package(GT), ppx(ppx/ppx_ocanren_all.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/test2*.*>: package(GT), ppx(ppx/ppx_ocanren_all.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
 
 #camlp5 stuff for tests that start from 0
 <regression/test0*.*> or <regression/stlc.*>: syntax(camlp5o), package(logger.syntax), package(GT,GT.syntax.all), use_pa_minikanren
