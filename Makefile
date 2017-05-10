@@ -45,7 +45,7 @@ clean: clean_tests
 ######################## Tests related stuff  ##########################
 # camlp5-based tests
 #REGRES_CASES := 000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-REGRES_CASES += 100ppxgt #101showT
+REGRES_CASES += 100ppxgt 102meta #101showT
 #ppx-based tests
 REGRES_CASES += 205infero 206evalo
 
