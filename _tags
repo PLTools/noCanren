@@ -31,6 +31,7 @@ true: short_paths
 #Some tests require syntax extensions with freshes
 <regression/stlcPPX.*>: rectypes
 <regression/test2*.*>: package(GT), ppx(ppx/ppx_ocanren_all.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
+<regression/test5*.*>: package(GT)
 
 #camlp5 stuff for tests that start from 0
 <regression/test0*.*> or <regression/stlc.*>: syntax(camlp5o), package(logger.syntax), package(GT,GT.syntax.all), use_pa_minikanren
