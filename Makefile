@@ -20,7 +20,8 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 	doc ppx \
 	only-toplevel toplevel minikanren_stuff tester bundle plugin
 
-.DEFAULT_GOAL: all
+.DEFAULT_GOAL: tests
+#.DEFAULT_GOAL: all
 
 all: minikanren_stuff plugin bundle
 
@@ -97,7 +98,7 @@ promote:
 
 
 
-tests: plugin minikanren_stuff compile_tests run_tests
+tests: compile_tests run_tests
 regression: tests
 test: tests
 

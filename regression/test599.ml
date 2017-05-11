@@ -28,15 +28,13 @@ class type virtual ['a,'a_inh,'a_syn,'b,'b_inh,'b_syn,'inh,'syn] t_tt
   = object
     inherit [ < a: 'a_inh -> 'a -> 'a_syn
               ; b: 'b_inh -> 'b -> 'b_syn >
-            (* , 'a,'a_inh,'a_syn
-            , 'b,'b_inh,'b_syn *)
             , ('a,'b) t
-            ,   ( 'a_inh, 'a, 'a_syn,
+            , ( 'a_inh, 'a, 'a_syn,
                 <
                   a: 'a_inh -> 'a -> 'a_syn
                 ; b: 'b_inh -> 'b -> 'b_syn
                 > ) GT.a
-            ,   ( 'b_inh,
+            , ( 'b_inh,
                 'b,
                 'b_syn,
                 < a: 'a_inh -> 'a -> 'a_syn
