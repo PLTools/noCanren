@@ -94,19 +94,17 @@ let generic_show impl fok ferr () e =
   | Error e -> impl#c_Error () ferr e
 
 class ['a, 'b] show_meta_t = fun for_a for_b -> object (this)
-
-end
-class ['a, 'b] show_result = object(this)
   inherit  ['a,unit,string,'b,unit,string,unit,string] t_t
   method c_OK    () : _ -> _ -> string
-    = fun _subj p0 -> sprintf "OK %s" (p0.GT.fx ())
+    = fun _subj p0 -> sprintf "OK %s" (for_a p0)
   method c_Error () :
     _ -> _ -> string
-    = fun _subj p1 -> sprintf "Error %s" (p1.GT.fx ())
-  method qqqq fa fb : unit -> ('a, 'b) t -> string = fun ()  ->
-    GT.transform t fa fb this ()
-  (* method t_t fa fb : unit -> ('a,'b) t -> string = fun () x ->
-    GT.transform t (GT.lift fa) (GT.lift fb) this () x *)
+    = fun _subj p1 -> sprintf "Error %s" (for_b p1)
+end
+class ['a, 'b] show_result = object(this)
+  inherit ['a, 'b] show_meta_t  (fun pa -> pa.GT.fx ())
+                                (fun pa -> pa.GT.fx ())
+
 end
 
 let () =
