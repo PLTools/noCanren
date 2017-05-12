@@ -104,8 +104,6 @@ class ['a] show_result2 = object(this)
                         (* (p1.GT.fx ()) *)
   method qqqq fa  : unit -> 'a t2 -> string = fun () ->
     GT.transform t2 fa this ()
-  (* method t_t fa fb : unit -> ('a,'b) t -> string = fun () x ->
-    GT.transform t (GT.lift fa) (GT.lift fb) this () x *)
 end
 
 let () =
