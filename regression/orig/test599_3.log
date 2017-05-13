@@ -2,3 +2,5 @@ OK 1
 Error error1
 OK 2.
 Error "error2"
+OK '3'
+Error "error3"
