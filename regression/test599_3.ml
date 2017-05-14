@@ -12,11 +12,9 @@ class type virtual ['inh, 'syn] t3_tt
           , concrete_a
           , string
           , 'inh, 'syn] t_meta_tt
-    method t_t3 :
-      'inh ->
-      t3 ->
-      'syn
-  end
+
+  (* method t_t3 : 'inh -> t3 -> 'syn *)
+end
 
 let t3_meta_gcata x = t2_meta_gcata id x
 
@@ -41,7 +39,6 @@ class virtual ['inh, 'syn] t3_t =
       'inh -> ( 'inh, t3, 'syn, < > ) GT.a -> concrete_a ->    'syn
     method virtual c_Error :
       'inh -> ( 'inh, t3, 'syn, < > ) GT.a ->     string ->    'syn
-    (* method t_t3 : 'inh -> t3 -> 'syn = GT.transform t3 this *)
   end
 
 class show_meta_t3 =
@@ -59,16 +56,13 @@ class ['a] show_result3 = object(this)
   method c_Error () : _ -> _ -> string
     = fun _subj p1 -> sprintf "Error %s"
                         (GT.lift (GT.string.GT.plugins)#show () p1)
-                        (* (p1.GT.fx ()) *)
-  (* method qqqq fa  : unit -> 'a t2 -> string = fun () ->
-    GT.transform t2 fa this () *)
 
+  (* The only appropriate place for this is here *)
   method t_t3  = GT.transform t3  this
 end
 
 let () =
-  let show (e: t3) =
-    t3.GT.gcata (new show_result3) () e in
+  let show (e: t3) = t3.GT.gcata (new show_result3) () e in
   printf "%s\n%!" (show (OK '3'));
   printf "%s\n%!" (show (Error "error3"));
   ()

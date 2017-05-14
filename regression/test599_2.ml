@@ -5,21 +5,14 @@ type  'a     t2 = ('a, string) t
 
 class type virtual ['a,'a_inh,'a_syn,'inh,'syn] t2_tt
   = object
-  inherit [ < a: 'a_inh -> 'a -> 'a_syn >
+  inherit [ < a: 'a_inh -> 'a -> 'a_syn > as 'heck
           , 'a t2
-          ,   ( 'a_inh, 'a, 'a_syn,
-              <
-                a: 'a_inh -> 'a -> 'a_syn
-              > ) GT.a
+          , ( 'a_inh, 'a, 'a_syn, 'heck) GT.a
           , string
-          , 'inh,'syn] t_meta_tt
-    method  t_t2 :
-      ('a_inh -> 'a -> 'a_syn) ->
-      'inh ->
-      'a t2 ->
-      'syn
+          , 'inh, 'syn] t_meta_tt
+    (* method  t_t2 : ('a_inh -> 'a -> 'a_syn) ->
+      'inh -> 'a t2 -> 'syn *)
   end
-
 
 let t2_meta_gcata on_a_arg = t_meta_gcata on_a_arg id
 
@@ -58,42 +51,23 @@ class virtual ['a,'a_inh,'a_syn,'inh,'syn] t2_t
   object (this)
     method virtual  c_OK :
       'inh ->
-      ( 'inh,
-        'a t2,
-        'syn,
-        <
-          a: 'a_inh -> 'a -> 'a_syn
-        > ) GT.a ->
-      ( 'a_inh,
-        'a,
-        'a_syn,
-        <
-          a: 'a_inh -> 'a -> 'a_syn
-        > ) GT.a ->
+      ( 'inh,   'a t2, 'syn, 'heck) GT.a ->
+      ( 'a_inh, 'a,  'a_syn, 'heck) GT.a ->
       'syn
     method virtual  c_Error :
       'inh ->
-      ( 'inh,
-        'a t2,
-        'syn,
-        <
-          a: 'a_inh -> 'a -> 'a_syn
-        > ) GT.a ->
-        string ->
-        'syn
+      ( 'inh, 'a t2, 'syn, 'heck) GT.a ->
+      string ->
+      'syn
+    (* omitted for sake of right types *)
     (* method t_t2 transform_a =
       GT.transform t2 transform_a this *)
   end
 
 class ['a, 'a_holder] show_meta_t2 = fun for_a ->
-  let for_b x =
-    (GT.lift (GT.string.GT.plugins)#show () x)
-  in
+  let for_b x = GT.lift (GT.string.GT.plugins)#show () x in
   object(this)
-    inherit [ 'a, 'a_holder (*( unit, 'a, string,
-                    < a: 'a_inh -> 'a -> 'a_syn
-                    ; b: 'b_inh -> 'b -> 'b_syn
-                    > as 'heck) GT.a *)
+    inherit [ 'a, 'a_holder
             , string, string
             ] show_meta_t for_a for_b
 
@@ -104,13 +78,8 @@ class ['a] show_result2 = object(this)
   method c_OK    () : _ -> _ GT.a -> string
     = fun _subj p0 -> sprintf "OK %s" (p0.GT.fx ())
   method c_Error () : _ -> string -> string
-    = fun _subj p1 ->
-      (* let (_:int) = (GT.lift (GT.string.GT.plugins)#show () p1) in *)
-      sprintf "Error %s"
+    = fun _subj p1 -> sprintf "Error %s"
                         (GT.lift (GT.string.GT.plugins)#show () p1)
-
-  (* method qqqq fa  : unit -> 'a t2 -> string = fun () ->
-    GT.transform t2 fa this () *)
 
   method t_t2 transform_a =
     GT.transform t2 transform_a this
