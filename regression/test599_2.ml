@@ -43,43 +43,37 @@ class virtual
             , 'inh, 'syn] t_meta_t
 end
 
-class virtual ['a,'a_inh,'a_syn,'inh,'syn] t2_t
+class virtual [ 'a,'a_inh,'a_syn, 'gt_a_for_a
+              , 'inh,'syn] t2_t
   : [ < a: 'a_inh -> 'a -> 'a_syn > as 'heck
     , 'a t2
-    , ( 'a_inh, 'a, 'a_syn, 'heck) GT.a
+    , ( 'a_inh, 'a, 'a_syn, 'heck) GT.a as 'gt_a_for_a
     , 'inh, 'syn] t2_meta_t =
   object (this)
-    method virtual  c_OK :
-      'inh ->
-      ( 'inh,   'a t2, 'syn, 'heck) GT.a ->
-      ( 'a_inh, 'a,  'a_syn, 'heck) GT.a ->
-      'syn
-    method virtual  c_Error :
-      'inh ->
-      ( 'inh, 'a t2, 'syn, 'heck) GT.a ->
-      string ->
-      'syn
+    inherit [ 'heck, 'a t2, 'gt_a_for_a
+            , 'inh,'syn] t2_meta_t
+
     (* omitted for sake of right types *)
     (* method t_t2 transform_a =
       GT.transform t2 transform_a this *)
   end
 
-class ['a, 'a_holder] show_meta_t2 = fun for_a ->
+class [ 'heck, 'a, 'a_holder
+      ] show_meta_t2 = fun for_a ->
   let for_b x = GT.lift (GT.string.GT.plugins)#show () x in
   object(this)
     inherit [ 'a, 'a_holder
             , string, string
+            , 'heck
             ] show_meta_t for_a for_b
 
   end
 
-class ['a] show_result2 = object(this)
-  inherit  ['a,unit,string,unit,string] t2_t
-  method c_OK    () : _ -> _ GT.a -> string
-    = fun _subj p0 -> sprintf "OK %s" (p0.GT.fx ())
-  method c_Error () : _ -> string -> string
-    = fun _subj p1 -> sprintf "Error %s"
-                        (GT.lift (GT.string.GT.plugins)#show () p1)
+class ['a] show_t2 = object(this)
+  inherit [ < a: unit -> 'a -> string > as 'heck
+          , 'a
+          , (unit,'a,string, 'heck) GT.a
+          ] show_meta_t2  (fun pa -> pa.GT.fx ())
 
   method t_t2 transform_a =
     GT.transform t2 transform_a this
@@ -87,7 +81,7 @@ end
 
 let () =
   let show fa (e: _ t2) =
-    t2.GT.gcata (GT.lift fa) (new show_result2) () e in
+    t2.GT.gcata (GT.lift fa) (new show_t2) () e in
   printf "%s\n%!" (show string_of_float (OK 2.));
   printf "%s\n%!" (show string_of_int (Error "error2"));
   ()

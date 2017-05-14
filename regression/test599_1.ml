@@ -95,8 +95,10 @@ end
 
 class virtual [ 'a, 'a_inh, 'a_syn, 'gt_a_for_a
               , 'b, 'b_inh, 'b_syn, 'gt_a_for_b
+              , 'heck
               , 'inh, 'syn] t_t
-  : [ < a: 'a_inh -> 'a -> 'a_syn; b: 'b_inh -> 'b -> 'b_syn > as 'heck
+  : [ (* < a: 'a_inh -> 'a -> 'a_syn; b: 'b_inh -> 'b -> 'b_syn > as*)
+      'heck
     , ('a, 'b) t
     , 'gt_a_for_a
     , 'gt_a_for_b
@@ -126,10 +128,12 @@ class virtual [ 'a, 'a_inh, 'a_syn, 'gt_a_for_a
 
 class [ 'a, 'a_holder
       , 'b, 'b_holder
+      , 'heck
       ] show_meta_t = fun for_a for_b -> object(this)
   inherit [ 'a,unit,string,'a_holder
           , 'b,unit,string,'b_holder
-          , unit,string] t_t
+          , 'heck
+          , unit, string] t_t
   method c_OK    () : _ -> 'a_holder -> string
     = fun _subj p0 -> sprintf "OK %s" (for_a p0)
   method c_Error () : _ -> 'b_holder -> string
@@ -142,11 +146,9 @@ class [ 'a, 'a_holder
 end
 
 class ['a, 'b] show_result = object(this)
-  inherit [ 'a, (unit,'a,string,
-                  < a: 'a_inh -> 'a -> 'a_syn
-                  ; b: 'b_inh -> 'b -> 'b_syn
-                  > as 'heck) GT.a
+  inherit [ 'a, (unit, 'a, string, 'heck) GT.a
           , 'b, (unit, 'b, string, 'heck) GT.a
+          , < a: unit -> 'a -> string; b: unit -> 'b -> string > as 'heck
           ] show_meta_t  (fun pa -> pa.GT.fx ())
                          (fun pa -> pa.GT.fx ())
 

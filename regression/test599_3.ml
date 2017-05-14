@@ -13,7 +13,6 @@ class type virtual ['inh, 'syn] t3_tt
           , string
           , 'inh, 'syn] t_meta_tt
 
-  (* method t_t3 : 'inh -> t3 -> 'syn *)
 end
 
 let t3_meta_gcata x = t2_meta_gcata id x
@@ -33,36 +32,32 @@ let (t3 :
   in
   { GT.gcata = t3_gcata; plugins = () }
 
-class virtual ['inh, 'syn] t3_t =
+class virtual [ 'heck
+              , 'type_itself
+              , 'inh,'syn ] t3_meta_t = object
+  inherit [ 'heck, 'type_itself, concrete_a
+          , 'inh, 'syn] t2_meta_t
+end
+class virtual ['inh, 'syn] t3_t
+  : [ <  > as 'heck, t3, 'inh, 'syn] t3_meta_t =
   object (this)
-    method virtual c_OK :
-      'inh -> ( 'inh, t3, 'syn, < > ) GT.a -> concrete_a ->    'syn
-    method virtual c_Error :
-      'inh -> ( 'inh, t3, 'syn, < > ) GT.a ->     string ->    'syn
+    inherit ['heck, t3, 'inh, 'syn] t3_meta_t
   end
 
-class show_meta_t3 =
+class ['heck] show_meta_t3 =
   let for_a = GT.lift (GT.char.GT.plugins)#show () in
   object
-    inherit [ concrete_a, concrete_a
-            ] show_meta_t2 for_a
+    inherit [ 'heck, concrete_a, concrete_a ] show_meta_t2 for_a
   end
 
-class ['a] show_result3 = object(this)
-  inherit  [unit, string] t3_t
-  method c_OK    () : _ -> _ -> string
-    = fun _subj p0 -> sprintf "OK '%s'"
-                        (GT.lift (GT.char.GT.plugins)#show () p0)
-  method c_Error () : _ -> _ -> string
-    = fun _subj p1 -> sprintf "Error %s"
-                        (GT.lift (GT.string.GT.plugins)#show () p1)
+class ['a] show_t3 = object(this)
+  inherit [ <  > as 'heck] show_meta_t3
 
-  (* The only appropriate place for this is here *)
-  method t_t3  = GT.transform t3  this
+  method t_t3  = GT.transform t3 this
 end
 
 let () =
-  let show (e: t3) = t3.GT.gcata (new show_result3) () e in
+  let show (e: t3) = t3.GT.gcata (new show_t3) () e in
   printf "%s\n%!" (show (OK '3'));
   printf "%s\n%!" (show (Error "error3"));
   ()
