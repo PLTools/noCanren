@@ -1,5 +1,5 @@
-open Test599
 open Printf
+open Test599_1
 
 type  'a     t2 = ('a, string) t
 

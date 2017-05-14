@@ -1,5 +1,5 @@
 open Printf
-open Test599
+open Test599_1
 open Test599_2
 
 type concrete_a = char
