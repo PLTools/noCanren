@@ -71,6 +71,17 @@ let _ =
   runIList (-1) q xsh (REPR (fun x -> (fresh (y z)(x =/= !![y; !2])(x === !![z; !2]))))
 
 
+(* next test goes into stackoverflow *)
+(*
+let () =
+  let runL n = runR (List.reify @@ List.reify ManualReifiers.int_reifier) (fun _ -> assert false)
+                (GT.show List.logic (GT.show List.logic @@ GT.show logic string_of_int ))
+                n in
+  let wrap x y = Fresh.one (fun tempH -> x =/= tempH % y) in
+  runL              (-1) q qh (REPR (fun q -> (fresh (x y z)(x === q)(wrap x y)(wrap y z) (wrap z x) ) ));
+  ()
+*)
+
 let () =
   let rec distincto l =
     conde [
