@@ -607,7 +607,12 @@ let rec (?&) = function
 
 let bind_star = (?&)
 
-let bind_star2 : State.t Stream.t -> goal list -> goal = fun s goals ->
+let rec bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t = fun s -> function
+| [] -> s
+| x::xs ->
+    (* printfn "2nd case of bind* 2";  *)
+    bind_star2 (MKStream.bind s x) xs
+
 
 let conde xs : goal = fun st ->
   (* printfn " creaded inc in conde"; *)

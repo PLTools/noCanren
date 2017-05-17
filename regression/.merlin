@@ -1,4 +1,4 @@
 REC
 FLG -short-paths
 
-FLG -ppx "/home/kakadu/.opam/4.04.0+fp+flambda/lib/ppx_deriving/ppx_deriving --as-ppx -deriving-plugin /home/kakadu/asp/ocanren-bench/ocanren6same-streams/_build/ppx/ppx_ocanren_all.cma "
+FLG -ppx "/home/kakadu/.opam/4.04.0+fp+flambda/lib/ppx_deriving/ppx_deriving --as-ppx -deriving-plugin /home/kakadu/prog/asp/ocanren-same-streams/_build/ppx/ppx_ocanren_all.cmxa "

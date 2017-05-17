@@ -149,7 +149,7 @@ val (?&) : goal list -> goal
 
 val bind_star : goal list -> goal
 
-val bind_star2 : State.t Stream.t -> goal list -> goal
+val bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t
 
 
 (** {2 Some predefined goals} *)

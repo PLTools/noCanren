@@ -113,6 +113,8 @@ let list_fold ~f ~initer xs =
   | [] -> failwith "bad argument"
   | start::xs -> List.fold_left ~init:(initer start) ~f xs
 
+let my_list es =
+  List.fold_right ~init:[%expr []] es ~f:(fun x acc -> [%expr [%e x] :: [%e acc]])
 
 let rec pamk_e mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
@@ -129,12 +131,15 @@ let rec pamk_e mapper e : expression =
         | [] -> assert false
         | [(_,body)] ->
             (* we omitte bind* here*)
-            Ast_convenience.app ~loc:e.pexp_loc (pamk_e mapper body) [[%expr st]]
-            (* [%expr [%e pamk_e mapper body] st] *)
+            (* Ast_convenience.app ~loc:e.pexp_loc  *)
+            [%expr [%e pamk_e mapper body] st]
         | (_xx,h)::body ->
-            let body = (_xx,[%expr [%e h] st]) :: body in
+            (* assert false; *)
+            (* let body = (_xx,[%expr [%e h] st]) :: body in *)
             let body = List.map (fun (xx,e) -> pamk_e mapper e) body in
-            Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star] body
+            Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
+              (* [%expr [%e h] st] :: [%expr []] :: [] *)
+              [%expr [%e pamk_e mapper h] st] :: (Ast_convenience.list body) :: []
            (* let initer = fun (_,x) -> (pamk_e mapper x) in
            list_fold (List.rev body) ~initer
                      ~f:(fun acc x -> [%expr [%e initer x] &&& [%e acc]]) *)
