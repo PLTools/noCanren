@@ -480,6 +480,8 @@ module State =
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
     let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
+    let new_var (env,_,_) = Env.fresh env |> fst
+
   end
 
 type 'a goal' = State.t -> 'a
@@ -604,6 +606,8 @@ let rec (?&) = function
 | x::y::tl -> ?& ((x &&& y)::tl)
 
 let bind_star = (?&)
+
+let bind_star2 : State.t Stream.t -> goal list -> goal = fun s goals ->
 
 let conde xs : goal = fun st ->
   (* printfn " creaded inc in conde"; *)

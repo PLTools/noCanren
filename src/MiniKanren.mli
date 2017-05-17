@@ -18,6 +18,8 @@
 
 module OldList : (module type of List)
 
+val printfn : ('a, unit, string, unit) format4 -> 'a
+
 (** {1 Implementation of miniKanren primitives} *)
 
 (** {2 Basic modules and types} *)
@@ -27,6 +29,8 @@ module MKStream :
   sig
     (** Stream type *)
     type 'a t
+
+    val inc: (unit -> 'a t) -> 'a t
   end
 
 module Stream :
@@ -69,10 +73,12 @@ module State :
 
     (** Printing helper *)
     val show : t -> string
+
+    val new_var : t -> 'a
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal'
+type 'a goal' = State.t -> 'a
 type goal = State.t MKStream.t goal'
 
 (** {3 Logical values and injections} *)
@@ -142,6 +148,9 @@ val conde : goal list -> goal
 val (?&) : goal list -> goal
 
 val bind_star : goal list -> goal
+
+val bind_star2 : State.t Stream.t -> goal list -> goal
+
 
 (** {2 Some predefined goals} *)
 

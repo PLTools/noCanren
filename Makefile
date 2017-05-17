@@ -17,7 +17,7 @@ TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean clean_tests install uninstall tests test regression promote_all \
-	doc \
+	ppx doc \
 	only-toplevel toplevel minikanren_stuff tester bundle plugin
 
 .DEFAULT_GOAL: all
@@ -26,6 +26,10 @@ all: minikanren_stuff plugin bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
+
+ppx:
+	$(OB) -Is src ppx/ppx_repr_bin.cmxa ppx/pa_minikanren_bin.cmxa \
+	   ppx/ppx_ocanren_all.cmxs
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
@@ -36,7 +40,8 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
-REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
+REGRES_CASES := #000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
+REGRES_CASES := 123wtf
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
