@@ -11,6 +11,11 @@ open Longident
 open StdLabels
 open Ast_convenience
 
+module Exp = struct
+  include Ast_helper.Exp
+  let const_string s = Exp.constant @@ Pconst_string (s, None)
+end
+
 let is_state_pattern pat =
   match pat.ppat_desc with
   | Ppat_var v when v.txt = "st" || v.txt = "state" -> Some v.txt
@@ -131,33 +136,31 @@ let rec pamk_e mapper e : expression =
         | [] -> assert false
         | [(_,body)] ->
             (* we omitte bind* here*)
-            (* Ast_convenience.app ~loc:e.pexp_loc  *)
             [%expr [%e pamk_e mapper body] st]
         | (_xx,h)::body ->
-            (* assert false; *)
-            (* let body = (_xx,[%expr [%e h] st]) :: body in *)
             let body = List.map (fun (xx,e) -> pamk_e mapper e) body in
             Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
-              (* [%expr [%e h] st] :: [%expr []] :: [] *)
-              [%expr [%e pamk_e mapper h] st] :: (Ast_convenience.list body) :: []
-           (* let initer = fun (_,x) -> (pamk_e mapper x) in
-           list_fold (List.rev body) ~initer
-                     ~f:(fun acc x -> [%expr [%e initer x] &&& [%e acc]]) *)
-
+              [ [%expr [%e pamk_e mapper h] st]; Ast_convenience.list body ]
       in
       match reconstruct_args args with
-      | Some xs ->
-          let (_: string list) = xs in
-          let new_body = List.fold_right xs
-                          ~f:(fun ident acc ->
-                              [%expr
-                                  (* call_fresh
-                                     (fun [%p pvar ident ] -> [%e acc]) *)
-                                let [%p pvar ident ] = State.new_var st in
-                                [%e acc]
-                              ]
-                             )
-                          ~init:[%expr MKStream.inc (fun () -> [%e new_body ])]
+      | Some (xs: string list) ->
+          let new_body =
+            List.fold_right xs
+              ~f:(fun ident acc ->
+                  [%expr
+                    let [%p pvar ident ], idx = State.new_var st in
+                    printfn "create new variable %s as _.%d" [%e Exp.const_string ident ] idx;
+                    [%e acc]
+                  ]
+                 )
+
+              ~init:[%expr  let () = printfn "create inc   in fresh === (%s)"
+                              [%e Exp.const_string (StdLabels.String.concat ~sep:" " xs)] in
+                            MKStream.inc (fun () ->
+                              let () = printfn "inc in fresh forced === (%s)"
+                                [%e Exp.const_string (StdLabels.String.concat ~sep:" " xs)] in
+                              [%e new_body ]
+                            )]
           in
           [%expr fun st -> [%e new_body] ]
       | None ->

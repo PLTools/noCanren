@@ -74,7 +74,7 @@ module State :
     (** Printing helper *)
     val show : t -> string
 
-    val new_var : t -> 'a
+    val new_var : t -> 'a * int
   end
 
 (** Goal converts a state into a lazy stream of states *)
@@ -143,6 +143,8 @@ val (?|) : goal list -> goal
 
 (** [conde] is a synonym for [?|] *)
 val conde : goal list -> goal
+
+val my_mplus_star: goal list -> State.t -> State.t MKStream.t
 
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a non-empty list of goals *)
 val (?&) : goal list -> goal

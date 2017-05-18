@@ -59,35 +59,35 @@ module MKStream =
     let rec mplus fs gs =
       match fs with
       | Nil           ->
-          (* printfn " mplus: 1st case"; *)
+          printfn " mplus: 1st case";
           force gs
       | Thunk f       ->
           (* The we force 2nd argument and left 1st one for later
             ... because fasterMK does that
           *)
-          (* printfn " mplus: 2nd case"; *)
+          printfn " mplus: 2nd case";
           Thunk (fun () -> let r = force gs in mplus r fs)
       | Single a      ->
-          (* printfn " mplus: 3rd case"; *)
+          printfn " mplus: 3rd case";
           choice a (fun () -> gs)
       | Compoz (a, f) ->
-          (* printfn " mplus: 4th case "; *)
+          printfn " mplus: 4th case ";
           choice a (fun () -> mplus gs @@ f ())
 
     let rec bind xs g =
       (* printfn "pizda"; *)
       match xs with
       | Nil ->
-            (* printfn " bind: 1std case"; *)
+            printfn " bind: 1std case";
             Nil
       | Thunk f ->
-          (* printfn " bind: 2nd case"; *)
+          printfn " bind: 2nd case";
           Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
       | Single c ->
-          (* printfn " bind: 3rd case"; *)
+          printfn " bind: 3rd case";
           g c
       | Compoz (c, f) ->
-          (* printfn " bind: 4th case"; *)
+          printfn " bind: 4th case";
           mplus (g c) (Thunk (fun () -> bind (f ()) g))
 
   end
@@ -480,7 +480,10 @@ module State =
     let empty () = (Env.empty (), Subst.empty, [])
     let env   (env, _, _) = env
     let show  (env, subst, constr) = sprintf "st {%s, %s}" (Subst.show subst) (GT.show(GT.list) Subst.show constr)
-    let new_var (env,_,_) = Env.fresh env |> fst
+    let new_var (env,_,_) =
+      let (x,_) = Env.fresh env in
+      let InnerVar (_,_,i,_) = x in
+      (x,i)
 
   end
 
@@ -615,9 +618,9 @@ let rec bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t = fun
 
 
 let conde xs : goal = fun st ->
-  (* printfn " creaded inc in conde"; *)
+  printfn " creaded inc in conde";
   MKStream.inc2 (fun () ->
-    (* printfn " force a conde"; *)
+    printfn " force a conde";
     my_mplus_star xs) st
 
 module Fresh =
