@@ -31,6 +31,10 @@ module MKStream :
     type 'a t
 
     val inc: (unit -> 'a t) -> 'a t
+    val inc2: (unit -> 'a -> 'b t) -> 'a -> 'b t
+    val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t
+    val mplus : 'a t -> 'a t -> 'a t
+    val mplus_star : 'a t list -> 'a t
   end
 
 module Stream :
@@ -152,6 +156,8 @@ val (?&) : goal list -> goal
 val bind_star : goal list -> goal
 
 val bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t
+
+val bind_star_simple : State.t MKStream.t -> State.t MKStream.t
 
 
 (** {2 Some predefined goals} *)

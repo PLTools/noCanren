@@ -21,21 +21,14 @@ let is_state_pattern pat =
   | Ppat_var v when v.txt = "st" || v.txt = "state" -> Some v.txt
   | _ -> None
 
-let is_defer e =
-  match e.pexp_desc with
-  | Pexp_ident i when i.txt = Longident.Lident "defer" -> true
-  | _ -> false
-
-let is_fresh e =
-  match e.pexp_desc with
-  | Pexp_ident i when i.txt = Longident.Lident "fresh" -> true
-  | _ -> false
-
 let need_insert_fname ~name e =
   match e.pexp_desc with
   | Pexp_ident i when i.txt = Lident name -> true
   | _ -> false
 
+let is_defer = need_insert_fname ~name:"defer"
+let is_conde = need_insert_fname ~name:"conde"
+let is_fresh = need_insert_fname ~name:"fresh"
 let is_call_fresh = need_insert_fname ~name:"call_fresh"
 let is_conj = need_insert_fname ~name:"conj"
 let is_disj e =
@@ -121,10 +114,35 @@ let list_fold ~f ~initer xs =
 let my_list es =
   List.fold_right ~init:[%expr []] es ~f:(fun x acc -> [%expr [%e x] :: [%e acc]])
 
+let parse_to_list alist =
+  let rec helper acc = function
+  | Pexp_construct (loc, None ) when loc.txt = Lident "[]" -> acc
+  | Pexp_construct (loc, Some {pexp_desc=Pexp_tuple [y1;y2]; _})
+      when loc.txt = Lident "::" ->
+      helper (y1::acc) y2.pexp_desc
+  | _ -> []
+  in
+  List.rev @@ helper [] alist
+
 let rec pamk_e mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
+  | Pexp_apply (e1,(_,alist)::args) when is_conde e1 ->
+      let clauses : expression list =
+        parse_to_list alist.pexp_desc |>
+          List.map ~f:(fun e -> [%expr
+            ([%e pamk_e mapper e] st)
+          ])
+      in
+      [%expr
+        fun st ->
+          printfn " created inc in conde";
+          MKStream.inc (fun () st ->
+            printfn " force a conde";
+            MKStream.mplus_star [%e Ast_convenience.list clauses] st) st
+      ]
+
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
@@ -140,29 +158,33 @@ let rec pamk_e mapper e : expression =
         | (_xx,h)::body ->
             let body = List.map (fun (xx,e) -> pamk_e mapper e) body in
             Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
-              [ [%expr [%e pamk_e mapper h] st]; Ast_convenience.list body ]
+              [ [%expr [%e pamk_e mapper h] st]
+              ; Ast_convenience.list body
+              ]
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
-          let new_body =
-            List.fold_right xs
+          let pretty_names = StringLabels.concat ~sep:" " xs in
+          let msg2 = sprintf "create inc   in fresh === (%s)" pretty_names in
+          let msg3 = sprintf "inc in fresh forced === (%s)" pretty_names in
+          [%expr fun st ->
+            [%e List.fold_right xs
               ~f:(fun ident acc ->
+                  let msg = sprintf "create new variable %s as" ident in
+                  let msg = msg ^ " _.%d" in
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    printfn "create new variable %s as _.%d" [%e Exp.const_string ident ] idx;
+                    printfn [%e  Exp.const_string msg] idx;
                     [%e acc]
                   ]
                  )
-
-              ~init:[%expr  let () = printfn "create inc   in fresh === (%s)"
-                              [%e Exp.const_string (StdLabels.String.concat ~sep:" " xs)] in
-                            MKStream.inc (fun () ->
-                              let () = printfn "inc in fresh forced === (%s)"
-                                [%e Exp.const_string (StdLabels.String.concat ~sep:" " xs)] in
-                              [%e new_body ]
-                            )]
-          in
-          [%expr fun st -> [%e new_body] ]
+              ~init:[%expr
+                printfn [%e Exp.const_string msg2];
+                MKStream.inc (fun () ->
+                  printfn [%e Exp.const_string msg3];
+                  [%e new_body ]
+                )]
+            ] ]
       | None ->
          eprintf "Can't reconstruct args of 'fresh'";
          {e with pexp_desc=Pexp_apply (e1,[Nolabel, new_body]) }

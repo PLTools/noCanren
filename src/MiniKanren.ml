@@ -34,9 +34,9 @@ module MKStream =
     let inc = from_fun
 
     let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
-      fun st -> inc (fun () ->
-        (* printfn " inc2 forced"; *)
-        thunk () st)
+      fun st -> inc (fun () -> thunk () st)
+    let inc3 (thunk: 'a -> unit -> 'b t) : 'a -> 'b t =
+      fun st -> inc (thunk st)
 
     let nil = Nil
 
@@ -66,13 +66,19 @@ module MKStream =
             ... because fasterMK does that
           *)
           printfn " mplus: 2nd case";
-          Thunk (fun () -> let r = force gs in mplus r fs)
+          (* Thunk (fun () -> let r = force gs in mplus r fs) *)
+          Thunk (fun () -> let r = force fs in mplus gs r)
       | Single a      ->
           printfn " mplus: 3rd case";
           choice a (fun () -> gs)
       | Compoz (a, f) ->
           printfn " mplus: 4th case ";
           choice a (fun () -> mplus gs @@ f ())
+
+    let rec mplus_star : 'a t list -> 'a t = function
+    | [] -> failwith "wrong argument"
+    | [h] -> h
+    | h::tl -> mplus h (Thunk (fun () -> mplus_star tl))
 
     let rec bind xs g =
       (* printfn "pizda"; *)
@@ -613,9 +619,10 @@ let bind_star = (?&)
 let rec bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t = fun s -> function
 | [] -> s
 | x::xs ->
-    (* printfn "2nd case of bind* 2";  *)
+    (* printfn "2nd case of bind* 2"; *)
     bind_star2 (MKStream.bind s x) xs
 
+let bind_star_simple s = bind_star2 s []
 
 let conde xs : goal = fun st ->
   printfn " creaded inc in conde";
