@@ -35,6 +35,8 @@ module MKStream :
     val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t
     val mplus : 'a t -> 'a t -> 'a t
     val mplus_star : 'a t list -> 'a t
+
+    val bind: 'a t -> ('a -> 'b t) -> 'b t
   end
 
 module Stream :

@@ -67,7 +67,11 @@ module MKStream =
           *)
           printfn " mplus: 2nd case";
           (* Thunk (fun () -> let r = force gs in mplus r fs) *)
-          Thunk (fun () -> let r = force fs in mplus gs r)
+          Thunk (fun () ->
+            printfn "forcing thunk created by 2nd case of mplus";
+            (* let r = force fs in mplus gs r *)
+            let r = force gs in mplus r fs
+          )
       | Single a      ->
           printfn " mplus: 3rd case";
           choice a (fun () -> gs)
@@ -88,7 +92,11 @@ module MKStream =
             Nil
       | Thunk f ->
           printfn " bind: 2nd case";
-          Thunk (fun () -> bind (f ()) g) (* delay here because miniKanren has it *)
+          (* delay here because miniKanren has it *)
+          Thunk (fun () ->
+            printfn "forcing thunk created by 2nd case of bind";
+            let r = f () in
+            bind r g)
       | Single c ->
           printfn " bind: 3rd case";
           g c
