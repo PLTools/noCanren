@@ -30,6 +30,7 @@ let is_defer = need_insert_fname ~name:"defer"
 let is_conde = need_insert_fname ~name:"conde"
 let is_fresh = need_insert_fname ~name:"fresh"
 let is_call_fresh = need_insert_fname ~name:"call_fresh"
+let is_unif = need_insert_fname ~name:"==="
 let is_conj = need_insert_fname ~name:"conj"
 let is_disj e =
   need_insert_fname ~name:"disj" e || need_insert_fname ~name:"|||" e
@@ -111,6 +112,13 @@ let list_fold ~f ~initer xs =
   | [] -> failwith "bad argument"
   | start::xs -> List.fold_left ~init:(initer start) ~f xs
 
+let list_fold_right0 ~f ~initer xs =
+  let rec helper = function
+  | [] -> failwith "bad_argument"
+  | x::xs -> list_fold ~initer ~f:(fun acc x -> f x acc) (x::xs)
+  in
+  helper (List.rev xs)
+
 let my_list es =
   List.fold_right ~init:[%expr []] es ~f:(fun x acc -> [%expr [%e x] :: [%e acc]])
 
@@ -124,51 +132,70 @@ let parse_to_list alist =
   in
   List.rev @@ helper [] alist
 
-let rec pamk_e mapper e : expression =
+let rec pamk_e ?(need_st=false) mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
   | Pexp_apply (e1,(_,alist)::args) when is_conde e1 ->
-      let clauses : expression list =
-        parse_to_list alist.pexp_desc |>
-          List.map ~f:(fun e -> [%expr
-            ([%e pamk_e mapper e] st)
-          ])
-      in
+      let clauses : expression list = parse_to_list alist.pexp_desc in
       [%expr
-        fun st ->
-          printfn " created inc in conde";
-          MKStream.inc (fun () st ->
-            printfn " force a conde";
-            MKStream.mplus_star [%e Ast_convenience.list clauses] st) st
+        printfn " created inc in conde";
+        MKStream.inc (fun () ->
+          printfn " force a conde";
+          [%e
+          match clauses with
+          | [b] ->
+            (* failwith "conde with a single clause appear very rarely" *)
+            pamk_e ~need_st:true mapper b
+          | clauses ->
+              (* assert false; *)
+              list_fold_right0 clauses ~initer:(pamk_e ~need_st:true mapper)
+                ~f:(fun x acc ->
+                  [%expr
+                    MKStream.mplus [%e pamk_e ~need_st:true mapper x]
+                      (MKStream.inc (fun () ->
+                        printfn " force inc from mplus*";
+                        [%e acc]))
+                  ]
+                )
+          ]
+        )
       ]
-
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
   | Pexp_apply (e1, (_,args) :: body) when is_fresh e1 -> begin
       (* List.iter body ~f:(fun (_,e) -> Printast.expression 0 Format.std_formatter e); *)
       assert (List.length body > 0);
+      let body = List.map snd body in
+
       let new_body : expression =
         match body with
         | [] -> assert false
-        | [(_,body)] ->
+        | [body] ->
             (* we omitte bind* here*)
-            [%expr [%e pamk_e mapper body] st]
-        | (_xx,h)::body ->
-            let body = List.map (fun (xx,e) -> pamk_e mapper e) body in
-            Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
+            if need_st then pamk_e ~need_st:true mapper body
+            else pamk_e mapper body
+        | [a; b] ->
+          [%expr
+            MKStream.bind
+              [%e pamk_e ~need_st:true mapper a]
+              (fun st -> [%e pamk_e ~need_st:true mapper b])
+          ]
+        | h::body ->
+            assert false
+            (* Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
               [ [%expr [%e pamk_e mapper h] st]
               ; Ast_convenience.list body
-              ]
+              ] *)
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
           let pretty_names = StringLabels.concat ~sep:" " xs in
           let msg2 = sprintf "create inc   in fresh === (%s)" pretty_names in
           let msg3 = sprintf "inc in fresh forced === (%s)" pretty_names in
-          [%expr fun st ->
-            [%e List.fold_right xs
+          let ans =
+            List.fold_right xs
               ~f:(fun ident acc ->
                   let msg = sprintf "create new variable %s as" ident in
                   let msg = msg ^ " _.%d" in
@@ -184,16 +211,25 @@ let rec pamk_e mapper e : expression =
                   printfn [%e Exp.const_string msg3];
                   [%e new_body ]
                 )]
-            ] ]
+          in
+
+          if need_st then ans
+          else [%expr fun st -> [%e ans]]
       | None ->
          eprintf "Can't reconstruct args of 'fresh'";
          {e with pexp_desc=Pexp_apply (e1,[Nolabel, new_body]) }
     end
   | Pexp_apply (d, [(_,body)]) when is_defer d ->
      [%expr (fun __st__ -> MiniKanren.Stream.from_fun (fun () -> [%e body] __st__)) ]
+  | Pexp_apply (d, body) when is_unif d ->
+      if need_st then [%expr [%e e] st]
+      else e
   | Pexp_apply (e, xs) ->
-     {e with pexp_desc=Pexp_apply (mapper.expr mapper e,
-                                   List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) }
+      let ans = Pexp_apply (mapper.expr mapper e,
+                                   List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) in
+      let ans = {e with pexp_desc = ans} in
+      if need_st then [%expr [%e ans] st]
+      else ans
   | Pexp_fun (l,opt,pat,e) ->
      { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
 

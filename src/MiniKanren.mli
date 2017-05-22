@@ -71,6 +71,9 @@ module Stream :
 
 (** {3 States and goals} *)
 
+(**  The type [('a, 'b) injected] describes an injection of a type ['a] into ['b] *)
+type ('a, 'b) injected
+
 (** A state *)
 module State :
   sig
@@ -80,7 +83,7 @@ module State :
     (** Printing helper *)
     val show : t -> string
 
-    val new_var : t -> 'a * int
+    val new_var : t -> ('a, 'b) injected * int
   end
 
 (** Goal converts a state into a lazy stream of states *)
@@ -89,8 +92,6 @@ type goal = State.t MKStream.t goal'
 
 (** {3 Logical values and injections} *)
 
-(**  The type [('a, 'b) injected] describes an injection of a type ['a] into ['b] *)
-type ('a, 'b) injected
 
 (** A type of abstract logic values *)
 @type 'a logic =

@@ -30,7 +30,9 @@ module MKStream =
               | Single of 'a
               | Compoz of 'a * (unit -> 'a t)
 
-    let from_fun (f: unit -> 'a t) : 'a t = Thunk f
+    let from_fun (f: unit -> 'a t) : 'a t =
+      printfn "    Thunk created";
+      Thunk f
     let inc = from_fun
 
     let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
@@ -67,8 +69,8 @@ module MKStream =
           *)
           printfn " mplus: 2nd case";
           (* Thunk (fun () -> let r = force gs in mplus r fs) *)
-          Thunk (fun () ->
-            printfn "forcing thunk created by 2nd case of mplus";
+          from_fun (fun () ->
+            printfn " forcing thunk created by 2nd case of mplus";
             (* let r = force fs in mplus gs r *)
             let r = force gs in mplus r fs
           )
@@ -82,7 +84,13 @@ module MKStream =
     let rec mplus_star : 'a t list -> 'a t = function
     | [] -> failwith "wrong argument"
     | [h] -> h
-    | h::tl -> mplus h (Thunk (fun () -> mplus_star tl))
+    | h::tl -> mplus h (from_fun (fun () -> mplus_star tl))
+
+    let show = function
+    | Nil -> "Nil"
+    | Thunk _ -> "Thunk"
+    | _ -> "wtf"
+
 
     let rec bind xs g =
       (* printfn "pizda"; *)
@@ -93,8 +101,8 @@ module MKStream =
       | Thunk f ->
           printfn " bind: 2nd case";
           (* delay here because miniKanren has it *)
-          Thunk (fun () ->
-            printfn "forcing thunk created by 2nd case of bind";
+          from_fun (fun () ->
+            printfn " forcing thunk created by 2nd case of bind";
             let r = f () in
             bind r g)
       | Single c ->
@@ -102,7 +110,12 @@ module MKStream =
           g c
       | Compoz (c, f) ->
           printfn " bind: 4th case";
-          mplus (g c) (Thunk (fun () -> bind (f ()) g))
+          mplus (g c) (from_fun (fun () ->
+            printfn " force thunk created by 5th case of bind";
+            let r = f () in
+            printfn " r is %s" (show r);
+            bind r g
+          ))
 
   end
 
