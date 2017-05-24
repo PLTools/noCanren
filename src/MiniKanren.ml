@@ -31,14 +31,14 @@ module MKStream =
               | Compoz of 'a * (unit -> 'a t)
 
     let from_fun (f: unit -> 'a t) : 'a t =
-      printfn "    Thunk created";
+      printfn "    Thunk created: %d" (2 * (Obj.magic f));
       Thunk f
     let inc = from_fun
 
-    let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
+    (* let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
       fun st -> inc (fun () -> thunk () st)
     let inc3 (thunk: 'a -> unit -> 'b t) : 'a -> 'b t =
-      fun st -> inc (thunk st)
+      fun st -> inc (thunk st) *)
 
     let nil = Nil
 
@@ -54,7 +54,9 @@ module MKStream =
 
     let force = function
     | Nil -> Nil
-    | Thunk f -> f ()
+    | Thunk f ->
+        printfn "    forcing thunk %d" (2 * (Obj.magic f));
+        f ()
     | Single a -> Single a
     | Compoz (a,f) -> assert false
 
@@ -71,8 +73,8 @@ module MKStream =
           (* Thunk (fun () -> let r = force gs in mplus r fs) *)
           from_fun (fun () ->
             printfn " forcing thunk created by 2nd case of mplus";
-            (* let r = force fs in mplus gs r *)
-            let r = force gs in mplus r fs
+            let r = force gs in
+            mplus r fs
           )
       | Single a      ->
           printfn " mplus: 3rd case";
@@ -93,7 +95,6 @@ module MKStream =
 
 
     let rec bind xs g =
-      (* printfn "pizda"; *)
       match xs with
       | Nil ->
             printfn " bind: 1std case";
@@ -102,7 +103,7 @@ module MKStream =
           printfn " bind: 2nd case";
           (* delay here because miniKanren has it *)
           from_fun (fun () ->
-            printfn " forcing thunk created by 2nd case of bind";
+            printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f));
             let r = f () in
             bind r g)
       | Single c ->
@@ -111,7 +112,7 @@ module MKStream =
       | Compoz (c, f) ->
           printfn " bind: 4th case";
           mplus (g c) (from_fun (fun () ->
-            printfn " force thunk created by 5th case of bind";
+            printfn " force thunk created by 5th case of bind %d" (2 * (Obj.magic f));
             let r = f () in
             printfn " r is %s" (show r);
             bind r g
@@ -131,7 +132,9 @@ module Stream =
 
     let rec of_mkstream = function
     | MKStream.Nil -> Nil
-    | MKStream.Thunk f -> from_fun (fun () -> of_mkstream @@ f ())
+    | MKStream.Thunk f -> from_fun (fun () ->
+        printfn "    forcing thunk %d" (2 * (Obj.magic f));
+        of_mkstream @@ f ())
     | MKStream.Single a -> Cons (a, Nil)
     | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
 
@@ -599,9 +602,9 @@ let (=/=) x y ((env, subst, constr) as st) =
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
 
-let delay2 : (unit -> goal) -> goal = MKStream.inc2
+(* let delay2 : (unit -> goal) -> goal = MKStream.inc2 *)
 
-let delay_goal : goal -> goal = fun g st -> Thunk (fun () -> g st)
+let delay_goal : goal -> goal = fun g st -> MKStream.from_fun (fun () -> g st)
 let inc = delay_goal
 
 
@@ -612,7 +615,7 @@ let (&&&) = conj
 let disj f g st =
   let open MKStream in
   mplus (f st)
-    (Thunk (fun () ->
+    (MKStream.from_fun (fun () ->
       (* printfn " force inc from mplus*"; *)
       g st))
 
@@ -647,9 +650,9 @@ let bind_star_simple s = bind_star2 s []
 
 let conde xs : goal = fun st ->
   printfn " creaded inc in conde";
-  MKStream.inc2 (fun () ->
+  MKStream.inc (fun () ->
     printfn " force a conde";
-    my_mplus_star xs) st
+    my_mplus_star xs st)
 
 module Fresh =
   struct
@@ -1045,6 +1048,7 @@ let () =
 ;;
 *)
 
+(*
 let ____ () =
   let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
     @@ ManualReifiers.int_reifier h t) in
@@ -1135,7 +1139,7 @@ let __ () =
     |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
   ()
 ;;
-
+*)
 let () = ();;
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;

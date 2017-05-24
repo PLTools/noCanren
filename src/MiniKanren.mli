@@ -31,8 +31,8 @@ module MKStream :
     type 'a t
 
     val inc: (unit -> 'a t) -> 'a t
-    val inc2: (unit -> 'a -> 'b t) -> 'a -> 'b t
-    val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t
+    (* val inc2: (unit -> 'a -> 'b t) -> 'a -> 'b t
+    val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t *)
     val mplus : 'a t -> 'a t -> 'a t
     val mplus_star : 'a t list -> 'a t
 
@@ -220,7 +220,7 @@ val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
   See also syntax extension which simplifies the syntax.
 *)
 val delay  : (unit -> goal) -> goal
-val delay2 : (unit -> goal) -> goal
+(* val delay2 : (unit -> goal) -> goal *)
 
 val delay_goal: goal -> goal
 

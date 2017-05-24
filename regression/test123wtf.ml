@@ -7,7 +7,9 @@ let (===) = unitrace (fun h x ->
   GT.show logic string_of_int @@ ManualReifiers.int_reifier h x)
 
 
-
+let () =
+  let c = Gc.get () in
+  Gc.set { c with Gc.verbose = 0x400 }
 
 
 
