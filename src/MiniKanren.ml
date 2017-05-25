@@ -30,9 +30,19 @@ module MKStream =
               | Single of 'a
               | Compoz of 'a * (unit -> 'a t)
 
+    let cur_inc = ref 0
+
     let from_fun (f: unit -> 'a t) : 'a t =
-      printfn "    Thunk created: %d" (2 * (Obj.magic f));
-      Thunk f
+      printf "    Thunk created: ";
+      incr cur_inc;
+      let n = !cur_inc in
+      let result = fun () ->
+        let () = printfn "    forcing thunk: %d" n in
+        f ()
+      in
+      printfn "%d" n;
+      Thunk result
+
     let inc = from_fun
 
     (* let inc2 (thunk: unit -> 'a -> 'b t) : 'a -> 'b t =
@@ -50,12 +60,14 @@ module MKStream =
     | Single _
     | Compoz _ -> false
 
-    let choice a f = Compoz (a, f)
+    let choice a f =
+      printfn "    created Choice %d" (2 * (Obj.magic f));
+      Compoz (a, f)
 
     let force = function
     | Nil -> Nil
     | Thunk f ->
-        printfn "    forcing thunk %d" (2 * (Obj.magic f));
+        (* printfn "      forcing thunk %d" (2 * (Obj.magic f)); *)
         f ()
     | Single a -> Single a
     | Compoz (a,f) -> assert false
@@ -90,9 +102,8 @@ module MKStream =
 
     let show = function
     | Nil -> "Nil"
-    | Thunk _ -> "Thunk"
+    | Thunk f -> sprintf "Thunk: %d" (2 * (Obj.magic f))
     | _ -> "wtf"
-
 
     let rec bind xs g =
       match xs with
@@ -111,8 +122,9 @@ module MKStream =
           g c
       | Compoz (c, f) ->
           printfn " bind: 4th case";
-          mplus (g c) (from_fun (fun () ->
-            printfn " force thunk created by 5th case of bind %d" (2 * (Obj.magic f));
+          let arg1 = g c in
+          mplus arg1 (from_fun (fun () ->
+            printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f));
             let r = f () in
             printfn " r is %s" (show r);
             bind r g
@@ -133,7 +145,7 @@ module Stream =
     let rec of_mkstream = function
     | MKStream.Nil -> Nil
     | MKStream.Thunk f -> from_fun (fun () ->
-        printfn "    forcing thunk %d" (2 * (Obj.magic f));
+        (* printfn "    forcing thunk  %d" (2 * (Obj.magic f)); *)
         of_mkstream @@ f ())
     | MKStream.Single a -> Cons (a, Nil)
     | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
