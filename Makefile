@@ -22,14 +22,14 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .DEFAULT_GOAL: all
 
-all: minikanren_stuff plugin bundle
+all: minikanren_stuff plugin ppx bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
 	$(OB) -Is src ppx/ppx_repr_bin.cmxa ppx/pa_minikanren_bin.cmxa \
-	   ppx/ppx_ocanren_all.cmxs
+	  ppx/ppx_ocanren_all.cma ppx/ppx_ocanren_all.cmxa ppx/ppx_ocanren_all.cmxs
 
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
@@ -104,6 +104,9 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cmx \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
+	_build/ppx/ppx_ocanren_all.cma \
+	_build/ppx/ppx_ocanren_all.cmxa \
+	_build/ppx/ppx_ocanren_all.cmxs \
 	$(wildcard _build/src/MiniKanren.[oa]) \
 	$(wildcard _build/camlp5/pa_minikanren.cm[oi]) \
 
