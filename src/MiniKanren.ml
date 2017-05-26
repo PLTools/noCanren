@@ -543,11 +543,17 @@ let call_fresh_named name f = fun (env, subst, constr) ->
 exception Disequality_violated
 
 let unif_counter = ref 0
-let report_unif_counter () = !unif_counter
+let diseq_counter = ref 0
+
+let report_counters () =
+  printfn "total unifications: %d" !unif_counter;
+  printfn "total diseq calls : %d" !diseq_counter
+
+
 
 let (===) (x: _ injected) y (env, subst, constr) =
   (* we should always unify two injected types *)
-  (* incr unif_counter; *)
+  incr unif_counter;
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -577,6 +583,7 @@ let (===) (x: _ injected) y (env, subst, constr) =
   with Occurs_check -> MKStream.nil
 
 let (=/=) x y ((env, subst, constr) as st) =
+  incr diseq_counter;
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
     let prefix = List.split (List.map Subst.(fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix) in

@@ -34,17 +34,14 @@ let rec appendo a b ab =
   conde
     [ (*project3 "appendo simple (a,b,ab): " show_logic_list a b ab &&&*)
       ((a === nil ()) &&& (b === ab))
-    ; Fresh.two (fun h t ->
-          (*project3 "appendo complex (a,b,ab): " show_logic_list a b ab &&& *)
-          (a === h%t) &&&
-          Fresh.one (fun ab' ->
-              (h%ab' === ab) &&& (appendo t b ab')
-          )
-        )
+    ; fresh (h t ab')
+        (a === h%t)
+        (ab === h%ab')
+        (appendo t b ab')
     ]
 
 let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list show_intl_list n
-
+(*
 let rec reverso a b =
   (* trace "reverso" @@ *)
   conde
@@ -55,7 +52,7 @@ let rec reverso a b =
           (appendo a' !<h b)
           (reverso t a')
     ]
-
+*)
 
 let _ =
   (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   )); *)
@@ -77,3 +74,5 @@ let _withFree =
   runL          3  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL         10  q  qh (REPR (fun q   -> reverso q q                                  )); *)
   ()
+
+let () = report_counters ()

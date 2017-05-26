@@ -138,29 +138,37 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
   | Pexp_apply (_,[]) -> e
   | Pexp_apply (e1,(_,alist)::args) when is_conde e1 ->
       let clauses : expression list = parse_to_list alist.pexp_desc in
+      let ans =
       [%expr
         printfn " created inc in conde";
         MKStream.inc (fun () ->
           printfn " force a conde";
           [%e
           match clauses with
-          | [b] ->
+          | [] -> failwith "conde with no clauses is a nonsense"
+          (* | [b] ->
             (* failwith "conde with a single clause appear very rarely" *)
-            pamk_e ~need_st:true mapper b
+            pamk_e ~need_st mapper b *)
           | clauses ->
-              (* assert false; *)
-              list_fold_right0 clauses ~initer:(pamk_e ~need_st:true mapper)
+            let wrap need_st =
+              list_fold_right0 clauses
+                ~initer:(pamk_e ~need_st mapper)
                 ~f:(fun x acc ->
                   [%expr
-                    MKStream.mplus [%e pamk_e ~need_st:true mapper x]
+                    MKStream.mplus [%e pamk_e ~need_st mapper x]
                       (MKStream.inc (fun () ->
                         printfn " force inc from mplus*";
                         [%e acc]))
                   ]
                 )
+            in
+            wrap true
           ]
         )
       ]
+      in
+      if need_st then ans
+      else [%expr fun st -> [%e ans]]
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
@@ -174,20 +182,28 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         | [] -> assert false
         | [body] ->
             (* we omitte bind* here*)
-            if need_st then pamk_e ~need_st:true mapper body
-            else pamk_e mapper body
+            pamk_e ~need_st:true mapper body
         | [a; b] ->
           [%expr
             MKStream.bind
-              [%e pamk_e ~need_st:true mapper a]
+              [%e pamk_e ~need_st mapper a]
               (fun st -> [%e pamk_e ~need_st:true mapper b])
           ]
         | h::body ->
-            assert false
-            (* Ast_convenience.app ~loc:e.pexp_loc [%expr bind_star2]  @@
-              [ [%expr [%e pamk_e mapper h] st]
-              ; Ast_convenience.list body
-              ] *)
+            let right =
+              list_fold_right0 body
+                ~initer:(fun b -> pamk_e ~need_st:true mapper b)
+                ~f:(fun x acc -> [%expr
+                    MKStream.bind
+                      [%e pamk_e ~need_st:true mapper x]
+                      (fun st -> [%e acc])
+                  ])
+            in
+            [%expr
+              MKStream.bind
+                [%e pamk_e ~need_st mapper h]
+                (fun st -> [%e right])
+            ]
       in
       match reconstruct_args args with
       | Some (xs: string list) ->

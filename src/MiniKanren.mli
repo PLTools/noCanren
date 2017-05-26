@@ -127,6 +127,8 @@ val call_fresh : (('a, 'b) injected -> goal) -> goal
 
 val call_fresh_named : string -> (('a, 'b) injected -> goal) -> goal
 
+val report_counters : unit -> unit
+
 (** [x === y] creates a goal, which performs a unification of [x] and [y] *)
 val (===) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
 
@@ -777,5 +779,3 @@ val (!<) : ('a, 'b) injected -> ('a, 'b) List.groundi
 
 (** [nil] is a synonym for [inj Nil] *)
 val nil : unit -> (_, _) List.groundi
-
-val report_unif_counter: unit -> int
