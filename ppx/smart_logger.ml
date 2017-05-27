@@ -32,6 +32,8 @@ let is_fresh = need_insert_fname ~name:"fresh"
 let is_call_fresh = need_insert_fname ~name:"call_fresh"
 let is_unif = need_insert_fname ~name:"==="
 let is_conj = need_insert_fname ~name:"conj"
+let is_conj_list = need_insert_fname ~name:"?&"
+
 let is_disj e =
   need_insert_fname ~name:"disj" e || need_insert_fname ~name:"|||" e
 
@@ -136,6 +138,13 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
+  | Pexp_apply (e1,(_,alist)::args) when is_conj_list e1 ->
+      let clauses : expression list = parse_to_list alist.pexp_desc in
+      let ans = list_fold_right0 clauses
+        ~initer:(fun x -> x)
+        ~f:(fun x acc -> [%expr [%e x] &&& [%e acc]])
+      in
+      pamk_e ~need_st mapper ans
   | Pexp_apply (e1,(_,alist)::args) when is_conde e1 ->
       let clauses : expression list = parse_to_list alist.pexp_desc in
       let ans =
@@ -186,7 +195,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         | [a; b] ->
           [%expr
             MKStream.bind
-              [%e pamk_e ~need_st mapper a]
+              [%e pamk_e ~need_st:true mapper a]
               (fun st -> [%e pamk_e ~need_st:true mapper b])
           ]
         | h::body ->
@@ -201,7 +210,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
             in
             [%expr
               MKStream.bind
-                [%e pamk_e ~need_st mapper h]
+                [%e pamk_e ~need_st:true mapper h]
                 (fun st -> [%e right])
             ]
       in
@@ -236,7 +245,10 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
          {e with pexp_desc=Pexp_apply (e1,[Nolabel, new_body]) }
     end
   | Pexp_apply (d, [(_,body)]) when is_defer d ->
-     [%expr (fun __st__ -> MiniKanren.Stream.from_fun (fun () -> [%e body] __st__)) ]
+      let ans = [%expr MKStream.inc (fun () -> [%e pamk_e ~need_st:false mapper body])] in
+      if need_st
+      then [%expr [%e ans] st]
+      else ans
   | Pexp_apply (d, body) when is_unif d ->
       if need_st then [%expr [%e e] st]
       else e
