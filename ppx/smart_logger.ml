@@ -149,9 +149,9 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       let clauses : expression list = parse_to_list alist.pexp_desc in
       let ans =
       [%expr
-        printfn " created inc in conde";
+        (* printfn " created inc in conde"; *)
         MKStream.inc (fun () ->
-          printfn " force a conde";
+          (* printfn " force a conde"; *)
           [%e
           match clauses with
           | [] -> failwith "conde with no clauses is a nonsense"
@@ -166,7 +166,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   [%expr
                     MKStream.mplus [%e pamk_e ~need_st mapper x]
                       (MKStream.inc (fun () ->
-                        printfn " force inc from mplus*";
+                        (* printfn " force inc from mplus*"; *)
                         [%e acc]))
                   ]
                 )
@@ -226,14 +226,14 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   let msg = msg ^ " _.%d" in
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    printfn [%e  Exp.const_string msg] idx;
+                    (* printfn [%e  Exp.const_string msg] idx; *)
                     [%e acc]
                   ]
                  )
               ~init:[%expr
-                printfn [%e Exp.const_string msg2];
+                (* printfn [%e Exp.const_string msg2]; *)
                 MKStream.inc (fun () ->
-                  printfn [%e Exp.const_string msg3];
+                  (* printfn [%e Exp.const_string msg3]; *)
                   [%e new_body ]
                 )]
           in

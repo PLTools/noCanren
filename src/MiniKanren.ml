@@ -17,7 +17,9 @@
  *)
 
 open Printf
+
 let printfn fmt = kprintf (printf "%s\n%!") fmt
+
 
 module OldList = List
 
@@ -33,14 +35,14 @@ module MKStream =
     let cur_inc = ref 0
 
     let from_fun (f: unit -> 'a t) : 'a t =
-      printf "    Thunk created: ";
-      incr cur_inc;
-      let n = !cur_inc in
+      (* printf "    Thunk created: "; *)
+      (* incr cur_inc;
+      let n = !cur_inc in *)
       let result = fun () ->
-        let () = printfn "    forcing thunk: %d" n in
+        (* let () = printfn "    forcing thunk: %d" n in *)
         f ()
       in
-      printfn "%d" n;
+      (* printfn "%d" n; *)
       Thunk result
 
     let inc = from_fun
@@ -61,7 +63,7 @@ module MKStream =
     | Compoz _ -> false
 
     let choice a f =
-      printfn "    created Choice %d" (2 * (Obj.magic f));
+      (* printfn "    created Choice %d" (2 * (Obj.magic f)); *)
       Compoz (a, f)
 
     let force = function
@@ -75,24 +77,24 @@ module MKStream =
     let rec mplus fs gs =
       match fs with
       | Nil           ->
-          printfn " mplus: 1st case";
+          (* printfn " mplus: 1st case"; *)
           force gs
       | Thunk f       ->
           (* The we force 2nd argument and left 1st one for later
             ... because fasterMK does that
           *)
-          printfn " mplus: 2nd case";
+          (* printfn " mplus: 2nd case"; *)
           (* Thunk (fun () -> let r = force gs in mplus r fs) *)
           from_fun (fun () ->
-            printfn " forcing thunk created by 2nd case of mplus";
+            (* printfn " forcing thunk created by 2nd case of mplus"; *)
             let r = force gs in
             mplus r fs
           )
       | Single a      ->
-          printfn " mplus: 3rd case";
+          (* printfn " mplus: 3rd case"; *)
           choice a (fun () -> gs)
       | Compoz (a, f) ->
-          printfn " mplus: 4th case ";
+          (* printfn " mplus: 4th case "; *)
           choice a (fun () -> mplus gs @@ f ())
 
     let rec mplus_star : 'a t list -> 'a t = function
@@ -108,25 +110,25 @@ module MKStream =
     let rec bind xs g =
       match xs with
       | Nil ->
-            printfn " bind: 1std case";
+            (* printfn " bind: 1std case"; *)
             Nil
       | Thunk f ->
-          printfn " bind: 2nd case";
+          (* printfn " bind: 2nd case"; *)
           (* delay here because miniKanren has it *)
           from_fun (fun () ->
-            printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f));
+            (* printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f)); *)
             let r = f () in
             bind r g)
       | Single c ->
-          printfn " bind: 3rd case";
+          (* printfn " bind: 3rd case"; *)
           g c
       | Compoz (c, f) ->
-          printfn " bind: 4th case";
+          (* printfn " bind: 4th case"; *)
           let arg1 = g c in
           mplus arg1 (from_fun (fun () ->
-            printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f));
+            (* printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f)); *)
             let r = f () in
-            printfn " r is %s" (show r);
+            (* printfn " r is %s" (show r); *)
             bind r g
           ))
 
@@ -543,10 +545,12 @@ let call_fresh_named name f = fun (env, subst, constr) ->
 exception Disequality_violated
 
 let unif_counter = ref 0
+let logged_unif_counter = ref 0
 let diseq_counter = ref 0
 
 let report_counters () =
-  printfn "total unifications: %d" !unif_counter;
+  printfn "total  unifications: %d" !unif_counter;
+  printfn "logged unifications: %d" !logged_unif_counter;
   printfn "total diseq calls : %d" !diseq_counter
 
 
@@ -668,9 +672,9 @@ let rec bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t = fun
 let bind_star_simple s = bind_star2 s []
 
 let conde xs : goal = fun st ->
-  printfn " creaded inc in conde";
+  (* printfn " creaded inc in conde"; *)
   MKStream.inc (fun () ->
-    printfn " force a conde";
+    (* printfn " force a conde"; *)
     my_mplus_star xs st)
 
 module Fresh =
@@ -878,7 +882,8 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
   success st
 
 let unitrace shower x y = fun st ->
-  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  incr logged_unif_counter;
+  printf "%d: unify '%s' and '%s'\n%!" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (x === y) st
 
 
