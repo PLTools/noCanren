@@ -21,16 +21,27 @@ let is_state_pattern pat =
   | Ppat_var v when v.txt = "st" || v.txt = "state" -> Some v.txt
   | _ -> None
 
-let need_insert_fname ~name e =
+let classify_name ~f e =
   match e.pexp_desc with
-  | Pexp_ident i when i.txt = Lident name -> true
+  | Pexp_ident i when f i.txt -> true
   | _ -> false
+let need_insert_fname ~name e =
+  classify_name e ~f:((=) (Lident name))
+  (* match e.pexp_desc with
+  | Pexp_ident i when i.txt = Lident name -> true
+  | _ -> false *)
 
 let is_defer = need_insert_fname ~name:"defer"
 let is_conde = need_insert_fname ~name:"conde"
 let is_fresh = need_insert_fname ~name:"fresh"
 let is_call_fresh = need_insert_fname ~name:"call_fresh"
-let is_unif = need_insert_fname ~name:"==="
+let is_unif =
+  classify_name
+    ~f:(function
+        | Lident s -> (String.length s >=3) && (String.sub s 0 3 = "===")
+        | _ -> false
+        )
+
 let is_conj = need_insert_fname ~name:"conj"
 let is_conj_list = need_insert_fname ~name:"?&"
 
@@ -145,13 +156,13 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         ~f:(fun x acc -> [%expr [%e x] &&& [%e acc]])
       in
       pamk_e ~need_st mapper ans
-  | Pexp_apply (e1,(_,alist)::args) when is_conde e1 ->
+  | Pexp_apply (e1,(_,alist)::otherargs) when is_conde e1 ->
       let clauses : expression list = parse_to_list alist.pexp_desc in
       let ans =
       [%expr
-        (* printfn " created inc in conde"; *)
+        mylog (fun () -> printfn " creating inc in conde");
         MKStream.inc (fun () ->
-          (* printfn " force a conde"; *)
+          mylog (fun () -> printfn " force a conde");
           [%e
           match clauses with
           | [] -> failwith "conde with no clauses is a nonsense"
@@ -166,7 +177,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   [%expr
                     MKStream.mplus [%e pamk_e ~need_st mapper x]
                       (MKStream.inc (fun () ->
-                        (* printfn " force inc from mplus*"; *)
+                        mylog (fun () -> printfn " force inc from mplus*");
                         [%e acc]))
                   ]
                 )
@@ -176,8 +187,12 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         )
       ]
       in
-      if need_st then ans
-      else [%expr fun st -> [%e ans]]
+      let ans = if need_st then ans
+         else [%expr fun st -> [%e ans]]
+      in
+      if otherargs <> []
+      then Exp.apply ans otherargs
+      else ans
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
@@ -226,14 +241,14 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   let msg = msg ^ " _.%d" in
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    (* printfn [%e  Exp.const_string msg] idx; *)
+                    mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
                     [%e acc]
                   ]
                  )
               ~init:[%expr
-                (* printfn [%e Exp.const_string msg2]; *)
+                mylog (fun () -> printfn [%e Exp.const_string msg2]);
                 MKStream.inc (fun () ->
-                  (* printfn [%e Exp.const_string msg3]; *)
+                  mylog (fun () -> printfn [%e Exp.const_string msg3]);
                   [%e new_body ]
                 )]
           in
@@ -250,8 +265,19 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       then [%expr [%e ans] st]
       else ans
   | Pexp_apply (d, body) when is_unif d ->
-      if need_st then [%expr [%e e] st]
-      else e
+
+      let loc_str =
+        let b = Buffer.create 10 in
+        let fmt = Format.formatter_of_buffer b in
+        Location.print_compact fmt e.pexp_loc;
+        Format.pp_flush_formatter fmt;
+        Buffer.contents b
+      in
+      (* let ans = e in *)
+      let body = (Labelled "loc", Exp.const_string loc_str) :: body in
+      let ans = Exp.apply ~loc:e.pexp_loc d body in
+      if need_st then [%expr [%e ans ] st]
+      else ans
   | Pexp_apply (e, xs) ->
       let ans = Pexp_apply (mapper.expr mapper e,
                                    List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) in

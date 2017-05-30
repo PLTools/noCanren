@@ -130,7 +130,7 @@ val call_fresh_named : string -> (('a, 'b) injected -> goal) -> goal
 val report_counters : unit -> unit
 
 (** [x === y] creates a goal, which performs a unification of [x] and [y] *)
-val (===) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
+val (===) : ?loc:string -> ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
 
 (** [x =/= y] creates a goal, which introduces a disequality constraint for [x] and [y] *)
 val (=/=) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
@@ -237,7 +237,9 @@ val project3: msg:string -> (helper -> ('a, 'b) injected -> string) ->
     ('a, 'b) injected -> ('a, 'b) injected -> ('a, 'b) injected -> goal
 
 (* Like (===) but with tracing *)
-val unitrace: (helper -> ('a, 'b) injected -> string) -> ('a, 'b) injected -> ('a, 'b) injected -> goal
+val unitrace: ?loc:string -> (helper -> ('a, 'b) injected -> string) -> ('a, 'b) injected -> ('a, 'b) injected -> goal
+
+val diseqtrace: (helper -> ('a, 'b) injected -> string) -> ('a, 'b) injected -> ('a, 'b) injected -> goal
 
 (**
   The exception is raised when we try to extract plain term from the answer but only terms with free

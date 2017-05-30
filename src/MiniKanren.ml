@@ -547,15 +547,17 @@ exception Disequality_violated
 let unif_counter = ref 0
 let logged_unif_counter = ref 0
 let diseq_counter = ref 0
+let logged_diseq_counter = ref 0
 
 let report_counters () =
   printfn "total  unifications: %d" !unif_counter;
   printfn "logged unifications: %d" !logged_unif_counter;
-  printfn "total diseq calls : %d" !diseq_counter
+  printfn "total diseq calls : %d" !diseq_counter;
+  printfn "logged diseq calls : %d" !logged_diseq_counter
 
 
 
-let (===) (x: _ injected) y (env, subst, constr) =
+let (===) ?loc (x: _ injected) y (env, subst, constr) =
   (* we should always unify two injected types *)
   incr unif_counter;
   try
@@ -881,11 +883,21 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
     (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
   success st
 
-let unitrace shower x y = fun st ->
+let unitrace ?loc shower x y = fun st ->
   incr logged_unif_counter;
-  printf "%d: unify '%s' and '%s'\n%!" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (x === y) st
+  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (match loc with Some l -> printf " on %s" l | None -> ());
+  let ans = (x === y) st in
+  if ans = Nil then printfn "  -"
+  else  printfn "  +";
+  ans
 
+let diseqtrace shower x y = fun st ->
+  incr logged_diseq_counter;
+  printf "%d: (=/=) '%s' and '%s'\n%!" !logged_diseq_counter
+    (shower (helper_of_state st) x)
+    (shower (helper_of_state st) y);
+  (x =/= y) st
 
 
 
