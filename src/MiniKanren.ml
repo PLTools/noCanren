@@ -168,9 +168,9 @@ module MKStream =
 
     let from_fun = inc
 
-    let nil : _ t = fun () -> !!!false
+    let nil : _ t = !!!(fun () -> !!!false)
 
-    type fuck = Dummy of int*string | Single of Obj.t
+    type wtf = Dummy of int*string | Single of Obj.t
     let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
 
     let single x = Obj.repr @@ Obj.magic (Single x)
@@ -206,19 +206,20 @@ module MKStream =
       in
       !!!(helper xs)
 
+    let cast gs : Obj.t = (!!!gs: unit -> _) ()
     let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
       case_inf fs
         ~f1:(fun () ->
               mylog (fun () -> printfn " mplus: 1st case");
-              !!!(gs: unit -> _) ())
+              cast gs)
         ~f2:(fun f ->
               mylog (fun () -> printfn " mplus: 2nd case");
               inc begin fun () ->
                 (* mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus"); *)
                 (* let r = (!!!gs: unit -> _) () in
                 mplus r fs *)
-                let r = f () in
-                mplus gs r
+                let r = cast gs in
+                mplus r !!!f
               end)
         ~f3:(fun c ->
               (* mylog (fun () -> printfn " mplus: 3rd case"); *)
@@ -227,7 +228,7 @@ module MKStream =
         ~f4:(fun c ff ->
               (* mylog (fun () -> printfn " mplus: 4th case "); *)
               (* choice a (inc @@ fun () -> mplus gs @@ f ()) *)
-              choice a (inc @@ fun () -> mplus gs @@ ff ())
+              choice c (inc @@ fun () -> mplus gs @@ ff ())
           )
 
     (* let rec mplus_star : 'a t list -> 'a t = function
@@ -241,10 +242,20 @@ module MKStream =
     | _ -> "wtf" *)
 
     let rec bind xs g =
-      match xs with
-      | Nil ->
-            mylog (fun () -> printfn " bind: 1st case");
-            Nil
+      case_inf xs
+        ~f1:(fun () ->
+                mylog (fun () -> printfn " bind: 1st case");
+                nil)
+        ~f2:(fun f ->
+              mylog (fun () -> printfn " bind: 2nd case");
+              (* delay here because miniKanren has it *)
+              from_fun (fun () ->
+                mylog (fun () -> printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f)) );
+                let r = f () in
+                bind r g)
+        ~f3:()
+        ~f4:()
+
       | Thunk f ->
           mylog (fun () -> printfn " bind: 2nd case");
           (* delay here because miniKanren has it *)
