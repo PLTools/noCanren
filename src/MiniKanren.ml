@@ -19,10 +19,14 @@
 open Printf
 
 let printfn fmt = kprintf (printf "%s\n%!") fmt
-
+let (!!!) = Obj.magic
 
 module OldList = List
 
+let log_enabled = true
+let mylog f = if log_enabled then f () else ignore (fun () -> f ())
+
+(*
 (* miniKanren-like stream, more generator than a stream *)
 module MKStream =
   struct
@@ -127,6 +131,135 @@ module MKStream =
           let arg1 = g c in
           mplus arg1 (from_fun (fun () ->
             (* printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f)); *)
+            let r = f () in
+            (* printfn " r is %s" (show r); *)
+            bind r g
+          ))
+
+  end
+*)
+
+(* miniKanren-like stream, most unsafe implementation *)
+module MKStream =
+  struct
+    open Obj
+    (*
+      Very unsafe implementation of streams
+      * false -- an empty list
+      * closure -- delayed list
+      * block with tag 1 -- single value
+      * (x,closure)   -- a value and continuation (pair has tag 0)
+    *)
+
+    type 'a t = Obj.t
+
+    let cur_inc = ref 0
+
+    let inc (f: unit -> 'a t) : 'a t =
+      mylog (fun () -> printf "    Thunk created: ");
+      incr cur_inc;
+      let n = !cur_inc in
+      let result = fun () ->
+        let () = mylog @@ fun () -> printfn "    forcing thunk: %d" n in
+        f ()
+      in
+      mylog (fun () -> printfn "%d" n);
+      Obj.repr result
+
+    let from_fun = inc
+
+    let nil : _ t = fun () -> !!!false
+
+    type fuck = Dummy of int*string | Single of Obj.t
+    let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
+
+    let single x = Obj.repr @@ Obj.magic (Single x)
+    let choice a f =
+      assert (closure_tag = tag@@repr f);
+      let ans = Obj.repr @@ Obj.magic (a,f) in
+      (* let () = mylog (fun () -> printfn "    created choice for value"
+                  (2 * (Obj.magic f)) )
+      in *)
+      ans
+
+    let case_inf xs ~f1 ~f2 ~f3 ~f4 : Obj.t =
+      if is_int xs then f1 ()
+      else
+        let tag = Obj.tag (repr xs) in
+        if tag = Obj.closure_tag
+        then f2 (!!!tag: unit -> Obj.t)
+        else if tag = 0 then f3 (field (repr xs) 0)
+        else
+          let () = assert (1 = tag) in
+          let () = assert (2 = size (repr xs)) in
+          f4 (field (repr xs) 0) (!!!(field (repr xs) 1): unit -> Obj.t)
+      (* [@@inline ] *)
+
+    (* let (_:int) = case_inf *)
+    let rec is_empty: _ t -> bool = fun xs ->
+      let rec helper xs =
+        case_inf (repr xs)
+          ~f1:(fun () -> !!!true)
+          ~f2:(fun f -> helper @@ repr (f ()))
+          ~f3:(fun _ -> !!!false)
+          ~f4:(fun _ -> !!!false)
+      in
+      !!!(helper xs)
+
+    let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
+      case_inf fs
+        ~f1:(fun () ->
+              mylog (fun () -> printfn " mplus: 1st case");
+              !!!(gs: unit -> _) ())
+        ~f2:(fun f ->
+              mylog (fun () -> printfn " mplus: 2nd case");
+              inc begin fun () ->
+                (* mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus"); *)
+                (* let r = (!!!gs: unit -> _) () in
+                mplus r fs *)
+                let r = f () in
+                mplus gs r
+              end)
+        ~f3:(fun c ->
+              (* mylog (fun () -> printfn " mplus: 3rd case"); *)
+              choice c (fun () -> gs)
+          )
+        ~f4:(fun c ff ->
+              (* mylog (fun () -> printfn " mplus: 4th case "); *)
+              (* choice a (inc @@ fun () -> mplus gs @@ f ()) *)
+              choice a (inc @@ fun () -> mplus gs @@ ff ())
+          )
+
+    (* let rec mplus_star : 'a t list -> 'a t = function
+    | [] -> failwith "wrong argument"
+    | [h] -> h
+    | h::tl -> mplus h (from_fun (fun () -> mplus_star tl)) *)
+
+    (* let show = function
+    | Nil -> "Nil"
+    | Thunk f -> sprintf "Thunk: %d" (2 * (Obj.magic f))
+    | _ -> "wtf" *)
+
+    let rec bind xs g =
+      match xs with
+      | Nil ->
+            mylog (fun () -> printfn " bind: 1st case");
+            Nil
+      | Thunk f ->
+          mylog (fun () -> printfn " bind: 2nd case");
+          (* delay here because miniKanren has it *)
+          from_fun (fun () ->
+            mylog (fun () -> printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f)) );
+            let r = f () in
+            bind r g)
+      | Single c ->
+          mylog (fun () -> printfn " bind: 3rd case");
+          g c
+      | Compoz (c, f) ->
+          mylog (fun () -> printfn " bind: 4th case");
+          let arg1 = g c in
+          mplus arg1 (from_fun (fun () ->
+            mylog (fun () -> printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f)) );
             let r = f () in
             (* printfn " r is %s" (show r); *)
             bind r g
