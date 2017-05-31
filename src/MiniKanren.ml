@@ -196,7 +196,7 @@ module MKStream =
       (* [@@inline ] *)
 
     (* let (_:int) = case_inf *)
-    let rec is_empty: _ t -> bool = fun xs ->
+    (* let rec is_empty: _ t -> bool = fun xs ->
       let rec helper xs =
         case_inf (repr xs)
           ~f1:(fun () -> !!!true)
@@ -204,21 +204,21 @@ module MKStream =
           ~f3:(fun _ -> !!!false)
           ~f4:(fun _ -> !!!false)
       in
-      !!!(helper xs)
+      !!!(helper xs) *)
 
-    let cast gs : Obj.t = (!!!gs: unit -> _) ()
+    let step gs : Obj.t = (!!!gs: unit -> _) ()
     let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
       case_inf fs
         ~f1:(fun () ->
               mylog (fun () -> printfn " mplus: 1st case");
-              cast gs)
+              step gs)
         ~f2:(fun f ->
               mylog (fun () -> printfn " mplus: 2nd case");
               inc begin fun () ->
                 (* mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus"); *)
                 (* let r = (!!!gs: unit -> _) () in
                 mplus r fs *)
-                let r = cast gs in
+                let r = step gs in
                 mplus r !!!f
               end)
         ~f3:(fun c ->
@@ -249,11 +249,12 @@ module MKStream =
         ~f2:(fun f ->
               mylog (fun () -> printfn " bind: 2nd case");
               (* delay here because miniKanren has it *)
-              from_fun (fun () ->
+              inc begin fun () ->
                 mylog (fun () -> printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f)) );
                 let r = f () in
-                bind r g)
-        ~f3:()
+                bind r g
+              end)
+        ~f3:(fun c -> !!!g c)
         ~f4:()
 
       | Thunk f ->
