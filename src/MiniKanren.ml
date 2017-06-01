@@ -21,9 +21,54 @@ open Printf
 let printfn fmt = kprintf (printf "%s\n%!") fmt
 let (!!!) = Obj.magic
 
+
+type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
+
+let is_valid_tag t =
+  let open Obj in
+  not (List.mem t
+    [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
+     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag])
+
+let rec wrap (x : Obj.t) =
+  Obj.(
+    let is_unboxed obj =
+      is_int obj ||
+      (fun t -> t = string_tag || t = double_tag) (tag obj)
+    in
+    if is_unboxed x
+    then Unboxed x
+    else
+      let t = tag x in
+      if is_valid_tag t
+      then
+        let f = if t = double_array_tag then !!! double_field else field in
+        Boxed (t, size x, f x)
+      else Invalid t
+    )
+
+let generic_show x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner o =
+    match wrap o with
+    | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
+    | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+    | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+    | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
+    | Boxed  (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner x;
+  Buffer.contents b
+;;
+
+
 module OldList = List
 
-let log_enabled = true
+let log_enabled = false
 let mylog f = if log_enabled then f () else ignore (fun () -> f ())
 
 (*
@@ -173,7 +218,9 @@ module MKStream =
     type wtf = Dummy of int*string | Single of Obj.t
     let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
 
-    let single x = Obj.repr @@ Obj.magic (Single x)
+    let single : 'a -> 'a t = fun x ->
+      mylog (fun () -> printfn "Single called");
+      Obj.repr @@ Obj.magic (Single !!!x)
     let choice a f =
       assert (closure_tag = tag@@repr f);
       let ans = Obj.repr @@ Obj.magic (a,f) in
@@ -187,26 +234,20 @@ module MKStream =
       else
         let tag = Obj.tag (repr xs) in
         if tag = Obj.closure_tag
-        then f2 (!!!tag: unit -> Obj.t)
-        else if tag = 0 then f3 (field (repr xs) 0)
+        then f2 (!!!xs: unit -> Obj.t)
+        else if tag = 1 then f3 (field (repr xs) 0)
         else
-          let () = assert (1 = tag) in
+          (* let () = printfn "\t%s" @@ generic_show xs in *)
+          let () = assert (0 = tag) in
           let () = assert (2 = size (repr xs)) in
           f4 (field (repr xs) 0) (!!!(field (repr xs) 1): unit -> Obj.t)
       (* [@@inline ] *)
 
-    (* let (_:int) = case_inf *)
-    (* let rec is_empty: _ t -> bool = fun xs ->
-      let rec helper xs =
-        case_inf (repr xs)
-          ~f1:(fun () -> !!!true)
-          ~f2:(fun f -> helper @@ repr (f ()))
-          ~f3:(fun _ -> !!!false)
-          ~f4:(fun _ -> !!!false)
-      in
-      !!!(helper xs) *)
 
-    let step gs : Obj.t = (!!!gs: unit -> _) ()
+
+    let step gs : Obj.t = Obj.magic gs @@ ()
+    let () = ()
+
     let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
       case_inf fs
         ~f1:(fun () ->
@@ -215,18 +256,18 @@ module MKStream =
         ~f2:(fun f ->
               mylog (fun () -> printfn " mplus: 2nd case");
               inc begin fun () ->
-                (* mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus"); *)
+                mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus");
                 (* let r = (!!!gs: unit -> _) () in
                 mplus r fs *)
                 let r = step gs in
                 mplus r !!!f
               end)
         ~f3:(fun c ->
-              (* mylog (fun () -> printfn " mplus: 3rd case"); *)
+              mylog (fun () -> printfn " mplus: 3rd case");
               choice c (fun () -> gs)
           )
         ~f4:(fun c ff ->
-              (* mylog (fun () -> printfn " mplus: 4th case "); *)
+              mylog (fun () -> printfn " mplus: 4th case ");
               (* choice a (inc @@ fun () -> mplus gs @@ f ()) *)
               choice c (inc @@ fun () -> mplus gs @@ ff ())
           )
@@ -254,29 +295,18 @@ module MKStream =
                 let r = f () in
                 bind r g
               end)
-        ~f3:(fun c -> !!!g c)
-        ~f4:()
-
-      | Thunk f ->
-          mylog (fun () -> printfn " bind: 2nd case");
-          (* delay here because miniKanren has it *)
-          from_fun (fun () ->
-            mylog (fun () -> printfn " forcing thunk created by 2nd case of bind: %d" (2 * (Obj.magic f)) );
-            let r = f () in
-            bind r g)
-      | Single c ->
-          mylog (fun () -> printfn " bind: 3rd case");
-          g c
-      | Compoz (c, f) ->
-          mylog (fun () -> printfn " bind: 4th case");
-          let arg1 = g c in
-          mplus arg1 (from_fun (fun () ->
-            mylog (fun () -> printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f)) );
-            let r = f () in
-            (* printfn " r is %s" (show r); *)
-            bind r g
-          ))
-
+        ~f3:(fun c ->
+              mylog (fun () -> printfn " bind: 2nd case");
+              (!!! g c) )
+        ~f4:(fun c f ->
+              mylog (fun () -> printfn " bind: 4th case");
+              let arg1 = !!!g c in
+              mplus arg1 @@
+                    inc begin fun () ->
+                      mylog (fun () -> printfn " force thunk created by 5th case of bind: %d" (2 * (Obj.magic f)) );
+                      bind (step f) g
+                    end
+          )
   end
 
 module Stream =
@@ -289,13 +319,19 @@ module Stream =
 
     let cons h t = Cons (h, t)
 
-    let rec of_mkstream = function
-    | MKStream.Nil -> Nil
-    | MKStream.Thunk f -> from_fun (fun () ->
-        (* printfn "    forcing thunk  %d" (2 * (Obj.magic f)); *)
-        of_mkstream @@ f ())
-    | MKStream.Single a -> Cons (a, Nil)
-    | MKStream.Compoz (a,f) -> Cons (a, from_fun (fun () -> of_mkstream @@ f ()))
+    let rec of_mkstream : 'a MKStream.t -> 'a t = fun xs ->
+      let rec helper xs =
+        !!!MKStream.case_inf !!!xs
+          ~f1:(fun () -> !!!Nil)
+          ~f2:(fun f  ->
+              (* printfn "f = %s, is_int=%b" (generic_show f) (Obj.is_int !!!f); *)
+              !!! (from_fun (fun () ->
+                (* printfn "f () = %s" (generic_show @@ f ()); *)
+                helper @@ f ())) )
+          ~f3:(fun a -> !!!(cons a Nil) )
+          ~f4:(fun a f -> !!!(cons a @@ from_fun (fun () -> helper @@ f ())) )
+      in
+      !!!(helper !!!xs)
 
     let rec is_empty = function
     | Nil    -> true
@@ -349,50 +385,7 @@ module Stream =
   end
 
 
-let (!!!) = Obj.magic
-
-type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
-
-let is_valid_tag t =
-  let open Obj in
-  not (List.mem t
-    [lazy_tag; closure_tag; object_tag; infix_tag; forward_tag; no_scan_tag;
-     abstract_tag; custom_tag; custom_tag; unaligned_tag; out_of_heap_tag])
-
-let rec wrap (x : Obj.t) =
-  Obj.(
-    let is_unboxed obj =
-      is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
-    in
-    if is_unboxed x
-    then Unboxed x
-    else
-      let t = tag x in
-      if is_valid_tag t
-      then
-        let f = if t = double_array_tag then !!! double_field else field in
-        Boxed (t, size x, f x)
-      else Invalid t
-    )
-
-let generic_show x =
-  let x = Obj.repr x in
-  let b = Buffer.create 1024 in
-  let rec inner o =
-    match wrap o with
-    | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
-    | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
-    | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
-    | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
-    | Boxed  (t, l, f) ->
-        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-        for i = 0 to l - 1 do (inner (f i); if i<l-1 then Buffer.add_string b " ") done;
-        Buffer.add_string b ">"
-  in
-  inner x;
-  Buffer.contents b
-;;
+let (!!!) = Obj.magic;;
 
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list
@@ -704,6 +697,11 @@ let report_counters () =
 
 let (===) ?loc (x: _ injected) y (env, subst, constr) =
   (* we should always unify two injected types *)
+  (* mylog (fun () ->
+            printfn "unify";
+            printfn "\t%s" (generic_show x);
+            printfn "\t%s" (generic_show y);
+  ); *)
   incr unif_counter;
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
@@ -1033,7 +1031,7 @@ let unitrace ?loc shower x y = fun st ->
   printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
   let ans = (x === y) st in
-  if ans = Nil then printfn "  -"
+  if ans == MKStream.nil then printfn "  -"
   else  printfn "  +";
   ans
 

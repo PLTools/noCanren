@@ -57,7 +57,7 @@ EXTEND
       let body = <:expr<
 (*        let () = Printf.printf "create inc in fresh ==== (%s)\n%!"
                     $str:__herr0$ in *)
-        delay2 (fun () ->
+        delay (fun () ->
       (*    let () = Printf.printf "inc in fresh forced: (%s)\n%!"
                     $str:__herr0$ in *)
           $body$) >>

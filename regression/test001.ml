@@ -32,10 +32,10 @@ let rec appendo a b ab =
   (* trace "appendo" @@ *)
   let (===) = unitrace show_logic_list in
   conde
-    [ project3 "appendo simple (a,b,ab): " show_logic_list a b ab &&&
+    [ (*project3 "appendo simple (a,b,ab): " show_logic_list a b ab &&& *)
       ((a === nil ()) &&& (b === ab))
     ; Fresh.two (fun h t ->
-          project3 "appendo complex (a,b,ab): " show_logic_list a b ab &&&
+          (* project3 "appendo complex (a,b,ab): " show_logic_list a b ab &&& *)
           (a === h%t) &&&
           Fresh.one (fun ab' ->
               (h%ab' === ab) &&& (appendo t b ab')
@@ -48,19 +48,16 @@ let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list 
 let rec reverso a b =
   (* trace "reverso" @@ *)
   conde
-    [ (project1 ~msg:"reverso simple:" show_logic_list a) &&&
-      ((a === nil ()) &&& (b === nil ()))
-    ; Fresh.two (fun h t ->
-          (a === h%t) &&&
-          (Fresh.one (fun a' ->
-              (appendo a' !<h b) &&& (reverso t a')
-          ))
-      )
+    [ (fun st -> MKStream.bind ((===) a (nil ()) st) (b === nil ()))
+    ; fresh (h t a')
+        (a === h%t)
+        (appendo a' !<h b)
+        (reverso t a')
     ]
 
 
 let _ =
-  (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   )); *)
+  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
   (* run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
   run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
