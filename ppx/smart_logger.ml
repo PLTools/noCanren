@@ -232,8 +232,8 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       match reconstruct_args args with
       | Some (xs: string list) ->
           let pretty_names = StringLabels.concat ~sep:" " xs in
-          let msg2 = sprintf "create inc   in fresh === (%s)" pretty_names in
-          let msg3 = sprintf "inc in fresh forced === (%s)" pretty_names in
+          let msg2 = sprintf "create inc in fresh ==== (%s)" pretty_names in
+          let msg3 = sprintf "inc in fresh forced: (%s)" pretty_names in
           let ans =
             List.fold_right xs
               ~f:(fun ident acc ->

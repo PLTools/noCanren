@@ -68,7 +68,14 @@ let generic_show x =
 
 module OldList = List
 
-let log_enabled = false
+let log_enabled =
+  let ans = ref false in
+  Arg.parse
+    [("-v", Unit (fun () -> ans := true), "verbose mode")]
+    (fun s -> printfn "anon argument '%s'" s)
+    "usage msg";
+  !ans
+
 let mylog f = if log_enabled then f () else ignore (fun () -> f ())
 
 (*
@@ -198,14 +205,17 @@ module MKStream =
 
     type 'a t = Obj.t
 
+    let nil : _ t = !!!false
+    let is_nil s = (s = !!!false)
+
     let cur_inc = ref 0
 
     let inc (f: unit -> 'a t) : 'a t =
-      mylog (fun () -> printf "    Thunk created: ");
+      mylog (fun () -> printf "    thunk created ");
       incr cur_inc;
       let n = !cur_inc in
       let result = fun () ->
-        let () = mylog @@ fun () -> printfn "    forcing thunk: %d" n in
+        let () = mylog @@ fun () -> printfn "    forcing thunk %d" n in
         f ()
       in
       mylog (fun () -> printfn "%d" n);
@@ -213,13 +223,11 @@ module MKStream =
 
     let from_fun = inc
 
-    let nil : _ t = !!!(fun () -> !!!false)
-
     type wtf = Dummy of int*string | Single of Obj.t
     let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
 
     let single : 'a -> 'a t = fun x ->
-      mylog (fun () -> printfn "Single called");
+      (* mylog (fun () -> printfn "Single called"); *)
       Obj.repr @@ Obj.magic (Single !!!x)
     let choice a f =
       assert (closure_tag = tag@@repr f);
@@ -249,6 +257,7 @@ module MKStream =
     let () = ()
 
     let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
+      assert (closure_tag = tag @@ repr gs);
       case_inf fs
         ~f1:(fun () ->
               mylog (fun () -> printfn " mplus: 1st case");
@@ -296,7 +305,7 @@ module MKStream =
                 bind r g
               end)
         ~f3:(fun c ->
-              mylog (fun () -> printfn " bind: 2nd case");
+              mylog (fun () -> printfn " bind: 3rd case");
               (!!! g c) )
         ~f4:(fun c f ->
               mylog (fun () -> printfn " bind: 4th case");
@@ -1031,7 +1040,7 @@ let unitrace ?loc shower x y = fun st ->
   printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
   let ans = (x === y) st in
-  if ans == MKStream.nil then printfn "  -"
+  if MKStream.is_nil ans then printfn "  -"
   else  printfn "  +";
   ans
 
