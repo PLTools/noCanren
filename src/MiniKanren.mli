@@ -29,15 +29,15 @@ val mylog : (unit -> unit) -> unit
 module MKStream :
   sig
     (** Stream type *)
-    type 'a t
+    type t
 
-    val inc: (unit -> 'a t) -> 'a t
+    val inc: (unit -> t) -> t
     (* val inc2: (unit -> 'a -> 'b t) -> 'a -> 'b t
     val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t *)
-    val mplus : 'a t -> 'a t -> 'a t
+    val mplus : t -> t -> t
     (* val mplus_star : 'a t list -> 'a t *)
 
-    val bind: 'a t -> ('a -> 'b t) -> 'b t
+    val bind: t -> ('a ->  t) -> t
   end
 
 module Stream :
@@ -89,7 +89,7 @@ module State :
 
 (** Goal converts a state into a lazy stream of states *)
 type 'a goal' = State.t -> 'a
-type goal = State.t MKStream.t goal'
+type goal = MKStream.t goal'
 
 (** {3 Logical values and injections} *)
 
@@ -154,16 +154,16 @@ val (?|) : goal list -> goal
 (** [conde] is a synonym for [?|] *)
 val conde : goal list -> goal
 
-val my_mplus_star: goal list -> State.t -> State.t MKStream.t
+(* val my_mplus_star: goal list -> State.t -> MKStream.t *)
 
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a non-empty list of goals *)
 val (?&) : goal list -> goal
 
 val bind_star : goal list -> goal
 
-val bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t
+(* val bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t *)
 
-val bind_star_simple : State.t MKStream.t -> State.t MKStream.t
+(* val bind_star_simple : State.t MKStream.t -> State.t MKStream.t *)
 
 
 (** {2 Some predefined goals} *)
@@ -212,7 +212,7 @@ module Fresh :
     - [run (succ one) (fun q r -> q === !!5 ||| r === !!6) (fun qs rs -> ]{i the same as the above}[)]
  *)
 val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
-                      (('g Stream.t -> 'h -> 'e) * ('c -> 'h * 'g MKStream.t))) ->
+                      (('g Stream.t -> 'h -> 'e) * ('c -> 'h * MKStream.t))) ->
           'a -> 'd -> 'f
 
 (**

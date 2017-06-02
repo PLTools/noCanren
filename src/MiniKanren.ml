@@ -203,14 +203,14 @@ module MKStream =
       * (x,closure)   -- a value and continuation (pair has tag 0)
     *)
 
-    type 'a t = Obj.t
+    type t = Obj.t
 
-    let nil : _ t = !!!false
+    let nil : t = !!!false
     let is_nil s = (s = !!!false)
 
     let cur_inc = ref 0
 
-    let inc (f: unit -> 'a t) : 'a t =
+    let inc (f: unit -> t) : t =
       mylog (fun () -> printf "    thunk created ");
       incr cur_inc;
       let n = !cur_inc in
@@ -226,9 +226,10 @@ module MKStream =
     type wtf = Dummy of int*string | Single of Obj.t
     let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
 
-    let single : 'a -> 'a t = fun x ->
+    let single : 'a -> t = fun x ->
       (* mylog (fun () -> printfn "Single called"); *)
       Obj.repr @@ Obj.magic (Single !!!x)
+
     let choice a f =
       assert (closure_tag = tag@@repr f);
       let ans = Obj.repr @@ Obj.magic (a,f) in
@@ -253,12 +254,13 @@ module MKStream =
 
 
 
-    let step gs : Obj.t = Obj.magic gs @@ ()
-    let () = ()
-
-    let rec mplus : _ t -> _ t -> _ t  = fun fs gs ->
+    let step gs =
       assert (closure_tag = tag @@ repr gs);
-      case_inf fs
+      !!!gs ()
+
+    let rec mplus : t -> t -> t  = fun cinf (gs: t) ->
+      assert (closure_tag = tag @@ repr gs);
+      case_inf cinf
         ~f1:(fun () ->
               mylog (fun () -> printfn " mplus: 1st case");
               step gs)
@@ -266,33 +268,22 @@ module MKStream =
               mylog (fun () -> printfn " mplus: 2nd case");
               inc begin fun () ->
                 mylog (fun () -> printfn " forcing thunk created by 2nd case of mplus");
-                (* let r = (!!!gs: unit -> _) () in
-                mplus r fs *)
                 let r = step gs in
                 mplus r !!!f
               end)
         ~f3:(fun c ->
               mylog (fun () -> printfn " mplus: 3rd case");
-              choice c (fun () -> gs)
+              choice c gs
           )
         ~f4:(fun c ff ->
-              mylog (fun () -> printfn " mplus: 4th case ");
+              assert false
+              (* mylog (fun () -> printfn " mplus: 4th case "); *)
               (* choice a (inc @@ fun () -> mplus gs @@ f ()) *)
-              choice c (inc @@ fun () -> mplus gs @@ ff ())
+              choice c (inc @@ fun () -> mplus (step gs) !!!ff)
           )
 
-    (* let rec mplus_star : 'a t list -> 'a t = function
-    | [] -> failwith "wrong argument"
-    | [h] -> h
-    | h::tl -> mplus h (from_fun (fun () -> mplus_star tl)) *)
-
-    (* let show = function
-    | Nil -> "Nil"
-    | Thunk f -> sprintf "Thunk: %d" (2 * (Obj.magic f))
-    | _ -> "wtf" *)
-
-    let rec bind xs g =
-      case_inf xs
+    let rec bind cinf g =
+      case_inf cinf
         ~f1:(fun () ->
                 mylog (fun () -> printfn " bind: 1st case");
                 nil)
@@ -328,7 +319,7 @@ module Stream =
 
     let cons h t = Cons (h, t)
 
-    let rec of_mkstream : 'a MKStream.t -> 'a t = fun xs ->
+    let rec of_mkstream : MKStream.t -> 'a t = fun xs ->
       let rec helper xs =
         !!!MKStream.case_inf !!!xs
           ~f1:(fun () -> !!!Nil)
@@ -679,7 +670,7 @@ module State =
   end
 
 type 'a goal' = State.t -> 'a
-type goal = State.t MKStream.t goal'
+type goal = MKStream.t goal'
 
 let call_fresh f = fun (env, subst, constr) ->
   let x, env' = Env.fresh env in
@@ -817,7 +808,7 @@ let rec (?&) = function
 
 let bind_star = (?&)
 
-let rec bind_star2 : State.t MKStream.t -> goal list -> State.t MKStream.t = fun s -> function
+let rec bind_star2 : MKStream.t -> goal list -> MKStream.t = fun s -> function
 | [] -> s
 | x::xs ->
     (* printfn "2nd case of bind* 2"; *)
