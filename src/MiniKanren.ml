@@ -702,7 +702,7 @@ let (===) ?loc (x: _ injected) y (env, subst, constr) =
             printfn "\t%s" (generic_show x);
             printfn "\t%s" (generic_show y);
   ); *)
-  incr unif_counter;
+  (* incr unif_counter; *)
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -732,7 +732,7 @@ let (===) ?loc (x: _ injected) y (env, subst, constr) =
   with Occurs_check -> MKStream.nil
 
 let (=/=) x y ((env, subst, constr) as st) =
-  incr diseq_counter;
+  (* incr diseq_counter; *)
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
     let prefix = List.split (List.map Subst.(fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix) in
@@ -1027,7 +1027,7 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
   success st
 
 let unitrace ?loc shower x y = fun st ->
-  incr logged_unif_counter;
+  (* incr logged_unif_counter; *)
   printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
   let ans = (x === y) st in
@@ -1036,7 +1036,7 @@ let unitrace ?loc shower x y = fun st ->
   ans
 
 let diseqtrace shower x y = fun st ->
-  incr logged_diseq_counter;
+  (* incr logged_diseq_counter; *)
   printf "%d: (=/=) '%s' and '%s'\n%!" !logged_diseq_counter
     (shower (helper_of_state st) x)
     (shower (helper_of_state st) y);
