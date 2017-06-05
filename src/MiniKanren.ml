@@ -276,8 +276,7 @@ module MKStream =
               choice c gs
           )
         ~f4:(fun c ff ->
-              assert false
-              (* mylog (fun () -> printfn " mplus: 4th case "); *)
+              mylog (fun () -> printfn " mplus: 4th case ");
               (* choice a (inc @@ fun () -> mplus gs @@ f ()) *)
               choice c (inc @@ fun () -> mplus (step gs) !!!ff)
           )
@@ -702,7 +701,7 @@ let (===) ?loc (x: _ injected) y (env, subst, constr) =
             printfn "\t%s" (generic_show x);
             printfn "\t%s" (generic_show y);
   ); *)
-  incr unif_counter;
+  (* incr unif_counter; *)
   try
     let prefix, subst' = Subst.unify env x y (Some subst) in
     begin match subst' with
@@ -732,7 +731,7 @@ let (===) ?loc (x: _ injected) y (env, subst, constr) =
   with Occurs_check -> MKStream.nil
 
 let (=/=) x y ((env, subst, constr) as st) =
-  incr diseq_counter;
+  (* incr diseq_counter; *)
   let normalize_store prefix constr =
     let subst  = Subst.of_list prefix in
     let prefix = List.split (List.map Subst.(fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix) in
