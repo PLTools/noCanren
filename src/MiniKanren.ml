@@ -65,7 +65,6 @@ let generic_show x =
   Buffer.contents b
 ;;
 
-
 module OldList = List
 
 let log_enabled =
