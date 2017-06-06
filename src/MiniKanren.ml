@@ -20,6 +20,8 @@ open Printf
 let printfn fmt = kprintf (printf "%s\n%!") fmt
 
 module OldList = List
+let log_enabled = false
+let mylog f = if log_enabled then f () else ignore (fun () -> f ())
 
 (* miniKanren-like stream, more generator than a stream *)
 module MKStream =
