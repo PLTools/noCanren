@@ -23,10 +23,15 @@ open Tester
 
 let show_nat_list = GT.(show List.ground @@ show Nat.ground)
 let show_nat      = GT.(show Nat.ground)
+let reify_nat_list = fun h t -> GT.(show List.logic @@ show Nat.logic) @@ List.reify Nat.reify h t
+let uni_nat_list = unitrace reify_nat_list
+let reify_nat = (fun h t -> GT.(show Nat.logic) @@ Nat.reify h t)
+let uni_nat = unitrace reify_nat
 
 (* Relational minimum/maximum (for nats only) *)
 let minmaxo a b min max =
   let open Nat in
+  (* let (===) = uni_nat in *)
   conde
     [ (min === a) &&& (max === b) &&& (a <= b)
     ; (max === a) &&& (min === b) &&& (a >  b)
@@ -35,7 +40,12 @@ let minmaxo a b min max =
 (* [l] is a (non-empty) list, [s] is its smallest element,
    [l'] --- all other elements
 *)
-let rec smallesto l s l' = conde
+let rec smallesto l s l' =
+  (* let (===) = uni_nat_list in *)
+  (* (project1 ~msg:"smallesto" reify_nat_list l) &&&
+  (project1 ~msg:"         " reify_nat s) &&&
+  (project1 ~msg:"         " reify_nat_list l') &&& *)
+  conde
   [ (l === !< s) &&& (l' === nil())
   ; fresh (h t s' t' max)
       (l' === max % t')
@@ -46,6 +56,8 @@ let rec smallesto l s l' = conde
 
 (* Relational sort *)
 let rec sorto x y =
+  (* let (===) = uni_nat_list in *)
+  (* (project2 ~msg:"sorto" reify_nat_list x y) &&& *)
   conde
     [ (* either both lists are empty *)
       (x === nil()) &&& (y === nil())
@@ -141,4 +153,5 @@ let _ =
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3])
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3]);
+  ()

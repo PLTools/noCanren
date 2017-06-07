@@ -22,7 +22,7 @@ let printfn fmt = kprintf (printf "%s\n%!") fmt
 let list_filter_map ~f xs =
   let rec helper acc = function
   | [] -> List.rev acc
-  | x::xs -> begin 
+  | x::xs -> begin
       match f x with None -> helper acc xs | Some y -> helper (y::acc) xs
     end
   in
@@ -41,6 +41,7 @@ module MKStream =
               | Single of 'a
               | Compoz of 'a * (unit -> 'a t)
 
+    let is_nil x = x=Nil
     let from_fun (f: unit -> 'a t) : 'a t = Thunk f
     let inc = from_fun
 
@@ -356,9 +357,9 @@ module Env :
 
     let fresh ?name ~scope e =
       let v = make_inner_logic ~envt:e.token ~scope e.next in
-      printf "new fresh var %swith index=%d\n"
+      (* printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
-        e.next;
+        e.next; *)
       e.next <- 1+e.next;
       (!!!v, e)
 
@@ -366,8 +367,8 @@ module Env :
       let index = 0 in (* dummy index *)
       let envt  = 0 in (* dummy env token *)
       let scope = 0 in (* dummy scope *)
-      let v = make_inner_logic ~envt ~scope index in
-      Obj.tag (!!! v), Obj.size (!!! v)
+      let v = Obj.repr @@ make_inner_logic ~envt ~scope index in
+      Obj.(tag v), Obj.(size v)
 
     let var {token=env_token;_} x =
       (* printfn " checking for var a%! '%s'" (generic_show x); *)
@@ -375,10 +376,10 @@ module Env :
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
-         (let q = Obj.field t 0 in
+         (let q = Obj.repr (!!!x: inner_logic).token_mk in
           (Obj.is_block q) && q == (!!!global_token)
          )
-      then (let q = Obj.field t 1 in
+      then (let q = Obj.repr (!!!x: inner_logic).token_env  in
             (* let () = printfn " Obj.is_int%! '%s' = %b" (generic_show q) (Obj.is_int q) in
             let () = printfn " env_token is %!'%s'" (generic_show env_token) in
             let () = printfn " q == (!!!env_token) = %!'%b'" (q == (!!!env_token)) in *)
@@ -387,6 +388,11 @@ module Env :
             else failwith "You hacked everything and pass logic variables into wrong environment"
             )
       else None
+
+    let var env x =
+      let ans = var env x in
+      (* printfn "it says %s" (match ans with Some n -> sprintf "yes, %d" n | None  -> "no"); *)
+      ans
 
     let is_var env v = None <> var env v
 
@@ -451,7 +457,9 @@ module Subst :
 
     let subst_lookup_exn ui (u: inner_logic) map : content =
       if is_inner_unbound u
-      then M.find !!!ui map
+      then
+        (* let () = printfn "inner is unbound" in  *)
+        M.find !!!ui map
       else !!!(u.subst)
 
     let rec walk : Env.t -> 'a -> t -> 'a = fun env var subst ->
@@ -479,10 +487,12 @@ module Subst :
             inner 0
 
     let subst_add (m,scope) xi (x: inner_logic) xi_and_term =
-      (* printfn " subst_add to %!  '%s'" (generic_show x);
-      printfn "            what: '%s'" (generic_show xi_and_term); *)
-      if scope_eq scope (scope_of_inner x)
-      then  let () = x.subst <- Obj.repr xi_and_term in
+      (* printfn " subst_add to %!  '%s'\n" (generic_show x);
+      printfn "            what: '%s'\n" (generic_show xi_and_term); *)
+      (* if scope_eq scope (scope_of_inner x) *)
+      if false
+      then  (* let () = printfn "before x.subst was '%s'" (generic_show x.subst) in *)
+            let () = x.subst <- Obj.repr xi_and_term in
             (* printfn " variable adjusted by%! '%s'" (generic_show xi_and_term); *)
             m
       else  M.add xi xi_and_term m
@@ -496,14 +506,20 @@ module Subst :
           ((xi, cnt)::delta, Some new_m)
       in
       let rec unify x y (delta, subst_map) =
+        (* printfn "file %s" __FILE__; *)
         match subst_map with
         | None -> delta, None
         | (Some subst) as s ->
             let x, y = walk env x subst, walk env y subst in
+            (* printfn "walk finished in %s:%d" __FILE__ __LINE__; *)
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
-            | Some xi, _       -> extend xi x y delta subst
-            | _      , Some yi -> extend yi y x delta subst
+            | Some xi, _       ->
+                (* printfn "going to extend %s" __FILE__; *)
+                extend xi x y delta subst
+            | _      , Some yi ->
+                (* printfn "going to extend %s" __FILE__; *)
+                extend yi y x delta subst
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -823,6 +839,7 @@ let report_unif_counter () = !unif_counter
 let (===) (x: _ injected) y (env, subst, constr, scope) =
   (* we should always unify two injected types *)
   (* incr unif_counter; *)
+  (* printfn "(===) '%s' and '%s'" (generic_show x) (generic_show y); *)
   try
     let prefix, subst' = Subst.unify env x y scope (Some subst) in
     begin match subst' with
@@ -1063,33 +1080,10 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
   success st
 
 let unitrace shower x y = fun st ->
-  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (x === y) st
-
-
-
-
-
-let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal =
-  fun shower q ((env,subst,_,_) as st) ->
-    printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine env subst !!!q);
-    success st
-
-(* let project2 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> goal = fun shower q r st ->
-  printf "%s '%s' and '%s'\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
-                                    (shower (helper_of_state st) @@ Obj.magic @@ refine st r);
-  success st
-
-let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> 'v -> goal = fun shower q r s st ->
-  printf "%s '%s' and '%s' and '%s'\n%!" msg
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st r)
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
-  success st *)
-
-let unitrace shower x y = fun st ->
-  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (x === y) st
+  printf "unify '%s' and '%s' " (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  let ans = (x === y) st in
+  let () = if MKStream.is_nil ans then printfn "failed" else printfn "+" in
+  ans
 
 (* ************************************************************************** *)
 module type T1 = sig
