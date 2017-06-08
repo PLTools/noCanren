@@ -42,7 +42,7 @@ clean: clean_tests
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-REGRES_CASES += 123wtf _appendo
+REGRES_CASES += #123wtf _appendo
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte

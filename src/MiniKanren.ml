@@ -534,6 +534,7 @@ module Env :
 
     let fresh ?name ~scope e =
       let v = make_inner_logic ~envt:e.token ~scope e.next in
+      let v = {v with subst = unbound} in
       printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
         e.next;
@@ -982,10 +983,11 @@ module State =
     let env   (env, _, _, _) = env
     let show  (env, subst, constr, scp) =
       sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show constr) scp
-    let new_var ~scope st =
-      let (x,_) = Env.fresh ~scope @@ env st in
+    let new_var (e,_,_,scope) =
+      let (x,_) = Env.fresh ~scope e in
       let i = (!!!x : inner_logic).index in
       (x,i)
+    let incr_scope (e,subs,cs,scp) = (e,subs,cs,scp+1)
   end
 
 type 'a goal' = State.t -> 'a
@@ -1012,11 +1014,11 @@ let report_counters () =
 
 let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
   (* we should always unify two injected types *)
-  (* mylog (fun () ->
+  mylog (fun () ->
             printfn "unify";
             printfn "\t%s" (generic_show x);
             printfn "\t%s" (generic_show y);
-  ); *)
+  );
   (* incr unif_counter; *)
   try
     let prefix, subst' = Subst.unify env x y scope (Some subst) in
@@ -1282,8 +1284,6 @@ let diseqtrace shower x y = fun st ->
   (x =/= y) st
 
 
-
-
 let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal =
   fun shower q ((env,subst,_,_) as st) ->
     printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine env subst !!!q);
@@ -1301,9 +1301,6 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
     (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
   success st *)
 
-let unitrace shower x y = fun st ->
-  printf "unify '%s' and '%s'\n%!" (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (x === y) st
 
 (* ************************************************************************** *)
 module type T1 = sig
