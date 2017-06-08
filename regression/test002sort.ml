@@ -23,9 +23,12 @@ open Tester
 
 let show_nat_list = GT.(show List.ground @@ show Nat.ground)
 let show_nat      = GT.(show Nat.ground)
+let uninat ?loc = unitrace ?loc (fun h t -> GT.(show Nat.logic) @@ Nat.reify h t)
+let uninatlist ?loc = unitrace ?loc (fun h t -> GT.(show List.logic @@ show Nat.logic) @@ List.reify Nat.reify h t)
 
 (* Relational minimum/maximum (for nats only) *)
 let minmaxo a b min max =
+  let (===) ?loc = uninat ?loc in
   let open Nat in
   conde
     [ (min === a) &&& (max === b) &&& (a <= b)
@@ -35,14 +38,16 @@ let minmaxo a b min max =
 (* [l] is a (non-empty) list, [s] is its smallest element,
    [l'] --- all other elements
 *)
-let rec smallesto l s l' = conde
-  [ (l === !< s) &&& (l' === nil())
-  ; fresh (h t s' t' max)
-      (l' === max % t')
-      (l === h % t)
-      (minmaxo h s' s max)
-      (smallesto t s' t')
-  ]
+let rec smallesto l s l' =
+  let (===) ?loc = uninatlist ?loc in
+  conde
+    [ (l === !< s) &&& (l' === nil())
+    ; fresh (h t s' t' max)
+        (l' === max % t')
+        (l === h % t)
+        (minmaxo h s' s max)
+        (smallesto t s' t')
+    ]
 
 (* Relational sort *)
 let rec sorto x y =
@@ -57,7 +62,7 @@ let rec sorto x y =
         (sorto xs xs')       (* 1 *)
         (smallesto x s xs)   (* 2 *)
     ]
-
+(* 
 let _ =
   run four  (fun q1 q2 q3 p -> sorto (q1 % (q2 % (q3 % nil ()))) p)
             (fun _  _  _  p ->
@@ -70,7 +75,7 @@ let _ =
                   GT.(show List.ground (show Nat.ground) rr#prj)
                 )
               )
-            )
+            ) *)
 
 (* Making regular sorting from relational one *)
 let sort l =
@@ -102,11 +107,11 @@ let perm' l =
 let _ =
   (* Sorting: *)
 
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]);
+  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []);
+  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]); *)
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [2; 1]);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [3; 2; 1]);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [4; 3; 2; 1]);
+  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [3; 2; 1]);
+  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [4; 3; 2; 1]); *)
 
   (* Alas, this one is too slow:
 
@@ -138,7 +143,9 @@ let _ =
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
 
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
+
+  (* Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3])
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3]); *)
+  ()

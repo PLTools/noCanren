@@ -80,7 +80,7 @@ module OldList = List
 let log_enabled =
   let ans = ref false in
   Arg.parse
-    [("-v", Unit (fun () -> ans := true), "verbose mode")]
+    [("-v", Arg.Unit (fun () -> ans := true), "verbose mode")]
     (fun s -> printfn "anon argument '%s'" s)
     "usage msg";
   !ans
@@ -393,7 +393,7 @@ module Stream =
   end
 
 
-let (!!!) = Obj.magic ;;
+let (!!!) = Obj.magic;;
 
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list
@@ -485,7 +485,7 @@ end;;
 
 (* Scope there are just ints but in faster-MK they use reference equality *)
 type scope_t = int
-let non_local_scope : scope_t = -8
+let non_local_scope : scope_t = -6
 
 let new_scope : unit -> scope_t =
   let scope = ref 0 in
@@ -494,7 +494,7 @@ let new_scope : unit -> scope_t =
 (* Global token will not be exported outside and will be used to detect the value
  * was actually created by us *)
 type token_mk = int list
-let global_token: token_mk = [8];;
+let global_token: token_mk = [-8];;
 
 type inner_logic =
   { token_mk: token_mk; token_env: token_env; index: int
@@ -503,7 +503,9 @@ type inner_logic =
   ; constraints: Obj.t list
   }
 
-let unbound : Obj.t = Obj.repr [13]
+let unbound : Obj.t =
+  Obj.repr "unbound"
+  (* Obj.repr [-13] *)
 
 let make_inner_logic ~envt ~scope index = { token_env = envt; token_mk = global_token
   ; index; subst = unbound; scope; constraints = [] }
@@ -522,9 +524,8 @@ module Env :
     val is_var : t -> 'a -> bool
   end =
   struct
-    type t = { token : token_env;
-               mutable next: int;
-               (* mutable reifiers: Obj.t MultiIntMap.t; *)
+    type t =  { token : token_env;
+                mutable next: int;
               }
 
     let last_token : token_env ref = ref 11
@@ -533,8 +534,8 @@ module Env :
       { token= !last_token; next=10 }
 
     let fresh ?name ~scope e =
-      let v = make_inner_logic ~envt:e.token ~scope e.next in
-      let v = {v with subst = unbound} in
+      let v = !!!(make_inner_logic ~envt:e.token ~scope e.next) in
+      let v = {!!!v with subst = unbound} in
       printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
         e.next;
@@ -548,41 +549,53 @@ module Env :
       let v = make_inner_logic ~envt ~scope index in
       Obj.tag (!!! v), Obj.size (!!! v)
 
-    let var {token=env_token;_} x =
-      (* printfn " checking for var a%! '%s'" (generic_show x); *)
+    let var env x =
+      (* printfn " checking for var a%! '%s'" (generic_show ~maxdepth:10 x); *)
       (* There we detect if x is a logic variable and then that it belongs to current env *)
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
-         (let q = Obj.field t 0 in
-          (Obj.is_block q) && q == (!!!global_token)
+         (let token = (!!!x : inner_logic).token_mk in
+          (Obj.is_block !!!token) && token == (!!!global_token)
          )
-      then (let q = Obj.field t 1 in
+      then (let q = (!!!x : inner_logic).token_env in
+            printfn "%s %d" __FILE__ __LINE__;
             (* let () = printfn " Obj.is_int%! '%s' = %b" (generic_show q) (Obj.is_int q) in
             let () = printfn " env_token is %!'%s'" (generic_show env_token) in
             let () = printfn " q == (!!!env_token) = %!'%b'" (q == (!!!env_token)) in *)
-            if (Obj.is_int q) && q == (!!!env_token)
+            if (Obj.is_int !!!q) && q == (!!!env.token)
             then Some (!!!x : inner_logic).index
             else failwith "You hacked everything and pass logic variables into wrong environment"
             )
       else None
 
+    let var env x =
+      let ans = var env x in
+      (* printfn "  is says %s" (match ans with Some n -> sprintf "yes %d" n | None  -> "no"); *)
+      ans
+
     let is_var env v = None <> var env v
 
     (* Some tests for to check environment self-correctness *)
-
-    (* let () =
+(*
+    let () =
       let scope = new_scope () in
       let e1 = empty () in
       let e2 = empty () in
       assert (e1 != e2);
       assert (e1.token != e2.token);
       let (q1,e11) = fresh ~scope e1 in
+      let (q2,___) = fresh ~scope e11 in
       assert (is_var e1  q1);
       assert (is_var e11 q1);
+      printfn "q1 is '%s'" (generic_show q1);
+      printfn "q2 is '%s'" (generic_show q2);
+      printfn "updating q1";
+      (!!!q1 : inner_logic).subst <- Obj.repr "asdf";
+      printfn "q1 is '%s'" (generic_show q1);
+      printfn "q2 is '%s'" (generic_show q2);
       assert (is_var e2  q1);
       () *)
-
   end
 
 module Subst :
@@ -658,11 +671,11 @@ module Subst :
             inner 0
 
     let subst_add (m,scope) xi (x: inner_logic) xi_and_term =
-      (* printfn " subst_add to %!  '%s'" (generic_show x);
-      printfn "            what: '%s'" (generic_show xi_and_term); *)
+      printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
+      printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term);
       if scope_eq scope (scope_of_inner x)
-      then  let () = x.subst <- Obj.repr xi_and_term in
-            (* printfn " variable adjusted by%! '%s'" (generic_show xi_and_term); *)
+      then  let () = x.subst <- Obj.repr (*"wtf" *)  xi_and_term in
+            printfn " variable adjusted by\n '%s'" (generic_show ~maxdepth:20 xi_and_term);
             m
       else  M.add xi xi_and_term m
 
@@ -671,7 +684,10 @@ module Subst :
         if occurs env xi term subst_map then raise Occurs_check
         else
           let cnt = make_content x term in
+          assert (Env.var env x <> Env.var env term);
           let new_m = subst_add (subst_map, scope) xi x cnt in
+
+          let () = assert (Env.is_var env x) in
           ((xi, cnt)::delta, Some new_m)
       in
       let rec unify x y (delta, subst_map) =
@@ -681,9 +697,10 @@ module Subst :
             let x, y = walk env x subst, walk env y subst in
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
-            | Some xi, _       -> extend xi x y delta subst
-            | _      , Some yi -> extend yi y x delta subst
+            | Some xi, _       -> printfn "B"; extend xi x y delta subst
+            | _      , Some yi -> printfn "C"; extend yi y x delta subst
             | _ ->
+                printfn "D";
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
                  | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
@@ -986,6 +1003,7 @@ module State =
     let new_var (e,_,_,scope) =
       let (x,_) = Env.fresh ~scope e in
       let i = (!!!x : inner_logic).index in
+      let x = !!!{x with subst = unbound} in
       (x,i)
     let incr_scope (e,subs,cs,scp) = (e,subs,cs,scp+1)
   end
