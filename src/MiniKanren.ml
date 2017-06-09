@@ -1332,25 +1332,6 @@ let diseqtrace shower x y = fun st ->
     (shower (helper_of_state st) y);
   (x =/= y) st
 
-
-let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal =
-  fun shower q ((env,subst,_,_) as st) ->
-    printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine env subst !!!q);
-    success st
-
-(* let project2 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> goal = fun shower q r st ->
-  printf "%s '%s' and '%s'\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
-                                    (shower (helper_of_state st) @@ Obj.magic @@ refine st r);
-  success st
-
-let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v -> 'v -> goal = fun shower q r s st ->
-  printf "%s '%s' and '%s' and '%s'\n%!" msg
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st q)
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st r)
-    (shower (helper_of_state st) @@ Obj.magic @@ refine st s);
-  success st *)
-
-
 (* ************************************************************************** *)
 module type T1 = sig
   type 'a t

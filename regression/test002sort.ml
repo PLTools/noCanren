@@ -21,10 +21,16 @@ open Printf
 open MiniKanren
 open Tester
 
-let show_nat_list = GT.(show List.ground @@ show Nat.ground)
-let show_nat      = GT.(show Nat.ground)
-let uninat ?loc = unitrace ?loc (fun h t -> GT.(show Nat.logic) @@ Nat.reify h t)
-let uninatlist ?loc = unitrace ?loc (fun h t -> GT.(show List.logic @@ show Nat.logic) @@ List.reify Nat.reify h t)
+(* let show_nat_list = GT.(show List.ground @@ show Nat.ground) *)
+(* let show_nat      = GT.(show Nat.ground) *)
+let reify_nat = fun h t -> GT.(show Nat.logic) @@ Nat.reify h t
+let uninat ?loc = unitrace ?loc reify_nat
+
+let reify_natlist = fun h t ->
+  (* printfn "t is '%s'" (generic_show t); *)
+  GT.(show List.logic @@ show Nat.logic) @@
+    List.reify Nat.reify h t
+let uninatlist ?loc = unitrace ?loc reify_natlist
 
 (* Relational minimum/maximum (for nats only) *)
 let minmaxo a b min max =
@@ -40,6 +46,9 @@ let minmaxo a b min max =
 *)
 let rec smallesto l s l' =
   let (===) ?loc = uninatlist ?loc in
+  (* project1 ~msg:"smallesto" reify_natlist l  &&&
+  project1 ~msg:"smallesto" reify_nat s &&&
+  project1 ~msg:"smallesto" reify_natlist l' &&& *)
   conde
     [ (l === !< s) &&& (l' === nil())
     ; fresh (h t s' t' max)
@@ -52,6 +61,7 @@ let rec smallesto l s l' =
 (* Relational sort *)
 let rec sorto x y =
   let (===) ?loc = uninatlist ?loc in
+  project1 ~msg:"sorto: x = " reify_natlist x &&&
   conde
     [ (* either both lists are empty *)
       (x === nil()) &&& (y === nil())

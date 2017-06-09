@@ -18,6 +18,8 @@
 
 module OldList : (module type of List)
 
+val generic_show: ?maxdepth:int -> 'a -> string
+
 val printfn : ('a, unit, string, unit) format4 -> 'a
 val mylog : (unit -> unit) -> unit
 
@@ -82,7 +84,7 @@ module State :
     type t
 
     (** Printing helper *)
-    val show : t -> string
+    (* val show : t -> string *)
 
     val new_var : t -> ('a, 'b) injected * int
     val incr_scope : t -> t

@@ -15,13 +15,13 @@ true: short_paths
 #<regression/test003.ml>: use_pa_minikanren
 <regression/test002sort.*> or <regression/test123wtf.*> or <regression/test_appendo.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_ocanren_all.native), package(GT)
 
+<regression/test002sort.*>: package(GT,GT.syntax.all,logger.syntax), syntax(camlp5o), use_pa_minikanren
 
-
-#<regression/test0*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
+<regression/test000.*>: package(GT,GT.syntax.all,logger.syntax), syntax(camlp5o), use_pa_minikanren
 #<regression/test004.ml> or <regression/test009.ml> or <regression/test005.ml> or <regression/test000.ml> : use_pa_minkanren
 
-<regression/test0*.ml> : syntax(camlp5o), package(logger.syntax)
-<regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
+#<regression/test0*.ml> : syntax(camlp5o), package(logger.syntax)
+#<regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
 
 ####################################################################
 # JSOO toplevel related stuff
