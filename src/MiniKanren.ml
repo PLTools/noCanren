@@ -602,34 +602,39 @@ module Env :
       () *)
   end
 
+
 module Subst :
   sig
     type t
 
     val empty   : t
 
-    type content = { lvar: Obj.t; new_val: Obj.t }
-    val make_content : 'a -> 'b  -> content
+    type content = { lvar: inner_logic; new_val: Obj.t }
+    val make_content : inner_logic -> 'b  -> content
 
-    val of_list : (int * content) list -> t
+    val of_list : content list -> t
 
     (* splits substitution into two lists of the same length. 1st contains logic vars,
      * second values to substitute *)
-    val split   : t -> Obj.t list * Obj.t list
+    val split   : t -> inner_logic list * Obj.t list
     val walk    : Env.t -> 'a -> t -> 'a
-    val unify   : Env.t -> 'a -> 'a -> scope_t -> t option -> (int * content) list * t option
+    val unify   : Env.t -> 'a -> 'a -> scope_t -> t option -> content list * t option
     val show    : t -> string
-  end =
-  struct
+  end = struct
+
+    (* module InnerLogicKey = struct
+      type t = inner_logic
+      let compare : t -> t -> int = (compare: int -> int -> int)
+    end *)
     module M = Map.Make (Int)
 
     (* map from var indicies to tuples of (actual vars, value) *)
-    type content = { lvar: Obj.t; new_val: Obj.t }
+    type content = { lvar: inner_logic; new_val: Obj.t }
     type t = content M.t
 
     let new_val {new_val=x;_} = Obj.obj x
-    let lvar    {lvar=v;_}    = Obj.obj v
-    let make_content a b = { lvar=Obj.repr a; new_val=Obj.repr b }
+    let lvar    {lvar=v;_}    = v
+    let make_content lvar b = { lvar; new_val=Obj.repr b }
 
     let show m =
       let b = Buffer.create 40 in
@@ -640,15 +645,18 @@ module Subst :
 
     let empty = M.empty
 
-    let of_list ts = List.fold_left (fun s (i, cnt) -> M.add i cnt s) M.empty ts
+    let of_list ts = List.fold_left (fun s cnt -> M.add cnt.lvar.index cnt s) M.empty ts
 
     let split s =
       M.fold (fun _ {lvar;new_val} (xs, ts) -> (lvar::xs, new_val::ts)) s ([], [])
 
     let subst_lookup_exn ui (u: inner_logic) map : content =
-      if is_inner_unbound u
+      match u.subst with
+      | Some t -> {lvar=u; new_val=t}
+      | None   ->  M.find !!!ui map
+      (* if is_inner_unbound u
       then M.find !!!ui map
-      else !!!(u.subst)
+      else !!!(u.subst) *)
 
     let rec walk : Env.t -> 'a -> t -> 'a = fun env var subst ->
       match Env.var env !!!var with
@@ -674,18 +682,18 @@ module Subst :
             in
             inner 0
 
-    let subst_add (m,scope) xi (x: inner_logic) xi_and_term =
+    let subst_add (m,scope) xi (x: inner_logic) (x_and_term: content) =
       (* printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
       printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term); *)
       if scope_eq scope (scope_of_inner x)
+      (* if false *)
       then
-        let () = subst_inner_term x (Obj.repr xi_and_term) in
+        let () = subst_inner_term x x_and_term.new_val in
         (* let () = printfn " variable adjusted by" in
-        let () = printfn "\t%s" (generic_show ~maxdepth:10 @@ Obj.field !!!xi_and_term 0) in
-        let () = printfn "\t%s" (generic_show @@ Obj.field !!!xi_and_term 1) in *)
+        let () = printfn "\t%s" (generic_show x_and_term.new_val) in *)
         printfn "in-place substitution to var %d" xi;
         m
-      else  M.add xi xi_and_term m
+      else  M.add xi x_and_term m
 
     let unify env x y scope subst =
       let extend xi x term delta subst_map =
@@ -696,7 +704,7 @@ module Subst :
           let new_m = subst_add (subst_map, scope) xi x cnt in
 
           let () = assert (Env.is_var env x) in
-          ((xi, cnt)::delta, Some new_m)
+          (cnt::delta, Some new_m)
       in
       let rec unify x y (delta, subst_map) =
         match subst_map with
@@ -738,6 +746,7 @@ module Subst :
   end
 
 let rec refine : Env.t -> Subst.t -> _ -> Obj.t -> Obj.t = fun env subst do_diseq x ->
+  printfn "refining %s" (generic_show ~maxdepth:10 x);
   let rec walk' forbidden term =
     let var = Subst.walk env term subst in
     match Env.var env var with
@@ -784,23 +793,23 @@ module type CONSTRAINTS = sig
    *)
   val refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list
 
-  val extend : prefix:(int * Subst.content) list -> Env.t -> t -> t
+  val extend : prefix:Subst.content list -> Env.t -> t -> t
 
-  val check  : prefix:(int * Subst.content) list -> Env.t -> Subst.t option -> t -> t
+  val check  : prefix:Subst.content list -> Env.t -> Subst.t option -> t -> t
 end
 
 module FastConstraints : CONSTRAINTS =
 struct
-  (* We store constraints as associative lists where first element of pair is a variable index *)
-  type single_constraint = (int * Subst.content) list
+  (* We store constraints as associative lists from inner_logic to term *)
+  type single_constraint = Subst.content list
   type t = single_constraint list
 
   let empty = []
   let bprintf_single b cs =
     let rec helper = function
     | [] -> ()
-    | (n,x) :: tl ->
-          bprintf b "%d -> %s;" n (generic_show x.Subst.new_val);
+    | c :: tl ->
+          bprintf b "%d -> %s;" (!!!c.Subst.lvar : inner_logic).index (generic_show c.Subst.new_val);
           helper tl
     in
     helper cs
@@ -821,12 +830,12 @@ struct
     helper cstore;
     Buffer.contents b
 
-  let split_and_unify ~prefix env subst =
+  let split_and_unify ~(prefix:single_constraint) env subst =
     (* There we can save on memory allocations if we will
       do incremental unification of the list *)
     let open Subst in
     let vs,ts = List.split @@
-      List.map (fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix
+      List.map (fun {lvar;new_val} -> (lvar, new_val)) prefix
     in
     try  Subst.unify env !!!vs !!!ts non_local_scope subst
     with Occurs_check -> [],None
@@ -867,25 +876,26 @@ struct
      **)
     let rec helper acc = function
     | [] -> List.rev acc
-    | (_n,cont)::tl -> begin
-        match Subst.(unify env cont.lvar cont.new_val non_local_scope (Some subst)) with
+    | cont::tl -> begin
+        match Subst.(unify env !!!(cont.lvar) !!!cont.new_val non_local_scope (Some subst)) with
         | _,None -> raise ReallyNotEqual
         | [],Some _ -> (* terms will be disequal by some other reason *)
                         helper acc tl
         | prefix,Some _ -> (* this constraint worth printing *)
-                            helper ((maybe_swap (_n,cont)) :: acc) tl
+                            helper ((maybe_swap cont) :: acc) tl
       end
     in
     try helper [] cs
     with ReallyNotEqual -> []
 
   let refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list = fun env base_subst cs term ->
+    printfn "going to refine constraints for a variable '%s'" (generic_show term);
     let maybe_swap =
       match Env.var env term with
       | None   -> (fun p -> p)
-      | Some n -> (fun ((_,cnt) as p) ->
-                    if cnt.Subst.new_val = term then (n, { lvar = term; new_val = cnt.Subst.lvar})
-                    else p)
+      | Some n -> (fun cnt ->
+                    if cnt.Subst.new_val = term then { lvar = !!!term; new_val = Obj.repr cnt.Subst.lvar}
+                    else cnt)
     in
     list_filter_map ~f:(fun prefix ->
       (* For every constraint we need to simplify using current substitution because previously
@@ -897,17 +907,25 @@ struct
       else Some dest
     ) (rem_subsumed env cs)
 
-  let interacts_with ~prefix (c: single_constraint) =
-    let (n,_) = List.hd c in
-    try let m,dest = List.find (fun (m,_) -> m=n) prefix in
-        Some dest
-    with Not_found -> None
+  let interacts_with ~prefix (c: single_constraint) : Subst.content option =
+    printfn "calling interacts_with";
+    let first_var = (List.hd c).Subst.lvar in
+    try Some (List.find (fun cnt -> cnt.Subst.lvar.index = first_var.index) prefix)
+    with Not_found ->
+      begin
+        (* New variable bindings can be not in the substitution. N.B. set-var-val optimization *)
+        (* TODO: Maybe pass substitution here and use find function form Subst module *)
+        match first_var.subst with
+        | Some term -> Some {lvar=first_var; new_val=term}
+        | None -> None
+      end
 
   let check ~prefix env (subst: Subst.t option) (c_store: t) =
+    printfn "Constraints.check";
     let rec apply_subst = function
     | [] -> []
-    | (_n,cnt)::tl -> begin
-        match Subst.unify env cnt.Subst.lvar cnt.Subst.new_val non_local_scope subst with
+    | cnt::tl -> begin
+        match Subst.unify env !!!(cnt.Subst.lvar) cnt.Subst.new_val non_local_scope subst with
         | __, None   -> raise ReallyNotEqual
         | [], Some _ -> raise Disequality_violated
         | pr, Some _ -> pr @ tl
@@ -919,9 +937,12 @@ struct
       | [] :: _ -> raise Disequality_violated
       | ((ch::ctl) as c) :: cothers -> begin
           match interacts_with ~prefix c with
-          | None -> loop (c::acc) cothers
+          | None ->
+              printfn "doesn't interact";
+              loop (c::acc) cothers
           | Some dest -> begin
-              match Subst.(unify env (c |> List.hd |> snd).new_val dest.new_val) non_local_scope subst with
+              printfn "interacts";
+              match Subst.(unify env (c |> List.hd).new_val dest.new_val) non_local_scope subst with
               |  _, None -> (* non-unifiable, we can forget a constraint *)
                   loop acc cothers
               | [], Some _ ->
@@ -941,7 +962,7 @@ struct
 
   let extend ~prefix _env cs = prefix :: cs
 end
-
+(*
 module DefaultConstraints : CONSTRAINTS =
 struct
   type t = Subst.t list
@@ -953,7 +974,7 @@ struct
     (* This implementation ignores first list of prefix which contains variable indicies *)
     let subst  = Subst.of_list prefix in
     let open Subst in
-    let prefix = List.split @@ List.map (fun (_, {lvar;new_val}) -> (lvar, new_val)) prefix in
+    let prefix = List.split @@ List.map (fun {lvar;new_val} -> (lvar, new_val)) prefix in
     (* There we can save on memory allocations if we will
        do incremental unification of the list *)
     let subsumes subst (vs, ts) =
@@ -977,6 +998,7 @@ struct
   let extend ~prefix env cs : t = normalize_store ~prefix env cs
 
   let refine env subs cs term =
+    printfn "Constraints.refine";
     list_filter_map cs ~f:(fun cs_sub ->
       let dest = Subst.walk env !!!term cs_sub in
       if dest == term then None else Some dest
@@ -997,7 +1019,7 @@ struct
             | _  -> (Subst.of_list p)::css'
       with Occurs_check -> css'
     )
-end
+end*)
 
 (* module Constraints = DefaultConstraints *)
 module Constraints = FastConstraints

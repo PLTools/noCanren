@@ -136,13 +136,13 @@ let _ =
 
   (* Permutations: *)
 
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm []);
+  (* Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm []);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]); *)
 
 
   (* Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);

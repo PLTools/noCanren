@@ -27,7 +27,7 @@ let show_intl_optl = show(logic)  (show(option) (show(logic) (show(int))))
 
 let int_opt_reifier = Option.reify int_reifier
 
-let fff = Option.(
+let fff _ = Option.(
     run_exn show_int 1 q qh (REPR(fun q -> q === !!5));
     runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === some !!5));
     runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === none ()));
@@ -41,7 +41,7 @@ module Result =
     module X =
       struct
         @type ('a,'b) t = Ok of 'a | Error of 'b with show, gmap
-        let fmap f g x = gmap(t) f g x
+        let fmap f g x = gmap(t) f g x;;
       end
 
   include X
@@ -51,13 +51,13 @@ module Result =
   let error x = inj @@ distrib (Error x)
 end
 
-let show1 = show(Result.t) (show(int)) (show(option) (show(int)))
+let show1 = GT.(show Result.t @@ show int) (show option @@ show int)
 let show1logic =
   show(logic) (show(Result.t) (show(logic) (show int)) (show(logic) (show option @@ show(logic) (show int))))
 
 let runResult n = runR (Result.reify int_reifier int_opt_reifier) show1 show1logic n
 
-let _ =
+let fff _ =
   run_exn show1 1  q qh (REPR(fun q -> q === Result.ok !!5 ));
   runResult   (-1) q qh (REPR(fun q -> call_fresh (fun r -> (q === Result.ok r) &&& conde [r === !!5; success])));
   runResult   (-1) q qh (REPR(fun q -> Fresh.two (fun r s -> conde
@@ -65,3 +65,16 @@ let _ =
                                                                 ; (q === Result.error r)
                                                                 ])
                         ))
+
+let (====) ?loc = unitrace (fun h t -> show_intl_optl @@ int_opt_reifier h t)
+let (=//=) ?loc = diseqtrace  (fun h t -> show_intl_optl @@ int_opt_reifier h t)
+let (===!) ?loc = unitrace (fun h t -> show logic string_of_int @@ ManualReifiers.int_reifier h t)
+
+let fuck =
+  let rel x =
+    fresh (y)
+      (x ==== Option.some y)
+      (x =//= Option.some !!5)
+      (y ===! !!5)
+  in
+  run_exn show_int_opt 1  q qh (REPR(rel))
