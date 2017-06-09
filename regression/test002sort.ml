@@ -51,6 +51,7 @@ let rec smallesto l s l' =
 
 (* Relational sort *)
 let rec sorto x y =
+  let (===) ?loc = uninatlist ?loc in
   conde
     [ (* either both lists are empty *)
       (x === nil()) &&& (y === nil())
@@ -62,7 +63,7 @@ let rec sorto x y =
         (sorto xs xs')       (* 1 *)
         (smallesto x s xs)   (* 2 *)
     ]
-(* 
+(*
 let _ =
   run four  (fun q1 q2 q3 p -> sorto (q1 % (q2 % (q3 % nil ()))) p)
             (fun _  _  _  p ->

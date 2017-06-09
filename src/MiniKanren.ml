@@ -498,20 +498,22 @@ let global_token: token_mk = [-8];;
 
 type inner_logic =
   { token_mk: token_mk; token_env: token_env; index: int
-  ; mutable subst: Obj.t; scope: scope_t (* set-var-val! stuff *)
+  ; mutable subst: Obj.t option; scope: scope_t (* set-var-val! stuff *)
   (* in the substitution we will store pair the same as in subst *)
   ; constraints: Obj.t list
   }
-
+(*
 let unbound : Obj.t =
-  Obj.repr "unbound"
+  Obj.repr "unbound" *)
   (* Obj.repr [-13] *)
 
 let make_inner_logic ~envt ~scope index = { token_env = envt; token_mk = global_token
-  ; index; subst = unbound; scope; constraints = [] }
+  ; index; subst = None; scope; constraints = [] }
 
-let is_inner_unbound x = (x.subst == unbound)
-let scope_of_inner { scope; _ } : scope_t =  scope
+let is_inner_unbound x = (x.subst = None)
+let subst_inner_term lo term = (lo.subst <- Some term)
+
+let scope_of_inner { scope; _ } : scope_t = scope
 let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
 
 module Env :
@@ -520,7 +522,7 @@ module Env :
 
     val empty  : unit -> t
     val fresh  : ?name:string -> scope:scope_t -> t -> 'a * t
-    val var    : t -> 'a -> int option
+    val var    : ?verbose:bool -> t -> 'a -> int option
     val is_var : t -> 'a -> bool
   end =
   struct
@@ -535,7 +537,6 @@ module Env :
 
     let fresh ?name ~scope e =
       let v = !!!(make_inner_logic ~envt:e.token ~scope e.next) in
-      let v = {!!!v with subst = unbound} in
       printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
         e.next;
@@ -549,8 +550,9 @@ module Env :
       let v = make_inner_logic ~envt ~scope index in
       Obj.tag (!!! v), Obj.size (!!! v)
 
-    let var env x =
-      (* printfn " checking for var a%! '%s'" (generic_show ~maxdepth:10 x); *)
+    let var ?(verbose=false) env x =
+      if verbose then
+        printfn " checking for var a%! '%s'" (generic_show ~maxdepth:10 x);
       (* There we detect if x is a logic variable and then that it belongs to current env *)
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
@@ -559,7 +561,8 @@ module Env :
           (Obj.is_block !!!token) && token == (!!!global_token)
          )
       then (let q = (!!!x : inner_logic).token_env in
-            printfn "%s %d" __FILE__ __LINE__;
+            if verbose then
+              printfn "%s %d" __FILE__ __LINE__;
             (* let () = printfn " Obj.is_int%! '%s' = %b" (generic_show q) (Obj.is_int q) in
             let () = printfn " env_token is %!'%s'" (generic_show env_token) in
             let () = printfn " q == (!!!env_token) = %!'%b'" (q == (!!!env_token)) in *)
@@ -569,9 +572,10 @@ module Env :
             )
       else None
 
-    let var env x =
-      let ans = var env x in
-      (* printfn "  is says %s" (match ans with Some n -> sprintf "yes %d" n | None  -> "no"); *)
+    let var ?(verbose=false) env x =
+      let ans = var ~verbose env x in
+      if verbose then
+        printfn "  is says %s" (match ans with Some n -> sprintf "yes %d" n | None  -> "no");
       ans
 
     let is_var env v = None <> var env v
@@ -671,12 +675,16 @@ module Subst :
             inner 0
 
     let subst_add (m,scope) xi (x: inner_logic) xi_and_term =
-      printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
-      printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term);
+      (* printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
+      printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term); *)
       if scope_eq scope (scope_of_inner x)
-      then  let () = x.subst <- Obj.repr (*"wtf" *)  xi_and_term in
-            printfn " variable adjusted by\n '%s'" (generic_show ~maxdepth:20 xi_and_term);
-            m
+      then
+        let () = subst_inner_term x (Obj.repr xi_and_term) in
+        (* let () = printfn " variable adjusted by" in
+        let () = printfn "\t%s" (generic_show ~maxdepth:10 @@ Obj.field !!!xi_and_term 0) in
+        let () = printfn "\t%s" (generic_show @@ Obj.field !!!xi_and_term 1) in *)
+        printfn "in-place substitution to var %d" xi;
+        m
       else  M.add xi xi_and_term m
 
     let unify env x y scope subst =
@@ -694,7 +702,8 @@ module Subst :
         match subst_map with
         | None -> delta, None
         | (Some subst) as s ->
-            let x, y = walk env x subst, walk env y subst in
+            let x = walk env x subst in
+            let y = walk env y subst in
             match Env.var env x, Env.var env y with
             | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
             | Some xi, _       -> printfn "B"; extend xi x y delta subst
@@ -1003,7 +1012,6 @@ module State =
     let new_var (e,_,_,scope) =
       let (x,_) = Env.fresh ~scope e in
       let i = (!!!x : inner_logic).index in
-      let x = !!!{x with subst = unbound} in
       (x,i)
     let incr_scope (e,subs,cs,scp) = (e,subs,cs,scp+1)
   end
@@ -1032,12 +1040,13 @@ let report_counters () =
 
 let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
   (* we should always unify two injected types *)
+  incr unif_counter;
+
   mylog (fun () ->
             printfn "unify";
-            printfn "\t%s" (generic_show x);
-            printfn "\t%s" (generic_show y);
+            printfn "\t%s" (generic_show ~maxdepth:10 x);
+            printfn "\t%s" (generic_show ~maxdepth:10 y);
   );
-  (* incr unif_counter; *)
   try
     let prefix, subst' = Subst.unify env x y scope (Some subst) in
     begin match subst' with
@@ -1287,7 +1296,7 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
 
 let unitrace ?loc shower x y = fun st ->
   incr logged_unif_counter;
-  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  printfn "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
   let ans = (x === y) st in
   if MKStream.is_nil ans then printfn "  -"
