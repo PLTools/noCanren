@@ -77,13 +77,17 @@ let list_filter_map ~f xs =
 
 module OldList = List
 
-let log_enabled =
+
+let (log_enabled, use_svv) =
   let ans = ref false in
+  let use_svv = ref false in
   Arg.parse
-    [("-v", Arg.Unit (fun () -> ans := true), "verbose mode")]
+    [ ("-v",   Arg.Unit (fun () -> ans := true), "verbose mode")
+    ; ("-svv", Arg.Unit (fun () -> use_svv := true), "use set-var-val optimization")
+    ]
     (fun s -> printfn "anon argument '%s'" s)
     "usage msg";
-  !ans
+  (!ans, !use_svv)
 
 let mylog f = if log_enabled then f () else ignore (fun () -> f ())
 
@@ -701,23 +705,9 @@ module Subst :
       in
       helper term
 
-    (* let subst_add (m,scope) xi (x: inner_logic) (x_and_term: content) =
-      (* printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
-      printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term); *)
-      if scope_eq scope (scope_of_inner x)
-      (* if false *)
-      then
-        let () = subst_inner_term x x_and_term.new_val in
-        (* let () = printfn " variable adjusted by" in
-        let () = printfn "\t%s" (generic_show x_and_term.new_val) in *)
-        printfn "in-place substitution to var %d" xi;
-        m
-      else  M.add xi x_and_term m *)
-
     let merge_a_prefix_unsafe ~scope prefix subst =
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
-        if scope_eq scope cnt.lvar.scope
-        (* if false *)
+        if use_svv && scope_eq scope cnt.lvar.scope
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
               let () = printfn "in-place substitution to var %d" cnt.lvar.index in
               acc
@@ -801,7 +791,7 @@ module Subst :
   end
 
 let rec refine : Env.t -> Subst.t -> _ -> Obj.t -> Obj.t = fun env subst do_diseq x ->
-  printfn "refining %s" (generic_show ~maxdepth:10 x);
+  (* printfn "refining %s" (generic_show ~maxdepth:10 x); *)
   let rec walk' forbidden term =
     let var = Subst.walk env term subst in
     match Env.var env var with
@@ -943,7 +933,7 @@ struct
     with ReallyNotEqual -> []
 
   let refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list = fun env base_subst cs term ->
-    printfn "going to refine constraints for a variable '%s'" (generic_show term);
+    (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
     let maybe_swap =
       match Env.var env term with
       | None   -> (fun p -> p)
@@ -975,7 +965,7 @@ struct
       end
 
   let check ~prefix env (subst: Subst.t) (c_store: t) : t =
-    printfn "Constraints.check";
+    (* printfn "Constraints.check with prefix %s" (show_single prefix); *)
     let rec apply_subst = function
     | [] -> []
     | cnt::tl -> begin
@@ -992,10 +982,10 @@ struct
       | ((ch::ctl) as c) :: cothers -> begin
           match interacts_with ~prefix c with
           | None ->
-              printfn "doesn't interact";
+              (* printfn "doesn't interact"; *)
               loop (c::acc) cothers
           | Some dest -> begin
-              printfn "interacts";
+              (* printfn "interacts"; *)
               match Subst.(unify env (c |> List.hd).new_val dest.new_val) non_local_scope subst with
               | None -> (* non-unifiable, we can forget a constraint *)
                   loop acc cothers
@@ -1083,6 +1073,7 @@ module State =
     type t = Env.t * Subst.t * Constraints.t * scope_t
     let empty () = (Env.empty (), Subst.empty, Constraints.empty, new_scope ())
     let env   (env, _, _, _) = env
+    let subst (_,s,_,_) = s
     let show  (env, subst, constr, scp) =
       sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show constr) scp
     let new_var (e,_,_,scope) =
@@ -1366,11 +1357,16 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
 
 let unitrace ?loc shower x y = fun st ->
   incr logged_unif_counter;
-  printfn "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (match loc with Some l -> printf " on %s" l | None -> ());
   let ans = (x === y) st in
+  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (match loc with Some l -> printf " on %s" l | None -> ());
+
   if MKStream.is_nil ans then printfn "  -"
   else  printfn "  +";
+  let () =
+    if !logged_unif_counter = 33
+    then printfn "\t a subst:\n%s" (Subst.show @@ State.subst st)
+  in
   ans
 
 let diseqtrace shower x y = fun st ->

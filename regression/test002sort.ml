@@ -118,8 +118,8 @@ let perm' l =
 let _ =
   (* Sorting: *)
 
-  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]); *)
+  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []); *)
+  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]); *)
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [2; 1]);
   (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [3; 2; 1]);
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [4; 3; 2; 1]); *)

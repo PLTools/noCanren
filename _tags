@@ -14,7 +14,7 @@ true: short_paths
 #<regression/test*.native> or <regression/test*.byte>: package(str,GT)
 <regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
 #<regression/test003.ml>: use_pa_minikanren
-<regression/test002sort.*> or <regression/test123wtf.*> or <regression/test_appendo.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_ocanren_all.native), package(GT)
+<regression/test006.*> or <regression/test002sort.*> or <regression/test123wtf.*> or <regression/test_appendo.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_ocanren_all.native), package(GT)
 
 <regression/test002sort.*>: package(GT,GT.syntax.all,logger.syntax), syntax(camlp5o), use_pa_minikanren
 
