@@ -162,6 +162,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       [%expr
         mylog (fun () -> printfn " creating inc in conde");
         MKStream.inc (fun () ->
+          let st = State.incr_scope st in
           mylog (fun () -> printfn " force a conde");
           [%e
           match clauses with

@@ -522,7 +522,7 @@ module Env :
 
     val empty  : unit -> t
     val fresh  : ?name:string -> scope:scope_t -> t -> 'a * t
-    val var    : ?verbose:bool -> t -> 'a -> int option
+    val var    : (*?verbose:bool ->*) t -> 'a -> int option
     val is_var : t -> 'a -> bool
   end =
   struct
@@ -537,9 +537,9 @@ module Env :
 
     let fresh ?name ~scope e =
       let v = !!!(make_inner_logic ~envt:e.token ~scope e.next) in
-      printf "new fresh var %swith index=%d\n"
+      (* printf "new fresh var %swith index=%d\n"
         (match name with None -> "" | Some n -> sprintf "'%s' " n)
-        e.next;
+        e.next; *)
       e.next <- 1+e.next;
       (!!!v, e)
 
@@ -550,9 +550,9 @@ module Env :
       let v = make_inner_logic ~envt ~scope index in
       Obj.tag (!!! v), Obj.size (!!! v)
 
-    let var ?(verbose=false) env x =
-      if verbose then
-        printfn " checking for var a%! '%s'" (generic_show ~maxdepth:10 x);
+    let var (* ?(verbose=false) *) env x =
+      (* if verbose then
+        printfn " checking for var a%! '%s'" (generic_show ~maxdepth:10 x); *)
       (* There we detect if x is a logic variable and then that it belongs to current env *)
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
@@ -561,8 +561,8 @@ module Env :
           (Obj.is_block !!!token) && token == (!!!global_token)
          )
       then (let q = (!!!x : inner_logic).token_env in
-            if verbose then
-              printfn "%s %d" __FILE__ __LINE__;
+            (* if verbose then
+              printfn "%s %d" __FILE__ __LINE__; *)
             (* let () = printfn " Obj.is_int%! '%s' = %b" (generic_show q) (Obj.is_int q) in
             let () = printfn " env_token is %!'%s'" (generic_show env_token) in
             let () = printfn " q == (!!!env_token) = %!'%b'" (q == (!!!env_token)) in *)
@@ -572,11 +572,11 @@ module Env :
             )
       else None
 
-    let var ?(verbose=false) env x =
+    (* let var ?(verbose=false) env x =
       let ans = var ~verbose env x in
       if verbose then
         printfn "  is says %s" (match ans with Some n -> sprintf "yes %d" n | None  -> "no");
-      ans
+      ans *)
 
     let is_var env v = None <> var env v
 
@@ -618,7 +618,14 @@ module Subst :
      * second values to substitute *)
     val split   : t -> inner_logic list * Obj.t list
     val walk    : Env.t -> 'a -> t -> 'a
-    val unify   : Env.t -> 'a -> 'a -> scope_t -> t option -> content list * t option
+
+    (* [merge_a_prefix ~scope p s] unions prefix [p] and substitution [s].
+      Very naive approach: no any walking or occurs_check is performed *)
+    val merge_a_prefix_unsafe : scope:scope_t -> content list  -> t -> t
+    (* Safe version of [merge_a_prefix_unsafe]. it can fail *)
+    val merge_a_prefix: Env.t -> scope:scope_t -> content list -> t -> (t * bool) option
+
+    val unify   : Env.t -> 'a -> 'a -> scope:scope_t -> t -> (content list * t) option
     val show    : t -> string
   end = struct
 
@@ -665,24 +672,36 @@ module Subst :
           try walk env (new_val @@ subst_lookup_exn i !!!var subst) subst
           with Not_found -> var
 
-    let rec occurs env xi term subst =
-      let y = walk env term subst in
-      match Env.var env y with
-      | Some yi -> xi = yi
-      | None ->
-         let wy = wrap (Obj.repr y) in
-         match wy with
-         | Invalid n when n = Obj.closure_tag -> false
-         | Unboxed _ -> false
-         | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
-         | Boxed (_, s, f) ->
-            let rec inner i =
-              if i >= s then false
-              else occurs env xi (!!!(f i)) subst || inner (i+1)
-            in
-            inner 0
+    let walk_by_func env var lookupf =
+      let rec helper var =
+        match Env.var env !!!var with
+        | None -> var
+        | Some i ->
+            try helper (lookupf i !!!var)
+            with Not_found -> var
+      in
+      helper var
 
-    let subst_add (m,scope) xi (x: inner_logic) (x_and_term: content) =
+    let occurs env xi term lookupf =
+      let rec helper term =
+        let y = walk_by_func env term lookupf in
+        match Env.var env y with
+        | Some yi -> xi = yi
+        | None ->
+           match wrap (Obj.repr y) with
+           | Invalid n when n = Obj.closure_tag -> false
+           | Unboxed _ -> false
+           | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
+           | Boxed (_, s, f) ->
+              let rec inner i =
+                if i >= s then false
+                else helper (!!!(f i)) || inner (i+1)
+              in
+              inner 0
+      in
+      helper term
+
+    (* let subst_add (m,scope) xi (x: inner_logic) (x_and_term: content) =
       (* printfn " subst_add to %!  '%s'" (generic_show ~maxdepth:20  x);
       printfn "          what: '%s'" (generic_show ~maxdepth:20  xi_and_term); *)
       if scope_eq scope (scope_of_inner x)
@@ -693,55 +712,91 @@ module Subst :
         let () = printfn "\t%s" (generic_show x_and_term.new_val) in *)
         printfn "in-place substitution to var %d" xi;
         m
-      else  M.add xi x_and_term m
+      else  M.add xi x_and_term m *)
 
-    let unify env x y scope subst =
-      let extend xi x term delta subst_map =
-        if occurs env xi term subst_map then raise Occurs_check
+    let merge_a_prefix_unsafe ~scope prefix subst =
+      ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
+        if scope_eq scope cnt.lvar.scope
+        (* if false *)
+        then  let () = subst_inner_term cnt.lvar cnt.new_val in
+              let () = printfn "in-place substitution to var %d" cnt.lvar.index in
+              acc
+        else M.add cnt.lvar.index cnt acc
+      )
+
+    let unify env x y ~scope main_subst =
+      (* The idea is to do unification and collect unification prefix during the process.
+         Since set-var-val optimisation appeared it is not safe to modify substitution on the go.
+         We will collect new substitutions in the prefix and commit them in the end
+        *)
+      let make_walk_func prefix = fun idx var ->
+        (* We should check
+            * var itself in case of set-var-val optimization
+            * substitution if it was added before
+            * prefix if it was added during current unification
+        *)
+        match var.subst with
+        | Some term -> !!!term
+        | None ->
+            try new_val @@ M.find var.index main_subst
+            with Not_found -> List.assq var !!!prefix
+      in
+      let extend xi x term prefix finder =
+        if occurs env xi term finder then raise Occurs_check
         else
           let cnt = make_content x term in
           assert (Env.var env x <> Env.var env term);
-          let new_m = subst_add (subst_map, scope) xi x cnt in
-
-          let () = assert (Env.is_var env x) in
-          (cnt::delta, Some new_m)
+          Some (cnt :: prefix)
       in
-      let rec unify x y (delta, subst_map) =
-        match subst_map with
-        | None -> delta, None
-        | (Some subst) as s ->
-            let x = walk env x subst in
-            let y = walk env y subst in
+      let rec helper x y : content list option -> _ = function
+        | None -> None
+        | (Some delta) as acc ->
+            let finder = make_walk_func delta in
+            let x = walk_by_func env x finder in
+            let y = walk_by_func env y finder in
             match Env.var env x, Env.var env y with
-            | Some xi, Some yi -> if xi = yi then delta, s else extend xi x y delta subst
-            | Some xi, _       -> printfn "B"; extend xi x y delta subst
-            | _      , Some yi -> printfn "C"; extend yi y x delta subst
+            | (Some xi, Some yi) when xi = yi -> acc
+            | (Some xi, Some _) -> extend xi x y delta finder
+            | Some xi, _        -> extend xi x y delta finder
+            | _      , Some yi  -> extend yi y x delta finder
             | _ ->
-                printfn "D";
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
-                 | Unboxed vx, Unboxed vy -> if vx = vy then delta, s else delta, None
+                 | Unboxed vx, Unboxed vy -> if vx = vy then acc else None
                  | Boxed (tx, sx, fx), Boxed (ty, sy, fy) ->
                     if tx = ty && sx = sy
                     then
-                      let rec inner i (delta, subst) =
-                      match subst with
-                        | None -> delta, None
-                        | Some _ ->
+                      let rec inner i = function
+                        | None -> None
+                        | (Some delta) as rez ->
                           if i < sx
-                          then inner (i+1) (unify (!!!(fx i)) (!!!(fy i)) (delta, subst))
-                          else delta, subst
+                          then inner (i+1) (helper (!!!(fx i)) (!!!(fy i)) rez)
+                          else rez
                       in
-                      inner 0 (delta, s)
-                    else delta, None
+                      inner 0 acc
+                    else None
                  | Invalid n, _
                  | _, Invalid n -> invalid_arg (sprintf "Invalid values for unification (%d)" n)
-                 | _ -> delta, None
+                 | _ -> None
                 )
       in
-      match unify !!!x !!!y ([], subst) with
-      | (delta, None) as ans -> ans
-      | (delta, Some map) -> (delta, Some map)
+      match helper !!!x !!!y (Some []) with
+      | None  -> None
+      | Some prefix ->
+          (* there we should commit changes in prefix to a substitution *)
+          let new_subst = merge_a_prefix_unsafe ~scope prefix main_subst in
+          Some (prefix, new_subst)
+      (* TODO: catch Occurs_check here *)
+
+    let merge_a_prefix env ~scope prefix subst =
+      let rec helper is_enlarged acc = function
+      | [] -> Some (acc, is_enlarged)
+      | h::tl ->
+          match unify env ~scope !!!h.lvar !!!h.new_val acc with
+          | None -> None
+          | Some (p,s) -> helper (is_enlarged || p<>[] ) s tl
+      in
+      helper false subst prefix
 
   end
 
@@ -795,7 +850,7 @@ module type CONSTRAINTS = sig
 
   val extend : prefix:Subst.content list -> Env.t -> t -> t
 
-  val check  : prefix:Subst.content list -> Env.t -> Subst.t option -> t -> t
+  val check  : prefix:Subst.content list -> Env.t -> Subst.t -> t -> t
 end
 
 module FastConstraints : CONSTRAINTS =
@@ -838,18 +893,17 @@ struct
       List.map (fun {lvar;new_val} -> (lvar, new_val)) prefix
     in
     try  Subst.unify env !!!vs !!!ts non_local_scope subst
-    with Occurs_check -> [],None
+    with Occurs_check -> None
 
   let is_subsumed env d d2 =
     let rec helper = function
     | [] -> false
     | h::tl -> begin
-        let (_,s) = split_and_unify ~prefix:d env (Some Subst.empty) in
-        match split_and_unify ~prefix:h env s with
-        | __, None -> helper tl
-        | [], Some _ -> true
-        | pref, maybeS ->
-            helper tl
+        let s = Subst.merge_a_prefix_unsafe ~scope:non_local_scope d Subst.empty in
+        match Subst.merge_a_prefix env ~scope:non_local_scope h s with
+        | None -> helper tl
+        | Some (_,false) -> true (* TODO: simplify? *)
+        | Some (__,_) -> helper tl
       end
     in
     helper d2
@@ -877,11 +931,11 @@ struct
     let rec helper acc = function
     | [] -> List.rev acc
     | cont::tl -> begin
-        match Subst.(unify env !!!(cont.lvar) !!!cont.new_val non_local_scope (Some subst)) with
-        | _,None -> raise ReallyNotEqual
-        | [],Some _ -> (* terms will be disequal by some other reason *)
+        match Subst.(unify env !!!(cont.lvar) !!!cont.new_val non_local_scope subst) with
+        | None -> raise ReallyNotEqual
+        | Some ([],_) -> (* terms will be disequal by some other reason. Ignore this part of constraint *)
                         helper acc tl
-        | prefix,Some _ -> (* this constraint worth printing *)
+        | Some (_,_) -> (* this constraint worth printing *)
                             helper ((maybe_swap cont) :: acc) tl
       end
     in
@@ -920,15 +974,15 @@ struct
         | None -> None
       end
 
-  let check ~prefix env (subst: Subst.t option) (c_store: t) =
+  let check ~prefix env (subst: Subst.t) (c_store: t) : t =
     printfn "Constraints.check";
     let rec apply_subst = function
     | [] -> []
     | cnt::tl -> begin
         match Subst.unify env !!!(cnt.Subst.lvar) cnt.Subst.new_val non_local_scope subst with
-        | __, None   -> raise ReallyNotEqual
-        | [], Some _ -> raise Disequality_violated
-        | pr, Some _ -> pr @ tl
+        | None   -> raise ReallyNotEqual
+        | Some ([], _) -> raise Disequality_violated
+        | Some (pr, _) -> pr @ tl
       end
     in
 
@@ -943,16 +997,16 @@ struct
           | Some dest -> begin
               printfn "interacts";
               match Subst.(unify env (c |> List.hd).new_val dest.new_val) non_local_scope subst with
-              |  _, None -> (* non-unifiable, we can forget a constraint *)
+              | None -> (* non-unifiable, we can forget a constraint *)
                   loop acc cothers
-              | [], Some _ ->
+              | Some ([],_) ->
                   (* a part of constraint is violated but two terms can still be distinct *)
                   let revisited_constraints =
                     try (apply_subst ctl) :: cothers
                     with ReallyNotEqual -> cothers
                   in
                   loop acc revisited_constraints
-              | prefix, Some _ ->
+              | Some (prefix,_) ->
                   (* we need to update constraint with new information *)
                   loop ((prefix @ c) :: acc) cothers
           end
@@ -1069,31 +1123,25 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
             printfn "\t%s" (generic_show ~maxdepth:10 x);
             printfn "\t%s" (generic_show ~maxdepth:10 y);
   );
-  try
-    let prefix, subst' = Subst.unify env x y scope (Some subst) in
-    begin match subst' with
+  try (
+    match Subst.unify env x y scope subst with
     | None -> MKStream.nil
-    | (Some s) as subst ->
+    | Some (prefix, s) ->
         try
-          let constr' = Constraints.check ~prefix env subst constr in
-          MKStream.single (env, s, constr',scope)
+          let constr' = Constraints.check ~prefix env s constr in
+          MKStream.single (env, s, constr', scope)
         with Disequality_violated -> MKStream.nil
-    end
+    )
   with Occurs_check -> MKStream.nil
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
   try
-    let prefix, subst' = Subst.unify env x y scope (Some subst) in
-    (* prefix is a delta between subst and subst' *)
-    match subst' with
+    match Subst.unify env x y scope subst with
     | None -> MKStream.single st
-    | Some s ->
-        (match prefix with
-        | [] -> MKStream.nil
-        | _  ->
-          let new_constrs = Constraints.extend ~prefix env constrs in
-          MKStream.single (env, subst, new_constrs, scope)
-        )
+    | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
+    | Some (prefix,_) ->
+        let new_constrs = Constraints.extend ~prefix env constrs in
+        MKStream.single (env, subst, new_constrs, scope)
   with Occurs_check -> MKStream.single st
 
 let delay : (unit -> goal) -> goal = fun g ->
