@@ -80,10 +80,11 @@ module OldList = List
 
 let (log_enabled, use_svv) =
   let ans = ref false in
-  let use_svv = ref false in
+  let use_svv = ref true in
   Arg.parse
     [ ("-v",   Arg.Unit (fun () -> ans := true), "verbose mode")
     ; ("-svv", Arg.Unit (fun () -> use_svv := true), "use set-var-val optimization")
+    ; ("-nosvv", Arg.Unit (fun () -> use_svv := false), "disable set-var-val optimization")
     ]
     (fun s -> printfn "anon argument '%s'" s)
     "usage msg";
@@ -492,7 +493,7 @@ type scope_t = int
 let non_local_scope : scope_t = -6
 
 let new_scope : unit -> scope_t =
-  let scope = ref 0 in
+  let scope = ref 0 in (* TODO: maybe put this into Env.t *)
   fun () -> (incr scope; !scope)
 
 (* Global token will not be exported outside and will be used to detect the value
@@ -519,6 +520,33 @@ let subst_inner_term lo term = (lo.subst <- Some term)
 
 let scope_of_inner { scope; _ } : scope_t = scope
 let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
+
+let pretty_generic_show ?(maxdepth= 99999) is_var x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth term =
+    if depth > maxdepth then Buffer.add_string b "..." else
+    if is_var !!!term then begin
+      let var = (!!!term : inner_logic) in
+      match var.subst with
+      | Some term ->
+          bprintf b "{ _.%d with subst=" var.index;
+          inner (depth+1) term;
+          bprintf b " }"
+      | None -> bprintf b "_.%d" var.index
+    end else match wrap term with
+      | Invalid n                                         -> bprintf b "<invalid %d>" n
+      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+      | Unboxed n                                         -> bprintf b  "int<%d>" (!!!n)
+      | Boxed  (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner 0 x;
+  Buffer.contents b
+;;
 
 module Env :
   sig
@@ -631,6 +659,7 @@ module Subst :
 
     val unify   : Env.t -> 'a -> 'a -> scope:scope_t -> t -> (content list * t) option
     val show    : t -> string
+    val pretty_show : ('a -> bool) -> t -> string
   end = struct
 
     (* module InnerLogicKey = struct
@@ -649,9 +678,16 @@ module Subst :
 
     let show m =
       let b = Buffer.create 40 in
-      Buffer.add_string b "subst {";
-      M.iter (fun i {new_val} -> bprintf b "%d -> %s; " i (generic_show new_val)) m;
+      Buffer.add_string b "subst {\n";
+      M.iter (fun i {new_val} -> bprintf b "  %d -> %s;\n" i (generic_show new_val)) m;
       Buffer.add_string b "}";
+      Buffer.contents b
+
+    let pretty_show is_var m =
+      let b = Buffer.create 40 in
+      bprintf b "subst {\n";
+      M.iter (fun i {new_val} -> bprintf b "  %d -> %s;\n" i (pretty_generic_show is_var new_val)) m;
+      bprintf b "}";
       Buffer.contents b
 
     let empty = M.empty
@@ -669,12 +705,20 @@ module Subst :
       then M.find !!!ui map
       else !!!(u.subst) *)
 
-    let rec walk : Env.t -> 'a -> t -> 'a = fun env var subst ->
-      match Env.var env !!!var with
-      | None   -> var
-      | Some i ->
-          try walk env (new_val @@ subst_lookup_exn i !!!var subst) subst
-          with Not_found -> var
+    let rec walk : Env.t -> 'a -> t -> 'a = fun env term subst ->
+      let rec helper x =
+        if Env.is_var env x
+        then begin
+          let v = (!!!x : inner_logic) in
+          match v.subst with
+          | Some term -> walk env !!!term subst
+          | None ->
+              try walk env (new_val @@ subst_lookup_exn v.index !!!v subst) subst
+              with Not_found -> x
+        end else
+          term
+      in
+      helper term
 
     let walk_by_func env var lookupf =
       let rec helper var =
@@ -709,7 +753,8 @@ module Subst :
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
         if use_svv && scope_eq scope cnt.lvar.scope
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
-              let () = printfn "in-place substitution to var %d" cnt.lvar.index in
+              (* let () = printfn "in-place substitution to var %d" cnt.lvar.index in *)
+              (* M.add cnt.lvar.index cnt acc *)
               acc
         else M.add cnt.lvar.index cnt acc
       )
@@ -952,7 +997,6 @@ struct
     ) (rem_subsumed env cs)
 
   let interacts_with ~prefix (c: single_constraint) : Subst.content option =
-    printfn "calling interacts_with";
     let first_var = (List.hd c).Subst.lvar in
     try Some (List.find (fun cnt -> cnt.Subst.lvar.index = first_var.index) prefix)
     with Not_found ->
@@ -1080,7 +1124,7 @@ module State =
       let (x,_) = Env.fresh ~scope e in
       let i = (!!!x : inner_logic).index in
       (x,i)
-    let incr_scope (e,subs,cs,scp) = (e,subs,cs,scp+1)
+    let incr_scope (e,subs,cs,scp) = (e,subs,cs, new_scope ())
   end
 
 type 'a goal' = State.t -> 'a
@@ -1127,7 +1171,8 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
   try
-    match Subst.unify env x y scope subst with
+    (* For disequalities we unify in non-local scope to prevent defiling*)
+    match Subst.unify env x y non_local_scope subst with
     | None -> MKStream.single st
     | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
     | Some (prefix,_) ->
@@ -1363,18 +1408,17 @@ let unitrace ?loc shower x y = fun st ->
 
   if MKStream.is_nil ans then printfn "  -"
   else  printfn "  +";
-  let () =
-    if !logged_unif_counter = 33
-    then printfn "\t a subst:\n%s" (Subst.show @@ State.subst st)
-  in
   ans
 
 let diseqtrace shower x y = fun st ->
   incr logged_diseq_counter;
+  let ans = (x =/= y) st in
   printf "%d: (=/=) '%s' and '%s'\n%!" !logged_diseq_counter
     (shower (helper_of_state st) x)
     (shower (helper_of_state st) y);
-  (x =/= y) st
+  if MKStream.is_nil ans then printfn "  -"
+  else  printfn "  +";
+  ans
 
 (* ************************************************************************** *)
 module type T1 = sig

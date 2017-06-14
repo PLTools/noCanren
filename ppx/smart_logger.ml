@@ -241,7 +241,6 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   let msg = sprintf "create new variable %s as" ident in
                   let msg = msg ^ " _.%d" in
                   [%expr
-                    let st = State.incr_scope st in
                     let [%p pvar ident ], idx = State.new_var st in
                     mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
                     [%e acc]
