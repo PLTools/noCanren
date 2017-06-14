@@ -16,7 +16,7 @@
  * (enclosed in the file COPYING).
  *)
 
-module OldList : (module type of List)
+(* module OldList : (module type of List) *)
 
 val generic_show: ?maxdepth:int -> 'a -> string
 
@@ -724,7 +724,7 @@ module List :
     val reify : (helper -> ('a, 'b) injected -> 'b) -> helper -> ('a ground, 'b logic) injected -> 'b logic
 
     (** Constructor *)
-    val cons : ('a, 'b logic) injected -> ('a, 'b) groundi -> ('a, 'b) groundi
+    val conso : ('a, 'b logic) injected -> ('a, 'b) groundi -> ('a, 'b) groundi
 
     (** Relational foldr *)
     val foldro : (('a, 'b) injected -> ('acc, 'acc2) injected -> ('acc, 'acc2) injected -> goal) ->
