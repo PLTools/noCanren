@@ -1740,14 +1740,18 @@ module Bool =
     let inj b : boolf = inj@@lift b
   end
 
+let conde_incr gs st =
+  let st = State.incr_scope st in
+  conde gs st
+
 let eqo x y t =
-  conde [
+  conde_incr [
     (x === y) &&& (t === Bool.true_);
     (x =/= y) &&& (t === Bool.false_);
   ]
 
 let neqo x y t =
-  conde [
+  conde_incr [
     (x =/= y) &&& (t === Bool.true_);
     (x === y) &&& (t === Bool.false_);
   ];;
@@ -1812,7 +1816,7 @@ module Nat = struct
     let s x = inj@@lift (S x)
 
     let rec addo x y z =
-      conde [
+      conde_incr [
         (x === o) &&& (z === y);
         Fresh.two (fun x' z' ->
            (x === (s x')) &&&
@@ -1824,19 +1828,19 @@ module Nat = struct
     let (+) = addo
 
     let rec mulo x y z =
-      conde [
-        ((x === o)) &&& (z === o);
-        Fresh.two (fun x' z' ->
-          (x === (s x')) &&& (
-          (addo y z' z) &&&
-          (mulo x' y z'))
-        )
-      ]
+      conde_incr
+        [ (x === o) &&& (z === o)
+        ; Fresh.two (fun x' z' ->
+            (x === (s x')) &&&
+            (addo y z' z) &&&
+            (mulo x' y z')
+          )
+        ]
 
     let ( * ) = mulo
 
     let rec leo x y b =
-      conde [
+      conde_incr [
         (x === o) &&& (b === Bool.true_);
         (x =/= o) &&& (y === o) &&& (b === Bool.false_);
         Fresh.two (fun x' y' ->
@@ -1849,7 +1853,7 @@ module Nat = struct
     let (<=) x y = leo x y Bool.true_
     let (>=) x y = geo x y Bool.false_
 
-    let rec gto x y b = conde
+    let rec gto x y b = conde_incr
       [ (x =/= o) &&& (y === o) &&& (b === Bool.true_)
       ; (x === o) &&& (b === Bool.false_)
       ; Fresh.two (fun x' y' ->
@@ -1983,7 +1987,7 @@ module List =
     let (!<) : ('a,'b) injected -> ('a,'b) groundi = fun x -> cons x @@ nil ()
 
     let rec foldro f a xs r =
-      conde [
+      conde_incr [
         (xs === nil ()) &&& (a === r);
         Fresh.three (fun h t a'->
             (xs === h % t) &&&
@@ -1993,7 +1997,7 @@ module List =
       ]
 
     let rec mapo f xs ys =
-      conde [
+      conde_incr [
         (xs === nil ()) &&& (ys === nil ());
         Fresh.two (fun z zs ->
           (xs === z % zs) &&&
@@ -2007,7 +2011,7 @@ module List =
 
     let filtero p xs ys =
       let folder x a a' =
-        conde [
+        conde_incr [
           (p x Bool.true_) &&& (x % a === a');
           (p x Bool.false_) &&& (a === a')
         ]
@@ -2015,7 +2019,7 @@ module List =
       foldro folder (nil ()) xs ys
 
     let rec lookupo p xs mx =
-      conde [
+      conde_incr [
         (xs === nil ()) &&& (mx === none ());
         Fresh.two (fun h t ->
           (h % t === xs) &&&
@@ -2031,7 +2035,7 @@ module List =
     let allo = foldro Bool.ando Bool.true_
 
     let rec lengtho l n =
-      conde [
+      conde_incr [
         (l === nil ()) &&& (n === Nat.o);
         Fresh.three (fun x xs n' ->
           (l === x % xs)  &&&
@@ -2041,7 +2045,7 @@ module List =
       ]
 
     let rec appendo a b ab =
-      conde [
+      conde_incr [
         (a === nil ()) &&& (b === ab);
         Fresh.three (fun h t ab' ->
           (a === h%t) &&&
@@ -2051,7 +2055,7 @@ module List =
       ]
 
     let rec reverso a b =
-      conde [
+      conde_incr [
         (a === nil ()) &&& (b === nil ());
         Fresh.three (fun h t a' ->
           (a === h%t) &&&
@@ -2063,7 +2067,7 @@ module List =
     let rec membero l a =
       Fresh.two (fun x xs ->
         (l === x % xs) &&&
-        (conde [
+        (conde_incr [
           x === a;
           (x =/= a) &&& (membero xs a)
         ])
