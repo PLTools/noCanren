@@ -7,21 +7,25 @@ let ilist xs = inj_list @@ List.map (!!) xs
 let just_a a = a === !!5
 
 let a_and_b a =
-  call_fresh (fun b ->
-      (a === !!7) &&&
-      ((b === !!6) ||| (b === !!5))
-  )
+  fresh (b)
+    (a === !!7)
+    (conde  [ b === !!6
+            ; b === !!5
+            ])
 
 let a_and_b' b =
-  call_fresh (
-    fun a ->
-      (a === !!7) &&&
-      ((b === !!6) ||| (b === !!5))
-  )
+  fresh (a)
+    (a === !!7)
+    (conde  [ (b === !!6)
+            ; (b === !!5)
+            ])
+
 
 let rec fives x =
-  (x === !!5) |||
-  defer (fives x)
+  conde
+    [ (x === !!5)
+    ; (fives x)
+    ]
 
 let show_int       = show(int)
 let show_int_list  = (show(List.ground) (show int))
@@ -29,15 +33,15 @@ let show_intl_list = (show(List.logic ) (show(logic) (show int)))
 let show_logic_list h xs = show_intl_list @@ List.reify ManualReifiers.int_reifier h xs
 
 let rec appendo a b ab =
-  let (===) = unitrace show_logic_list in
+  let (===) ?loc = unitrace ?loc show_logic_list in
   conde
     [ (*project3 "appendo simple (a,b,ab): " show_logic_list a b ab &&& *)
       ((a === nil ()) &&& (b === ab))
-    ; Fresh.three (fun h t ab' ->
+    ; fresh (h t ab')
           (* project3 "appendo complex (a,b,ab): " show_logic_list a b ab &&& *)
-          (a === h%t) &&&
-          (h%ab' === ab) &&& (appendo t b ab')
-        )
+          (a === h%t)
+          (h%ab' === ab)
+          (appendo t b ab')
     ]
 
 let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list show_intl_list n

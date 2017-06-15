@@ -4,13 +4,13 @@ open MiniKanren
 open Tester
 open Stlc
 
-module GTyp = 
+module GTyp =
   struct
 
-    module T = 
-      struct    
-        @type ('a, 'b) t = 
-	| P   of 'a      (* primitive *)
+    module T =
+      struct
+        @type ('a, 'b) t =
+        | P   of 'a      (* primitive *)
         | Arr of 'b * 'b (* arrow *)
         with gmap, show
 

@@ -3,12 +3,12 @@ open Tester
 open Printf
 open GT
 
-module Peano = 
+module Peano =
   struct
 
-    module T = 
-      struct    
-        @type 'a t = O | S of 'a with show, gmap
+    module T =
+      struct
+        @type 'a t = O | S of 'a with show, gmap;;
 
         let fmap f x = gmap(t) f x
      end

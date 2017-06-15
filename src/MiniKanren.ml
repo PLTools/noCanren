@@ -753,7 +753,7 @@ module Subst :
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
         if use_svv && scope_eq scope cnt.lvar.scope
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
-              (* let () = printfn "in-place substitution to var %d" cnt.lvar.index in *)
+              let () = printfn "in-place substitution to var %d" cnt.lvar.index in
               (* M.add cnt.lvar.index cnt acc *)
               acc
         else M.add cnt.lvar.index cnt acc
@@ -876,12 +876,12 @@ exception Disequality_violated
 module type CONSTRAINTS = sig
   type t
   val empty: t
-  val show: t -> string
+  val show: env:Env.t -> t -> string
 
   (** [refine env c x] refines [x] and maybe changes constraints [c].
    *  It returns a list of term that [x] should not be equal
    *)
-  val refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list
+  val refine: Env.t -> Subst.t -> t -> inner_logic -> Obj.t list
 
   val extend : prefix:Subst.content list -> Env.t -> t -> t
 
@@ -890,35 +890,71 @@ end
 
 module FastConstraints : CONSTRAINTS =
 struct
-  (* We store constraints as associative lists from inner_logic to term *)
+  (* A constraint itself is a substitution represented as associative list *)
   type single_constraint = Subst.content list
-  type t = single_constraint list
 
-  let empty = []
-  let bprintf_single b cs =
+  module M = struct
+    include Map.Make(Int)
+    (* and this should be a multimap *)
+
+    (* type 'a t = 'a list M.t *)
+
+    let empty : single_constraint list t = empty
+    let find_exn : key -> 'a list t -> 'a list = find
+    let find key map =
+      try find_exn key map
+      with Not_found -> []
+
+    let add1 : key -> 'a -> 'a list t -> 'a list t = fun k v m ->
+      try let vs = find_exn k m in
+          let vs = (*if List.memq v vs then vs else*) v::vs in
+          add k vs m
+      with Not_found -> add k [v] m
+
+    let replace: key -> 'a list -> 'a list t -> 'a list t = fun k v ->
+      if v = [] then remove k
+      else add k v
+  end
+
+  type t = single_constraint list M.t
+
+  let empty = M.empty
+  let bprintf_single ~env b cs =
     let rec helper = function
     | [] -> ()
     | c :: tl ->
-          bprintf b "%d -> %s;" (!!!c.Subst.lvar : inner_logic).index (generic_show c.Subst.new_val);
+          bprintf b "%d -> %s;" (!!!c.Subst.lvar : inner_logic).index (pretty_generic_show (Env.is_var env) c.Subst.new_val);
           helper tl
     in
     helper cs
 
-  let show_single c =
+  let show_single ~env c =
     let b = Buffer.create 40 in
     bprintf b " ( ";
-    let () = bprintf_single b c in
+    let () = bprintf_single ~env b c in
     bprintf b " ) ";
     Buffer.contents b
 
-  let show cstore =
+  let show ~env cstore =
     let b = Buffer.create 40 in
-    let rec helper = function
-    | [] -> ()
-    | h::tl ->  bprintf_single b h;  helper tl
-    in
-    helper cstore;
+    M.iter (fun k css ->
+      bprintf b "\t%d -> [ ";
+      List.iter (fun s -> bprintf_single ~env b s) css;
+      bprintf b " ]\n";
+    ) cstore;
     Buffer.contents b
+
+
+  let extend : prefix:single_constraint -> Env.t -> t -> t = fun ~prefix env cs ->
+    assert (prefix <> []);
+    let open Subst in
+    let h = List.hd prefix in
+    let ans = M.add1 h.lvar.index prefix cs in
+    match Env.var env h.new_val with
+    | None -> ans
+    | Some n ->
+        let swapped = { new_val = Obj.repr h.lvar; lvar = (!!!(h.new_val) : inner_logic) } in
+        M.add1 n (swapped::(List.tl prefix)) ans
 
   let split_and_unify ~(prefix:single_constraint) env subst =
     (* There we can save on memory allocations if we will
@@ -930,71 +966,6 @@ struct
     try  Subst.unify env !!!vs !!!ts non_local_scope subst
     with Occurs_check -> None
 
-  let is_subsumed env d d2 =
-    let rec helper = function
-    | [] -> false
-    | h::tl -> begin
-        let s = Subst.merge_a_prefix_unsafe ~scope:non_local_scope d Subst.empty in
-        match Subst.merge_a_prefix env ~scope:non_local_scope h s with
-        | None -> helper tl
-        | Some (_,false) -> true (* TODO: simplify? *)
-        | Some (__,_) -> helper tl
-      end
-    in
-    helper d2
-
-  let rem_subsumed env cs =
-    let rec helper d acc =
-      match d with
-      | [] -> acc
-      | h::tl when is_subsumed env h tl || is_subsumed env h acc ->
-          helper tl acc
-      | h:: tl -> helper tl (h::acc)
-    in
-    helper cs []
-
-  exception ReallyNotEqual
-  let simplify_single_constraint ~env ~subst maybe_swap cs =
-    (* We need this to simplify answer in that case:
-     *   subst: [ q -> (a,b); ]
-     *   constr: [ (a=/=5) || (b=/=6) ]
-     *   extend subst with (a === 3)
-     *   ask to refine: q
-     *   expected answer: q = (3, b)
-     *   without simplification: q = (3, b {{ =/= 6}})
-     **)
-    let rec helper acc = function
-    | [] -> List.rev acc
-    | cont::tl -> begin
-        match Subst.(unify env !!!(cont.lvar) !!!cont.new_val non_local_scope subst) with
-        | None -> raise ReallyNotEqual
-        | Some ([],_) -> (* terms will be disequal by some other reason. Ignore this part of constraint *)
-                        helper acc tl
-        | Some (_,_) -> (* this constraint worth printing *)
-                            helper ((maybe_swap cont) :: acc) tl
-      end
-    in
-    try helper [] cs
-    with ReallyNotEqual -> []
-
-  let refine: Env.t -> Subst.t -> t -> Obj.t -> Obj.t list = fun env base_subst cs term ->
-    (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
-    let maybe_swap =
-      match Env.var env term with
-      | None   -> (fun p -> p)
-      | Some n -> (fun cnt ->
-                    if cnt.Subst.new_val = term then { lvar = !!!term; new_val = Obj.repr cnt.Subst.lvar}
-                    else cnt)
-    in
-    list_filter_map ~f:(fun prefix ->
-      (* For every constraint we need to simplify using current substitution because previously
-         we checked only head of the constraint *)
-      let prefix = simplify_single_constraint ~env ~subst:base_subst maybe_swap prefix in
-      let cs_sub = Subst.of_list prefix in
-      let dest = Subst.walk env !!!term cs_sub in
-      if dest == term then None
-      else Some dest
-    ) (rem_subsumed env cs)
 
   let interacts_with ~prefix (c: single_constraint) : Subst.content option =
     let first_var = (List.hd c).Subst.lvar in
@@ -1009,8 +980,9 @@ struct
       end
 
   let check ~prefix env (subst: Subst.t) (c_store: t) : t =
-    (* printfn "Constraints.check with prefix %s" (show_single prefix); *)
-    let rec apply_subst = function
+    printfn "Constraints.check with prefix %s" (show_single ~env prefix);
+    printfn "store is:\n%s" (show ~env c_store);
+    (* let rec apply_subst = function
     | [] -> []
     | cnt::tl -> begin
         match Subst.unify env !!!(cnt.Subst.lvar) cnt.Subst.new_val non_local_scope subst with
@@ -1018,9 +990,52 @@ struct
         | Some ([], _) -> raise Disequality_violated
         | Some (pr, _) -> pr @ tl
       end
+    in *)
+
+    let revisit_constraint c : (int * single_constraint) option =
+      let rec helper = function
+      | [] -> None
+      | (h::tl) as cs ->
+          match Subst.(unify env !!!(h.Subst.lvar) h.Subst.new_val) non_local_scope subst with
+          | None -> (* non-unifiable, we can forget a constraint *)
+              helper tl
+          | Some ([],_) -> helper tl
+          | Some (_,_)  -> Some (h.lvar.index, cs)
+      in
+
+      assert (c<>[]);
+      let h = List.hd c in
+      match Env.var env h.Subst.new_val with
+      | Some ni ->
+          let tl = List.tl c in
+          Some (ni, {new_val=Obj.repr h.Subst.lvar; lvar = !!!(h.Subst.new_val)} :: tl)
+      | None ->
+          helper c
     in
 
-    let rec loop acc = function
+    let rec loop2 map = function
+    | [] -> map
+    | h :: tl ->
+        let important = M.find h.Subst.lvar.index map in
+        let (acc_cur, acc_other) =
+          ListLabels.fold_left important ~init:([],[])
+              ~f:(fun (acc_cur,acc_other) cs ->
+                    match revisit_constraint cs with
+                    | None -> raise Disequality_violated
+                    | Some (idx, new_cs) when idx = h.lvar.index -> (new_cs::acc_cur, acc_other)
+                    | Some (i,   new_cs) -> (acc_cur, (i,new_cs)::acc_other)
+                )
+        in
+        let map = M.replace h.lvar.index acc_cur map in
+        let map = ListLabels.fold_left ~init:map acc_other ~f:(fun acc (i,cs) -> M.add1 i cs acc) in
+        (* We don't need to check newly created constraint with current prefix because it was done
+            in a function [revisit_constraint]
+          *)
+        loop2 map tl
+    in
+    loop2 c_store prefix
+
+    (* let rec loop acc = function
       | []      -> List.rev acc
       | [] :: _ -> raise Disequality_violated
       | ((ch::ctl) as c) :: cothers -> begin
@@ -1046,9 +1061,97 @@ struct
           end
         end
     in
-    loop [] c_store
+    loop [] c_store *)
 
-  let extend ~prefix _env cs = prefix :: cs
+
+  (* Refine-related stuff goes below *)
+
+  (* [is_subsumed env c xs] checks that [c] is subsumed by some of the constraints in [xs] *)
+  let is_subsumed env : single_constraint -> single_constraint list -> _ = fun d d2 ->
+    let s = Subst.merge_a_prefix_unsafe ~scope:non_local_scope d Subst.empty in
+    let rec helper = function
+    | [] -> false
+    | h::tl -> begin
+        match Subst.merge_a_prefix env ~scope:non_local_scope h s with
+        | None -> helper tl
+        | Some (_,false) -> true (* TODO: simplify? *)
+        | Some (__,_) -> helper tl
+      end
+    in
+    helper d2
+
+  let rem_subsumed env cs =
+    let rec helper d acc =
+      match d with
+      | [] -> acc
+      | h::tl when is_subsumed env h tl || is_subsumed env h acc ->
+          helper tl acc
+      | h:: tl -> helper tl (h::acc)
+    in
+    helper cs []
+
+  exception ReallyNotEqual
+  let simplify_single_constraint ~env ~subst (asked_var: inner_logic) maybe_swap single : single_constraint =
+    (* We need this to simplify answer in that case:
+     *   subst: [ q -> (a,b); ]
+     *   constr: [ (a=/=5) || (b=/=6) ]
+     *   extend subst with (a === 3)
+     *   ask to refine: q
+     *   expected answer: q = (3, b)
+     *   without simplification: q = (3, b {{ =/= 6}})
+     **)
+    let rec helper acc = function
+    | [] -> acc
+    | cont::tl -> begin
+        match Subst.(unify env !!!(cont.lvar) !!!cont.new_val non_local_scope subst) with
+        | None -> raise ReallyNotEqual
+        | Some ([],_) -> (* terms will be disequal by some other reason. Ignore this part of constraint *)
+              if cont.Subst.lvar != asked_var && cont.Subst.new_val != !!!asked_var then []
+              else helper acc tl
+        | Some (_,_) -> (* this constraint worth printing *)
+                            helper ((maybe_swap cont) :: acc) tl
+      end
+    in
+    try helper [] single
+    with ReallyNotEqual -> []
+
+  let rem_subsumed_opt ~env ~subst asked_var maybe_swap cs_map : single_constraint list =
+    (* there we have constraints related to idx. they are the ones stored with key varidx and maybe some others *)
+    M.fold (fun _k cs_list (acc: single_constraint list) ->
+          (* TODO: we can eliminate List.find by checking _k *)
+          ListLabels.fold_left ~init:acc cs_list ~f:(fun (acc: single_constraint list) (single: single_constraint) ->
+              let single = simplify_single_constraint ~env ~subst asked_var maybe_swap single in
+              try let _ = List.find (fun x -> (x.Subst.lvar==asked_var) || (x.Subst.new_val == !!!asked_var)) single in
+                    if is_subsumed env single acc
+                    then acc
+                    else single::acc
+              with Not_found -> acc
+          )
+      )
+      cs_map
+      ([]: single_constraint list)
+
+  let refine: Env.t -> Subst.t -> t -> inner_logic -> Obj.t list = fun env subst cs term ->
+    (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
+    let maybe_swap =
+      let open Subst in
+      (* We always refine logic variables by design, so we can omit checking that term is a variable *)
+      let n = term.index in
+      (*match Env.var env term with
+      | None   -> (fun p -> p)
+      | Some n -> *) (fun cnt ->
+                    if cnt.new_val == !!!term then { lvar = !!!term; new_val = Obj.repr cnt.lvar }
+                    else cnt)
+    in
+    ListLabels.map ~f:(fun prefix ->
+      (* For every constraint we need to simplify using current substitution because previously
+         we checked only head of the constraint *)
+      (* let prefix = simplify_single_constraint ~env ~subst:base_subst maybe_swap prefix in *)
+      let cs_sub = Subst.merge_a_prefix_unsafe ~scope:non_local_scope prefix Subst.empty in
+      let dest = Subst.walk env !!!term cs_sub in
+      assert (term <> dest);
+      dest
+    ) (rem_subsumed_opt ~env ~subst term maybe_swap cs)
 end
 (*
 module DefaultConstraints : CONSTRAINTS =
@@ -1119,7 +1222,7 @@ module State =
     let env   (env, _, _, _) = env
     let subst (_,s,_,_) = s
     let show  (env, subst, constr, scp) =
-      sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show constr) scp
+      sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show ~env constr) scp
     let new_var (e,_,_,scope) =
       let (x,_) = Env.fresh ~scope e in
       let i = (!!!x : inner_logic).index in
@@ -2140,3 +2243,5 @@ let inj_list_p xs = inj_list @@ List.map (fun (x,y) -> inj_pair x y) xs
 let rec inj_nat_list = function
 | []    -> nil()
 | x::xs -> inj_nat x % inj_nat_list xs
+
+let defer : goal -> goal = fun x -> x
