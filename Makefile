@@ -41,7 +41,7 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
-REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
+REGRES_CASES := 000 001 002sort 004 005 006 007 009 010 011 013 014 015runaway 016sorto
 REGRES_CASES += #123wtf _appendo
 
 define TESTRULES

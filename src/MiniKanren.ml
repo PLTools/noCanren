@@ -753,7 +753,7 @@ module Subst :
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
         if use_svv && scope_eq scope cnt.lvar.scope
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
-              let () = printfn "in-place substitution to var %d" cnt.lvar.index in
+              (* let () = printfn "in-place substitution to var %d" cnt.lvar.index in *)
               (* M.add cnt.lvar.index cnt acc *)
               acc
         else M.add cnt.lvar.index cnt acc
@@ -938,7 +938,7 @@ struct
   let show ~env cstore =
     let b = Buffer.create 40 in
     M.iter (fun k css ->
-      bprintf b "\t%d -> [ ";
+      bprintf b "\t%d -> [ " k;
       List.iter (fun s -> bprintf_single ~env b s) css;
       bprintf b " ]\n";
     ) cstore;
@@ -980,8 +980,8 @@ struct
       end
 
   let check ~prefix env (subst: Subst.t) (c_store: t) : t =
-    printfn "Constraints.check with prefix %s" (show_single ~env prefix);
-    printfn "store is:\n%s" (show ~env c_store);
+    (* printfn "Constraints.check with prefix %s" (show_single ~env prefix);
+    printfn "store is:\n%s" (show ~env c_store); *)
     (* let rec apply_subst = function
     | [] -> []
     | cnt::tl -> begin
@@ -1000,16 +1000,16 @@ struct
           | None -> (* non-unifiable, we can forget a constraint *)
               helper tl
           | Some ([],_) -> helper tl
-          | Some (_,_)  -> Some (h.lvar.index, cs)
+          | Some ((ph::_) as new_prefix, _)  -> Some (ph.lvar.index, new_prefix@tl)
       in
 
       assert (c<>[]);
-      let h = List.hd c in
+      (* let h = List.hd c in
       match Env.var env h.Subst.new_val with
       | Some ni ->
           let tl = List.tl c in
           Some (ni, {new_val=Obj.repr h.Subst.lvar; lvar = !!!(h.Subst.new_val)} :: tl)
-      | None ->
+      | None -> *)
           helper c
     in
 
@@ -1333,6 +1333,7 @@ let rec bind_star2 : MKStream.t -> goal list -> MKStream.t = fun s -> function
 let bind_star_simple s = bind_star2 s []
 
 let conde xs : goal = fun st ->
+  let st = State.incr_scope st in
   (* printfn " creaded inc in conde"; *)
   MKStream.inc (fun () ->
     (* printfn " force a conde"; *)
@@ -1654,153 +1655,7 @@ module ManualReifiers = struct
       else Pair.reify r1 r2 c p
 
 end;;
-(*
-let () =
-  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
-    @@ ManualReifiers.int_reifier h t) in
-  let goal1 exp st =
-    MKStream.mplus
-      (call_fresh_named "t" (fun t st ->
-        MKStream.inc (fun () ->
-          ?& [ exp === !!0
-             ; exp === !!1 ] st )) st)
-      (Thunk (fun () ->
-        (* printfn "herr"; *)
-        MKStream.mplus
-          (call_fresh_named "es" (fun t st ->
-            MKStream.inc (fun () -> (exp=== !!2) st)) st)
-          (Thunk (fun () ->
-           call_fresh_named "zz" (fun t st ->
-             MKStream.inc (fun () -> (exp=== !!3) st)) st))
-      ))
-  in
-  (* let goal2 exp st =
-    disj
-      (call_fresh_named "t" (fun _t  ->
-        MKStream.inc2 (fun () -> exp === !!1 )) )
-      (disj
-          (call_fresh_named "es" (fun _t ->
-            MKStream.inc2 (fun () -> exp === !!2  )) )
-          (call_fresh_named "zz" (fun _t ->
-            MKStream.inc2 (fun () -> exp === !!3 )) )
-      ) st
-  in *)
-  let goal2 exp =
-    conde
-      [ call_fresh_named "t" (fun _t  ->
-          MKStream.inc2 (fun () ->
-          ?&  [ exp === !!0
-              ; exp === !!1
-              ])
-        )
-      ; call_fresh_named "es" (fun _t ->
-            MKStream.inc2 (fun () -> exp === !!2 ))
-      ; call_fresh_named "zz" (fun _t ->
-            MKStream.inc2 (fun () -> exp === !!3 ))
-      ]
-  in
 
-  run q goal1 (fun qs -> Stream.take ~n:2 qs
-      |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d"));
-  print_newline ();
-  run q goal2 (fun qs -> Stream.take ~n:2 qs
-      |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d"));
-  ()
-;;
-*)
-
-(*
-let ____ () =
-  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
-    @@ ManualReifiers.int_reifier h t) in
-
-  let goal1 exp =
-    conde [ call_fresh_named "t1" (fun t1 ->
-              MKStream.inc2 @@ fun () ->
-              ?&  [ (exp === !!0) ]
-              )
-          ; call_fresh_named "t2" (fun t2 ->
-              MKStream.inc2 @@ fun () ->
-              ?&  [ (exp === !!3) ]
-              )
-          ; call_fresh_named "t3" (fun t3 ->
-              MKStream.inc2 @@ fun () ->
-              ?&  [ (exp === !!6) ]
-              )
-          ]
-  in
-  run q goal1 (fun qs -> Stream.take ~n:(-1) qs
-    |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
-  ()
-;;
-
-let __ () =
-  let (===) = unitrace (fun h t -> GT.(show logic @@ show int)
-    @@ ManualReifiers.int_reifier h t) in
-
-  (* let rec evalo m =
-    printfn " applying evalo to m";
-    call_fresh_named "f2" (fun f2 ->
-      let () = printfn "create inc in fresh ==== (f2)" in
-      delay2 @@ fun () ->
-        printfn "inc in fresh forced: (f2)";
-        (fun st ->
-          MKStream.bind
-            ( printfn " creaded inc in conde";
-              MKStream.inc2 (fun () ->
-                printfn " force a conde";
-                fun st ->
-                MKStream.mplus
-                  (call_fresh_named "x" (fun _x ->
-                      printfn "create inc in fresh ==== (x)";
-                      MKStream.inc2 @@ fun () ->
-                        printfn "inc in fresh forced: (x)" ;
-                        (f2 === !!1)
-                    ) st)
-                  (Thunk (fun () ->
-                    printfn " force inc from mplus*";
-                    call_fresh_named "p" (fun _p ->
-                        printfn "create inc in fresh ==== (p)";
-                        MKStream.inc2 @@ fun () ->
-                          printfn "inc in fresh forced: (p)" ;
-                          (f2 === !!2)
-                      ) st))
-              ) st
-            )
-            (evalo !!4 )
-        )
-    )
-  in *)
-  let rec evalo m =
-    printfn " applying evalo to m";
-    call_fresh_named "f2" (fun f2 ->
-      let () = printfn "create inc in fresh ==== (f2)" in
-      delay2 @@ fun () ->
-        printfn "inc in fresh forced: (f2)" ;
-        ?&
-      [ conde
-          [ call_fresh_named "x" (fun _x ->
-              printfn "create inc in fresh ==== (x)";
-              delay2 @@ fun () ->
-                printfn "inc in fresh forced: (x)" ;
-                (f2 === !!1)
-            )
-          ; call_fresh_named "p" (fun _p ->
-              printfn "create inc in fresh ==== (p)";
-              delay2 @@ fun () ->
-                printfn "inc in fresh forced: (p)" ;
-                (f2 === !!2)
-            )
-          ]
-      ; (evalo !!4 )
-      ]
-    )
-  in
-  run q evalo (fun qs -> Stream.take ~n:1 qs
-    |> List.map (fun rr -> rr#prj) |> List.iter (printfn "%d") );
-  ()
-;;
-*)
 let () = ();;
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
@@ -1887,18 +1742,14 @@ module Bool =
     let inj b : boolf = inj@@lift b
   end
 
-let conde_incr gs st =
-  let st = State.incr_scope st in
-  conde gs st
-
 let eqo x y t =
-  conde_incr [
+  conde [
     (x === y) &&& (t === Bool.true_);
     (x =/= y) &&& (t === Bool.false_);
   ]
 
 let neqo x y t =
-  conde_incr [
+  conde [
     (x =/= y) &&& (t === Bool.true_);
     (x === y) &&& (t === Bool.false_);
   ];;
@@ -1963,7 +1814,7 @@ module Nat = struct
     let s x = inj@@lift (S x)
 
     let rec addo x y z =
-      conde_incr [
+      conde [
         (x === o) &&& (z === y);
         Fresh.two (fun x' z' ->
            (x === (s x')) &&&
@@ -1975,7 +1826,7 @@ module Nat = struct
     let (+) = addo
 
     let rec mulo x y z =
-      conde_incr
+      conde
         [ (x === o) &&& (z === o)
         ; Fresh.two (fun x' z' ->
             (x === (s x')) &&&
@@ -1987,7 +1838,7 @@ module Nat = struct
     let ( * ) = mulo
 
     let rec leo x y b =
-      conde_incr [
+      conde [
         (x === o) &&& (b === Bool.true_);
         (x =/= o) &&& (y === o) &&& (b === Bool.false_);
         Fresh.two (fun x' y' ->
@@ -2000,7 +1851,7 @@ module Nat = struct
     let (<=) x y = leo x y Bool.true_
     let (>=) x y = geo x y Bool.false_
 
-    let rec gto x y b = conde_incr
+    let rec gto x y b = conde
       [ (x =/= o) &&& (y === o) &&& (b === Bool.true_)
       ; (x === o) &&& (b === Bool.false_)
       ; Fresh.two (fun x' y' ->
@@ -2041,7 +1892,7 @@ module List =
     module F = Fmap2(X)
 
     let nil ()  = inj (F.distrib Nil)
-    let cons x y = inj (F.distrib (Cons (x, y)))
+    let conso x y = inj (F.distrib (Cons (x, y)))
 
     type 'a ground = ('a, 'a ground) t;;
     type 'a logic  = ('a, 'a logic) t logic'
@@ -2050,7 +1901,7 @@ module List =
       if c#isVar x then var_of_injected_exn c x (reify arg_r)
       else F.reify arg_r (reify arg_r) c x
 
-    let rec of_list = function [] -> nil () | x::xs -> cons x (of_list xs)
+    let rec of_list = function [] -> nil () | x::xs -> conso x (of_list xs)
 
     let ground = {
       GT.gcata = ();
@@ -2129,12 +1980,12 @@ module List =
         end
       }
 
-    let (%): ('a,'b) injected -> ('a,'b) groundi -> ('a,'b) groundi = cons
-    let (%<): ('a,'b) injected -> ('a,'b) injected -> ('a,'b) groundi = fun x y -> cons x @@ cons y @@ nil ()
-    let (!<) : ('a,'b) injected -> ('a,'b) groundi = fun x -> cons x @@ nil ()
+    let (%): ('a,'b) injected -> ('a,'b) groundi -> ('a,'b) groundi = conso
+    let (%<): ('a,'b) injected -> ('a,'b) injected -> ('a,'b) groundi = fun x y -> conso x @@ conso y @@ nil ()
+    let (!<) : ('a,'b) injected -> ('a,'b) groundi = fun x -> conso x @@ nil ()
 
     let rec foldro f a xs r =
-      conde_incr [
+      conde [
         (xs === nil ()) &&& (a === r);
         Fresh.three (fun h t a'->
             (xs === h % t) &&&
@@ -2144,7 +1995,7 @@ module List =
       ]
 
     let rec mapo f xs ys =
-      conde_incr [
+      conde [
         (xs === nil ()) &&& (ys === nil ());
         Fresh.two (fun z zs ->
           (xs === z % zs) &&&
@@ -2158,7 +2009,7 @@ module List =
 
     let filtero p xs ys =
       let folder x a a' =
-        conde_incr [
+        conde [
           (p x Bool.true_) &&& (x % a === a');
           (p x Bool.false_) &&& (a === a')
         ]
@@ -2166,7 +2017,7 @@ module List =
       foldro folder (nil ()) xs ys
 
     let rec lookupo p xs mx =
-      conde_incr [
+      conde [
         (xs === nil ()) &&& (mx === none ());
         Fresh.two (fun h t ->
           (h % t === xs) &&&
@@ -2182,7 +2033,7 @@ module List =
     let allo = foldro Bool.ando Bool.true_
 
     let rec lengtho l n =
-      conde_incr [
+      conde [
         (l === nil ()) &&& (n === Nat.o);
         Fresh.three (fun x xs n' ->
           (l === x % xs)  &&&
@@ -2192,7 +2043,7 @@ module List =
       ]
 
     let rec appendo a b ab =
-      conde_incr [
+      conde [
         (a === nil ()) &&& (b === ab);
         Fresh.three (fun h t ab' ->
           (a === h%t) &&&
@@ -2202,7 +2053,7 @@ module List =
       ]
 
     let rec reverso a b =
-      conde_incr [
+      conde [
         (a === nil ()) &&& (b === nil ());
         Fresh.three (fun h t a' ->
           (a === h%t) &&&
@@ -2214,7 +2065,7 @@ module List =
     let rec membero l a =
       Fresh.two (fun x xs ->
         (l === x % xs) &&&
-        (conde_incr [
+        (conde [
           x === a;
           (x =/= a) &&& (membero xs a)
         ])
@@ -2229,19 +2080,17 @@ module List =
 
   end
 
-let (%)  = List.cons
+let (%)  = List.conso
 let (%<) = List.(%<)
 let (!<) = List.(!<)
 let nil  = List.nil
 
 let rec inj_list: ('a, 'b) injected list -> ('a, 'b) List.groundi = function
 | []    -> nil ()
-| x::xs -> List.cons x (inj_list xs)
+| x::xs -> List.conso x (inj_list xs)
 
 let inj_list_p xs = inj_list @@ List.map (fun (x,y) -> inj_pair x y) xs
 
 let rec inj_nat_list = function
 | []    -> nil()
 | x::xs -> inj_nat x % inj_nat_list xs
-
-let defer : goal -> goal = fun x -> x

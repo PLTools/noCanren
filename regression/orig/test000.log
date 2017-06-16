@@ -18,10 +18,8 @@ q=Ok (5);
 }
 fun q ->
   call_fresh
-    (fun r ->
-       (&&&) ((===) q (Result.ok r)) (conde [(===) r ((!!) 5); success])), all answers {
+    (fun r -> (&&&) ((===) q (Result.ok r)) (conde [(===) r ((!!) 5)])), all answers {
 q=Ok (5);
-q=Ok (_.11);
 }
 fun q ->
   Fresh.two
@@ -31,4 +29,6 @@ fun q ->
           (===) q (Result.error r)]), all answers {
 q=Ok (_.12 [=/= 4]);
 q=Error (_.11);
+}
+test_diseq_with_setvarval1, 1 answer {
 }

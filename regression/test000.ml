@@ -4,6 +4,10 @@ open Printf
 open ManualReifiers
 open GT
 
+let (====) = (===)
+let (=//=) = (=/=)
+let (===!) = (===)
+
 module Option =
   struct
 
@@ -67,15 +71,15 @@ let fff =
                         ));
   ()
 
-let (====) ?loc = unitrace (fun h t -> show_intl_optl @@ int_opt_reifier h t)
+(* let (====) ?loc = unitrace (fun h t -> show_intl_optl @@ int_opt_reifier h t)
 let (=//=) ?loc = diseqtrace  (fun h t -> show_intl_optl @@ int_opt_reifier h t)
-let (===!) ?loc = unitrace (fun h t -> show logic string_of_int @@ ManualReifiers.int_reifier h t)
+let (===!) ?loc = unitrace (fun h t -> show logic string_of_int @@ ManualReifiers.int_reifier h t) *)
 
-let dummy_test _ =
-  let rel x =
+let _ =
+  let test_diseq_with_setvarval1 x =
     fresh (y)
       (x ==== Option.some y)
       (x =//= Option.some !!5)
       (y ===! !!5)
   in
-  run_exn show_int_opt 1  q qh (REPR(rel))
+  run_exn show_int_opt 1  q qh (REPR(test_diseq_with_setvarval1))

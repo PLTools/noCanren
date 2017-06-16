@@ -21,20 +21,17 @@ open Printf
 open MiniKanren
 open Tester
 
-(* let show_nat_list = GT.(show List.ground @@ show Nat.ground) *)
-(* let show_nat      = GT.(show Nat.ground) *)
 let reify_nat = fun h t -> GT.(show Nat.logic) @@ Nat.reify h t
 let uninat ?loc = unitrace ?loc reify_nat
 
 let reify_natlist = fun h t ->
-  (* printfn "t is '%s'" (generic_show t); *)
   GT.(show List.logic @@ show Nat.logic) @@
     List.reify Nat.reify h t
 let uninatlist ?loc = unitrace ?loc reify_natlist
 
 (* Relational minimum/maximum (for nats only) *)
 let minmaxo a b min max =
-  let (===) ?loc = uninat ?loc in
+  (* let (===) ?loc = uninat ?loc in *)
   let open Nat in
   conde
     [ (min === a) &&& (max === b) &&& (a <= b)
@@ -45,7 +42,7 @@ let minmaxo a b min max =
    [l'] --- all other elements
 *)
 let rec smallesto l s l' =
-  let (===) ?loc = uninatlist ?loc in
+  (* let (===) ?loc = uninatlist ?loc in *)
   (* project1 ~msg:"smallesto" reify_natlist l  &&&
   project1 ~msg:"smallesto" reify_nat s &&&
   project1 ~msg:"smallesto" reify_natlist l' &&& *)
@@ -60,8 +57,8 @@ let rec smallesto l s l' =
 
 (* Relational sort *)
 let rec sorto x y =
-  let (===) ?loc = uninatlist ?loc in
-  project1 ~msg:"sorto: x = " reify_natlist x &&&
+  (* let (===) ?loc = uninatlist ?loc in
+  project1 ~msg:"sorto: x = " reify_natlist x &&& *)
   conde
     [ (* either both lists are empty *)
       (x === nil()) &&& (y === nil())
@@ -118,8 +115,8 @@ let perm' l =
 let _ =
   (* Sorting: *)
 
-  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []); *)
-  (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]); *)
+  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []);
+  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [2; 1]);
   (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [3; 2; 1]);
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [4; 3; 2; 1]); *)
@@ -146,17 +143,17 @@ let _ =
 
   (* Permutations: *)
 
-  (* Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm []);
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm []);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]); *)
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
 
 
-  (* Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1]);
   Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3]); *)
+  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3]);
   ()

@@ -27,5 +27,5 @@ fun q -> infero (abs varX (abs varF (app (v varF) (v varX)))) q, 1 answer {
 q=Arr (_.30, Arr (Arr (_.30, _.26), _.26));
 }
 fun q -> infero q (arr (p varX) (p varX)), 1 answer {
-q=Abs (_.33, V (_.33));
+q=Abs (_.29, V (_.29));
 }

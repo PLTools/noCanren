@@ -35,7 +35,7 @@ let () =
   run_exn show_nat         1    q  qh (REPR (fun q     -> Nat.mulo ?$3 q   ?$6                           ));
   run_exn show_nat         1    q  qh (REPR (fun q     -> Nat.mulo ?$3 ?$0 q                             ));
   run_exn show_nat         1    q  qh (REPR (fun q     -> Nat.mulo q   ?$5 ?$0                           ));
-  run_exn show_nat         3    q  qh (REPR (fun q     -> Nat.mulo q   ?$0 ?$0                           )) 
+  run_exn show_nat         3    q  qh (REPR (fun q     -> Nat.mulo q   ?$0 ?$0                           ))
 
 let () =
   run_exn show_nat         1    q  qh (REPR (fun q     -> sumo (nats []) q                               ));
@@ -55,9 +55,10 @@ let () =
 
   run_exn show_bool        1    q   qh (REPR (fun q     -> List.allo (bools [true;false;true]) q          ));
   run_exn show_bool        1    q   qh (REPR (fun q     -> List.allo (Bool.true_ % (q %< Bool.true_)) Bool.true_  ));
-  run_exn show_bool      (-1) qrs qrsh (REPR (fun q r s -> List.allo (Bool.true_ % (q %< r)) s                    ))
+  run_exn show_bool      (-1) qrs qrsh (REPR (fun q r s -> List.allo (Bool.true_ % (q %< r)) s                    ));
+  ()
 
-let _ =
+let () =
   run_exn show_nat_llist    1    q  qh (REPR (fun q     -> List.mapo (Nat.addo ?$1) (nats [0;1;2]) q              ));
   run_exn show_nat_llist    1    q  qh (REPR (fun q     -> List.mapo (Nat.addo ?$2) q (nats [4;3;2])              ));
   run_exn show_nat          1    q  qh (REPR (fun q     -> List.mapo (Nat.addo q) (nats [1;2;3]) (nats [4;5;6])   ));
@@ -69,7 +70,8 @@ let _ =
   run_exn show_bool_llist   1    q  qh (REPR (fun q     -> List.mapo Bool.noto' (bools []) q                    ));
 
   run_exn show_nat_llist  (-1)   q  qh (REPR (fun q     -> List.filtero (eqo ?$2) (nats [0;1;2;3]) q          ));
-  run_exn show_option_nat   1    q  qh (REPR (fun q     -> List.lookupo (eqo ?$1) (nats [0;2;1;3]) q          ))
+  run_exn show_option_nat   1    q  qh (REPR (fun q     -> List.lookupo (eqo ?$1) (nats [0;2;1;3]) q          ));
+  ()
 
 let show_nat_list   = GT.(show List.ground @@ show Nat.ground)
 let show_natl_listl = GT.(show List.logic  @@ show Nat.logic)
