@@ -725,12 +725,13 @@ module Subst :
         match Env.var env !!!var with
         | None -> var
         | Some i ->
-            try helper (lookupf i !!!var)
+            try let ans = (lookupf i !!!var) in
+                if ans != !!!var then helper ans else var
             with Not_found -> var
       in
       helper var
 
-    let occurs env xi term lookupf =
+    let occurs_by_func env xi term lookupf =
       let rec helper term =
         let y = walk_by_func env term lookupf in
         match Env.var env y with
@@ -749,6 +750,23 @@ module Subst :
       in
       helper term
 
+    let rec occurs env xi term subst =
+      let y = walk env term subst in
+      match Env.var env y with
+      | Some yi -> xi = yi
+      | None ->
+         let wy = wrap (Obj.repr y) in
+         match wy with
+         | Invalid n when n = Obj.closure_tag -> false
+         | Unboxed _ -> false
+         | Invalid n -> invalid_arg (sprintf "Invalid value in occurs check (%d)" n)
+         | Boxed (_, s, f) ->
+            let rec inner i =
+              if i >= s then false
+              else occurs env xi (!!!(f i)) subst || inner (i+1)
+            in
+            inner 0
+
     let merge_a_prefix_unsafe ~scope prefix subst =
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
         if use_svv && scope_eq scope cnt.lvar.scope
@@ -761,39 +779,47 @@ module Subst :
 
     let unify env x y ~scope main_subst =
       (* The idea is to do unification and collect unification prefix during the process.
+        WRONG:
          Since set-var-val optimisation appeared it is not safe to modify substitution on the go.
          We will collect new substitutions in the prefix and commit them in the end
+        RIGHT:
+          It is safe to modify variables on the go. Beause two cases:
+          * if we do unification just after conde, then the scope is already incremented and nothing goes into
+            the fresh variables.
+          * if we do unification after the fresh, then if case of failure unification it doesn't matter
+            that variable will be distructively substituted: we will not look on these variables in future.
         *)
-      let make_walk_func prefix = fun idx var ->
+      let make_walk_func subs = fun idx var ->
         (* We should check
             * var itself in case of set-var-val optimization
             * substitution if it was added before
-            * prefix if it was added during current unification
         *)
         match var.subst with
         | Some term -> !!!term
         | None ->
-            try new_val @@ M.find var.index main_subst
-            with Not_found -> List.assq var !!!prefix
+            try new_val @@ M.find var.index subs
+            with Not_found -> !!!var
       in
-      let extend xi x term prefix finder =
-        if occurs env xi term finder then raise Occurs_check
+      let extend xi x term (prefix,sub1) =
+        if occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = make_content x term in
           assert (Env.var env x <> Env.var env term);
-          Some (cnt :: prefix)
+          (* It's safe to do destructive substitution here. See comment on the top*)
+          let sub2 = merge_a_prefix_unsafe ~scope [cnt] sub1 in
+          Some (cnt :: prefix, sub2)
       in
-      let rec helper x y : content list option -> _ = function
+      let rec helper x y : (content list * t) option -> _ = function
         | None -> None
-        | (Some delta) as acc ->
-            let finder = make_walk_func delta in
-            let x = walk_by_func env x finder in
-            let y = walk_by_func env y finder in
+        | Some ((delta, subs) as pair) as acc ->
+            (* let finder = make_walk_func subs in *)
+            let x = walk env x subs in
+            let y = walk env y subs in
             match Env.var env x, Env.var env y with
             | (Some xi, Some yi) when xi = yi -> acc
-            | (Some xi, Some _) -> extend xi x y delta finder
-            | Some xi, _        -> extend xi x y delta finder
-            | _      , Some yi  -> extend yi y x delta finder
+            | (Some xi, Some _) -> extend xi x y pair
+            | Some xi, _        -> extend xi x y pair
+            | _      , Some yi  -> extend yi y x pair
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -816,14 +842,13 @@ module Subst :
                 )
       in
       try
-        match helper !!!x !!!y (Some []) with
+        match helper !!!x !!!y (Some ([], main_subst)) with
         | None  -> None
-        | Some prefix ->
+        | Some (prefix, new_subst) ->
             (* there we should commit changes in prefix to a substitution *)
-            let new_subst = merge_a_prefix_unsafe ~scope prefix main_subst in
+            (* let new_subst = merge_a_prefix_unsafe ~scope prefix main_subst in *)
             Some (prefix, new_subst)
       with Occurs_check -> None
-
 
     let merge_a_prefix env ~scope prefix subst =
       let rec helper is_enlarged acc = function
