@@ -815,13 +815,15 @@ module Subst :
                  | _ -> None
                 )
       in
-      match helper !!!x !!!y (Some []) with
-      | None  -> None
-      | Some prefix ->
-          (* there we should commit changes in prefix to a substitution *)
-          let new_subst = merge_a_prefix_unsafe ~scope prefix main_subst in
-          Some (prefix, new_subst)
-      (* TODO: catch Occurs_check here *)
+      try
+        match helper !!!x !!!y (Some []) with
+        | None  -> None
+        | Some prefix ->
+            (* there we should commit changes in prefix to a substitution *)
+            let new_subst = merge_a_prefix_unsafe ~scope prefix main_subst in
+            Some (prefix, new_subst)
+      with Occurs_check -> None
+
 
     let merge_a_prefix env ~scope prefix subst =
       let rec helper is_enlarged acc = function
@@ -963,9 +965,7 @@ struct
     let vs,ts = List.split @@
       List.map (fun {lvar;new_val} -> (lvar, new_val)) prefix
     in
-    try  Subst.unify env !!!vs !!!ts non_local_scope subst
-    with Occurs_check -> None
-
+    Subst.unify env !!!vs !!!ts non_local_scope subst
 
   let interacts_with ~prefix (c: single_constraint) : Subst.content option =
     let first_var = (List.hd c).Subst.lvar in
@@ -1261,27 +1261,24 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
             printfn "\t%s" (generic_show ~maxdepth:10 x);
             printfn "\t%s" (generic_show ~maxdepth:10 y);
   );
-  try (
-    match Subst.unify env x y scope subst with
-    | None -> MKStream.nil
-    | Some (prefix, s) ->
-        try
-          let constr' = Constraints.check ~prefix env s constr in
-          MKStream.single (env, s, constr', scope)
-        with Disequality_violated -> MKStream.nil
-    )
-  with Occurs_check -> MKStream.nil
+
+  match Subst.unify env x y scope subst with
+  | None -> MKStream.nil
+  | Some (prefix, s) ->
+      try
+        let constr' = Constraints.check ~prefix env s constr in
+        MKStream.single (env, s, constr', scope)
+      with Disequality_violated -> MKStream.nil
+
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
-  try
-    (* For disequalities we unify in non-local scope to prevent defiling*)
-    match Subst.unify env x y non_local_scope subst with
-    | None -> MKStream.single st
-    | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
-    | Some (prefix,_) ->
-        let new_constrs = Constraints.extend ~prefix env constrs in
-        MKStream.single (env, subst, new_constrs, scope)
-  with Occurs_check -> MKStream.single st
+  (* For disequalities we unify in non-local scope to prevent defiling*)
+  match Subst.unify env x y non_local_scope subst with
+  | None -> MKStream.single st
+  | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
+  | Some (prefix,_) ->
+      let new_constrs = Constraints.extend ~prefix env constrs in
+      MKStream.single (env, subst, new_constrs, scope)
 
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
