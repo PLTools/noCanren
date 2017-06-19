@@ -1243,3 +1243,6 @@ let inj_list_p xs = inj_list @@ List.map (fun (x,y) -> inj_pair x y) xs
 let rec inj_nat_list = function
 | []    -> nil()
 | x::xs -> inj_nat x % inj_nat_list xs
+
+let report_counters () = ()
+
