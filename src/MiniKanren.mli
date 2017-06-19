@@ -758,4 +758,6 @@ val (!<) : ('a, 'b) injected -> ('a, 'b) List.groundi
 (** [nil] is a synonym for [inj Nil] *)
 val nil : unit -> (_, _) List.groundi
 
+
 val report_unif_counter: unit -> int
+val report_counters : unit -> unit
