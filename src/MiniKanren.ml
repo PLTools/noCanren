@@ -192,6 +192,8 @@ let (!!) x = inj (lift x)
 let inj_pair : ('a, 'c) injected -> ('b,'d) injected -> ('a * 'b, ('c * 'd) logic) injected =
   fun x y -> (x, y)
 
+let inj_tuple3 a b c = (a,b,c)
+
 external inj_int : int -> (int, int logic) injected = "%identity"
 
 exception Not_a_value
@@ -779,6 +781,11 @@ module Pair = struct
   include Fmap2(X)
 end
 
+module Tuple3 = Fmap3(struct
+    type ('a,'b,'c) t = 'a * 'b * 'c
+    let fmap f g h (x,y,z) = (f x, g y, h z)
+  end)
+
 module ManualReifiers = struct
   let rec simple_reifier: helper -> ('a, 'a logic) injected -> 'a logic = fun c n ->
     if c#isVar n
@@ -804,6 +811,11 @@ module ManualReifiers = struct
     = fun r1 r2 c p ->
       if c#isVar p then var_of_injected_exn c p (pair_reifier r1 r2)
       else Pair.reify r1 r2 c p
+
+  let rec tuple3 = fun r1 r2 r3 (c: helper) p ->
+    if c#isVar p
+    then var_of_injected_exn c p (tuple3 r1 r2 r3)
+    else Tuple3.reify r1 r2 r3 c p
 
 end;;
 

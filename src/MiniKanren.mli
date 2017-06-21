@@ -428,7 +428,14 @@ module ManualReifiers :
     val pair_reifier: (helper -> ('a,'b) injected -> 'b) ->
                     (helper -> ('c,'d) injected -> 'd) ->
                     helper -> ('a * 'c, ('b * 'd) logic as 'r) injected -> 'r
- end
+    val tuple3:
+      (helper -> ('a,'b) injected -> 'b) ->
+      (helper -> ('c,'d) injected -> 'd) ->
+      (helper -> ('e,'f) injected -> 'f) ->
+      helper ->
+      ('a * 'c * 'e, ('b * 'd * 'f) logic as 'r) injected ->
+      'r
+end
 
 (** {2 Standart relational library } *)
 
@@ -714,6 +721,11 @@ val inj_list : ('a, 'b) injected list -> ('a, 'b) List.groundi
 val inj_pair   : ('a, 'b) injected -> ('c, 'd) injected -> ('a * 'c, ('b * 'd) logic) injected
 val inj_list_p : (('a, 'b) injected * ('c, 'd) injected) list -> ('a * 'c, ('b * 'd) logic) List.groundi
 val inj_int    : int -> (int, int logic) injected
+
+val inj_tuple3 :  ('a, 'b) injected ->
+                  ('c, 'd) injected ->
+                  ('e, 'f) injected ->
+                  ('a * 'c * 'e, ('b * 'd * 'f) logic) injected
 
 (** [inj_nat_list l] is a deforsted synonym for injection *)
 val inj_nat_list : int list -> (Nat.ground, Nat.logic) List.groundi
