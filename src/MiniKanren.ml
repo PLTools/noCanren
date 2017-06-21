@@ -957,7 +957,7 @@ struct
     in
     helper cs
 
-  let show_single ~env c =
+  let show_single ~env (c: single_constraint) =
     let b = Buffer.create 40 in
     bprintf b " ( ";
     let () = bprintf_single ~env b c in
@@ -1006,9 +1006,18 @@ struct
         | None -> None
       end
 
+  type revisiting_result =
+    (** This constraint always holds in a substitution *)
+    | Obsolete
+    (* Constraint has been revisited and should be added for another variable *)
+    | Reworked of int * single_constraint
+    | Violated
+
   let check ~prefix env (subst: Subst.t) (c_store: t) : t =
     (* printfn "Constraints.check with prefix %s" (show_single ~env prefix);
     printfn "store is:\n%s" (show ~env c_store); *)
+
+
     (* let rec apply_subst = function
     | [] -> []
     | cnt::tl -> begin
@@ -1019,15 +1028,18 @@ struct
       end
     in *)
 
-    let revisit_constraint c : (int * single_constraint) option =
+    let revisit_constraint c : revisiting_result =
+      (* printfn "revisiting single constraint";
+      printfn "  %s" (show_single ~env c); *)
       let rec helper = function
-      | [] -> None
+      | [] -> Violated
       | (h::tl) as cs ->
           match Subst.(unify env !!!(h.Subst.lvar) h.Subst.new_val) non_local_scope subst with
           | None -> (* non-unifiable, we can forget a constraint *)
-              helper tl
+              Obsolete
           | Some ([],_) -> helper tl
-          | Some ((ph::_) as new_prefix, _)  -> Some (ph.lvar.index, new_prefix@tl)
+          | Some ((ph::_) as new_prefix, _)  ->
+              Reworked (ph.lvar.index, new_prefix@tl)
       in
 
       assert (c<>[]);
@@ -1048,9 +1060,13 @@ struct
           ListLabels.fold_left important ~init:([],[])
               ~f:(fun (acc_cur,acc_other) cs ->
                     match revisit_constraint cs with
-                    | None -> raise Disequality_violated
-                    | Some (idx, new_cs) when idx = h.lvar.index -> (new_cs::acc_cur, acc_other)
-                    | Some (i,   new_cs) -> (acc_cur, (i,new_cs)::acc_other)
+                    | Violated -> raise Disequality_violated
+                    | Reworked (idx, new_one) when idx = h.lvar.index ->
+                        printfn "B";
+                        (new_one::acc_cur, acc_other)
+                    | Reworked (idx, new_one) ->
+                        (acc_cur, (idx,new_one)::acc_other)
+                    | Obsolete -> (acc_cur, acc_other)
                 )
         in
         let map = M.replace h.lvar.index acc_cur map in
@@ -1248,6 +1264,7 @@ module State =
     let empty () = (Env.empty (), Subst.empty, Constraints.empty, new_scope ())
     let env   (env, _, _, _) = env
     let subst (_,s,_,_) = s
+    let constraints (_,_,cs,_) = cs
     let show  (env, subst, constr, scp) =
       sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show ~env constr) scp
     let new_var (e,_,_,scope) =
@@ -1530,22 +1547,25 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
 
 let unitrace ?loc shower x y = fun st ->
   incr logged_unif_counter;
+  (* if (!unif_counter > 10) then assert false; *)
   let ans = (x === y) st in
-  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (* printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
 
   if MKStream.is_nil ans then printfn "  -"
-  else  printfn "  +";
+  else  printfn "  +"; *)
   ans
 
 let diseqtrace shower x y = fun st ->
   incr logged_diseq_counter;
+  (* State.constraints st |> Constraints.show ~env:(State.env st) |> print_endline; *)
+
   let ans = (x =/= y) st in
-  printf "%d: (=/=) '%s' and '%s'\n%!" !logged_diseq_counter
+  (* printf "%d: (=/=) '%s' and '%s'" !logged_diseq_counter
     (shower (helper_of_state st) x)
     (shower (helper_of_state st) y);
   if MKStream.is_nil ans then printfn "  -"
-  else  printfn "  +";
+  else  printfn "  +"; *)
   ans
 
 (* ************************************************************************** *)
