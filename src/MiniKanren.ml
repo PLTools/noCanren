@@ -1239,29 +1239,73 @@ module  Logger : sig
   type t
   val empty : unit -> t
   val make_node : string -> t -> t
+
+  val print : t -> unit
 end = struct
-  let lastIndex = ref 0
+
   module H = Hashtbl.Make(Int)
 
   type entry = int list ref * string
-  type t = int * entry H.t
+  type last_index = int
+  type t = last_index ref * int * entry H.t
 
-  let next () = incr lastIndex; !lastIndex
+  (* let next () = incr lastIndex; !lastIndex *)
 
   let empty () : t =
-    let i = next () in
+    let root_idx = ref 0 in
     let tbl = H.create 37 in
-    H.add tbl i (ref [], "root");
-    (i, tbl)
+    H.add tbl !root_idx (ref [], "root");
+    (root_idx, !root_idx, tbl)
 
-  let make_node str (i, tbl) =
-    let j = next () in
+
+  let print : t -> unit = fun (_,_,tbl) ->
+    (* let ch = open_out filename in *)
+    let open Format in
+    (* let ppf = Format.std_formatter in *)
+
+    let rec loop n =
+      (* printfn "%s %d" __FILE__ __LINE__; *)
+      try let (xs,msg) = H.find tbl n in
+          printf  "@,@[<v 2>%s" msg;
+          List.iter loop (List.rev !xs);
+          printf  "@]";
+      with Not_found -> ()
+    in
+    loop 0;
+    Format.print_newline ();
+    Format.print_flush ();
+    force_newline ()
+
+  let make_node str (lastIdx, i, tbl) =
+    incr lastIdx;
+    let j = !lastIdx in
     try
       let (xs, _) = H.find tbl i in
       xs := j :: !xs;
       H.add tbl j (ref [], str);
-      (j, tbl)
+      let ans = (lastIdx, j, tbl) in
+      print ans;
+      ans
     with Not_found -> assert false
+
+
+(*
+      let rec iter_graph name xs =
+        (* printf "iter_graph with name=%s, xs.len = %d\n%!" name (List.length xs); *)
+        match xs with
+        | [] -> fprintf ppf "@,@[<v 1>%s@]" name;
+        | xs ->
+           fprintf ppf "@,@[<v 1>%s" name;
+           List.iter (fun (dest, name,_) ->
+                      try let nodes = find g dest in
+                          iter_graph name nodes;
+                          fprintf ppf "@]"
+                      with Not_found -> fprintf ppf "@,@[<v 1>%s@]" (string_of_node dest)
+                     ) xs
+      in
+      iter_graph "root" (find g 0);
+      force_newline ();
+      close_out ch *)
 
 end
 

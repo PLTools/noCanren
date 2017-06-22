@@ -149,51 +149,22 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
   (* Printast.expression 0 Format.std_formatter e; *)
   match e.pexp_desc with
   | Pexp_apply (_,[]) -> e
-  | Pexp_apply (e1,(_,alist)::args) when is_conj_list e1 ->
+  | Pexp_apply (e1,(_,alist)::otherargs) when is_conj_list e1 ->
       let clauses : expression list = parse_to_list alist.pexp_desc in
-      let ans = list_fold_right0 clauses
-        ~initer:(fun x -> x)
-        ~f:(fun x acc -> [%expr [%e x] &&& [%e acc]])
-      in
-      pamk_e ~need_st mapper ans
+      let ans = [%expr
+        ?& [%e Ast_convenience.list @@ List.map (fun e -> pamk_e mapper e) clauses ]
+      ] in
+      if need_st
+      then [%expr  [%e ans] st]
+      else ans
   | Pexp_apply (e1,(_,alist)::otherargs) when is_conde e1 ->
-
       let clauses : expression list = parse_to_list alist.pexp_desc in
-      [%expr
+      let ans = [%expr
         conde [%e Ast_convenience.list @@ List.map (fun e -> pamk_e mapper e) clauses ]
-      ]
-      (*
-      let ans =
-      [%expr
-        mylog (fun () -> printfn " creating inc in conde");
-        MKStream.inc (fun () ->
-          let st = State.incr_scope st in
-          mylog (fun () -> printfn " force a conde");
-          [%e
-          match clauses with
-          | [] -> failwith "conde with no clauses is a nonsense"
-          | clauses ->
-            let need_st = true in
-            list_fold_right0 clauses
-                ~initer:(pamk_e ~need_st mapper)
-                ~f:(fun x acc ->
-                  [%expr
-                    MKStream.mplus [%e pamk_e ~need_st mapper x]
-                      (MKStream.inc (fun () ->
-                        mylog (fun () -> printfn " force inc from mplus*");
-                        [%e acc]))
-                  ]
-                )
-          ]
-        )
-      ]
-      in
-      let ans = if need_st then ans
-         else [%expr fun st -> [%e ans]]
-      in
-      if otherargs <> []
-      then Exp.apply ans otherargs
-      else ans *)
+      ] in
+      if need_st
+      then [%expr  [%e ans] st]
+      else ans
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e

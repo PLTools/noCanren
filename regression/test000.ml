@@ -64,10 +64,14 @@ let runResult n = runR (Result.reify int_reifier int_opt_reifier) show1 show1log
 let fff =
   run_exn show1 1  q qh (REPR(fun q -> q === Result.ok !!5 ));
   runResult   (-1) q qh (REPR(fun q -> call_fresh (fun r -> (q === Result.ok r) &&& conde [r === !!5])));
-  runResult   (-1) q qh (REPR(fun q -> Fresh.two (fun r s -> conde
-                                                                [ (q === Result.ok    s) &&& (s =/= !!4)
-                                                                ; (q === Result.error r)
-                                                                ])
+  runResult   (-1) q qh (REPR(fun q -> fresh (r s)
+                                          (conde
+                                            [ ?&  [ q === Result.ok s
+                                                  ; s =/= !!4
+                                                  ]
+                                            ; (q === Result.error r)
+                                            ]
+                                          )
                         ));
   ()
 
