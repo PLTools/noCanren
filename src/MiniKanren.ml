@@ -1078,35 +1078,6 @@ struct
     in
     loop2 c_store prefix
 
-    (* let rec loop acc = function
-      | []      -> List.rev acc
-      | [] :: _ -> raise Disequality_violated
-      | ((ch::ctl) as c) :: cothers -> begin
-          match interacts_with ~prefix c with
-          | None ->
-              (* printfn "doesn't interact"; *)
-              loop (c::acc) cothers
-          | Some dest -> begin
-              (* printfn "interacts"; *)
-              match Subst.(unify env (c |> List.hd).new_val dest.new_val) non_local_scope subst with
-              | None -> (* non-unifiable, we can forget a constraint *)
-                  loop acc cothers
-              | Some ([],_) ->
-                  (* a part of constraint is violated but two terms can still be distinct *)
-                  let revisited_constraints =
-                    try (apply_subst ctl) :: cothers
-                    with ReallyNotEqual -> cothers
-                  in
-                  loop acc revisited_constraints
-              | Some (prefix,_) ->
-                  (* we need to update constraint with new information *)
-                  loop ((prefix @ c) :: acc) cothers
-          end
-        end
-    in
-    loop [] c_store *)
-
-
   (* Refine-related stuff goes below *)
 
   (* [is_subsumed env c xs] checks that [c] is subsumed by some of the constraints in [xs] *)
@@ -1152,7 +1123,7 @@ struct
               if cont.Subst.lvar != asked_var && cont.Subst.new_val != !!!asked_var then []
               else helper acc tl
         | Some (_,_) -> (* this constraint worth printing *)
-                            helper ((maybe_swap cont) :: acc) tl
+              helper ((maybe_swap cont) :: acc) tl
       end
     in
     try helper [] single
@@ -1172,7 +1143,7 @@ struct
           )
       )
       cs_map
-      ([]: single_constraint list)
+      []
 
   let refine: Env.t -> Subst.t -> t -> inner_logic -> Obj.t list = fun env subst cs term ->
     (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
@@ -1265,6 +1236,7 @@ module State =
     let env   (env, _, _, _) = env
     let subst (_,s,_,_) = s
     let constraints (_,_,cs,_) = cs
+
     let show  (env, subst, constr, scp) =
       sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show ~env constr) scp
     let new_var (e,_,_,scope) =
@@ -1314,7 +1286,6 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
         MKStream.single (env, s, constr', scope)
       with Disequality_violated -> MKStream.nil
 
-
 let (=/=) x y ((env, subst, constrs, scope) as st) =
   (* For disequalities we unify in non-local scope to prevent defiling*)
   match Subst.unify env x y non_local_scope subst with
@@ -1326,8 +1297,6 @@ let (=/=) x y ((env, subst, constrs, scope) as st) =
 
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
-
-(* let delay2 : (unit -> goal) -> goal = MKStream.inc2 *)
 
 let delay_goal : goal -> goal = fun g st -> MKStream.from_fun (fun () -> g st)
 let inc = delay_goal
@@ -1375,9 +1344,7 @@ let bind_star_simple s = bind_star2 s []
 
 let conde xs : goal = fun st ->
   let st = State.incr_scope st in
-  (* printfn " creaded inc in conde"; *)
   MKStream.inc (fun () ->
-    (* printfn " force a conde"; *)
     my_mplus_star xs st)
 
 module Fresh =
@@ -1523,6 +1490,8 @@ let run n goalish f =
   let run f = f (State.empty ()) in
   run (adder goalish) |> ApplyLatest.apply app_num |> (currier f)
 
+(* Tracing/debugging stuff *)
+
 let trace msg g = fun state ->
   printf "%s: %s\n%!" msg (State.show state);
   g state
@@ -1547,7 +1516,7 @@ let project3 ~msg : (helper -> 'b -> string) -> (('a, 'b) injected as 'v) -> 'v 
 
 let unitrace ?loc shower x y = fun st ->
   incr logged_unif_counter;
-  (* if (!unif_counter > 10) then assert false; *)
+
   let ans = (x === y) st in
   (* printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
@@ -1558,8 +1527,6 @@ let unitrace ?loc shower x y = fun st ->
 
 let diseqtrace shower x y = fun st ->
   incr logged_diseq_counter;
-  (* State.constraints st |> Constraints.show ~env:(State.env st) |> print_endline; *)
-
   let ans = (x =/= y) st in
   (* printf "%d: (=/=) '%s' and '%s'" !logged_diseq_counter
     (shower (helper_of_state st) x)
@@ -1710,7 +1677,6 @@ module ManualReifiers = struct
 
 end;;
 
-let () = ();;
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
 @type 'a lnat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap;;
