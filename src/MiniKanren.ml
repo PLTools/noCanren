@@ -461,7 +461,12 @@ external inj_int : int -> (int, int logic) injected = "%identity"
 exception Not_a_value
 exception Occurs_check
 
-module Int = struct type t = int let compare : int -> int -> int = Pervasives.compare end
+module Int = struct
+  type t = int
+  let compare : int -> int -> int = Pervasives.compare
+  let equal : int -> int -> bool = Pervasives.(=)
+  let hash : int -> int = Hashtbl.hash
+end
 module MultiIntMap : sig
   type key = Int.t
   type 'a t
@@ -556,7 +561,7 @@ module Env :
 
     val empty  : unit -> t
     val fresh  : ?name:string -> scope:scope_t -> t -> 'a * t
-    val var    : (*?verbose:bool ->*) t -> 'a -> int option
+    val var    : (* ?verbose:bool -> *) t -> 'a -> int option
     val is_var : t -> 'a -> bool
   end =
   struct
@@ -612,7 +617,7 @@ module Env :
         printfn "  is says %s" (match ans with Some n -> sprintf "yes %d" n | None  -> "no");
       ans *)
 
-    let is_var env v = None <> var env v
+    let is_var env v = None <> var (* ~verbose:true *) env v
 
     (* Some tests for to check environment self-correctness *)
 (*
@@ -1229,33 +1234,85 @@ end*)
 (* module Constraints = DefaultConstraints *)
 module Constraints = FastConstraints
 
+
+module  Logger : sig
+  type t
+  val empty : unit -> t
+  val make_node : string -> t -> t
+end = struct
+  let lastIndex = ref 0
+  module H = Hashtbl.Make(Int)
+
+  type entry = int list ref * string
+  type t = int * entry H.t
+
+  let next () = incr lastIndex; !lastIndex
+
+  let empty () : t =
+    let i = next () in
+    let tbl = H.create 37 in
+    H.add tbl i (ref [], "root");
+    (i, tbl)
+
+  let make_node str (i, tbl) =
+    let j = next () in
+    try
+      let (xs, _) = H.find tbl i in
+      xs := j :: !xs;
+      H.add tbl j (ref [], str);
+      (j, tbl)
+    with Not_found -> assert false
+
+end
+
 module State =
   struct
-    type t = Env.t * Subst.t * Constraints.t * scope_t
-    let empty () = (Env.empty (), Subst.empty, Constraints.empty, new_scope ())
-    let env   (env, _, _, _) = env
-    let subst (_,s,_,_) = s
-    let constraints (_,_,cs,_) = cs
+    type t =
+      { env : Env.t
+      ; subst : Subst.t
+      ; constrs : Constraints.t
+      ; scope : scope_t
+      ; logger: Logger.t
+      }
 
-    let show  (env, subst, constr, scp) =
-      sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show ~env constr) scp
-    let new_var (e,_,_,scope) =
-      let (x,_) = Env.fresh ~scope e in
+    let empty () =
+      let env = Env.empty () in
+      let subst = Subst.empty in
+      let constrs = Constraints.empty in
+      let scope = new_scope () in
+      let logger = Logger.empty () in
+      { env; subst; constrs; scope; logger; }
+
+    let env   { env } = env
+    let subst { subst } = subst
+    let constraints { constrs } = constrs
+    let logger { logger } = logger
+
+    let branch st lg = { st with logger = lg }
+
+    let show  {env; subst; constrs; scope} =
+      sprintf "st {%s, %s} scope=%d" (Subst.show subst) (Constraints.show ~env constrs) scope
+
+    let new_var {env; scope} =
+      let (x,_) = Env.fresh ~scope env in
       let i = (!!!x : inner_logic).index in
       (x,i)
-    let incr_scope (e,subs,cs,scp) = (e,subs,cs, new_scope ())
+
+    let incr_scope st = { st with scope = new_scope () }
   end
 
 type 'a goal' = State.t -> 'a
 type goal = MKStream.t goal'
 
-let call_fresh f : State.t -> _ = fun (env, subst, constr, scope) ->
+let call_fresh f : State.t -> _ = State.(fun {env; scope} as st ->
   let x, env' = Env.fresh ~scope env in
-  f x (env', subst, constr, scope)
+  f x { st with env=env' }
+)
 
-let call_fresh_named name f = fun (env, subst, constr, scope) ->
+let call_fresh_named name f = State.(fun {env; scope} as st ->
   let x, env' = Env.fresh ~name ~scope env in
-  f x (env', subst, constr, scope)
+  f x { st with env=env' }
+)
 
 let unif_counter = ref 0
 let logged_unif_counter = ref 0
@@ -1268,7 +1325,10 @@ let report_counters () =
   printfn "total diseq calls : %d" !diseq_counter;
   printfn "logged diseq calls : %d" !logged_diseq_counter
 
-let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
+let (===) ?loc (x: _ injected) (y: _ injected) =
+  let open State in
+  fun {env; subst; constrs; scope; logger} as st ->
+
   (* we should always unify two injected types *)
   incr unif_counter;
 
@@ -1278,22 +1338,28 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
             printfn "\t%s" (generic_show ~maxdepth:10 y);
   );
 
+  (* let _ = State.show st |> printfn "%s" in *)
+  let _ = Logger.make_node "===" logger in
   match Subst.unify env x y scope subst with
   | None -> MKStream.nil
   | Some (prefix, s) ->
       try
-        let constr' = Constraints.check ~prefix env s constr in
-        MKStream.single (env, s, constr', scope)
+        (* let _ = Subst.show s |> printfn "%s" in *)
+        let constr' = Constraints.check ~prefix env s constrs in
+        MKStream.single { st with subst = s; constrs=constr' }
       with Disequality_violated -> MKStream.nil
 
-let (=/=) x y ((env, subst, constrs, scope) as st) =
+let (=/=) (x: _ injected) (y: _ injected) =
+  let open State in
+  fun {env; subst; constrs; scope; logger} as st ->
   (* For disequalities we unify in non-local scope to prevent defiling*)
+  let _ = Logger.make_node "=/=" logger in
   match Subst.unify env x y non_local_scope subst with
   | None -> MKStream.single st
   | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
   | Some (prefix,_) ->
-      let new_constrs = Constraints.extend ~prefix env constrs in
-      MKStream.single (env, subst, new_constrs, scope)
+      let constr' = Constraints.extend ~prefix env constrs in
+      MKStream.single { st with constrs=constr' }
 
 let delay : (unit -> goal) -> goal = fun g ->
   fun st -> MKStream.from_fun (fun () -> g () st)
@@ -1327,10 +1393,15 @@ let rec my_mplus_star xs st = match xs with
 | h::tl -> disj h (my_mplus_star tl) st
 
 (* "bind*" *)
-let rec (?&) = function
-| []   -> failwith "wrong argument of ?&"
-| [h]  -> h
-| x::y::tl -> ?& ((x &&& y)::tl)
+let (?&) : goal list -> goal = fun gs st ->
+  let node = Logger.make_node "bind*" @@ State.logger st in
+  let st = State.branch st node in
+  let rec helper = function
+  | []   -> failwith "wrong argument of ?&"
+  | [h]  -> h
+  | x::y::tl -> helper ((x &&& y)::tl)
+  in
+  helper gs st
 
 let bind_star = (?&)
 
@@ -1356,12 +1427,12 @@ let list_fold_right0 ~f ~initer xs =
 
 let conde: goal list -> goal = fun xs st ->
   let st = State.incr_scope st in
+  let node = Logger.make_node "conde" @@ State.logger st in
+  let st = State.branch st node in
   list_fold_right0 ~initer:(fun x -> x)
     xs
-    ~f:(fun g acc ->
-        begin
-          fun st -> MKStream.mplus (g st) @@ MKStream.inc (fun () -> acc st)
-        end
+    ~f:(fun g acc st ->
+          MKStream.mplus (g st) @@ MKStream.inc (fun () -> acc st)
       )
   |> (fun g -> MKStream.inc (fun ()  -> g st))
 
@@ -1415,7 +1486,7 @@ module ExtractDeepest =
   end
 
 type helper = < isVar : 'a . 'a -> bool >
-let helper_of_state st : helper =
+let helper_of_state : State.t -> helper = fun st ->
   !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end)
 
 class type ['a,'b] refined = object
@@ -1424,8 +1495,10 @@ class type ['a,'b] refined = object
   method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
 end
 
-let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs, scp) as st) ->
-  let ans = !!!(refine env s (Constraints.refine env s cs) (Obj.repr x)) in
+let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined =
+  let open State in
+  fun x ({env; subst; constrs} as st) ->
+  let ans = !!!(refine env subst (Constraints.refine env subst constrs) (Obj.repr x)) in
   let is_open = has_free_vars (Env.is_var env) (Obj.repr ans) in
   let c: helper = helper_of_state st in
 
@@ -1514,7 +1587,10 @@ let trace msg g = fun state ->
   printf "%s: %s\n%!" msg (State.show state);
   g state
 
-let refine_with_state (env,subs,cs,_) term = refine env subs (Constraints.refine env subs cs) (Obj.repr term)
+let refine_with_state =
+  let open State in
+  fun {env; subst; constrs} term ->
+    refine env subst (Constraints.refine env subst constrs) (Obj.repr term)
 
 let project1 ~msg : (helper -> 'b -> string) -> ('a, 'b) injected -> goal = fun shower q st ->
   printf "%s %s\n%!" msg (shower (helper_of_state st) @@ Obj.magic @@ refine_with_state st q);

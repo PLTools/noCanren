@@ -24,7 +24,7 @@ let a_and_b' b =
 let rec fives x =
   conde
     [ (x === !!5)
-    ; (fives x)
+    ; (delay @@ fun () -> fives x)
     ]
 
 let show_int       = show(int)
@@ -63,7 +63,7 @@ let _ =
   run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
-  run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));  
+  run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
   run_exn show_int       2  q qh (REPR (fun q   -> a_and_b' q                                      ));
