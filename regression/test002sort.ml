@@ -87,37 +87,36 @@ let _ =
 
 (* Making regular sorting from relational one *)
 let sort l =
-  List.prj_ground Nat.prj_ground @@
+  (List.prj_logic Nat.prj_logic) @@
   run q (sorto @@ inj_nat_list l)
-        (fun qs -> Stream.hd qs |> (fun rr -> rr#prj))
+        (fun qs -> Stream.hd qs |> (fun rr -> rr#refine (List.reify Nat.reify)))
 
 (* Veeeeery straightforward implementation of factorial *)
 let rec fact = function 0 -> 1 | n -> n * fact (n-1)
 
-
 (* Making permutations from relational sorting *)
 let perm l =
-  List.map (List.prj_ground Nat.prj_ground) @@
+  List.map (List.prj_logic Nat.prj_logic) @@
   run q (fun q -> sorto q @@ inj_nat_list (List.sort Pervasives.compare l))
         (fun qs ->
           qs |> Stream.take ~n:(fact @@ List.length l) |>
-          List.map (fun rr -> rr#prj))
+          List.map (fun rr -> rr#refine (List.reify Nat.reify) ))
 
 (* More hardcore version: no standard sorting required *)
 let perm' l =
-  List.map (List.prj_ground Nat.prj_ground) @@
+  List.map (List.prj_logic Nat.prj_logic) @@
   run q (fun q -> fresh (r) (sorto (inj_nat_list l) r) (sorto q r))
         (fun qs ->
           qs |> Stream.take ~n:(fact @@ List.length l)
-          |> List.map (fun rr -> rr#prj))
+          |> List.map (fun rr -> rr#refine (List.reify Nat.reify)))
 
 (* Entry point *)
 let _ =
   (* Sorting: *)
 
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort []);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [1]);
-  Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [2; 1]);
+  Printf.printf "%s\n\n%!" (show(List.logic) (show(int)) @@ sort []);
+  Printf.printf "%s\n\n%!" (show(List.logic) (show(int)) @@ sort [1]);
+  Printf.printf "%s\n\n%!" (show(List.logic) (show(int)) @@ sort [2; 1]);
   (* Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [3; 2; 1]);
   Printf.printf "%s\n\n%!" (show(list) (show(int)) @@ sort [4; 3; 2; 1]); *)
 
@@ -143,17 +142,17 @@ let _ =
 
   (* Permutations: *)
 
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm []);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm []);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1; 2]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1; 2; 3]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1; 2; 3; 4]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1; 2; 3; 4; 5]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
 
 
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' []);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2]);
-  Printf.printf "%s\n\n%!" (show(list) (show(list) (show(int))) @@ perm' [1; 2; 3]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm' []);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm' [1]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm' [1; 2]);
+  Printf.printf "%s\n\n%!" (show(list) (show(List.logic) (show(int))) @@ perm' [1; 2; 3]);
   ()

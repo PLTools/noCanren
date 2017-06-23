@@ -3,9 +3,17 @@ open GT
 open MiniKanren
 open Tester
 
-@type token = Id | Add | Mul with show
+module Token = struct
+  module T = struct
+    @type t = Id | Add | Mul with show;;
+    let fmap x = x
+  end
+  include T
+  include Fmap0(T)
 
-let show_token = show(token)
+end
+let show_token = GT.(show Token.t)
+open Token
 
 module GExpr =
   struct
@@ -26,6 +34,9 @@ module GExpr =
 
   let rec show_expr  e = show T.t show_expr e
   let rec show_lexpr e = show(logic) (show T.t show_lexpr) e
+
+  let reify_ = reify
+  let rec reify e = reify_ reify e
 
 end
 
@@ -74,13 +85,18 @@ let pExpr i r = fresh (i') (pTop i i' r) (eof i')
 
 let runE_exn n = run_exn show_expr n
 let show_stream xs = show(List.ground) show_token xs
+let show_lstream xs = show(List.logic) (show logic show_token) xs
+
+(* let (_:int) = runR *)
+let runE e  = runR GExpr.reify show_expr show_lexpr e
+let runS xs = runR (List.reify Token.reify) show_stream show_lstream xs
 
 let _ =
-  (* runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id]) q                              ));
-  runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id]) q               ));
-  runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id; !!Mul; !!Id]) q));
-  runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id; !!Add; !!Id]) q));
-  runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Add; !!Id; !!Mul; !!Id]) q));
-  runE_exn   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Add; !!Id; !!Add; !!Id]) q)); *)
-  run_exn show_stream 1   q   qh (REPR (fun q -> pExpr q (m (i ()) (i ()))                   ));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id]) q                              ));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id]) q               ));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id; !!Mul; !!Id]) q));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Mul; !!Id; !!Add; !!Id]) q));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Add; !!Id; !!Mul; !!Id]) q));
+  runE   1   q   qh (REPR (fun q -> pExpr (inj_list [!!Id; !!Add; !!Id; !!Add; !!Id]) q));
+  runS   1   q   qh (REPR (fun q -> pExpr q (m (i ()) (i ()))                   ));
   ()

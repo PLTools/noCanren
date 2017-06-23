@@ -45,6 +45,7 @@ let rec appendo a b ab =
     ]
 
 let runL n         = runR (List.reify ManualReifiers.int_reifier) show_int_list show_intl_list n
+let runInt n       = runR ManualReifiers.int_reifier show_int (show(logic)@@ show int) n
 
 let rec reverso a b =
   (* let (===) = unitrace (fun h t -> GT.(show List.logic @@ show logic (show int)) @@
@@ -60,14 +61,14 @@ let rec reverso a b =
 
 
 let _ =
-  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
-  run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));  
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
-  run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
-  run_exn show_int       2  q qh (REPR (fun q   -> a_and_b' q                                      ));
-  run_exn show_int      10  q qh (REPR (fun q   -> fives q                                         ));
+  runL    1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  runL    1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
+  runL    1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
+  runL    2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
+  runL     1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
+  runInt   1  q qh (REPR (fun q   -> a_and_b q                                       ));
+  runInt   2  q qh (REPR (fun q   -> a_and_b' q                                      ));
+  runInt  10  q qh (REPR (fun q   -> fives q                                         ));
   ()
 
 let _withFree =

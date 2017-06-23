@@ -114,7 +114,7 @@ let () =
        )
      ]
   in
-  run_exn show_int_list (-1) q qh (REPR (fun q -> remembero !1 (!1 % (!2 % (!1 %< !3))) q          ));
+  runIList              (-1) q qh (REPR (fun q -> remembero !1 (!1 % (!2 % (!1 %< !3))) q          ));
   runInt                (-1) q qh (REPR (fun q -> remembero !1 (!1 % (!2 %< !3)) (!1 % (!2 %< !3)) ));
 
    let rec rembero x ls out =
@@ -130,5 +130,5 @@ let () =
        )
      ]
    in
-   run_exn show_int_list (-1) q qh (REPR (fun q -> rembero !1 (!1 % (!2 % (!1 %< !3))) q          ));
+   runIList              (-1) q qh (REPR (fun q -> rembero !1 (!1 % (!2 % (!1 %< !3))) q          ));
    runInt                (-1) q qh (REPR (fun q -> rembero !1 (!1 % (!2 %< !3)) (!1 % (!2 %< !3)) ))

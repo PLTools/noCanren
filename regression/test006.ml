@@ -54,18 +54,18 @@ let a_la_quine q r s =
     ; evalo (app s q) r
     ]
 
+let runL n = runR glam_reifier show_rlam show_llam n
 let _ =
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> substo (v varX) varX (v varY) q                       ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
-  run_exn show_rlam 2    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) (v varY))        q     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX))        q) (v varY)     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX        q) (v varY)) (v varY)     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app            (v varX) (v varX)) q            ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (v varX)    q                                   ));
+  runL 1    q   qh (REPR (fun q   -> substo (v varX) varX (v varY) q                       ));
+  runL 1    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
+  runL 2    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
+  runL 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) (v varY))        q     ));
+  runL 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX))        q) (v varY)     ));
+  runL 1    q   qh (REPR (fun q   -> evalo (app (abs varX        q) (v varY)) (v varY)     ));
+  runL 1    q   qh (REPR (fun q   -> evalo (app            (v varX) (v varX)) q            ));
+  runL 1    q   qh (REPR (fun q   -> evalo (v varX)    q                                   ));
   ()
 
-let runL n = runR glam_reifier show_rlam show_llam n
 
 let _withFree =
   runL 1     q   qh (REPR (fun q     -> evalo (app q (v varX)) (v varX)             ));
