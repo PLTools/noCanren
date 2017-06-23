@@ -490,6 +490,7 @@ module Fmap3 (T : T3) :
 
 module ManualReifiers :
   sig
+    val bool_reifier: helper -> (bool, bool logic) injected -> bool logic
     val int_reifier: helper -> (int, int logic) injected -> int logic
     val string_reifier: helper -> (string, string logic) injected -> string logic
     val pair_reifier: (helper -> ('a,'b) injected -> 'b) ->
@@ -556,6 +557,8 @@ module Bool :
 
     (** A synonym for injected boolean *)
     type groundi = (ground, logic) injected
+
+    val reify : helper -> (ground, logic) injected -> logic
 
     (** Constants *)
     val false_ : groundi
@@ -643,6 +646,8 @@ module Nat :
     (** Project ground Peano number to plain int *)
     val prj_ground : ground -> int
 
+    val prj_logic : logic -> int
+
     (** A type synonym for injected nat *)
     type groundi = (ground, logic) injected
 
@@ -725,6 +730,7 @@ module List :
 
     (** Project ground lists to normal OCaml lists *)
     val prj_ground : ('a -> 'b) -> 'a ground -> 'b list
+    val prj_logic  : ('a -> 'b) -> 'a logic -> 'b logic
 
     (** A synonym for injected list *)
     type ('a,'b) groundi = ('a ground, 'b logic) injected
@@ -746,7 +752,7 @@ module List :
     val filtero : (('a, 'b) injected -> Bool.groundi -> goal) -> ('a, 'b) groundi -> ('a, 'b) groundi -> goal
 
     (** Relational lookup *)
-    val lookupo : (('a, 'b) injected -> Bool.groundi -> goal) -> ('a, 'b) groundi -> ('a option, 'b option logic) injected -> goal
+    val lookupo : (('a, 'b) injected -> Bool.groundi -> goal) -> ('a, 'b) groundi -> ('a option, 'b option logic') injected -> goal
 
     (** Boolean list disjunctions *)
     val anyo : (Bool.ground, Bool.logic) groundi -> Bool.groundi -> goal

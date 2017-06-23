@@ -1743,6 +1743,8 @@ module Bool =
     let show_ground  : ground  -> string = string_of_bool
 
     let inj b : boolf = inj@@lift b
+
+    let reify = ManualReifiers.bool_reifier
   end
 
 let eqo x y t =
@@ -1809,6 +1811,11 @@ module Nat = struct
     let rec of_int n = if n <= 0 then O else S (of_int (n-1))
     let rec to_int   = function O -> 0 | S n -> 1 + to_int n
     let prj_ground   = to_int
+
+    let rec prj_logic = function
+    | Var _ -> failwith "free variables in a term"
+    | Value O -> 0
+    | Value (S n) -> 1 + prj_logic n
 
     let rec inj_ground: ground -> logic = fun n ->
       Value (GT.(gmap lnat) inj_ground n)
@@ -1971,6 +1978,11 @@ module List =
     let rec prj_ground : ('a -> 'b) -> 'a ground -> 'b list = fun f -> function
     | Nil -> []
     | Cons (x,xs) -> (f x)::(prj_ground f xs)
+
+    let rec prj_logic : ('a -> 'b) -> 'a logic -> 'b logic = fun f -> function
+    | Var (x,cs) -> Var (x, List.map (prj_logic f) cs)
+    | Value Nil -> Value Nil
+    | Value (Cons (x,xs)) -> Value (Cons (f x, prj_logic f xs))
 
     type ('a,'b) groundi = ('a ground, 'b logic) injected
 
