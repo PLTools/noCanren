@@ -1530,7 +1530,7 @@ let helper_of_state st : helper =
 
 class type ['a,'b] refined = object
   method is_open: bool
-  method refine: (helper -> ('a, 'b) injected -> 'b) -> 'b
+  method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
 end
 
 let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs, scp) as st) ->
@@ -1539,7 +1539,7 @@ let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s,
 
   object(self)
     method is_open = true
-    method refine refiner =
+    method refine refiner ~inj =
       refiner c ans
   end
 
