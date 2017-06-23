@@ -208,9 +208,21 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         | [body] ->
             (* we omitte bind* here*)
             pamk_e ~need_st:true mapper body
+        | [a; b] ->
+          [%expr
+            MKStream.bind
+              [%e pamk_e ~need_st:true mapper a]
+              (fun st -> [%e pamk_e ~need_st:true mapper b])
+          ]
         | body ->
-            let xs = List.map (pamk_e ~need_st:false mapper) body in
-            [%expr ?& [%e Ast_convenience.list xs ] st ]
+              list_fold body
+                ~initer:(fun b -> pamk_e ~need_st:true mapper b)
+                ~f:(fun acc x -> [%expr
+                    MKStream.bind
+                      [%e acc]
+                      (fun st -> [%e pamk_e ~need_st:true mapper x])
+                  ])
+
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
