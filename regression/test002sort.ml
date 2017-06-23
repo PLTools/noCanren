@@ -89,7 +89,7 @@ let _ =
 let sort l =
   (List.prj_logic Nat.prj_logic) @@
   run q (sorto @@ inj_nat_list l)
-        (fun qs -> Stream.hd qs |> (fun rr -> rr#refine (List.reify Nat.reify)))
+        (fun qs -> Stream.hd qs |> (fun rr -> rr#refine (List.reify Nat.reify) ~inj:(fun _ -> assert false)))
 
 (* Veeeeery straightforward implementation of factorial *)
 let rec fact = function 0 -> 1 | n -> n * fact (n-1)
@@ -100,7 +100,7 @@ let perm l =
   run q (fun q -> sorto q @@ inj_nat_list (List.sort Pervasives.compare l))
         (fun qs ->
           qs |> Stream.take ~n:(fact @@ List.length l) |>
-          List.map (fun rr -> rr#refine (List.reify Nat.reify) ))
+          List.map (fun rr -> rr#refine (List.reify Nat.reify) ~inj:(fun _ -> assert false) ))
 
 (* More hardcore version: no standard sorting required *)
 let perm' l =
@@ -108,7 +108,7 @@ let perm' l =
   run q (fun q -> fresh (r) (sorto (inj_nat_list l) r) (sorto q r))
         (fun qs ->
           qs |> Stream.take ~n:(fact @@ List.length l)
-          |> List.map (fun rr -> rr#refine (List.reify Nat.reify)))
+          |> List.map (fun rr -> rr#refine (List.reify Nat.reify) ~inj:(fun _ -> assert false)))
 
 (* Entry point *)
 let _ =

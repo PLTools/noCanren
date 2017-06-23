@@ -29,7 +29,7 @@ let run_gen onOK onFree n num handler (repr, goal) =
         match Stream.retrieve ~n:1 st with
         | [],_ -> raise NoMoreAnswers
         | [rr],tl ->
-          onFree i name rr#refine;
+          onFree i name (fun r -> rr#refine r ~inj:(fun _ -> assert false));
           (name,tl)
         | _ -> assert false
       ) pairs
