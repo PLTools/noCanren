@@ -404,13 +404,6 @@ let (!!!) = Obj.magic;;
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a with show, gmap, html, eq, compare, foldl, foldr
 
-(* miniKanren-related stuff starts here *)
-type ('a, 'b) injected = 'a
-
-external lift: 'a -> ('a, 'a) injected = "%identity"
-external inj: ('a, 'b) injected -> ('a, 'b logic) injected = "%identity"
-;;
-
 let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x ->
   let rec helper = function
   | Value x -> f x
@@ -447,7 +440,197 @@ let logic = {logic with
           ()
           x
    end
-};;
+}
+;;
+(* miniKanren-related stuff starts here *)
+
+(* The [token_t] type is use to connect logic variables with environment where they were created *)
+@type token_env = GT.int (* with show,gmap,html,eq,compare,foldl,foldr *);;
+
+(* Scope there are just ints but in faster-MK they use reference equality *)
+type scope_t = int
+let non_local_scope : scope_t = -6
+
+let new_scope : unit -> scope_t =
+  let scope = ref 0 in (* TODO: maybe put this into Env.t *)
+  fun () -> (incr scope; !scope)
+
+(* Global token will not be exported outside and will be used to detect the value
+ * was actually created by us *)
+type token_mk = int list
+let global_token: token_mk = [-8];;
+
+type inner_logic =
+  { token_mk: token_mk; token_env: token_env; index: int
+  ; mutable subst: Obj.t option; scope: scope_t (* set-var-val! stuff *)
+  (* in the substitution we will store pair the same as in subst *)
+  ; constraints: Obj.t list
+  }
+
+let make_inner_logic ~envt ~scope index = { token_env = envt; token_mk = global_token
+  ; index; subst = None; scope; constraints = [] }
+
+let is_inner_unbound x = (x.subst = None)
+let subst_inner_term lo term = (lo.subst <- Some term)
+
+let scope_of_inner { scope; _ } : scope_t = scope
+let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
+
+type ('a, 'b) injected = 'a
+
+external lift: 'a -> ('a, 'a) injected = "%identity"
+external inj: ('a, 'b) injected -> ('a, 'b logic) injected = "%identity"
+
+(* ************************************************************************** *)
+module type T1 = sig
+  type 'a t
+  val fmap : ('a -> 'b) -> 'a t -> 'b t
+end
+module type T2 = sig
+  type ('a, 'b) t
+  val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
+end
+module type T3 = sig
+  type ('a, 'b, 'c) t
+  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('a, 'b, 'c) t -> ('q, 'r, 's) t
+end
+module type T4 = sig
+  type ('a, 'b, 'c, 'd) t
+  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('a, 'b, 'c, 'd) t -> ('q, 'r, 's, 't) t
+end
+module type T5 = sig
+  type ('a, 'b, 'c, 'd, 'e) t
+  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('a, 'b, 'c, 'd, 'e) t -> ('q, 'r, 's, 't, 'u) t
+end
+module type T6 = sig
+  type ('a, 'b, 'c, 'd, 'e, 'f) t
+  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('f -> 'v) -> ('a, 'b, 'c, 'd, 'e, 'f) t -> ('q, 'r, 's, 't, 'u, 'v) t
+end
+
+type helper = < isVar : 'a . 'a -> bool >
+
+let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injected -> 'b) -> 'b = fun c x r ->
+  if c#isVar x
+  (* TODO: maybe create one more isVar with type : 'a -> inner_logic option *)
+  then
+    let x : inner_logic = !!!x in
+    !!!(Var (x.index, List.map (!!!(r c)) x.constraints))
+  else failwith "Bad argument of var_of_injected: it should be logic variable"
+
+module Fmap1 (T : T1) = struct
+  external distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected = "%identity"
+
+  let rec reify: (helper -> ('a,'b) injected -> 'b) -> helper ->
+        ('a T.t, 'b T.t logic as 'r) injected -> 'r
+    = fun arg_r c x ->
+      if c#isVar x
+      then var_of_injected_exn c x (reify arg_r)
+      else Value (T.fmap (arg_r c) x)
+end
+
+module Fmap2 (T : T2) = struct
+  external distrib : (('a,'b) injected, ('c, 'd) injected) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) injected = "%identity"
+
+  let rec reify:
+        (helper -> ('a,'b) injected -> 'b) ->
+        (helper -> ('c,'d) injected -> 'd) ->
+         helper -> (('a,'c) T.t, ('b,'d) T.t logic) injected -> ('b,'d) T.t logic
+    = fun r1 r2 c x ->
+      if c#isVar x then var_of_injected_exn c x (reify r1 r2)
+      else Value (T.fmap (r1 c) (r2 c) x)
+end
+
+module Fmap3 (T : T3) = struct
+  type ('a, 'b, 'c) t = ('a, 'b, 'c) T.t
+  external distrib : (('a, 'b) injected, ('c, 'd) injected, ('e, 'f) injected) t -> (('a, 'c, 'e) t, ('b, 'd, 'f) t) injected = "%identity"
+
+  let rec reify r1 r2 r3 (c: helper) x =
+    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3)
+    else Value (T.fmap (r1 c) (r2 c) (r3 c) x)
+end
+
+module Fmap4 (T : T4) = struct
+  type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) T.t
+  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) t ->
+                     (('a, 'c, 'e, 'g) t, ('b, 'd, 'f, 'h) t) injected = "%identity"
+
+  let rec reify r1 r2 r3 r4 (c: helper) x =
+    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4)
+    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) x)
+end
+
+module Fmap5 (T : T5) = struct
+  type ('a, 'b, 'c, 'd, 'e) t = ('a, 'b, 'c, 'd, 'e) T.t
+  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected, ('i, 'j) injected) t ->
+                     (('a, 'c, 'e, 'g, 'i) t, ('b, 'd, 'f, 'h, 'j) t) injected = "%identity"
+
+  let rec reify r1 r2 r3 r4 r5 (c: helper) x =
+    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5)
+    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) x)
+end
+
+module Fmap6 (T : T6) = struct
+  type ('a, 'b, 'c, 'd, 'e, 'f) t = ('a, 'b, 'c, 'd, 'e, 'f) T.t
+  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected, ('i, 'j) injected, ('k, 'l) injected) t ->
+                     (('a, 'c, 'e, 'g, 'i, 'k) t, ('b, 'd, 'f, 'h, 'j, 'l) t) injected = "%identity"
+
+  let rec reify r1 r2 r3 r4 r5 r6 (c: helper) x =
+    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5 r6)
+    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) (r6 c) x)
+end
+
+module Pair = struct
+  module X = struct
+    type ('a,'b) t = 'a * 'b
+    let fmap f g (x,y) = (f x, g y)
+  end
+  include Fmap2(X)
+end
+
+module Tuple3 = Fmap3(struct
+    type ('a,'b,'c) t = 'a * 'b * 'c
+    let fmap f g h (x,y,z) = (f x, g y, h z)
+  end)
+
+module ManualReifiers = struct
+  let rec simple_reifier: helper -> ('a, 'a logic) injected -> 'a logic = fun c n ->
+    if c#isVar n
+    then var_of_injected_exn c n simple_reifier
+    else Value  n
+
+  let bool_reifier : helper -> (bool, bool logic) injected -> bool logic =
+    simple_reifier
+
+  let rec int_reifier: helper -> (int, int logic) injected -> int logic = fun c n ->
+    if c#isVar n
+    then var_of_injected_exn c n int_reifier
+    else Value n
+
+  let rec string_reifier: helper -> (string, string logic) injected -> string logic = fun c x ->
+    if c#isVar x
+    then var_of_injected_exn c x string_reifier
+    else Value  x
+
+  let rec pair_reifier: (helper -> ('a,'b) injected -> 'b) ->
+                        (helper -> ('c,'d) injected -> 'd) ->
+                        helper -> ('a * 'c, ('b * 'd) logic as 'r) injected -> 'r
+    = fun r1 r2 c p ->
+      if c#isVar p then var_of_injected_exn c p (pair_reifier r1 r2)
+      else Pair.reify r1 r2 c p
+
+  let rec tuple3 = fun r1 r2 r3 (c: helper) p ->
+    if c#isVar p
+    then var_of_injected_exn c p (tuple3 r1 r2 r3)
+    else Tuple3.reify r1 r2 r3 c p
+
+end;;
+
+(** Importand part about reification and injected values finishes*)
+
+
+
+
+
 
 let (!!) x = inj (lift x)
 
@@ -485,43 +668,6 @@ end = struct
   let find_exn : key -> 'a t -> 'a list = M.find
   let replace: key -> 'a list -> 'a t -> 'a t = M.add
 end;;
-
-
-(* The [token_t] type is use to connect logic variables with environment where they were created *)
-@type token_env = GT.int (* with show,gmap,html,eq,compare,foldl,foldr *);;
-
-(* Scope there are just ints but in faster-MK they use reference equality *)
-type scope_t = int
-let non_local_scope : scope_t = -6
-
-let new_scope : unit -> scope_t =
-  let scope = ref 0 in (* TODO: maybe put this into Env.t *)
-  fun () -> (incr scope; !scope)
-
-(* Global token will not be exported outside and will be used to detect the value
- * was actually created by us *)
-type token_mk = int list
-let global_token: token_mk = [-8];;
-
-type inner_logic =
-  { token_mk: token_mk; token_env: token_env; index: int
-  ; mutable subst: Obj.t option; scope: scope_t (* set-var-val! stuff *)
-  (* in the substitution we will store pair the same as in subst *)
-  ; constraints: Obj.t list
-  }
-(*
-let unbound : Obj.t =
-  Obj.repr "unbound" *)
-  (* Obj.repr [-13] *)
-
-let make_inner_logic ~envt ~scope index = { token_env = envt; token_mk = global_token
-  ; index; subst = None; scope; constraints = [] }
-
-let is_inner_unbound x = (x.subst = None)
-let subst_inner_term lo term = (lo.subst <- Some term)
-
-let scope_of_inner { scope; _ } : scope_t = scope
-let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
 
 let pretty_generic_show ?(maxdepth= 99999) is_var x =
   let x = Obj.repr x in
@@ -664,10 +810,6 @@ module Subst :
     val pretty_show : ('a -> bool) -> t -> string
   end = struct
 
-    (* module InnerLogicKey = struct
-      type t = inner_logic
-      let compare : t -> t -> int = (compare: int -> int -> int)
-    end *)
     module M = Map.Make (Int)
 
     (* map from var indicies to tuples of (actual vars, value) *)
@@ -703,9 +845,6 @@ module Subst :
       match u.subst with
       | Some t -> {lvar=u; new_val=t}
       | None   ->  M.find !!!ui map
-      (* if is_inner_unbound u
-      then M.find !!!ui map
-      else !!!(u.subst) *)
 
     let rec walk : Env.t -> 'a -> t -> 'a = fun env term subst ->
       let rec helper x =
@@ -791,17 +930,7 @@ module Subst :
           * if we do unification after the fresh, then if case of failure unification it doesn't matter
             that variable will be distructively substituted: we will not look on these variables in future.
         *)
-      let make_walk_func subs = fun idx var ->
-        (* We should check
-            * var itself in case of set-var-val optimization
-            * substitution if it was added before
-        *)
-        match var.subst with
-        | Some term -> !!!term
-        | None ->
-            try new_val @@ M.find var.index subs
-            with Not_found -> !!!var
-      in
+
       let extend xi x term (prefix,sub1) =
         if occurs env xi term sub1 then raise Occurs_check
         else
@@ -1002,7 +1131,7 @@ struct
         (* New variable bindings can be not in the substitution. N.B. set-var-val optimization *)
         (* TODO: Maybe pass substitution here and use find function form Subst module *)
         match first_var.subst with
-        | Some term -> Some {lvar=first_var; new_val=term}
+        | Some term -> Some { Subst.lvar=first_var; Subst.new_val=term}
         | None -> None
       end
 
@@ -1017,39 +1146,21 @@ struct
     (* printfn "Constraints.check with prefix %s" (show_single ~env prefix);
     printfn "store is:\n%s" (show ~env c_store); *)
 
-
-    (* let rec apply_subst = function
-    | [] -> []
-    | cnt::tl -> begin
-        match Subst.unify env !!!(cnt.Subst.lvar) cnt.Subst.new_val non_local_scope subst with
-        | None   -> raise ReallyNotEqual
-        | Some ([], _) -> raise Disequality_violated
-        | Some (pr, _) -> pr @ tl
-      end
-    in *)
-
     let revisit_constraint c : revisiting_result =
       (* printfn "revisiting single constraint";
       printfn "  %s" (show_single ~env c); *)
       let rec helper = function
       | [] -> Violated
-      | (h::tl) as cs ->
+      | h::tl ->
           match Subst.(unify env !!!(h.Subst.lvar) h.Subst.new_val) non_local_scope subst with
           | None -> (* non-unifiable, we can forget a constraint *)
               Obsolete
           | Some ([],_) -> helper tl
           | Some ((ph::_) as new_prefix, _)  ->
-              Reworked (ph.lvar.index, new_prefix@tl)
+              Reworked (ph.Subst.lvar.index, new_prefix@tl)
       in
-
-      assert (c<>[]);
-      (* let h = List.hd c in
-      match Env.var env h.Subst.new_val with
-      | Some ni ->
-          let tl = List.tl c in
-          Some (ni, {new_val=Obj.repr h.Subst.lvar; lvar = !!!(h.Subst.new_val)} :: tl)
-      | None -> *)
-          helper c
+      (* assert (c<>[]); *)
+      helper c
     in
 
     let rec loop2 map = function
@@ -1061,15 +1172,14 @@ struct
               ~f:(fun (acc_cur,acc_other) cs ->
                     match revisit_constraint cs with
                     | Violated -> raise Disequality_violated
-                    | Reworked (idx, new_one) when idx = h.lvar.index ->
-                        printfn "B";
+                    | Reworked (idx, new_one) when idx = h.Subst.lvar.index ->
                         (new_one::acc_cur, acc_other)
                     | Reworked (idx, new_one) ->
                         (acc_cur, (idx,new_one)::acc_other)
                     | Obsolete -> (acc_cur, acc_other)
                 )
         in
-        let map = M.replace h.lvar.index acc_cur map in
+        let map = M.replace h.Subst.lvar.index acc_cur map in
         let map = ListLabels.fold_left ~init:map acc_other ~f:(fun acc (i,cs) -> M.add1 i cs acc) in
         (* We don't need to check newly created constraint with current prefix because it was done
             in a function [revisit_constraint]
@@ -1147,20 +1257,17 @@ struct
 
   let refine: Env.t -> Subst.t -> t -> inner_logic -> Obj.t list = fun env subst cs term ->
     (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
-    let maybe_swap =
+    let maybe_swap cnt =
       let open Subst in
       (* We always refine logic variables by design, so we can omit checking that term is a variable *)
-      let n = term.index in
-      (*match Env.var env term with
-      | None   -> (fun p -> p)
-      | Some n -> *) (fun cnt ->
-                    if cnt.new_val == !!!term then { lvar = !!!term; new_val = Obj.repr cnt.lvar }
-                    else cnt)
+      (* TODO: I'm not sure that maybe_swap is still needed *)
+      if cnt.new_val == !!!term
+      then { lvar = !!!term; new_val = Obj.repr cnt.lvar }
+      else cnt
     in
     ListLabels.map ~f:(fun prefix ->
       (* For every constraint we need to simplify using current substitution because previously
          we checked only head of the constraint *)
-      (* let prefix = simplify_single_constraint ~env ~subst:base_subst maybe_swap prefix in *)
       let cs_sub = Subst.merge_a_prefix_unsafe ~scope:non_local_scope prefix Subst.empty in
       let dest = Subst.walk env !!!term cs_sub in
       assert (term <> dest);
@@ -1271,12 +1378,12 @@ let report_counters () =
 let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
   (* we should always unify two injected types *)
   incr unif_counter;
-
+(*
   mylog (fun () ->
             printfn "unify";
             printfn "\t%s" (generic_show ~maxdepth:10 x);
             printfn "\t%s" (generic_show ~maxdepth:10 y);
-  );
+  ); *)
 
   match Subst.unify env x y scope subst with
   | None -> MKStream.nil
@@ -1287,7 +1394,7 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
       with Disequality_violated -> MKStream.nil
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
-  (* For disequalities we unify in non-local scope to prevent defiling*)
+  (* For disequalities we unify in non-local scope to prevent defiling *)
   match Subst.unify env x y non_local_scope subst with
   | None -> MKStream.single st
   | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
@@ -1396,7 +1503,6 @@ module ExtractDeepest =
       ((a, foo), base)
   end
 
-type helper = < isVar : 'a . 'a -> bool >
 let helper_of_state st : helper =
   !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end)
 
@@ -1533,149 +1639,7 @@ let diseqtrace shower x y = fun st ->
     (shower (helper_of_state st) y);
   if MKStream.is_nil ans then printfn "  -"
   else  printfn "  +"; *)
-  ans
-
-(* ************************************************************************** *)
-module type T1 = sig
-  type 'a t
-  val fmap : ('a -> 'b) -> 'a t -> 'b t
-end
-module type T2 = sig
-  type ('a, 'b) t
-  val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
-end
-module type T3 = sig
-  type ('a, 'b, 'c) t
-  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('a, 'b, 'c) t -> ('q, 'r, 's) t
-end
-module type T4 = sig
-  type ('a, 'b, 'c, 'd) t
-  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('a, 'b, 'c, 'd) t -> ('q, 'r, 's, 't) t
-end
-module type T5 = sig
-  type ('a, 'b, 'c, 'd, 'e) t
-  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('a, 'b, 'c, 'd, 'e) t -> ('q, 'r, 's, 't, 'u) t
-end
-module type T6 = sig
-  type ('a, 'b, 'c, 'd, 'e, 'f) t
-  val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('f -> 'v) -> ('a, 'b, 'c, 'd, 'e, 'f) t -> ('q, 'r, 's, 't, 'u, 'v) t
-end
-
-let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injected -> 'b) -> 'b = fun c x r ->
-  if c#isVar x
-  (* TODO: maybe create one more isVar with type : 'a -> inner_logic option *)
-  then
-    let x : inner_logic = !!!x in
-    !!!(Var (x.index, List.map (!!!(r c)) x.constraints))
-  else failwith "Bad argument of var_of_injected: it should be logic variable"
-
-module Fmap1 (T : T1) = struct
-  external distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected = "%identity"
-
-  let rec reify: (helper -> ('a,'b) injected -> 'b) -> helper ->
-        ('a T.t, 'b T.t logic as 'r) injected -> 'r
-    = fun arg_r c x ->
-      if c#isVar x
-      then var_of_injected_exn c x (reify arg_r)
-      else Value (T.fmap (arg_r c) x)
-end
-
-module Fmap2 (T : T2) = struct
-  external distrib : (('a,'b) injected, ('c, 'd) injected) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) injected = "%identity"
-
-  let rec reify:
-        (helper -> ('a,'b) injected -> 'b) ->
-        (helper -> ('c,'d) injected -> 'd) ->
-         helper -> (('a,'c) T.t, ('b,'d) T.t logic) injected -> ('b,'d) T.t logic
-    = fun r1 r2 c x ->
-      if c#isVar x then var_of_injected_exn c x (reify r1 r2)
-      else Value (T.fmap (r1 c) (r2 c) x)
-end
-
-module Fmap3 (T : T3) = struct
-  type ('a, 'b, 'c) t = ('a, 'b, 'c) T.t
-  external distrib : (('a, 'b) injected, ('c, 'd) injected, ('e, 'f) injected) t -> (('a, 'c, 'e) t, ('b, 'd, 'f) t) injected = "%identity"
-
-  let rec reify r1 r2 r3 (c: helper) x =
-    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) x)
-end
-
-module Fmap4 (T : T4) = struct
-  type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) T.t
-  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected) t ->
-                     (('a, 'c, 'e, 'g) t, ('b, 'd, 'f, 'h) t) injected = "%identity"
-
-  let rec reify r1 r2 r3 r4 (c: helper) x =
-    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) x)
-end
-
-module Fmap5 (T : T5) = struct
-  type ('a, 'b, 'c, 'd, 'e) t = ('a, 'b, 'c, 'd, 'e) T.t
-  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected, ('i, 'j) injected) t ->
-                     (('a, 'c, 'e, 'g, 'i) t, ('b, 'd, 'f, 'h, 'j) t) injected = "%identity"
-
-  let rec reify r1 r2 r3 r4 r5 (c: helper) x =
-    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) x)
-end
-
-module Fmap6 (T : T6) = struct
-  type ('a, 'b, 'c, 'd, 'e, 'f) t = ('a, 'b, 'c, 'd, 'e, 'f) T.t
-  external distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected, ('g, 'h) injected, ('i, 'j) injected, ('k, 'l) injected) t ->
-                     (('a, 'c, 'e, 'g, 'i, 'k) t, ('b, 'd, 'f, 'h, 'j, 'l) t) injected = "%identity"
-
-  let rec reify r1 r2 r3 r4 r5 r6 (c: helper) x =
-    if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5 r6)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) (r6 c) x)
-end
-
-module Pair = struct
-  module X = struct
-    type ('a,'b) t = 'a * 'b
-    let fmap f g (x,y) = (f x, g y)
-  end
-  include Fmap2(X)
-end
-
-module Tuple3 = Fmap3(struct
-    type ('a,'b,'c) t = 'a * 'b * 'c
-    let fmap f g h (x,y,z) = (f x, g y, h z)
-  end)
-
-module ManualReifiers = struct
-  let rec simple_reifier: helper -> ('a, 'a logic) injected -> 'a logic = fun c n ->
-    if c#isVar n
-    then var_of_injected_exn c n simple_reifier
-    else Value  n
-
-  let bool_reifier : helper -> (bool, bool logic) injected -> bool logic =
-    simple_reifier
-
-  let rec int_reifier: helper -> (int, int logic) injected -> int logic = fun c n ->
-    if c#isVar n
-    then var_of_injected_exn c n int_reifier
-    else Value n
-
-  let rec string_reifier: helper -> (string, string logic) injected -> string logic = fun c x ->
-    if c#isVar x
-    then var_of_injected_exn c x string_reifier
-    else Value  x
-
-  let rec pair_reifier: (helper -> ('a,'b) injected -> 'b) ->
-                        (helper -> ('c,'d) injected -> 'd) ->
-                        helper -> ('a * 'c, ('b * 'd) logic as 'r) injected -> 'r
-    = fun r1 r2 c p ->
-      if c#isVar p then var_of_injected_exn c p (pair_reifier r1 r2)
-      else Pair.reify r1 r2 c p
-
-  let rec tuple3 = fun r1 r2 r3 (c: helper) p ->
-    if c#isVar p
-    then var_of_injected_exn c p (tuple3 r1 r2 r3)
-    else Tuple3.reify r1 r2 r3 c p
-
-end;;
+  ans;;
 
 (* ***************************** a la relational StdLib here ***************  *)
 @type ('a, 'l) llist = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
