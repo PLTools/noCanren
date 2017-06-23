@@ -260,13 +260,13 @@ class type ['a,'b] refined = object
     Get the answer as plain term. Raises exception [Not_a_value] when only terms with free variables
     are available.
   *)
-  method prj: 'a
+  (* method prj: 'a *)
 
   (**
     Get the answer as non-flat value. If the actual answer is a flat value it will be injected using
     the function provided.
    *)
-  method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
+  method refine: (helper -> ('a, 'b) injected -> 'b) -> 'b
 end
 
 (** A type to refine a stream of states into the stream of answers (w.r.t. some known logic variable *)

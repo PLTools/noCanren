@@ -479,7 +479,7 @@ let scope_eq (a: scope_t) (b: scope_t) = (compare a b = 0)
 type ('a, 'b) injected = 'a
 
 external lift: 'a -> ('a, 'a) injected = "%identity"
-external inj: ('a, 'b) injected -> ('a, 'b logic) injected = "%identity"
+let inj: ('a, 'b) injected -> ('a, 'b logic) injected = fun x -> !!!(Value x)
 
 (* ************************************************************************** *)
 module type T0 = sig
@@ -539,7 +539,9 @@ module Fmap1 (T : T1) = struct
     = fun arg_r c x ->
       if c#isVar x
       then var_of_injected_exn c x (reify arg_r)
-      else Value (T.fmap (arg_r c) x)
+      else match !!!x with
+        | Value x -> Value (T.fmap (arg_r c) x)
+        | _ -> assert false
 end
 
 module Fmap2 (T : T2) = struct
@@ -551,7 +553,9 @@ module Fmap2 (T : T2) = struct
          helper -> (('a,'c) T.t, ('b,'d) T.t logic) injected -> ('b,'d) T.t logic
     = fun r1 r2 c x ->
       if c#isVar x then var_of_injected_exn c x (reify r1 r2)
-      else Value (T.fmap (r1 c) (r2 c) x)
+      else match !!!x with
+        | Value x -> Value (T.fmap (r1 c) (r2 c) x)
+        | _ -> assert false
 end
 
 module Fmap3 (T : T3) = struct
@@ -560,7 +564,8 @@ module Fmap3 (T : T3) = struct
 
   let rec reify r1 r2 r3 (c: helper) x =
     if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) x)
+    else match !!!x with
+      | Value x -> Value (T.fmap (r1 c) (r2 c) (r3 c) x)
 end
 
 module Fmap4 (T : T4) = struct
@@ -570,7 +575,8 @@ module Fmap4 (T : T4) = struct
 
   let rec reify r1 r2 r3 r4 (c: helper) x =
     if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) x)
+    else match !!!x with
+      | Value x -> Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) x)
 end
 
 module Fmap5 (T : T5) = struct
@@ -580,7 +586,8 @@ module Fmap5 (T : T5) = struct
 
   let rec reify r1 r2 r3 r4 r5 (c: helper) x =
     if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) x)
+    else match !!!x with
+      | Value x -> Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) x)
 end
 
 module Fmap6 (T : T6) = struct
@@ -590,7 +597,8 @@ module Fmap6 (T : T6) = struct
 
   let rec reify r1 r2 r3 r4 r5 r6 (c: helper) x =
     if c#isVar x then var_of_injected_exn c x (reify r1 r2 r3 r4 r5 r6)
-    else Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) (r6 c) x)
+    else match !!!x with
+      | Value x -> Value (T.fmap (r1 c) (r2 c) (r3 c) (r4 c) (r5 c) (r6 c) x)
 end
 
 module Pair = struct
@@ -610,7 +618,7 @@ module ManualReifiers = struct
   let rec simple_reifier: helper -> ('a, 'a logic) injected -> 'a logic = fun c n ->
     if c#isVar n
     then var_of_injected_exn c n simple_reifier
-    else Value  n
+    else !!!n
 
   let bool_reifier : helper -> (bool, bool logic) injected -> bool logic =
     simple_reifier
@@ -618,12 +626,12 @@ module ManualReifiers = struct
   let rec int_reifier: helper -> (int, int logic) injected -> int logic = fun c n ->
     if c#isVar n
     then var_of_injected_exn c n int_reifier
-    else Value n
+    else !!! n
 
   let rec string_reifier: helper -> (string, string logic) injected -> string logic = fun c x ->
     if c#isVar x
     then var_of_injected_exn c x string_reifier
-    else Value  x
+    else !!!x
 
   let rec pair_reifier: (helper -> ('a,'b) injected -> 'b) ->
                         (helper -> ('c,'d) injected -> 'd) ->
@@ -639,21 +647,21 @@ module ManualReifiers = struct
 
 end;;
 
+let (!!) x = inj (lift x)
+
+let inj_pair : ('a, 'c) injected -> ('b,'d) injected -> ('a * 'b, ('c * 'd) logic) injected =
+  fun x y -> !!!(Value (x, y))
+
+let inj_tuple3 a b c = !!!(Value (a,b,c))
+
+let inj_int : int -> (int, int logic) injected = fun x -> !!x
+
 (** Importand part about reification and injected values finishes*)
 
 
 
 
 
-
-let (!!) x = inj (lift x)
-
-let inj_pair : ('a, 'c) injected -> ('b,'d) injected -> ('a * 'b, ('c * 'd) logic) injected =
-  fun x y -> (x, y)
-
-let inj_tuple3 a b c = (a,b,c)
-
-external inj_int : int -> (int, int logic) injected = "%identity"
 
 exception Not_a_value
 exception Occurs_check
@@ -1522,20 +1530,17 @@ let helper_of_state st : helper =
 
 class type ['a,'b] refined = object
   method is_open: bool
-  method prj: 'a
-  method refine: (helper -> ('a, 'b) injected -> 'b) -> inj:('a -> 'b) -> 'b
+  method refine: (helper -> ('a, 'b) injected -> 'b) -> 'b
 end
 
 let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) refined = fun x ((env, s, cs, scp) as st) ->
   let ans = !!!(refine env s (Constraints.refine env s cs) (Obj.repr x)) in
-  let is_open = has_free_vars (Env.is_var env) (Obj.repr ans) in
   let c: helper = helper_of_state st in
 
   object(self)
-    method is_open = is_open
-    method prj = if self#is_open then raise Not_a_value else !!!ans
-    method refine refiner ~inj =
-      if self#is_open then refiner c ans else inj ans
+    method is_open = true
+    method refine refiner =
+      refiner c ans
   end
 
 module R : sig
@@ -1750,7 +1755,7 @@ let neqo x y t =
   conde [
     (x =/= y) &&& (t === Bool.true_);
     (x === y) &&& (t === Bool.false_);
-  ];;
+  ]
 
 module Nat = struct
     type 'a logic' = 'a logic
