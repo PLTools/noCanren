@@ -634,6 +634,9 @@ module Nat :
     (** A type synonym for injected nat *)
     type groundi = (ground, logic) injected
 
+    val o : groundi
+    val s : groundi -> groundi
+
     (** Relational addition *)
     val addo  : groundi -> groundi -> groundi -> goal
 
