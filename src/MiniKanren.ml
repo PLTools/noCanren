@@ -80,11 +80,11 @@ module OldList = List
 
 let (log_enabled, use_svv) =
   let ans = ref false in
-  let use_svv = ref true in
+  let use_svv = ref false in
   Arg.parse
     [ ("-v",   Arg.Unit (fun () -> ans := true), "verbose mode")
-    ; ("-svv", Arg.Unit (fun () -> use_svv := true), "use set-var-val optimization")
-    ; ("-nosvv", Arg.Unit (fun () -> use_svv := false), "disable set-var-val optimization")
+    (* ; ("-svv", Arg.Unit (fun () -> use_svv := true), "use set-var-val optimization")
+    ; ("-nosvv", Arg.Unit (fun () -> use_svv := false), "disable set-var-val optimization") *)
     ]
     (fun s -> printfn "anon argument '%s'" s)
     "usage msg";
@@ -910,7 +910,8 @@ module Subst :
 
     let merge_a_prefix_unsafe ~scope prefix subst =
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
-        if use_svv && scope_eq scope cnt.lvar.scope
+        (* if use_svv && scope_eq scope cnt.lvar.scope *)
+        if false
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
               (* let () = printfn "in-place substitution to var %d" cnt.lvar.index in *)
               (* M.add cnt.lvar.index cnt acc *)
