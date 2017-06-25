@@ -1274,13 +1274,13 @@ struct
       dest
     ) (rem_subsumed_opt ~env ~subst term maybe_swap cs)
 end
-(*
+
 module DefaultConstraints : CONSTRAINTS =
 struct
   type t = Subst.t list
 
   let empty = []
-  let show c = GT.show(GT.list) Subst.show c
+  let show ~env = GT.(show list) @@ Subst.pretty_show (Env.is_var env) 
 
   let normalize_store ~prefix env constr =
     (* This implementation ignores first list of prefix which contains variable indicies *)
@@ -1291,8 +1291,8 @@ struct
        do incremental unification of the list *)
     let subsumes subst (vs, ts) =
       try
-        match Subst.unify env !!!vs !!!ts non_local_scope (Some subst) with
-        | [], Some _ -> true
+        match Subst.unify env !!!vs !!!ts non_local_scope subst with
+        | Some ([], _) -> true
         | _ -> false
       with Occurs_check -> false
     in
@@ -1321,20 +1321,17 @@ struct
     ListLabels.fold_left cstr ~init:[] ~f:(fun css' cs_sub ->
       (* TODO: here is room for optimization memory usage *)
       let x,t = Subst.split cs_sub in
-      try
-        let p, s' = Subst.unify env (!!!x) (!!!t) non_local_scope subst' in
-        match s' with
-        | None -> css'
-        | Some _ ->
-            match p with
-            | [] -> raise Disequality_violated
-            | _  -> (Subst.of_list p)::css'
-      with Occurs_check -> css'
+      match Subst.unify env (!!!x) (!!!t) non_local_scope subst' with
+      | None -> css'
+      | Some (p,s') ->
+          match p with
+          | [] -> raise Disequality_violated
+          | _  -> (Subst.of_list p)::css'
     )
-end*)
+end
 
-(* module Constraints = DefaultConstraints *)
-module Constraints = FastConstraints
+module Constraints = DefaultConstraints
+(* module Constraints = FastConstraints *)
 
 module State =
   struct
