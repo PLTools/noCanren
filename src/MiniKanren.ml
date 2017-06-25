@@ -1281,7 +1281,7 @@ struct
   type t = Subst.t list
 
   let empty = []
-  let show ~env = GT.(show list) @@ Subst.pretty_show (Env.is_var env) 
+  let show ~env = GT.(show list) @@ Subst.pretty_show (Env.is_var env)
 
   let normalize_store ~prefix env constr =
     (* This implementation ignores first list of prefix which contains variable indicies *)
@@ -1311,7 +1311,6 @@ struct
   let extend ~prefix env cs : t = normalize_store ~prefix env cs
 
   let refine env subs cs term =
-    printfn "Constraints.refine";
     list_filter_map cs ~f:(fun cs_sub ->
       let dest = Subst.walk env !!!term cs_sub in
       if dest == term then None else Some dest
