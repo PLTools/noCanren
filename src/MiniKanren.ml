@@ -1041,19 +1041,28 @@ struct
   let rem_subsumed_opt ~env ~subst asked_var maybe_swap cs_map : single_constraint list =
     (* there we have constraints related to idx. they are the ones stored with key varidx and maybe some others *)
     M.fold (fun _k cs_list (acc: single_constraint list) ->
-          (* TODO: we can eliminate List.find by checking _k *)
-          ListLabels.fold_left ~init:acc cs_list ~f:(fun (acc: single_constraint list) (single: single_constraint) ->
+      (* TODO: we can eliminate List.find by checking _k *)
+      ListLabels.fold_left ~init:acc cs_list
+        ~f:(fun (acc: single_constraint list) (single: single_constraint) ->
               let single = simplify_single_constraint ~env ~subst asked_var maybe_swap single in
               try let _ = List.find (fun x -> (x.Subst.lvar==asked_var) || (x.Subst.new_val == !!!asked_var)) single in
                     if is_subsumed env single acc
                     then acc
                     else single::acc
               with Not_found -> acc
-          )
-      )
-      cs_map
-      []
+        )
+    )
+    cs_map
+    []
 
+  let rem_duplicates xs =
+    let rec loop acc = function
+    | [] -> acc
+    | h::tl when List.memq h acc -> loop acc tl
+    | h::tl -> loop (h::acc) tl
+    in
+    loop [] xs
+    
   let refine: Env.t -> Subst.t -> t -> inner_logic -> Obj.t list = fun env subst cs term ->
     (* printfn "going to refine constraints for a variable '%s'" (generic_show term); *)
     let maybe_swap cnt =
@@ -1064,14 +1073,17 @@ struct
       then { lvar = !!!term; new_val = Obj.repr cnt.lvar }
       else cnt
     in
-    ListLabels.map ~f:(fun prefix ->
-      (* For every constraint we need to simplify using current substitution because previously
-         we checked only head of the constraint *)
-      let cs_sub = Subst.merge_a_prefix_unsafe ~scope:non_local_scope prefix Subst.empty in
-      let dest = Subst.walk env !!!term cs_sub in
-      assert (term <> dest);
-      dest
-    ) (rem_subsumed_opt ~env ~subst term maybe_swap cs)
+    let ans =
+      ListLabels.map ~f:(fun prefix ->
+        (* For every constraint we need to simplify using current substitution because previously
+           we checked only head of the constraint *)
+        let cs_sub = Subst.merge_a_prefix_unsafe ~scope:non_local_scope prefix Subst.empty in
+        let dest = Subst.walk env !!!term cs_sub in
+        assert (term <> dest);
+        dest
+      ) (rem_subsumed_opt ~env ~subst term maybe_swap cs)
+    in
+    rem_duplicates ans
 end
 
 (*
