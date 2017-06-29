@@ -159,16 +159,16 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
   | Pexp_apply (e1,(_,alist)::otherargs) when is_conde e1 ->
 
       let clauses : expression list = parse_to_list alist.pexp_desc in
-      [%expr
+      (* [%expr
         conde [%e Ast_convenience.list @@ List.map (fun e -> pamk_e mapper e) clauses ]
-      ]
-      (*
+      ] *)
+
       let ans =
       [%expr
-        mylog (fun () -> printfn " creating inc in conde");
+        (* mylog (fun () -> printfn " creating inc in conde"); *)
         MKStream.inc (fun () ->
           let st = State.incr_scope st in
-          mylog (fun () -> printfn " force a conde");
+          (* mylog (fun () -> printfn " force a conde"); *)
           [%e
           match clauses with
           | [] -> failwith "conde with no clauses is a nonsense"
@@ -180,7 +180,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   [%expr
                     MKStream.mplus [%e pamk_e ~need_st mapper x]
                       (MKStream.inc (fun () ->
-                        mylog (fun () -> printfn " force inc from mplus*");
+                        (* mylog (fun () -> printfn " force inc from mplus*"); *)
                         [%e acc]))
                   ]
                 )
@@ -193,7 +193,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       in
       if otherargs <> []
       then Exp.apply ans otherargs
-      else ans *)
+      else ans
   | Pexp_apply (e1,[args]) when is_fresh e1 ->
       (* bad syntax -- no body*)
      e
@@ -215,23 +215,23 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       match reconstruct_args args with
       | Some (xs: string list) ->
           let pretty_names = StringLabels.concat ~sep:" " xs in
-          let msg2 = sprintf "create inc in fresh ==== (%s)" pretty_names in
-          let msg3 = sprintf "inc in fresh forced: (%s)" pretty_names in
+          (* let msg2 = sprintf "create inc in fresh ==== (%s)" pretty_names in
+          let msg3 = sprintf "inc in fresh forced: (%s)" pretty_names in *)
           let ans =
             List.fold_right xs
               ~f:(fun ident acc ->
-                  let msg = sprintf "create new variable %s as" ident in
-                  let msg = msg ^ " _.%d" in
+                  (* let msg = sprintf "create new variable %s as" ident in
+                  let msg = msg ^ " _.%d" in *)
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
+                    (* mylog (fun () -> printfn [%e  Exp.const_string msg] idx); *)
                     [%e acc]
                   ]
                  )
               ~init:[%expr
-                mylog (fun () -> printfn [%e Exp.const_string msg2]);
+                (* mylog (fun () -> printfn [%e Exp.const_string msg2]); *)
                 MKStream.inc (fun () ->
-                  mylog (fun () -> printfn [%e Exp.const_string msg3]);
+                  (* mylog (fun () -> printfn [%e Exp.const_string msg3]); *)
                   [%e new_body ]
                 )]
           in
