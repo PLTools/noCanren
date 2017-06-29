@@ -4,8 +4,6 @@ open MiniKanrenStd
 open Tester
 open Printf
 
-let ilist xs = inj_list (!!) xs
-
 let runaway_cell: (int List.ground, int logic List.logic) injected ref = ref (Obj.magic ())
 
 let demo1 q =
@@ -16,7 +14,7 @@ let demo1 q =
 
 let demo2 q =
   call_fresh (fun r ->
-    (r === !!5) &&&
+    (r === inj@@lift 5) &&&
     conde [ (*(q === nil())
           ; *)(q === !runaway_cell)
           ]
