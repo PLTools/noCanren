@@ -92,7 +92,7 @@ module State :
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal'
+type 'a goal' = State.t -> 'a
 type goal = MKStream.t goal'
 
 (** {3 Logical values and injections} *)
