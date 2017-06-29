@@ -1,10 +1,11 @@
 open Printf
 open GT
 open MiniKanren
+open MiniKanrenStd
 
-module GLam = 
+module GLam =
   struct
-    module T = 
+    module T =
       struct
         @type ('varname, 'self) t =
         | V of 'varname
@@ -37,4 +38,4 @@ let varY = !! "y"
 let varF = !! "f"
 
 let rec glam_reifier : helper -> GLam.flam -> GLam.llam = fun c x ->
-  GLam.reify ManualReifiers.string_reifier glam_reifier c x
+  GLam.reify ManualReifiers.string glam_reifier c x
