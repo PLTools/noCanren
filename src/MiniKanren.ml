@@ -691,7 +691,8 @@ module Subst :
 
     let merge_a_prefix_unsafe ~scope prefix subst =
       ListLabels.fold_left prefix ~init:subst ~f:(fun acc cnt ->
-        if scope_eq scope cnt.lvar.scope
+        (* if scope_eq scope cnt.lvar.scope *)
+        if false
         then  let () = subst_inner_term cnt.lvar cnt.new_val in
               acc
         else M.add cnt.lvar.index cnt acc
