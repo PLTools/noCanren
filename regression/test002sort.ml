@@ -19,6 +19,7 @@
 open GT
 open Printf
 open MiniKanren
+open MiniKanrenStd
 open Tester
 
 let show_nat_list = GT.(show List.ground @@ show Nat.ground)

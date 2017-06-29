@@ -1,5 +1,6 @@
 open Printf
 open MiniKanren
+open MiniKanrenStd
 open Tester
 
 let show_nat        = GT.show(Nat.ground)
