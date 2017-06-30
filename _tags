@@ -25,7 +25,7 @@ true: short_paths
 <regression/test*.native> or <regression/test*.byte>: package(str)
 
 <regression/stlcPPX.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
-<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_showT.cma), package(ppx_deriving)
+<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_showT.cma -deriving-plugin ppx/ppx_deriving_show.cma), package(ppx_deriving)
 
 <regression/test102*.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma), package(ppx_deriving)
 
