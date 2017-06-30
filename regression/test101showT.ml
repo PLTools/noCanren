@@ -1,8 +1,64 @@
-type 'a logic = Var of int (* * 'a logic list *)
-              | Value of 'a
+let pppt_int : (Format.formatter -> int -> unit) = (fun fmt -> Format.fprintf fmt "%d")
+
+let pppt_string : (Format.formatter -> string -> unit) = (fun fmt -> Format.fprintf fmt "%s" )
+
+type ('a,'b) pair = 'a * 'b
+
+type 'a logic = Value of 'a | Var of int
 [@@deriving showT {with_path=false}]
+
+(* type 'a list = Nil | Cons of 'a * 'a list
+[@@deriving showT {with_path=false}] *)
+
+(* type pair = int * string *)
+(* [@@deriving showT {with_path=false}] *)
+
+(* type 'a logic = Var of int (* * 'a logic list *)
+              | Value of 'a
+(* [@@deriving showT {with_path=false}] *)
 ;;
 
+let rec pppt_logic :
+          'a .
+            (string * (Format.formatter -> 'a -> Ppx_deriving_runtime.unit))
+              ->
+              (string *
+                (Format.formatter -> 'a logic -> Ppx_deriving_runtime.unit))
+  =
+  ((let open! Ppx_deriving_runtime in
+      fun (typ_a,poly_a)  ->
+        let full_typ_name = (Printf.sprintf "(%s) logic") typ_a  in
+        (full_typ_name,
+          (fun fmt  ->
+             function
+             | Var a0 ->
+                 (Format.fprintf fmt "(@[<2>Var@ ";
+                  snd
+                    ((fst ("int", (fun fmt  -> Format.fprintf fmt "%d"))),
+                      (snd ("int", (fun fmt  -> Format.fprintf fmt "%d")) a0));
+                  Format.fprintf fmt "@])")
+             | Value a0 ->
+                 (Format.fprintf fmt "(@[<2>Value@ ";
+                  snd ((fst (poly_a fmt)), (snd (poly_a fmt) a0));
+                  Format.fprintf fmt "@])"))))
+  [@ocaml.warning "-A"])
+
+and show_logic :
+  'a .
+    (string * (Format.formatter -> 'a -> Ppx_deriving_runtime.unit)) ->
+      'a logic -> Ppx_deriving_runtime.string
+  =
+  fun (typ_a,poly_a)  ->
+    fun x  -> Format.asprintf "%a" (snd (pppt_logic (typ_a, poly_a))) x
+
+
+(* and show_logic :
+  'a .
+    (string * (Format.formatter -> 'a -> Ppx_deriving_runtime.unit)) ->
+      'a logic -> Ppx_deriving_runtime.string
+  =
+  fun (typ_a,poly_a)  ->
+    fun x  -> Format.asprintf "%a" (snd (pppt_logic (typ_a, poly_a))) x *)
 
 (*
 let rec pppt_logic : string * (Format.formatter -> 'a -> unit) ->
@@ -24,11 +80,6 @@ let rec pppt_logic : string * (Format.formatter -> 'a -> unit) ->
         Format.fprintf fmt ")"
   )
 *)
-let pppt_int : string * (Format.formatter -> int -> unit) =
-  ("int", (fun fmt -> Format.fprintf fmt "%d"))
-
-let pppt_string : string * (Format.formatter -> string -> unit) =
-  ("string", (fun fmt -> Format.fprintf fmt "%s" ))
 
 let () =
   Format.fprintf Format.std_formatter "%a\n%!" (pppt_logic pppt_int    |> snd ) (Value 1);
@@ -75,4 +126,4 @@ let () =
     (Cons (Value 10, Cons (Var (1,[]), Nil)));
   Format.fprintf Format.std_formatter "%a\n%!" (pppt_intlogic_llist |> snd )
     (Value (Cons (Value 10, Value (Cons (Value 20, Var (21,[Var (20,[])]))))));
-*)
+*) *)
