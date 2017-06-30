@@ -46,15 +46,15 @@ let pp_type_of_decl ~options ~path type_decl =
   let _ = parse_options options in
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
   Ppx_deriving.poly_arrow_of_type_decl
-    (fun var -> [%type: string * (Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit)])
+    (fun var -> [%type: (Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit)])
     type_decl
-    [%type: string * (Format.formatter -> [%t typ] -> Ppx_deriving_runtime.unit)]
+    [%type: (Format.formatter -> [%t typ] -> Ppx_deriving_runtime.unit)]
 
 let show_type_of_decl ~options ~path type_decl =
   let _ = parse_options options in
   let typ = Ppx_deriving.core_type_of_type_decl type_decl in
   Ppx_deriving.poly_arrow_of_type_decl
-    (fun var -> [%type: string * (Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit)])
+    (fun var -> [%type: (Format.formatter -> [%t var] -> Ppx_deriving_runtime.unit)])
     type_decl
     [%type: [%t typ] -> Ppx_deriving_runtime.string]
 
@@ -65,13 +65,17 @@ let sig_of_type ~options ~path type_decl =
    Sig.value (Val.mk (mknoloc (Ppx_deriving.mangle_type_decl (`Prefix "show") type_decl))
               (show_type_of_decl ~options ~path type_decl))]
 
-let rec expr_of_typ quoter typ =
+let thrd3 (_,_,x) = x
+
+let rec expr_of_typ quoter typ : int * expression * expression =
   let expr_of_typ = expr_of_typ quoter in
   match attr_printer typ.ptyp_attributes with
-  | Some printer -> [%expr [%e wrap_printer quoter printer] fmt]
+  | Some printer ->
+      failwith "not implemented"
+      [%expr [%e wrap_printer quoter printer] fmt]
   | None ->
   if attr_opaque typ.ptyp_attributes then
-    [%expr fun _ -> Format.pp_print_string fmt "<opaque>"]
+    0,[%expr ""],[%expr fun _ -> Format.pp_print_string fmt "<opaque>"]
   else
     let format x = [%expr Format.fprintf fmt [%e str x]] in
     let seq start finish fold typ =
@@ -79,20 +83,20 @@ let rec expr_of_typ quoter typ =
         Format.fprintf fmt [%e str start];
         ignore ([%e fold] (fun sep x ->
           if sep then Format.fprintf fmt ";@ ";
-          [%e expr_of_typ typ] x; true) false x);
+          [%e match expr_of_typ typ with (_,_,e) -> e] x; true) false x);
         Format.fprintf fmt [%e str finish];]
     in
     let typ = Ppx_deriving.remove_pervasives ~deriver typ in
     match typ with
-    | [%type: _] -> [%expr fun _ -> Format.pp_print_string fmt "_"]
+    | [%type: _] -> 0, [%expr "_"], [%expr fun _ -> Format.pp_print_string fmt "_"]
     | { ptyp_desc = Ptyp_arrow _ } ->
-      [%expr fun _ -> Format.pp_print_string fmt "<fun>"]
+      0, [%expr "???"], [%expr fun _ -> Format.pp_print_string fmt "<fun>"]
     | { ptyp_desc = Ptyp_constr _ } ->
       let builtin = not (attr_nobuiltin typ.ptyp_attributes) in
       begin match builtin, typ with
-      | true, [%type: unit]        -> [%expr ("unit", fun fmt () -> Format.pp_print_string fmt "()") ]
-      | true, [%type: int]         -> [%expr ("int", fun fmt -> [%e format "%d"]) ]
-      | true, [%type: int32]
+      | true, [%type: unit]        -> 0, [%expr "unit"], [%expr fun fmt () -> Format.pp_print_string fmt "()" ]
+      | true, [%type: int]         -> 0, [%expr "int" ], [%expr fun fmt -> [%e format "%d"] ]
+      (* | true, [%type: int32]
       | true, [%type: Int32.t]     -> format "%ldl"
       | true, [%type: int64]
       | true, [%type: Int64.t]     -> format "%LdL"
@@ -100,28 +104,41 @@ let rec expr_of_typ quoter typ =
       | true, [%type: Nativeint.t] -> format "%ndn"
       | true, [%type: float]       -> format "%F"
       | true, [%type: bool]        -> format "%B"
-      | true, [%type: char]        -> format "%C"
+      | true, [%type: char]        -> format "%C" *)
       | true, [%type: string]
-      | true, [%type: String.t]    -> format "%S"
-      | true, [%type: bytes]
+      | true, [%type: String.t]    -> 0, [%expr  "string"], format "%S"
+      (* | true, [%type: bytes]
       | true, [%type: Bytes.t] ->
         [%expr fun x -> Format.fprintf fmt "%S" (Bytes.to_string x)]
       | true, [%type: [%t? typ] ref] ->
         [%expr fun x ->
           Format.pp_print_string fmt "ref (";
           [%e expr_of_typ typ] !x;
-          Format.pp_print_string fmt ")"]
-      | true, [%type: [%t? typ] list]  -> seq "@[<2>["   "@,]@]" [%expr List.fold_left]  typ
-      | true, [%type: [%t? typ] array] -> seq "@[<2>[|" "@,|]@]" [%expr Array.fold_left] typ
-      | true, [%type: [%t? typ] option] ->
+          Format.pp_print_string fmt ")"] *)
+      | true, [%type: [%t? typ] list]  ->
+          let (arity,showTarg,pp_arg) = expr_of_typ typ in
+          let ans =
+            [%expr fun x ->
+              Format.fprintf fmt [%e str "@[<2>["];
+              let _ = List.fold_left (fun sep x ->
+                if sep then Format.fprintf fmt ";@ ";
+                [%e pp_arg] x; true) false x
+              in
+              Format.fprintf fmt "@,]@]";
+            ]
+          in
+          (arity, [%expr ""], ans)
+          (* seq "@[<2>["   "@,]@]" [%expr List.fold_left]  typ *)
+      (* | true, [%type: [%t? typ] array] -> seq "@[<2>[|" "@,|]@]" [%expr Array.fold_left] typ *)
+      (* | true, [%type: [%t? typ] option] ->
         [%expr
           function
           | None -> Format.pp_print_string fmt "None"
           | Some x ->
             Format.pp_print_string fmt "(Some ";
             [%e expr_of_typ typ] x;
-            Format.pp_print_string fmt ")"]
-      | true, [%type: ([%t? ok_t],[%t? err_t]) Result.result] ->
+            Format.pp_print_string fmt ")"] *)
+      (* | true, [%type: ([%t? ok_t],[%t? err_t]) Result.result] ->
         [%expr
           function
           | Result.Ok ok ->
@@ -131,13 +148,13 @@ let rec expr_of_typ quoter typ =
           | Result.Error e ->
             Format.pp_print_string fmt "(Error ";
             [%e expr_of_typ err_t] e;
-            Format.pp_print_string fmt ")"]
-      | true, ([%type: [%t? typ] lazy_t] | [%type: [%t? typ] Lazy.t]) ->
+            Format.pp_print_string fmt ")"] *)
+      (* | true, ([%type: [%t? typ] lazy_t] | [%type: [%t? typ] Lazy.t]) ->
         [%expr fun x ->
           if Lazy.is_val x then [%e expr_of_typ typ] (Lazy.force x)
-          else Format.pp_print_string fmt "<not evaluated>"]
+          else Format.pp_print_string fmt "<not evaluated>"] *)
       | _, { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->
-        let args_pp = List.map (fun typ -> [%expr fun fmt -> [%e expr_of_typ typ]]) args in
+        let args_pp = List.map (fun typ -> [%expr fun fmt -> [%e thrd3@@ expr_of_typ typ]]) args in
         let printer =
           match attr_polyprinter typ.ptyp_attributes with
           | Some printer -> wrap_printer quoter printer
@@ -145,19 +162,20 @@ let rec expr_of_typ quoter typ =
             let printer = Exp.ident (mknoloc (Ppx_deriving.mangle_lid (`Prefix "pppt") lid)) in
             Ppx_deriving.quote quoter printer
         in
-        app [%expr snd [%e app printer args_pp]] [[%expr fmt]]
+        0, [%expr ""], app [%expr snd [%e app printer args_pp]] [[%expr fmt]]
         (* app [%expr snd [%e printer]] (args_pp @ [[%expr fmt]]) *)
       | _ -> assert false
       end
     | { ptyp_desc = Ptyp_tuple typs } ->
-      let args = List.mapi (fun i typ -> app (expr_of_typ typ) [evar (argn i)]) typs in
-      [%expr
-        fun [%p ptuple (List.mapi (fun i _ -> pvar (argn i)) typs)] ->
-        Format.fprintf fmt "(@[";
-        [%e args |> Ppx_deriving.(fold_exprs
-                (seq_reduce ~sep:[%expr Format.fprintf fmt ",@ "]))];
-        Format.fprintf fmt "@])"]
-    | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc } ->
+      let args = List.mapi (fun i typ -> app (thrd3 @@ expr_of_typ typ) [evar (argn i)]) typs in
+      0, [%expr sprintf "(%s * %s)"],
+        [%expr
+          fun [%p ptuple (List.mapi (fun i _ -> pvar (argn i)) typs)] ->
+          Format.fprintf fmt "(@[";
+          [%e args |> Ppx_deriving.(fold_exprs
+                  (seq_reduce ~sep:[%expr Format.fprintf fmt ",@ "]))];
+          Format.fprintf fmt "@])"]
+    (* | { ptyp_desc = Ptyp_variant (fields, _, _); ptyp_loc } ->
       let cases =
         fields |> List.map (fun field ->
           match field with
@@ -176,8 +194,8 @@ let rec expr_of_typ quoter typ =
             raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
                          deriver (Ppx_deriving.string_of_core_type typ))
       in
-      Exp.function_ cases
-    | { ptyp_desc = Ptyp_var name } -> [%expr [%e evar ("poly_"^name)] fmt]
+      Exp.function_ cases *)
+    | { ptyp_desc = Ptyp_var name } -> 0,[%expr ""],[%expr [%e evar ("poly_"^name)] fmt]
     | { ptyp_desc = Ptyp_alias (typ, _) } -> expr_of_typ typ
     | { ptyp_loc } ->
       raise_errorf ~loc:ptyp_loc "%s cannot be derived for %s"
@@ -190,7 +208,7 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
   let prettyprinter =
     match type_decl.ptype_kind, type_decl.ptype_manifest with
     | Ptype_abstract, Some manifest ->
-      expr_of_typ quoter manifest
+      thrd3 @@ expr_of_typ quoter manifest
     | Ptype_variant constrs, _ ->
       let cases =
         constrs |> List.map (fun { pcd_name = { txt = name' }; pcd_args; pcd_attributes } ->
@@ -222,14 +240,19 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
                      (app (wrap_printer quoter printer) ([%expr fmt] :: args))
           | None, Pcstr_tuple(typs) ->
             let args =
-              List.mapi (fun i typ -> app (expr_of_typ quoter typ) [evar (argn i)]) typs in
+              List.mapi (fun i typ ->
+                  let p = thrd3 (expr_of_typ quoter typ) in
+                  let name = [%expr fst [%e p]] in
+                  let applic = [%expr snd [%e p] [%e evar (argn i)]] in
+                  [%expr [%e name], [%e applic]]
+              ) typs in
             let printer =
               match args with
               | []   -> [%expr Format.pp_print_string fmt [%e str constr_name]]
               | [arg] ->
                 [%expr
                   Format.fprintf fmt [%e str ("(@[<2>" ^  constr_name ^ "@ ")];
-                  [%e arg];
+                  snd [%e arg];
                   Format.fprintf fmt "@])"]
               | args ->
                 [%expr
@@ -244,7 +267,7 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
               labels |> List.map (fun { pld_name = { txt = n }; pld_type = typ } ->
                 [%expr
                   Format.fprintf fmt "@[%s =@ " [%e str n];
-                  [%e expr_of_typ quoter typ] [%e evar (argl n)];
+                  [%e thrd3 @@ expr_of_typ quoter typ] [%e evar (argl n)];
                   Format.fprintf fmt "@]"
                 ])
             in
@@ -266,7 +289,7 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
           let pld_type = {pld_type with ptyp_attributes=pld_attributes@pld_type.ptyp_attributes} in
           [%expr
             Format.fprintf fmt "@[%s =@ " [%e str field_name];
-            [%e expr_of_typ quoter pld_type] [%e Exp.field (evar "x") (mknoloc (Lident name))];
+            [%e thrd3 @@ expr_of_typ quoter pld_type] [%e Exp.field (evar "x") (mknoloc (Lident name))];
             Format.fprintf fmt "@]"
           ])
       in
@@ -281,14 +304,14 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
       raise_errorf ~loc "%s cannot be derived for open types" deriver
   in
   let pp_poly_apply =
-    (* Ppx_deriving.poly_apply_of_type_decl type_decl *)
-      (* (evar (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl)) *)
+    Ppx_deriving.poly_apply_of_type_decl type_decl
+      (evar (Ppx_deriving.mangle_type_decl (`Prefix "pp") type_decl))
 
-    Ppx_deriving.fold_left_type_decl (fun acc name -> [%expr [%e acc]
+    (* Ppx_deriving.fold_left_type_decl (fun acc name -> [%expr [%e acc]
         ([%e evar @@ Printf.sprintf "typ_%s" name],[%e evar @@ Printf.sprintf "poly_%s" name ])
       ])
       (evar (Ppx_deriving.mangle_type_decl (`Prefix "pppt") type_decl))
-      type_decl
+      type_decl *)
   in
   let stringprinter = [%expr fun x -> Format.asprintf "%a" (snd [%e pp_poly_apply]) x] in
   let polymorphize =
@@ -319,8 +342,7 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
           ns
   in
   let prettyprinter =
-    [%expr let full_typ_name = [%e newname] in
-      (full_typ_name, [%e prettyprinter])
+    [%expr [%e prettyprinter]
     ]
   in
   [Vb.mk (Pat.constraint_ pp_var pp_type)
@@ -329,11 +351,11 @@ let str_of_type ~options ~path ({ ptype_loc = loc } as type_decl) =
 
 let () =
   Ppx_deriving.(register (create deriver
-    ~core_type: (Ppx_deriving.with_quoter (fun quoter typ ->
-      [%expr fun x -> Format.asprintf "%a" (fun fmt -> [%e expr_of_typ quoter typ]) x]))
+    (* ~core_type: (Ppx_deriving.with_quoter (fun quoter typ ->
+      [%expr fun x -> Format.asprintf "%a" (fun fmt -> [%e thrd3 @@ expr_of_typ quoter typ]) x])) *)
     ~type_decl_str: (fun ~options ~path type_decls ->
       [Str.value Recursive (List.concat (List.map (str_of_type ~options ~path) type_decls))])
-    ~type_decl_sig: (fun ~options ~path type_decls ->
-      List.concat (List.map (sig_of_type ~options ~path) type_decls))
+    (* ~type_decl_sig: (fun ~options ~path type_decls ->
+      List.concat (List.map (sig_of_type ~options ~path) type_decls)) *)
     ()
   ))
