@@ -33,6 +33,7 @@ plugin:
 ppx:
 	$(OB) -Is src ppx/ppx_deriving_gt.cma ppx/ppx_deriving_gt.cmxs \
 		ppx/ppx_deriving_showT.cmxs \
+		ppx/ppx_deriving_show.cmxs \
 		ppx/ppx_repr_bin.native ppx/pa_minikanren_bin.native \
 		ppx/ppx_ocanren_all.native \
 		ppx/ppx_deriving_showT.cma
@@ -48,7 +49,7 @@ clean: clean_tests
 REGRES_CASES += #100ppxgt #102meta #
 REGRES_CASES += 101showT
 #ppx-based tests
-REGRES_CASES += 205infero 206evalo
+REGRES_CASES += #205infero 206evalo
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte

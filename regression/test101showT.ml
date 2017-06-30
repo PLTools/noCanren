@@ -1,11 +1,85 @@
 let pppt_int : (Format.formatter -> int -> unit) = (fun fmt -> Format.fprintf fmt "%d")
-
+let pppt_int_typed : (string -> Format.formatter -> int -> unit) =
+  fun typ fmt n -> Format.fprintf fmt "%d : %s" n typ
 let pppt_string : (Format.formatter -> string -> unit) = (fun fmt -> Format.fprintf fmt "%s" )
 
-type ('a,'b) pair = 'a * 'b
+(* type ('a,'b) pair = 'a * 'b *)
 
 type 'a logic = Value of 'a | Var of int
 [@@deriving showT {with_path=false}]
+
+let rec pppt_logic =
+  let open! Ppx_deriving_runtime in
+      fun typ__a  ->
+        fun poly_a  ->
+          fun fmt  ->
+            function
+            | Value a0 ->
+                (Format.fprintf fmt "(@[<2>Value@ ";
+                 (poly_a typ__a fmt) a0;
+                 Format.fprintf fmt "@])")
+            | Var a0 ->
+                Format.fprintf fmt "@[<2>@ (_.%d:@ %s)@]" a0 typ__a
+
+and show_logic typ__a poly_a x =
+  Format.asprintf "%a" (pppt_logic typ__a poly_a) x
+
+type ('a,'b) glist = Nil | Cons of 'a * 'b
+(* [@@deriving showT {with_path=false}] *)
+let rec pppt_glist
+  : string -> (string -> Format.formatter -> 'a -> unit) ->
+    string -> (string -> Format.formatter -> 'b -> unit) ->
+    Format.formatter ->
+    ('a, 'b) glist -> unit
+=
+  let open! Ppx_deriving_runtime in
+      fun typ__a  ->
+        fun poly_a  ->
+          fun typ__b  ->
+            fun poly_b  ->
+              fun fmt  ->
+                function
+                | Nil  -> Format.pp_print_string fmt "Nil"
+                | Cons (a0,a1) ->
+                    (Format.fprintf fmt "(@[<2>Cons (@,";
+                     ((poly_a typ__a fmt) a0;
+                      Format.fprintf fmt ",@ ";
+                      (poly_b typ__b fmt) a1);
+                     Format.fprintf fmt "@,))@]")
+
+and show_glist typ__a poly_a typ__b poly_b x =
+  Format.asprintf "%a" ((pppt_glist typ__a poly_a) typ__b poly_b) x
+
+type 'a llist = ('a, 'b) glist as 'b
+[@@deriving showT {with_path=false}]
+
+
+let () = print_endline @@ show_llist "int" pppt_int_typed Nil
+let () = print_endline @@ show_llist "int" pppt_int_typed (Cons (1, Nil))
+let () = print_endline @@ show_llist "logic"
+          (fun _ -> pppt_logic "int" (fun _ -> pppt_int))
+          (Cons (Value 1, Cons (Var 10, Nil)))
+(* let rec pppt_llist
+  : string -> (string -> Format.formatter -> 'a -> unit) ->
+    Format.formatter ->
+    ('a) llist -> unit
+=
+  let __0 () = pppt_glist  in
+  ((let open! Ppx_deriving_runtime in
+      fun typ__a  ->
+        fun poly_a  ->
+          fun fmt  ->
+            let typ__b = "('a,'b) glist"  in
+            let rec poly_b (typ__b: string) fmt = pppt_glist typ__a poly_a typ__b poly_b fmt in
+            (__0 ()) typ__a poly_a
+              typ__b
+              (fun typ__b fmt -> poly_b typ__b fmt) fmt)
+    [@ocaml.warning "-A"])
+
+and show_llist typ__a poly_a x =
+  Format.asprintf "%a" (pppt_llist typ__a poly_a) x *)
+
+
 
 (* type 'a list = Nil | Cons of 'a * 'a list
 [@@deriving showT {with_path=false}] *)
