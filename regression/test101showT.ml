@@ -25,33 +25,12 @@ and show_logic typ__a poly_a x =
   Format.asprintf "%a" (pppt_logic typ__a poly_a) x
 
 type ('a,'b) glist = Nil | Cons of 'a * 'b
-(* [@@deriving showT {with_path=false}] *)
-let rec pppt_glist
-  : string -> (string -> Format.formatter -> 'a -> unit) ->
-    string -> (string -> Format.formatter -> 'b -> unit) ->
-    Format.formatter ->
-    ('a, 'b) glist -> unit
-=
-  let open! Ppx_deriving_runtime in
-      fun typ__a  ->
-        fun poly_a  ->
-          fun typ__b  ->
-            fun poly_b  ->
-              fun fmt  ->
-                function
-                | Nil  -> Format.pp_print_string fmt "Nil"
-                | Cons (a0,a1) ->
-                    (Format.fprintf fmt "(@[<2>Cons (@,";
-                     ((poly_a typ__a fmt) a0;
-                      Format.fprintf fmt ",@ ";
-                      (poly_b typ__b fmt) a1);
-                     Format.fprintf fmt "@,))@]")
-
-and show_glist typ__a poly_a typ__b poly_b x =
-  Format.asprintf "%a" ((pppt_glist typ__a poly_a) typ__b poly_b) x
+[@@deriving showT {with_path=false}]
 
 type 'a llist = ('a, 'b) glist as 'b
 [@@deriving showT {with_path=false}]
+
+
 
 
 let () = print_endline @@ show_llist "int" pppt_int_typed Nil
@@ -59,6 +38,28 @@ let () = print_endline @@ show_llist "int" pppt_int_typed (Cons (1, Nil))
 let () = print_endline @@ show_llist "logic"
           (fun _ -> pppt_logic "int" (fun _ -> pppt_int))
           (Cons (Value 1, Cons (Var 10, Nil)))
+
+
+type ('s, 'xs) gterm =
+| Symb  of 's
+| Seq of 'xs [@@deriving showT {with_path=false}]
+
+type lterm = (string logic, lterm llist) gterm logic
+[@@deriving showT {with_path=false}]
+
+type ('s, 't, 'xs) gresult =
+| Closure of 's * 't * 'xs
+| Val     of 't
+[@@deriving showT {with_path=false}]
+
+type lresult = (string logic, lterm, (string logic * lresult) logic llist) gresult logic
+[@@deriving showT {with_path=false}]
+
+type lenv = (string logic * lresult) logic llist
+[@@deriving showT {with_path=false}]
+
+let () = print_endline @@ show_lenv (Cons (Var 18, Nil))
+
 (* let rec pppt_llist
   : string -> (string -> Format.formatter -> 'a -> unit) ->
     Format.formatter ->

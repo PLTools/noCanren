@@ -115,11 +115,14 @@ let rec expr_of_typ quoter typ =
     | { ptyp_desc = Ptyp_arrow _ } ->
       0, [%expr "???"], [%expr fun _ -> Format.pp_print_string fmt "<fun>"]
     | { ptyp_desc = Ptyp_alias (base_typ,name)} ->
+        let (_,_,basse) = expr_of_typ base_typ in
+
         0,[%expr "???"],
         [%expr
           (* TODO: repalce typ__a in printed type *)
           let typ__b = [%e Exp.constant (Pconst_string (string_of_core_type base_typ,None)) ] in
-          let rec poly_b typ__b = pppt_glist typ__a poly_a typ__b poly_b in
+          (* let rec poly_b typ__b = pppt_glist typ__a poly_a typ__b poly_b in *)
+          let rec poly_b typ__b fmt = [%e basse ] in
           [%e thrd3 @@ expr_of_typ base_typ ]
         ]
 
@@ -138,7 +141,7 @@ let rec expr_of_typ quoter typ =
       | true, [%type: bool]        -> format "%B"
       | true, [%type: char]        -> format "%C" *)
       | true, [%type: string]
-      | true, [%type: String.t]    -> 0, [%expr "unif"], format "%S"
+      | true, [%type: String.t]    -> 0, [%expr "string"], format "%S"
       (* | true, [%type: bytes]
       | true, [%type: Bytes.t] ->
         [%expr fun x -> Format.fprintf fmt "%S" (Bytes.to_string x)] *)
@@ -191,8 +194,13 @@ let rec expr_of_typ quoter typ =
       | _, { ptyp_desc = Ptyp_constr ({ txt = lid }, args) } ->
         (* Format.printf "%s" (Longident.flatten lid |> String.concat " "); *)
         let args_pp = List.concat @@ List.map (fun typ ->
-          let _,typ,pp = expr_of_typ typ in
-            [ typ; [%expr fun _ fmt -> [%e pp]] ]
+          let _,typ1,pp = expr_of_typ typ in
+          let the_typ = match typ.ptyp_desc with
+          | Ptyp_var name -> Pat.var @@ mknoloc ("typ__" ^ name)
+          | _ -> Pat.any ()
+          in
+          (* [ typ; [%expr fun _ fmt -> [%e pp]] ] *)
+          [ typ1; [%expr fun [%p the_typ ] fmt -> [%e pp]] ]
         ) args in
         let printer =
           match attr_polyprinter typ.ptyp_attributes with
@@ -205,8 +213,14 @@ let rec expr_of_typ quoter typ =
       | _ -> assert false
       end
     | { ptyp_desc = Ptyp_tuple typs } ->
-      let args = List.mapi (fun i typ -> app (thrd3 @@ expr_of_typ typ) [evar (argn i)]) typs in
-      0,[%expr "asdfasdfas"],
+      let typs,funcs = List.split @@
+        List.mapi (fun i typ -> match expr_of_typ typ with _,a,b -> (a,b)) typs
+      in
+      let the_big_typ =
+        [%expr "asdfasdfas"]
+      in
+      let args = List.mapi (fun i foo -> app foo [evar (argn i)]) funcs in
+      0, the_big_typ,
       [%expr
         fun [%p ptuple (List.mapi (fun i _ -> pvar (argn i)) typs)] ->
         Format.fprintf fmt "(@[";
