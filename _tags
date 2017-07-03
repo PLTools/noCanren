@@ -20,6 +20,7 @@ true: short_paths
 <src/MiniKanren*.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
 <src/*.ml*>: package(GT)
 
+<regression/Quine_decls.*> or <regression/test102*.*>: package(ppx_deriving.runtime,GT), rectypes, ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma -deriving-plugin ppx/ppx_deriving_showT.cma), ppx(ppx/ppx_ocanren_all.native --as-ppx)
 # regression tests related stuff
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(str)

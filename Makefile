@@ -50,7 +50,7 @@ clean: clean_tests
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-REGRES_CASES += 100ppxgt 101showT
+REGRES_CASES += 100ppxgt 101showT 102showT
 #ppx-based tests
 REGRES_CASES += #205infero 206evalo
 
