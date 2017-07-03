@@ -202,6 +202,8 @@ let (!!) x = inj (lift x)
 let inj_pair : ('a, 'c) injected -> ('b,'d) injected -> ('a * 'b, ('c * 'd) logic) injected =
   fun x y -> (x, y)
 
+let inj_triple = fun x y z -> (x, y, z)
+
 external inj_int : int -> (int, int logic) injected = "%identity"
 
 exception Not_a_value
@@ -485,7 +487,7 @@ let (=/=) x y ((env, subst, constr) as st) =
         )
   with Occurs_check -> Stream.cons st Stream.nil
 
-      
+
 let conj f g st = Stream.bind (f st) g
 
 let (&&&) = conj
@@ -1078,6 +1080,13 @@ module List =
     }
 
     type ('a,'b) groundi = ('a ground, 'b logic) injected
+
+    let to_logic f xs =
+      let rec helper = function
+      | Nil -> Value Nil
+      | Cons (x,xs) -> Value (Cons (f x, helper xs))
+      in
+      helper xs
 
     let groundi =
       { GT.gcata = ()

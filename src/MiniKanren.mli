@@ -648,12 +648,17 @@ module List :
 
     (** Alias for [cdro] *)
     val tlo   : ('a, 'b) groundi -> ('a, 'b) groundi -> goal
+
+    val to_logic : ('a -> 'b) -> 'a ground -> 'b logic
+
   end
 
 (** [inj_list l] is a deforested synonym for injection *)
 val inj_list : ('a, 'b) injected list -> ('a, 'b) List.groundi
 
 val inj_pair   : ('a, 'b) injected -> ('c, 'd) injected -> ('a * 'c, ('b * 'd) logic) injected
+val inj_triple : ('a, 'b) injected -> ('c, 'd) injected -> ('e, 'f) injected -> ('a * 'c * 'e, ('b * 'd * 'f) logic) injected
+
 val inj_list_p : (('a, 'b) injected * ('c, 'd) injected) list -> ('a * 'c, ('b * 'd) logic) List.groundi
 val inj_int    : int -> (int, int logic) injected
 
