@@ -92,7 +92,7 @@ module State :
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal'
+type 'a goal' = State.t -> 'a
 type goal = MKStream.t goal'
 
 (** {3 Logical values and injections} *)
@@ -104,15 +104,17 @@ type 'a logic =
 | Value of 'a
 [@@deriving gt {show}]
 
+
+val fmap_logic : ('a -> 'b) -> 'a logic -> 'b logic
 (** GT-compatible typeinfo for logics *)
 val logic :
   (unit,
    < show    : ('a -> string) -> 'a logic -> string;
-     html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+     (* html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
      eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
      compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
      foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
-     foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
+     foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn; *)
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 

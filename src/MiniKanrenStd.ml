@@ -39,6 +39,9 @@ type ('a, 'l) llist = Nil | Cons of 'a * 'l
 type 'a lnat = O | S of 'a
 [@@deriving gt {show}]
 
+let fmap_llist f g = function Nil -> Nil | Cons (a,b) -> Cons (f a, g b)
+let fmap_lnat  f   = function O -> O | S x -> S (f x)
+
 module Option = struct
   module T =
     struct
@@ -65,12 +68,12 @@ module Bool =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (GT.bool) n
+          (* method html    n   = GT.html   (GT.bool) n
           method eq      n m = GT.eq     (GT.bool) n m
           method compare n m = GT.compare(GT.bool) n m
           method foldr   n   = GT.foldr  (GT.bool) n
-          method foldl   n   = GT.foldl  (GT.bool) n
-          method gmap    n   = GT.gmap   (GT.bool) n
+          method foldl   n   = GT.foldl  (GT.bool) n *)
+          method gmap    n   = n
           method show    n   = GT.show   (GT.bool) n
         end
     }
@@ -81,12 +84,12 @@ module Bool =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (logic') (GT.html   (ground)) n
+          (* method html    n   = GT.html   (logic') (GT.html   (ground)) n
           method eq      n m = GT.eq     (logic') (GT.eq     (ground)) n m
           method compare n m = GT.compare(logic') (GT.compare(ground)) n m
           method foldr   a n = GT.foldr  (logic') (GT.foldr  (ground)) a n
-          method foldl   a n = GT.foldl  (logic') (GT.foldl  (ground)) a n
-          method gmap    n   = GT.gmap   (logic') (GT.gmap   (ground)) n
+          method foldl   a n = GT.foldl  (logic') (GT.foldl  (ground)) a n *)
+          method gmap    n   = n (* GT.gmap   (logic') (GT.gmap   (ground)) n *)
           method show    n   = GT.show   (logic') (GT.show   (ground)) n
         end
     }
@@ -171,13 +174,7 @@ module Nat = struct
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method gmap    n =
-          object (this)
-            (* inherit  ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) llist] llist_t *)
-            method c_Cons inh subj p0 p1 = Cons ((p0.GT.fx ()), (p1.GT.fx ()))
-            method c_Nil inh subj = Nil
-          end
-
+          method gmap    n = X.fmap this#gmap n
           method show    n = GT.show   (lnat) this#show    n
         end
     }
@@ -187,6 +184,7 @@ module Nat = struct
       GT.plugins =
         object(this)
           (* method gmap    n   = GT.gmap   (logic') (GT.gmap   (lnat) this#gmap   ) n *)
+          method gmap  : logic -> logic = fun  n -> fmap_logic (X.fmap this#gmap) n
           method show    n   = GT.show   (logic') (GT.show   (lnat) this#show   ) n
         end
     }
@@ -194,11 +192,11 @@ module Nat = struct
     let rec of_int n = if n <= 0 then O else S (of_int (n-1))
     let rec to_int   = function O -> 0 | S n -> 1 + to_int n
 
-    let rec to_logic n = Value (GT.(gmap lnat) to_logic n)
+    let rec to_logic n = Value (fmap to_logic n)
 
     let from_logic' = from_logic
 
-    let rec from_logic x = GT.gmap(lnat) (from_logic) @@ from_logic' x
+    let rec from_logic x = fmap (from_logic) @@ from_logic' x
 
     let o   = inj@@ F.distrib O
     let s x = inj@@ F.distrib (S x)
@@ -301,18 +299,13 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    fa l = GT.html   (llist) fa (this#html    fa) l
-          method eq      fa l = GT.eq     (llist) fa (this#eq      fa) l
-          method compare fa l = GT.compare(llist) fa (this#compare fa) l
-          method foldr   fa l = GT.foldr  (llist) fa (this#foldr   fa) l
-          method foldl   fa l = GT.foldl  (llist) fa (this#foldl   fa) l
-          method gmap    fa l = GT.gmap   (llist) fa (this#gmap    fa) l
+          method gmap : ('b -> 'c) -> 'b ground -> 'c ground = fun fa l -> X.fmap fa (this#gmap    fa) l
           method show    fa l = "[" ^
             let rec inner l =
               (GT.transform(llist)
                  (GT.lift fa)
                  (GT.lift inner)
-                 (object inherit ['a,'a ground] llist_t[show]
+                 (object inherit ['a,'a ground] show_llist_t
                     method c_Nil   _ _      = ""
                     method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                   end)
@@ -327,12 +320,7 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method compare fa l = GT.compare (logic') (GT.compare (llist) fa (this#compare fa)) l
-          method gmap    fa l = GT.gmap    (logic') (GT.gmap    (llist) fa (this#gmap    fa)) l
-          method eq      fa l = GT.eq      (logic') (GT.eq      (llist) fa (this#eq      fa)) l
-          method foldl   fa l = GT.foldl   (logic') (GT.foldl   (llist) fa (this#foldl   fa)) l
-          method foldr   fa l = GT.foldr   (logic') (GT.foldr   (llist) fa (this#foldr   fa)) l
-          method html    fa l = GT.html    (logic') (GT.html    (llist) fa (this#html    fa)) l
+          method gmap : ('b -> 'c) -> 'b logic -> 'c logic = fun fa l -> fmap_logic (X.fmap fa (this#gmap    fa)) l
 
           (* We override default implementation to show list as semicolon-separated *)
           method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
@@ -342,7 +330,7 @@ module List =
                     GT.transform(llist)
                       (GT.lift fa)
                       (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] llist_t[show]
+                      (object inherit ['a,'a logic] show_llist_t
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs =
                            x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
@@ -363,11 +351,11 @@ module List =
     | Nil -> []
     | Cons (x,xs) -> (f x)::(to_list f xs)
 
-    let rec to_logic f xs = Value (GT.(gmap llist) f (to_logic f) xs)
+    let rec to_logic f xs = Value (fmap_llist f (to_logic f) xs)
 
     let from_logic' = from_logic
 
-    let rec from_logic fa x = GT.gmap(llist) fa (from_logic fa) @@ from_logic' x
+    let rec from_logic fa x = fmap_llist fa (from_logic fa) @@ from_logic' x
 
     let inj' = inj
 

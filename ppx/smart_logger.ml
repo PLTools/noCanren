@@ -224,14 +224,14 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                   let msg = msg ^ " _.%d" in
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
+                    (* mylog (fun () -> printfn [%e  Exp.const_string msg] idx); *)
                     [%e acc]
                   ]
                  )
               ~init:[%expr
-                mylog (fun () -> printfn [%e Exp.const_string msg2]);
+                (* mylog (fun () -> printfn [%e Exp.const_string msg2]); *)
                 MKStream.inc (fun () ->
-                  mylog (fun () -> printfn [%e Exp.const_string msg3]);
+                  (* mylog (fun () -> printfn [%e Exp.const_string msg3]); *)
                   [%e new_body ]
                 )]
           in

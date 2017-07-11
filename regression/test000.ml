@@ -10,13 +10,13 @@ let show_intl_optl = show(logic)  (show(option) (show(logic) (show(int))))
 
 let int_opt_reifier = Option.reify ManualReifiers.int
 
-let _ =
-  let open Option in
-  run_exn show_int 1 q qh (REPR(fun q -> q === !!5));
-  runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === some !!5));
-  runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === none ()));
-  runR int_reifier     show_int     show_intl      1 q qh (REPR(fun q -> some q === some !!5 ));
-  runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> call_fresh (fun w -> q === some w)))
+let _ = Option.(
+    run_exn show_int 1 q qh (REPR(fun q -> q === !!5));
+    runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === some !!5));
+    runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> q === none ()));
+    runR ManualReifiers.int show_int     show_intl   1 q qh (REPR(fun q -> some q === some !!5 ));
+    runR int_opt_reifier show_int_opt show_intl_optl 1 q qh (REPR(fun q -> call_fresh (fun w -> q === some w)))
+  )
 
 module Result =
   struct

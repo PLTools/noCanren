@@ -241,7 +241,11 @@ module Stream =
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a
-[@@derving gt {show} ]
+[@@deriving gt {show} ]
+
+let rec fmap_logic f = function
+| Value x -> Value (f x)
+| Var (n,xs) -> Var (n, List.map (fmap_logic f) xs)
 
 let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x ->
   let rec helper = function
@@ -255,17 +259,17 @@ let rec bprintf_logic: Buffer.t -> ('a -> unit) -> 'a logic -> unit = fun b f x 
 let logic = {logic with
  gcata = ();
  plugins =
-   object
-     method gmap    = logic.plugins#gmap
-     method html    = logic.plugins#html
+   object(self)
+     method gmap f = fmap_logic f
+     (* method html    = logic.plugins#html
      method eq      = logic.plugins#eq
      method compare = logic.plugins#compare
      method foldl   = logic.plugins#foldl
-     method foldr   = logic.plugins#foldr
+     method foldr   = logic.plugins#foldr *)
      method show fa x =
        GT.transform(logic)
           (GT.lift fa)
-          (object inherit ['a] logic_t[show]
+          (object inherit ['a] show_logic_t
             method c_Var _ s i cs =
               (* I have some issues with callign show_logic there, so copy-paste*)
               (* show_logic (fun _ -> assert false) (Var(_token,i,cs)) *)

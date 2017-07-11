@@ -7,10 +7,10 @@ open Tester
 
 let show_token = show(token)
 
-module GExpr = 
+module GExpr =
   struct
 
-    module T = 
+    module T =
       struct
         @type 'self t  = I | A of 'self * 'self | M of 'self * 'self with show, gmap
 
