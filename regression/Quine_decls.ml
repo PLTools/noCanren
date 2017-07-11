@@ -71,7 +71,7 @@ module Gterm = struct
 end
 
 let rec gterm_reifier c : Gterm.fterm -> Gterm.lterm =
-  Gterm.reify ManualReifiers.string_reifier (List.reify gterm_reifier) c
+  Gterm.reify ManualReifiers.string (List.reify gterm_reifier) c
 
 module Gresult = struct
   module X = struct
@@ -84,7 +84,7 @@ module Gresult = struct
     | Closure (a,b,c) -> Closure (f a, g b, h c)
     | Val b -> Val (g b)
 
-    let t = {t with
+    let t = {
       gcata = ();
       plugins = object
         method gmap = fmap
@@ -118,8 +118,8 @@ end
 
 let rec gresult_reifier c : Gresult.fresult -> Gresult.lresult =
   let open ManualReifiers in
-  Gresult.reify string_reifier gterm_reifier
-    (List.reify (pair_reifier string_reifier gresult_reifier))
+  Gresult.reify string gterm_reifier
+    (List.reify (pair string gresult_reifier))
     c
 
 let (!!) x = inj @@ lift x
@@ -133,7 +133,7 @@ type fenv = ( (string * rresult) List.ground,
 let show_reif_env h e =
   GT.(show List.logic @@ show logic @@
         show pair  (show logic (fun s -> s)) show_lresult) @@
-  (List.reify ManualReifiers.(pair_reifier string_reifier gresult_reifier))
+  (List.reify ManualReifiers.(pair string gresult_reifier))
   h e
 
 let (===!) = (===)
@@ -195,7 +195,7 @@ and evalo (term: fterm) (env: fenv) (r: fresult) =
   ]
 
 let ( ~~ ) s  = symb @@ inj @@ lift s
-let s      tl = seq (inj_list tl)
+let s      tl = seq (inj_listi tl)
 
 let nil = nil ()
 

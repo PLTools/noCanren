@@ -2,9 +2,9 @@ open Printf
 open GT
 open MiniKanren
 
-module GLam = 
+module GLam =
   struct
-    module T = 
+    module T =
       struct
         @type ('varname, 'self) t =
         | V of 'varname
