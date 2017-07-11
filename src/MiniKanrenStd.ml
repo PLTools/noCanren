@@ -35,9 +35,10 @@ module ManualReifiers = struct
 end;;
 
 type ('a, 'l) llist = Nil | Cons of 'a * 'l
-[@@deriving gt {show}]
+[@@deriving gt {show}, showT {with_path=false} ]
+
 type 'a lnat = O | S of 'a
-[@@deriving gt {show}]
+[@@deriving gt {show}, showT {with_path=false} ]
 
 let fmap_llist f g = function Nil -> Nil | Cons (a,b) -> Cons (f a, g b)
 let fmap_lnat  f   = function O -> O | S x -> S (f x)
@@ -56,10 +57,12 @@ module Option = struct
   let none () = inj @@ distrib None
 end
 
+let pppt_bool fmt b = Format.fprintf fmt "%b" b
+
 module Bool =
   struct
 
-    type 'a logic' = 'a logic
+    type 'a logic' = 'a logic [@@deriving showT]
     let logic' = logic
 
     type ground = bool
@@ -78,7 +81,7 @@ module Bool =
         end
     }
 
-    type logic = bool logic'
+    type logic = bool logic'  [@@deriving showT {with_path=false} ]
 
     let logic = {
       GT.gcata = ();
@@ -273,11 +276,11 @@ module List =
 
     include List
 
-    type 'a logic' = 'a logic
+    type 'a logic' = 'a logic  [@@deriving showT {with_path=false} ]
 
     let logic' = logic
 
-    type ('a, 'l) t = ('a, 'l) llist
+    type ('a, 'l) t = ('a, 'l) llist [@@deriving showT {with_path=false} ]
 
     module X = struct
       type ('a,'b) t = ('a, 'b) llist
@@ -291,7 +294,36 @@ module List =
     let conso x y = inj (F.distrib (Cons (x, y)))
 
     type 'a ground = ('a, 'a ground) t;;
-    type 'a logic  = ('a, 'a logic) t logic'
+    type 'a logic  = ('a, 'a logic) t logic' (* [@@deriving showT {with_path=false} ] *)
+
+    let pppt_logic = fun typ_a (poly_a: string -> Format.formatter -> 'a -> unit) fmt xs ->
+      let open! Ppx_deriving_runtime in
+
+      let rec pppt_inner typ_a poly_a fmt = function
+      | Nil -> ()
+      | Cons (a, lo) ->
+          begin
+          poly_a typ_a fmt a;
+          Format.fprintf fmt ";@ ";
+          do_tail lo
+          end
+      and do_tail = function
+      | Var _ as xs -> MiniKanrenCore.pppt_logic (typ_a ^ " List.logic") (fun s -> pppt_inner s poly_a) fmt xs
+      | Value x ->
+          (* let (_: 'a logic) = x in *)
+          pppt_inner (typ_a ^ " List.logic") poly_a fmt x
+      in
+
+      match xs with
+      | Var _ -> do_tail xs
+      | Value x ->
+          Format.fprintf fmt "[@ ";
+          pppt_inner typ_a poly_a fmt x;
+          Format.fprintf fmt "@ ]"
+
+    (* let show_logic_typed typ__a poly_a xs = Format.asprintf "%a" (pppt_logic typ__a poly_a) xs *)
+
+    (* let (_:int) = pppt_logic *)
 
     let rec reify r1 h = F.reify r1 (reify r1) h
 

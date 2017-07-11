@@ -7,6 +7,8 @@ open Printf
 open GT
 open MiniKanren
 
+let () = Format.set_margin 100
+
 let list_combine3 xs ys zs =
   let rec helper acc = function
     | (x::xs, y::ys, z::zs) -> helper ((x,y,z)::acc) (xs,ys,zs)
@@ -27,13 +29,13 @@ module Gterm = struct
   module X = struct
     type ('s, 'xs) t =
       | Symb  of 's
-      | Seq   of 'xs [@@deriving gt {show}, showT]
+      | Seq   of 'xs [@@deriving gt {show}, showT {with_path=false} ]
 
     let fmap f g = function
     | Symb s -> Symb (f s)
     | Seq xs -> Seq (g xs)
 
-    let t = {t with
+    let t = {
       gcata = ();
       plugins = object
         method gmap = fmap (* t.plugins#gmap *)
@@ -56,12 +58,14 @@ module Gterm = struct
   include Fmap2(X)
 
   type rterm = (string, rterm List.ground) X.t
-  type lterm = (string logic, lterm List.logic) X.t logic
+  type lterm = (string logic, lterm List.logic) X.t logic [@@deriving showT {with_path=false} ]
   type fterm = (rterm, lterm) injected
 
+  let (_: lterm -> string) = show_lterm
+
   let rec show_rterm : rterm -> string = fun t -> GT.(show X.t (fun s -> s) (show List.ground show_rterm)) t
-  let rec show_lterm : lterm -> string =
-    fun x -> GT.(show logic @@ show X.t (show logic (fun s -> s)) (show List.logic show_lterm) ) x
+  (* let rec show_lterm : lterm -> string =
+    fun x -> GT.(show logic @@ show X.t (show logic (fun s -> s)) (show List.logic show_lterm) ) x *)
 
   let rec to_logic : rterm -> lterm = fun term ->
     Value (GT.(gmap X.t) (fun s -> Value s) (List.to_logic to_logic) term)

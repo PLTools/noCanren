@@ -243,6 +243,23 @@ type 'a logic =
 | Value of 'a
 [@@deriving gt {show} ]
 
+let rec pppt_logic typ__a poly_a fmt = function
+  | Value a0 ->
+                (* Format.fprintf fmt "(@[<2>Value@ "; *)
+                 (poly_a typ__a fmt) a0;
+                 (* Format.fprintf fmt "@])" *)
+  | Var (a0,xs) ->
+                Format.fprintf fmt "@[<2>@ (_.%d:@ %s)@ {{@ =/=@ " a0 typ__a;
+                List.iteri (fun n x ->
+                  if n>0 then Format.fprintf fmt ",@ ";
+                  pppt_logic typ__a poly_a fmt x;
+                ) xs;
+                Format.fprintf fmt "}}@]"
+
+let show_logic_typed typ__a poly_a x =
+  Format.asprintf "%a" (pppt_logic typ__a poly_a) x
+
+
 let rec fmap_logic f = function
 | Value x -> Value (f x)
 | Var (n,xs) -> Var (n, List.map (fmap_logic f) xs)
