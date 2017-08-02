@@ -241,23 +241,69 @@ module Stream =
 type 'a logic =
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a
-[@@deriving gt {show} ]
-
-let rec pppt_logic typ__a poly_a fmt = function
-  | Value a0 ->
-                (* Format.fprintf fmt "(@[<2>Value@ "; *)
-                 (poly_a typ__a fmt) a0;
-                 (* Format.fprintf fmt "@])" *)
-  | Var (a0,xs) ->
-                Format.fprintf fmt "@[<2>@ (_.%d:@ %s)@ {{@ =/=@ " a0 typ__a;
-                List.iteri (fun n x ->
-                  if n>0 then Format.fprintf fmt ",@ ";
-                  pppt_logic typ__a poly_a fmt x;
-                ) xs;
-                Format.fprintf fmt "}}@]"
-
-let show_logic_typed typ__a poly_a x =
-  Format.asprintf "%a" (pppt_logic typ__a poly_a) x
+(* [@@deriving gt {show} ] *)
+class type virtual ['a,'ia,'sa,'inh,'syn] logic_tt =
+  object
+    method  c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method  c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+let (logic :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,unit)
+    GT.t)
+  =
+  let rec logic_gcata fa trans inh subj =
+    let rec self = logic_gcata fa trans
+    
+    and tpo = object method a = fa end
+     in
+    match subj with
+    | Var (p0,p1) -> trans#c_Var inh (GT.make self subj tpo) p0 p1
+    | Value p0 ->
+        trans#c_Value inh (GT.make self subj tpo) (GT.make fa p0 tpo)
+     in
+  { GT.gcata = logic_gcata; GT.plugins = () } 
+class virtual ['a,'ia,'sa,'inh,'syn] logic_t =
+  object (this)
+    method virtual  c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method virtual  c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method t_logic fa = (GT.transform logic) fa this
+  end
+class ['a] show_logic_t =
+  object (this)
+    inherit  ['a,unit,string,unit,string] logic_t
+    method c_Value inh subj p0 = "Value (" ^ ((p0.GT.fx ()) ^ ")")
+    method c_Var inh subj p0 p1 =
+      "Var (" ^
+        ((String.concat ", "
+            [(GT.lift (GT.int.GT.plugins)#show ()) p0;
+            (GT.lift
+               ((GT.list.GT.plugins)#show
+                  (GT.transform logic (subj.GT.t)#a this ())) ()) p1])
+           ^ ")")
+  end
+let logic =
+  {
+    GT.gcata = (logic.GT.gcata);
+    GT.plugins =
+      (object
+         method show fa =
+           (GT.transform logic) (GT.lift fa) (new show_logic_t) ()
+       end)
+  } 
 
 
 let rec fmap_logic f = function

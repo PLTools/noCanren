@@ -1,43 +1,16 @@
-true: debug, rectypes, color(always), bin_annot, keep_asm
+true: debug, rectypes, bin_annot, keep_asm
 true: short_paths
 
 <src/MiniKanren.*> or <regression/test*.*>: rectypes
 
-#<ppx/*>: package(compiler-libs.common,ppx_deriving,ppx_deriving.runtime,ppx_tools.metaquot)
-<ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
-<ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std),open(Ast_convenience_405),open(Ppx_tools_405),open(Ast_405)
-#<ppx/ppx_repr.native>: package(ocaml-migrate-parsetree.driver-main)
-
-#<ppx/*.cma>: package(ppx_deriving.api,ppx_deriving.runtime)
-
 <regression/test100ppxgt*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
 
 <samples>: not_hygienic
-<camlp5/pa_minikanren.*>: syntax(camlp5o), package(camlp5)
 
-
-<src/MiniKanrenCore*.*> or <src/MiniKanrenStd*.*>: opaque
-<src/MiniKanren*.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma  -deriving-plugin ppx/ppx_deriving_showT.cma), package(ppx_deriving.runtime)
+<src/MiniKanren*.*>: package(GT)
 <src/*.ml*>: package(GT)
 
-<regression/Quine_decls.*> or <regression/test102*.*>: package(ppx_deriving.runtime,GT), rectypes, ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma -deriving-plugin ppx/ppx_deriving_showT.cma), ppx(ppx/ppx_ocanren_all.native --as-ppx)
-# regression tests related stuff
-<regression/orig/*>: traverse
-<regression/test*.native> or <regression/test*.byte>: package(str)
-
-<regression/stlcPPX.*>: package(GT), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
-<regression/test101showT.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_showT.cma -deriving-plugin ppx/ppx_deriving_show.cma), package(ppx_deriving)
-
-<regression/test102*.*>: ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma), package(ppx_deriving)
-
-#PPX tests are like 2xx
-#Some tests require syntax extensions with freshes
-<regression/stlcPPX.*>: rectypes
-<regression/test2*.*>: package(GT), ppx(ppx/ppx_ocanren_all.native --as-ppx), ppx(ocamlfind ppx_deriving/ppx_deriving --as-ppx -deriving-plugin ppx/ppx_deriving_gt.cma)
-
-#camlp5 stuff for tests that start from 0
-<regression/test0*.*> or <regression/stlc.*>: syntax(camlp5o), package(logger.syntax), package(GT,GT.syntax.all), use_pa_minikanren
-<regression/stlc.*>: rectypes
+<regression/test666*.*>: package(GT)
 
 ####################################################################
 # JSOO toplevel related stuff

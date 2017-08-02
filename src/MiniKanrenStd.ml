@@ -35,10 +35,139 @@ module ManualReifiers = struct
 end;;
 
 type ('a, 'l) llist = Nil | Cons of 'a * 'l
-[@@deriving gt {show}, showT {with_path=false} ]
+(* [@@deriving gt {show}, showT {with_path=false} ] *)
+class type virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_tt =
+  object
+    method  c_Nil :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   > )
+          GT.a -> 'syn
+    method  c_Cons :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_llist :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) llist -> 'syn
+  end
+let (llist :
+  (('ia -> 'a -> 'sa) ->
+     ('il -> 'l -> 'sl) ->
+       ('a,'ia,'sa,'l,'il,'sl,'inh,'syn)#llist_tt ->
+         'inh -> ('a,'l) llist -> 'syn,unit)
+    GT.t)
+  =
+  let rec llist_gcata fa fl trans inh subj =
+    let rec self = llist_gcata fa fl trans
+    
+    and tpo = object method a = fa method l = fl end
+     in
+    match subj with
+    | Nil  -> trans#c_Nil inh (GT.make self subj tpo)
+    | Cons (p0,p1) ->
+        trans#c_Cons inh (GT.make self subj tpo) (GT.make fa p0 tpo)
+          (GT.make fl p1 tpo)
+     in
+  { GT.gcata = llist_gcata; GT.plugins = () } 
+class virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_t =
+  object (this)
+    method virtual  c_Nil :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   > )
+          GT.a -> 'syn
+    method virtual  c_Cons :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method t_llist fa fl = (GT.transform llist) fa fl this
+  end
+class ['a,'l] show_llist_t =
+  object (this)
+    inherit  ['a,unit,string,'l,unit,string,unit,string] llist_t
+    method c_Cons inh subj p0 p1 =
+      "Cons (" ^ ((String.concat ", " [p0.GT.fx (); p1.GT.fx ()]) ^ ")")
+    method c_Nil inh subj = "Nil ()"
+  end
+let llist =
+  {
+    GT.gcata = (llist.GT.gcata);
+    GT.plugins =
+      (object
+         method show fa fl =
+           (GT.transform llist) (GT.lift fa) (GT.lift fl) (new show_llist_t)
+             ()
+       end)
+  } 
+
 
 type 'a lnat = O | S of 'a
-[@@deriving gt {show}, showT {with_path=false} ]
+(* [@@deriving gt {show}, showT {with_path=false} ] *)
+class type virtual ['a,'ia,'sa,'inh,'syn] lnat_tt =
+  object
+    method  c_O :
+      'inh -> ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  c_S :
+      'inh ->
+        ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_lnat : ('ia -> 'a -> 'sa) -> 'inh -> 'a lnat -> 'syn
+  end
+let (lnat :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#lnat_tt -> 'inh -> 'a lnat -> 'syn,unit)
+    GT.t)
+  =
+  let rec lnat_gcata fa trans inh subj =
+    let rec self = lnat_gcata fa trans
+    
+    and tpo = object method a = fa end
+     in
+    match subj with
+    | O  -> trans#c_O inh (GT.make self subj tpo)
+    | S p0 -> trans#c_S inh (GT.make self subj tpo) (GT.make fa p0 tpo)  in
+  { GT.gcata = lnat_gcata; GT.plugins = () } 
+class virtual ['a,'ia,'sa,'inh,'syn] lnat_t =
+  object (this)
+    method virtual  c_O :
+      'inh -> ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method virtual  c_S :
+      'inh ->
+        ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method t_lnat fa = (GT.transform lnat) fa this
+  end
+class ['a] show_lnat_t =
+  object (this)
+    inherit  ['a,unit,string,unit,string] lnat_t
+    method c_S inh subj p0 = "S (" ^ ((p0.GT.fx ()) ^ ")")
+    method c_O inh subj = "O ()"
+  end
+let lnat =
+  {
+    GT.gcata = (lnat.GT.gcata);
+    GT.plugins =
+      (object
+         method show fa =
+           (GT.transform lnat) (GT.lift fa) (new show_lnat_t) ()
+       end)
+  } 
+
 
 let fmap_llist f g = function Nil -> Nil | Cons (a,b) -> Cons (f a, g b)
 let fmap_lnat  f   = function O -> O | S x -> S (f x)
@@ -295,35 +424,6 @@ module List =
 
     type 'a ground = ('a, 'a ground) t;;
     type 'a logic  = ('a, 'a logic) t logic' (* [@@deriving showT {with_path=false} ] *)
-
-    let pppt_logic = fun typ_a (poly_a: string -> Format.formatter -> 'a -> unit) fmt xs ->
-      let open! Ppx_deriving_runtime in
-
-      let rec pppt_inner typ_a poly_a fmt = function
-      | Nil -> ()
-      | Cons (a, lo) ->
-          begin
-          poly_a typ_a fmt a;
-          Format.fprintf fmt ";@ ";
-          do_tail lo
-          end
-      and do_tail = function
-      | Var _ as xs -> MiniKanrenCore.pppt_logic (typ_a ^ " List.logic") (fun s -> pppt_inner s poly_a) fmt xs
-      | Value x ->
-          (* let (_: 'a logic) = x in *)
-          pppt_inner (typ_a ^ " List.logic") poly_a fmt x
-      in
-
-      match xs with
-      | Var _ -> do_tail xs
-      | Value x ->
-          Format.fprintf fmt "[@ ";
-          pppt_inner typ_a poly_a fmt x;
-          Format.fprintf fmt "@ ]"
-
-    (* let show_logic_typed typ__a poly_a xs = Format.asprintf "%a" (pppt_logic typ__a poly_a) xs *)
-
-    (* let (_:int) = pppt_logic *)
 
     let rec reify r1 h = F.reify r1 (reify r1) h
 

@@ -254,9 +254,6 @@ module List :
         GT.t
 
 
-    val pppt_logic : string ->
-                 (string -> Format.formatter -> 'b -> unit) ->
-                 Format.formatter -> 'b logic -> unit
     (** A synonym for injected list *)
     type ('a,'b) groundi = ('a ground, 'b logic) injected
 

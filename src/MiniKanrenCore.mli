@@ -104,9 +104,6 @@ type 'a logic =
 | Value of 'a
 [@@deriving gt {show}]
 
-val pppt_logic : string -> (string -> Format.formatter -> 'a -> unit) -> Format.formatter -> 'a logic -> unit
-
-val show_logic_typed: string -> (string -> Format.formatter -> 'a -> unit) -> 'a logic -> string
 
 val fmap_logic : ('a -> 'b) -> 'a logic -> 'b logic
 (** GT-compatible typeinfo for logics *)
