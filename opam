@@ -16,7 +16,5 @@ remove:  [make "PREFIX=%{prefix}%" "uninstall"]
 
 depends: [
   "ocamlfind" {build}
-  "camlp5"
-  "logger"
   "GT"
 ]

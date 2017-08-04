@@ -1472,3 +1472,39 @@ let diseqtrace shower x y = fun st ->
 (* ***************************** a la relational StdLib here ***************  *)
 
 let report_counters () = ()
+
+
+module Cache3 = struct
+  type key = Obj.t * Obj.t * Obj.t
+
+  type t = key list
+
+  let empty = []
+  let size = List.length 
+  exception Found
+  let alpha_contains ((a,b,c) as key) state cache = 
+    let env = State.env state in
+    let subst = State.subst state in 
+    (* first we need to walk all the key parts *)
+    let a = Subst.walk env a (State.subst state) |> Obj.repr in
+    let b = Subst.walk env b (State.subst state) |> Obj.repr in
+    let c = Subst.walk env c (State.subst state) |> Obj.repr in
+
+    let new_xyz = (a,b,c) in
+
+    try cache |> List.iter (fun xyz ->
+          match Subst.unify env xyz new_xyz ~scope:non_local_scope (State.subst state) with
+          | None -> ()
+          | Some (prefix, new_sub) when Subst.walk env xyz subst = Subst.walk env new_xyz subst -> 
+             raise Found
+	  | _ -> ()
+        );
+        false
+    with Found -> true
+
+
+  let extend key cache = key::cache
+
+end
+
+

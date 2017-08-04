@@ -480,3 +480,15 @@ module Fmap6 (T : T6) :
   end
 
 val simple_reifier: helper -> ('a, 'a logic) injected -> 'a logic
+
+module Cache3 : sig
+  type key = Obj.t * Obj.t * Obj.t
+  type t
+  val empty: t
+  val size: t -> int
+  val alpha_contains: key -> State.t -> t -> bool
+
+  val extend : key -> t -> t
+end
+
+
