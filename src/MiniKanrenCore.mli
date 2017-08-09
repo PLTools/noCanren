@@ -486,9 +486,7 @@ module Cache3 : sig
   type t
   val empty: t
   val size: t -> int
-  val alpha_contains: key -> State.t -> t -> bool
+  val alpha_contains: ?printer:(helper -> key -> string) -> key -> State.t -> t -> bool
 
   val extend : key -> t -> t
 end
-
-

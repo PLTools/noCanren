@@ -1492,11 +1492,19 @@ module Cache3 = struct
 
     let new_xyz = (a,b,c) in
 
-    (* let () =
-
-    in *)
     try cache |> List.iter (fun xyz ->
-          match Subst.unify env xyz new_xyz ~scope:non_local_scope (State.subst state) with
+          let walked_xyz =
+            let a,b,c = xyz in
+            let a = Subst.walk env a (State.subst state) |> Obj.repr in
+            let b = Subst.walk env b (State.subst state) |> Obj.repr in
+            let c = Subst.walk env c (State.subst state) |> Obj.repr in
+            (a,b,c)
+          in
+          let () = match printer with None -> () | Some printer ->
+            let p term = printer (helper_of_state state) term in
+            printfn "checking '%s' unifiable with '%s'" (p walked_xyz) (p new_xyz)
+          in
+          match Subst.unify env walked_xyz new_xyz ~scope:non_local_scope (State.subst state) with
           | None -> ()
           | Some (prefix, new_sub) when Subst.walk env xyz subst = Subst.walk env new_xyz subst ->
              raise Found

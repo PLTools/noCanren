@@ -10,8 +10,14 @@ let runL n         = runR (List.reify ManualReifiers.int) show_int_list show_int
 
 let ilist xs = inj_list (!!) xs
 let just_a a = a === !!5
-let project3 ~msg x y z = project3 ~msg (fun h t -> show_intl_list @@ List.reify ManualReifiers.int h t) x y z
-let project2 ~msg x y   = project2 ~msg (fun h t -> show_intl_list @@ List.reify ManualReifiers.int h t) x y
+let show_reify_list h t = show_intl_list @@ List.reify ManualReifiers.int h t
+let project3 ~msg x y z = project3 ~msg show_reify_list x y z
+let project2 ~msg x y   = project2 ~msg show_reify_list x y
+let show_reify_key h (x,y,z) =
+  sprintf "(%s, %s, %s)"
+    (show_reify_list h @@ Obj.magic x)
+    (show_reify_list h @@ Obj.magic y)
+    (show_reify_list h @@ Obj.magic z)
 
 exception RelDivergeExn
 let par_conj_exn f g st =
@@ -49,7 +55,7 @@ let rec appendo a b ab = fun st ->
     | ss -> ss
     | effect (AskAppendoCache (new_arg, st)) k ->
         if Cache3.alpha_contains new_arg st cache
-        then continue k Hang
+        then let () = print_endline "Hand" in continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
@@ -66,7 +72,7 @@ let rec appendo a b ab = fun st ->
 let rec reverso a b = fun st ->
   let _ = ignore @@ project2 ~msg:"Entering reverso" a b st in
   let cache =
-    let arg = Obj.(repr a, repr b, repr 1) in
+    let arg = Obj.(repr a, repr b, repr 0) in
     try
       match perform (AskReversoCache (arg, st)) with
       | Hang -> raise RelDivergeExn
@@ -77,8 +83,8 @@ let rec reverso a b = fun st ->
     match reverso a b st with
     | ss -> ss
     | effect (AskReversoCache (new_arg, st)) k ->
-        if Cache3.alpha_contains new_arg st cache
-        then continue k Hang
+        if Cache3.alpha_contains ~printer:show_reify_key new_arg st cache
+        then let () = printfn "Hang %s %d" __FILE__ __LINE__ in continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
