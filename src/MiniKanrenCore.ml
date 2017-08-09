@@ -261,7 +261,7 @@ let (logic :
   =
   let rec logic_gcata fa trans inh subj =
     let rec self = logic_gcata fa trans
-    
+
     and tpo = object method a = fa end
      in
     match subj with
@@ -269,7 +269,7 @@ let (logic :
     | Value p0 ->
         trans#c_Value inh (GT.make self subj tpo) (GT.make fa p0 tpo)
      in
-  { GT.gcata = logic_gcata; GT.plugins = () } 
+  { GT.gcata = logic_gcata; GT.plugins = () }
 class virtual ['a,'ia,'sa,'inh,'syn] logic_t =
   object (this)
     method virtual  c_Var :
@@ -303,7 +303,7 @@ let logic =
          method show fa =
            (GT.transform logic) (GT.lift fa) (new show_logic_t) ()
        end)
-  } 
+  }
 
 
 let rec fmap_logic f = function
@@ -1480,11 +1480,11 @@ module Cache3 = struct
   type t = key list
 
   let empty = []
-  let size = List.length 
+  let size = List.length
   exception Found
-  let alpha_contains ((a,b,c) as key) state cache = 
+  let alpha_contains ?printer ((a,b,c) as key) state cache =
     let env = State.env state in
-    let subst = State.subst state in 
+    let subst = State.subst state in
     (* first we need to walk all the key parts *)
     let a = Subst.walk env a (State.subst state) |> Obj.repr in
     let b = Subst.walk env b (State.subst state) |> Obj.repr in
@@ -1492,12 +1492,15 @@ module Cache3 = struct
 
     let new_xyz = (a,b,c) in
 
+    (* let () =
+
+    in *)
     try cache |> List.iter (fun xyz ->
           match Subst.unify env xyz new_xyz ~scope:non_local_scope (State.subst state) with
           | None -> ()
-          | Some (prefix, new_sub) when Subst.walk env xyz subst = Subst.walk env new_xyz subst -> 
+          | Some (prefix, new_sub) when Subst.walk env xyz subst = Subst.walk env new_xyz subst ->
              raise Found
-	  | _ -> ()
+          | _ -> ()
         );
         false
     with Found -> true
@@ -1506,5 +1509,3 @@ module Cache3 = struct
   let extend key cache = key::cache
 
 end
-
-

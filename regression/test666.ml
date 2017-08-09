@@ -13,22 +13,44 @@ let just_a a = a === !!5
 let project3 ~msg x y z = project3 ~msg (fun h t -> show_intl_list @@ List.reify ManualReifiers.int h t) x y z
 let project2 ~msg x y   = project2 ~msg (fun h t -> show_intl_list @@ List.reify ManualReifiers.int h t) x y
 
-effect AskAppendoCache : (Obj.t * Obj.t * Obj.t) -> Cache3.t
-effect AskReversoCache : (Obj.t * Obj.t * Obj.t) -> Cache3.t
+exception RelDivergeExn
+let par_conj_exn f g st =
+  let (get_stream, next) =
+    try let stream = f st in
+        (fun () -> stream), g
+    with RelDivergeExn -> (fun () -> g st), f
+  in
+  let stream =
+    try get_stream ()
+    with RelDivergeExn ->
+      print_endline "both streams in par_conj_exn has been diverged";
+      failure st
+  in
+  MKStream.bind stream next
+
+type ask_result = Hang | Later of Cache3.t;;
+effect AskAppendoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
+effect AskReversoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 
 let rec appendo a b ab = fun st ->
   let _ = ignore @@ project3 ~msg:"Entering appendo" a b ab st in
+
   let cache =
     let arg = Obj.(repr a, repr b, repr ab) in
-    try perform (AskAppendoCache arg)
+    try
+      match perform (AskAppendoCache (arg, st)) with
+      | Hang -> raise RelDivergeExn
+      | Later cache -> cache
     with Unhandled -> Cache3.(extend arg empty)
   in
 
   let appendo a b ab = fun st ->
     match appendo a b ab st with
     | ss -> ss
-    | effect (AskAppendoCache new_arg) k ->
-        continue k Cache3.(extend new_arg cache)
+    | effect (AskAppendoCache (new_arg, st)) k ->
+        if Cache3.alpha_contains new_arg st cache
+        then continue k Hang
+        else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
     [ ((a === nil ()) &&& (b === ab))
@@ -45,29 +67,39 @@ let rec reverso a b = fun st ->
   let _ = ignore @@ project2 ~msg:"Entering reverso" a b st in
   let cache =
     let arg = Obj.(repr a, repr b, repr 1) in
-    try perform (AskReversoCache arg)
+    try
+      match perform (AskReversoCache (arg, st)) with
+      | Hang -> raise RelDivergeExn
+      | Later cache -> cache
     with Unhandled -> Cache3.(extend arg empty)
   in
   let reverso a b = fun st ->
     match reverso a b st with
     | ss -> ss
-    | effect (AskReversoCache new_arg) k ->
-        continue k Cache3.(extend new_arg cache)
+    | effect (AskReversoCache (new_arg, st)) k ->
+        if Cache3.alpha_contains new_arg st cache
+        then continue k Hang
+        else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
     [ ((a === nil ()) &&& (b === nil ()))
     ; Fresh.three @@ fun h t a' ->
         (a === h%t) &&&
-        (reverso t a') &&&
-        (appendo a' !<h b)
+        (par_conj_exn
+          (reverso t a')
+          (appendo a' !<h b)
+        )
     ]
     st
 
 
 let () =
   runL (-1)  q  qh ("", (fun q   -> appendo (ilist [1;2;3]) (ilist [4;5]) q       ));
+  (* OK *)
   runL (-1)  q  qh ("", (fun q   -> reverso (ilist [1;2;3]) q                     ));
-()
+  (* should hang *)
+  runL (-1)  q  qh ("", (fun q   -> reverso q (ilist [1;2;3])                     ));
+  ()
 
 (*
 exception RelDivergeExn
