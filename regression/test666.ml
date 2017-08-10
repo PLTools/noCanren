@@ -39,7 +39,7 @@ effect AskAppendoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 effect AskReversoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 
 let rec appendo a b ab = fun st ->
-  let _ = ignore @@ project3 ~msg:"Entering appendo" a b ab st in
+  (* let _ = ignore @@ project3 ~msg:"Entering appendo" a b ab st in *)
 
   let cache =
     let arg = Obj.(repr a, repr b, repr ab) in
@@ -55,7 +55,7 @@ let rec appendo a b ab = fun st ->
     | ss -> ss
     | effect (AskAppendoCache (new_arg, st)) k ->
         if Cache3.alpha_contains new_arg st cache
-        then let () = print_endline "Hand" in continue k Hang
+        then let () = print_endline "Hanging appendo" in continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
@@ -70,7 +70,7 @@ let rec appendo a b ab = fun st ->
     st
 
 let rec reverso a b = fun st ->
-  let _ = ignore @@ project2 ~msg:"Entering reverso" a b st in
+  (* let _ = ignore @@ project2 ~msg:"Entering reverso" a b st in *)
   let cache =
     let arg = Obj.(repr a, repr b, repr 0) in
     try
@@ -84,7 +84,7 @@ let rec reverso a b = fun st ->
     | ss -> ss
     | effect (AskReversoCache (new_arg, st)) k ->
         if Cache3.alpha_contains ~printer:show_reify_key new_arg st cache
-        then let () = printfn "Hang %s %d" __FILE__ __LINE__ in continue k Hang
+        then let () = printfn "Hanging reverso" in continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
   conde
@@ -100,7 +100,7 @@ let rec reverso a b = fun st ->
 
 
 let () =
-  runL (-1)  q  qh ("", (fun q   -> appendo (ilist [1;2;3]) (ilist [4;5]) q       ));
+  (* runL (-1)  q  qh ("", (fun q   -> appendo (ilist [1;2;3]) (ilist [4;5]) q       )); *)
   (* OK *)
   runL (-1)  q  qh ("", (fun q   -> reverso (ilist [1;2;3]) q                     ));
   (* should hang *)

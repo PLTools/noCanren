@@ -654,7 +654,7 @@ module Subst :
     (* Safe version of [merge_a_prefix_unsafe]. it can fail *)
     val merge_a_prefix: Env.t -> scope:scope_t -> content list -> t -> (t * bool) option
 
-    val unify   : Env.t -> 'a -> 'a -> scope:scope_t -> t -> (content list * t) option
+    val unify   : ?more_general:bool -> ?printer:('b -> string) -> Env.t -> 'a -> 'a -> scope:scope_t -> t -> (content list * t) option
     val show    : t -> string
     val pretty_show : ('a -> bool) -> t -> string
   end = struct
@@ -765,7 +765,12 @@ module Subst :
         else M.add cnt.lvar.index cnt acc
       )
 
-    let unify env x y ~scope main_subst =
+    let unify ?(more_general=false) ?printer env x y ~scope main_subst =
+
+      (* let () =
+        match printer with None -> () | Some p ->
+          printfn "unify '%s' and '%s' " (p !!!x) (p !!!y)
+      in *)
       (* The idea is to do unification and collect unification prefix during the process.
         RIGHT:
           It is safe to modify variables on the go. Beause two cases:
@@ -776,7 +781,7 @@ module Subst :
         *)
 
       let extend xi x term (prefix,sub1) =
-        if occurs env xi term sub1 then raise Occurs_check
+        if (not more_general) && occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = make_content x term in
           assert (Env.var env x <> Env.var env term);
@@ -787,13 +792,17 @@ module Subst :
       let rec helper x y : (content list * t) option -> _ = function
         | None -> None
         | Some ((delta, subs) as pair) as acc ->
+            (* let foo = function Some n -> sprintf "_.%d" n | None -> "   " in
+            printfn "unifying %s: %s" (foo @@ Env.var env x) (generic_show x);
+            printfn "     adn %s: %s" (foo @@ Env.var env y) (generic_show y); *)
             let x = walk env x subs in
             let y = walk env y subs in
             match Env.var env x, Env.var env y with
             | (Some xi, Some yi) when xi = yi -> acc
             | (Some xi, Some _) -> extend xi x y pair
             | Some xi, _        -> extend xi x y pair
-            | _      , Some yi  -> extend yi y x pair
+            | _      , Some yi  when not more_general -> extend yi y x pair
+            | _      , Some _   -> None
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -816,13 +825,13 @@ module Subst :
                 )
       in
       try helper !!!x !!!y (Some ([], main_subst))
-      with Occurs_check -> None
+      with Occurs_check -> print_endline "Occurs check gotten"; None
 
     let merge_a_prefix env ~scope prefix subst =
       let rec helper is_enlarged acc = function
       | [] -> Some (acc, is_enlarged)
       | h::tl ->
-          match unify env ~scope !!!h.lvar !!!h.new_val acc with
+          match unify env ~scope !!!(!!!h.lvar) !!!(!!!h.new_val) acc with
           | None -> None
           | Some (p,s) -> helper (is_enlarged || p<>[] ) s tl
       in
@@ -1486,11 +1495,12 @@ module Cache3 = struct
     let env = State.env state in
     let subst = State.subst state in
     (* first we need to walk all the key parts *)
-    let a = Subst.walk env a (State.subst state) |> Obj.repr in
-    let b = Subst.walk env b (State.subst state) |> Obj.repr in
-    let c = Subst.walk env c (State.subst state) |> Obj.repr in
+    let a = Subst.walk env a subst |> Obj.repr in
+    let b = Subst.walk env b subst |> Obj.repr in
+    let c = Subst.walk env c subst |> Obj.repr in
 
     let new_xyz = (a,b,c) in
+    (* printfn "subst:\n%s" (Subst.pretty_show (Env.is_var env) subst); *)
 
     try cache |> List.iter (fun xyz ->
           let walked_xyz =
@@ -1500,15 +1510,20 @@ module Cache3 = struct
             let c = Subst.walk env c (State.subst state) |> Obj.repr in
             (a,b,c)
           in
-          let () = match printer with None -> () | Some printer ->
+          (* let () = match printer with None -> () | Some printer ->
             let p term = printer (helper_of_state state) term in
-            printfn "checking '%s' unifiable with '%s'" (p walked_xyz) (p new_xyz)
+            printfn "checking '%s' is more general then '%s'" (p new_xyz) (p walked_xyz)
+          in *)
+          let unify a b = match printer with
+          | None -> Subst.unify ~more_general:true env
+              a b ~scope:non_local_scope (State.subst state)
+          | Some f ->
+            Subst.unify ~more_general:true ~printer:(fun x -> f (helper_of_state state) !!!x) env
+              a b ~scope:non_local_scope (State.subst state)
           in
-          match Subst.unify env walked_xyz new_xyz ~scope:non_local_scope (State.subst state) with
+          match unify new_xyz walked_xyz with
           | None -> ()
-          | Some (prefix, new_sub) when Subst.walk env xyz subst = Subst.walk env new_xyz subst ->
-             raise Found
-          | _ -> ()
+          | Some (prefix, new_sub) -> raise Found
         );
         false
     with Found -> true
