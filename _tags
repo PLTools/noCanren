@@ -10,7 +10,7 @@ true: short_paths
 <src/MiniKanren*.*>: package(GT)
 <src/*.ml*>: package(GT)
 
-<regression/test666*.*>: package(GT)
+<regression/test66*.*>: package(GT)
 
 ####################################################################
 # JSOO toplevel related stuff

@@ -1532,3 +1532,18 @@ module Cache3 = struct
   let extend key cache = key::cache
 
 end
+
+exception RelDivergeExn
+let par_conj_exn f g st =
+  let (get_stream, next) =
+    try let stream = f st in
+        (fun () -> stream), g
+    with RelDivergeExn -> (fun () -> g st), f
+  in
+  let stream =
+    try get_stream ()
+    with RelDivergeExn ->
+      print_endline "both streams in par_conj_exn has been diverged";
+      failure st
+  in
+  MKStream.bind stream next

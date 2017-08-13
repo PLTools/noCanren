@@ -490,3 +490,6 @@ module Cache3 : sig
 
   val extend : key -> t -> t
 end
+
+exception RelDivergeExn
+val par_conj_exn : goal -> goal -> goal
