@@ -12,6 +12,10 @@ true: short_paths
 <src/MiniKanren*.*>: package(unix),syntax(camlp5o),package(GT,GT.syntax.all),package(logger.syntax)
 <src/*.ml*>: package(GT)
 
+<src/Deep*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
+<regression/test2*.ml>: syntax(camlp5o), package(GT)
+<regression/test2*.native>: package(GT)
+
 <regression/orig/*>: traverse
 <regression/test*.native> or <regression/test*.byte>: package(unix),package(str)
 <regression/stlc.*>: syntax(camlp5o), package(GT.syntax.all)
@@ -19,7 +23,7 @@ true: short_paths
 <regression/test0*.*>: package(GT,GT.syntax.all), syntax(camlp5o)
 
 <regression/test*.ml> : syntax(camlp5o), package(logger.syntax)
-<regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
+#<regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
 
 ####################################################################
 # JSOO toplevel related stuff

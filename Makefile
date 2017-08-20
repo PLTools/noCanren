@@ -42,7 +42,7 @@ clean: clean_tests
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto
-
+REGRES_CASES += 220simple 221appendo 222sorto 223binarith
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
 NATIVE_TEST_EXECUTABLES += regression/test$(1).native
