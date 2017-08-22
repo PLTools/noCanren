@@ -24,13 +24,94 @@ end;;
 type ('a, 'l) llist =
 | Nil
 | Cons of 'a * 'l
-[@@derving gt {show} ]
+
+class type virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_tt =
+  object
+    method  c_Nil :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                   > )
+          GT.a -> 'syn
+    method  c_Cons :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                   > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_llist :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) llist -> 'syn
+  end
+val llist :
+  (('ia -> 'a -> 'sa) -> ('il -> 'l -> 'sl) -> ('a,'ia,'sa,'l,'il,'sl,'inh,'syn)#llist_tt ->
+         'inh -> ('a,'l) llist -> 'syn,
+    < show: ('a -> string) ->  ('l -> string) -> ('a,'l) llist -> string  ;
+      gmap: ('a -> 'q) ->  ('l -> 'r) -> ('a,'l) llist -> ('q, 'r) llist;
+    > )
+    GT.t
+class virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_t :
+  object
+    method  virtual c_Nil :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                   > )
+          GT.a -> 'syn
+    method  virtual c_Cons :
+      'inh ->
+        ('inh,('a,'l) llist,'syn,<
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                   > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_llist :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) llist -> 'syn
+  end
+
+
 
 (** Abstract nat type *)
 type 'a lnat =
 | O
 | S of 'a
-[@@derving gt {show} ]
+
+class type virtual ['a,'ia,'sa,'inh,'syn] lnat_tt =
+  object
+    method  c_O :
+      'inh -> ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  c_S :
+      'inh ->
+        ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_lnat : ('ia -> 'a -> 'sa) -> 'inh -> 'a lnat -> 'syn
+  end
+val lnat :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#lnat_tt -> 'inh -> 'a lnat -> 'syn,
+     <  show:  ('a -> string) -> 'a lnat -> string  ;
+        gmap:  ('a -> 'q) -> 'a lnat -> 'q lnat  ;
+                                                                 > )
+    GT.t
+class virtual ['a,'ia,'sa,'inh,'syn] lnat_t :
+  object
+    method  virtual c_O :
+      'inh -> ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  virtual c_S :
+      'inh ->
+        ('inh,'a lnat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_lnat : ('ia -> 'a -> 'sa) -> 'inh -> 'a lnat -> 'syn
+  end
+
 
 module Option : sig
   type 'a t = 'a option

@@ -36,18 +36,23 @@ end;;
 
 type ('a, 'l) llist = Nil | Cons of 'a * 'l
 (* [@@deriving gt {show}, showT {with_path=false} ] *)
+
+let fmap_llist f g = function
+| Nil -> Nil
+| Cons (a,b) -> Cons (f a, g b)
+
 class type virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_tt =
   object
     method  c_Nil :
       'inh ->
         ('inh,('a,'l) llist,'syn,<
-                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
                                    > )
           GT.a -> 'syn
     method  c_Cons :
       'inh ->
         ('inh,('a,'l) llist,'syn,<
-                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
                                    > )
           GT.a ->
           ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
@@ -67,7 +72,7 @@ let (llist :
   =
   let rec llist_gcata fa fl trans inh subj =
     let rec self = llist_gcata fa fl trans
-    
+
     and tpo = object method a = fa method l = fl end
      in
     match subj with
@@ -76,19 +81,19 @@ let (llist :
         trans#c_Cons inh (GT.make self subj tpo) (GT.make fa p0 tpo)
           (GT.make fl p1 tpo)
      in
-  { GT.gcata = llist_gcata; GT.plugins = () } 
+  { GT.gcata = llist_gcata; GT.plugins = () }
 class virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] llist_t =
   object (this)
     method virtual  c_Nil :
       'inh ->
         ('inh,('a,'l) llist,'syn,<
-                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
                                    > )
           GT.a -> 'syn
     method virtual  c_Cons :
       'inh ->
         ('inh,('a,'l) llist,'syn,<
-                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl  
+                                   a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
                                    > )
           GT.a ->
           ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
@@ -112,11 +117,17 @@ let llist =
          method show fa fl =
            (GT.transform llist) (GT.lift fa) (GT.lift fl) (new show_llist_t)
              ()
+          method gmap = fmap_llist
        end)
-  } 
+  }
 
 
 type 'a lnat = O | S of 'a
+
+let fmap_lnat f = function
+| O -> O
+| S x -> S (f x)
+
 (* [@@deriving gt {show}, showT {with_path=false} ] *)
 class type virtual ['a,'ia,'sa,'inh,'syn] lnat_tt =
   object
@@ -135,13 +146,13 @@ let (lnat :
   =
   let rec lnat_gcata fa trans inh subj =
     let rec self = lnat_gcata fa trans
-    
+
     and tpo = object method a = fa end
      in
     match subj with
     | O  -> trans#c_O inh (GT.make self subj tpo)
     | S p0 -> trans#c_S inh (GT.make self subj tpo) (GT.make fa p0 tpo)  in
-  { GT.gcata = lnat_gcata; GT.plugins = () } 
+  { GT.gcata = lnat_gcata; GT.plugins = () }
 class virtual ['a,'ia,'sa,'inh,'syn] lnat_t =
   object (this)
     method virtual  c_O :
@@ -163,10 +174,10 @@ let lnat =
     GT.gcata = (lnat.GT.gcata);
     GT.plugins =
       (object
-         method show fa =
-           (GT.transform lnat) (GT.lift fa) (new show_lnat_t) ()
+          method show fa = (GT.transform lnat) (GT.lift fa) (new show_lnat_t) ()
+          method gmap = fmap_lnat
        end)
-  } 
+  }
 
 
 let fmap_llist f g = function Nil -> Nil | Cons (a,b) -> Cons (f a, g b)
