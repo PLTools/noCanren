@@ -76,95 +76,49 @@ let list_filter_map ~f xs =
   helper [] xs
 
 
-(* miniKanren-like streams, the most unsafe implementation *)
-module MKStream =
-  struct
-    open Obj
-    (*
-      Very unsafe implementation of streams
-      * false -- an empty list
-      * closure -- delayed list
-      * block with tag 1 -- single value
-      * (x,closure)   -- a value and continuation (pair has tag 0)
-    *)
-
-    type t = Obj.t
-
-    let nil : t = !!!false
-    let is_nil s = (s = !!!false)
-
-    let inc (f: unit -> t) : t =
-      Obj.repr f
-
-    let from_fun = inc
-
-    type wtf = Dummy of int*string | Single of Obj.t
-    let () = assert (Obj.tag @@ repr (Single !!![]) = 1)
-
-    let single : 'a -> t = fun x ->
-      Obj.repr @@ Obj.magic (Single !!!x)
-
-    let choice a f =
-      assert (closure_tag = tag@@repr f);
-      Obj.repr @@ Obj.magic (a,f)
-
-    let case_inf xs ~f1 ~f2 ~f3 ~f4 : Obj.t =
-      if is_int xs then f1 ()
-      else
-        let tag = Obj.tag (repr xs) in
-        if tag = Obj.closure_tag
-        then f2 (!!!xs: unit -> Obj.t)
-        else if tag = 1 then f3 (field (repr xs) 0)
-        else
-          (* let () = assert (0 = tag) in
-          let () = assert (2 = size (repr xs)) in *)
-          f4 (field (repr xs) 0) (!!!(field (repr xs) 1): unit -> Obj.t)
-      (* [@@inline ] *)
-
-    let step gs =
-      assert (closure_tag = tag @@ repr gs);
-      !!!gs ()
-
-    let rec mplus : t -> t -> t  = fun cinf (gs: t) ->
-      assert (closure_tag = tag @@ repr gs);
-      case_inf cinf
-        ~f1:(fun () ->
-              step gs)
-        ~f2:(fun f ->
-              inc begin fun () ->
-                let r = step gs in
-                mplus r !!!f
-              end)
-        ~f3:(fun c ->
-              choice c gs
-          )
-        ~f4:(fun c ff ->
-              choice c (inc @@ fun () -> mplus (step gs) !!!ff)
-          )
-
-    let rec bind cinf g =
-      case_inf cinf
-        ~f1:(fun () ->
-                nil)
-        ~f2:(fun f ->
-              (* delay here because miniKanren has it *)
-              inc begin fun () ->
-                let r = f () in
-                bind r g
-              end)
-        ~f3:(fun c ->
-              (!!!g c) )
-        ~f4:(fun c f ->
-              let arg1 = !!!g c in
-              mplus arg1 @@
-                    inc begin fun () ->
-                      bind (step f) g
-                    end
-          )
-  end
-
 module Stream =
   struct
+
+    module Internal =
+      struct
+	type 'a t =
+	  | Nil
+	  | Thunk  of 'a thunk
+	  | Single of 'a
+	  | Choice of 'a * ('a t)
+	and 'a thunk = unit -> 'a t
+
+	let nil        = Nil
+	let single x   = Single x
+	let choice a f = Choice (a, f)
+	let inc    f   = Thunk f
+	let from_fun   = inc
+
+	let rec is_empty = function
+        | Nil      -> true
+        | Thunk f  -> is_empty @@ f ()
+        | _        -> false
+
+	let force = function
+        | Thunk f -> f ()
+        | fs      -> fs
+
+	let rec mplus fs gs =
+	  match fs with
+	  | Nil            -> force gs
+	  | Thunk   _      -> inc (fun () -> mplus (force gs) fs)
+	  | Single  a      -> choice a gs
+	  | Choice (a, hs) -> choice a (from_fun @@ fun () -> mplus (force gs) hs)
+
+	let rec bind xs g =
+	  match xs with
+	  | Nil           -> Nil
+	  | Thunk   f     -> inc (fun () -> bind (f ()) g)
+	  | Single  c     -> g c
+	  | Choice (c, f) -> mplus (g c) (from_fun (fun () -> bind (force f) g))
+      end
+
+    type 'a internal = 'a Internal.t
     type 'a t = Nil | Cons of 'a * 'a t | Lazy of 'a t Lazy.t
 
     let from_fun (f: unit -> 'a t) : 'a t = Lazy (Lazy.from_fun f)
@@ -173,17 +127,11 @@ module Stream =
 
     let cons h t = Cons (h, t)
 
-    let rec of_mkstream : MKStream.t -> 'a t = fun xs ->
-      let rec helper xs =
-        !!!MKStream.case_inf !!!xs
-          ~f1:(fun () -> !!!Nil)
-          ~f2:(fun f  ->
-              !!! (from_fun (fun () ->
-                helper @@ f ())) )
-          ~f3:(fun a -> !!!(cons a Nil) )
-          ~f4:(fun a f -> !!!(cons a @@ from_fun (fun () -> helper @@ f ())) )
-      in
-      !!!(helper !!!xs)
+    let rec of_mkstream = function
+    | Internal.Nil -> Nil
+    | Internal.Thunk f -> from_fun (fun () -> of_mkstream @@ f ())
+    | Internal.Single a -> Cons (a, Nil)
+    | Internal.Choice (a, f) -> Cons (a, from_fun (fun () -> of_mkstream @@ Internal.force f))
 
     let rec is_empty = function
     | Nil    -> true
@@ -203,19 +151,6 @@ module Stream =
     let hd s = List.hd @@ take ~n:1 s
     let tl s = snd @@ retrieve ~n:1 s
 
-    (* let rec mplus fs gs =
-      match fs with
-      | Nil           -> gs
-      | Cons (hd, tl) -> cons hd @@ from_fun (fun () -> mplus gs tl)
-      | Lazy z        -> from_fun (fun () -> mplus gs (Lazy.force z) )
-
-    let rec bind xs f =
-      match xs with
-      | Cons (x, xs) -> from_fun (fun () -> mplus (f x) (bind xs f))
-      | Nil          -> nil
-      | Lazy z       -> from_fun (fun () -> bind (Lazy.force z) f) *)
-
-
     let rec map f = function
     | Nil          -> Nil
     | Cons (x, xs) -> Cons (f x, map f xs)
@@ -232,9 +167,9 @@ module Stream =
       | Cons (x, xs), Cons (y, ys) -> Cons ((x, y), zip xs ys)
       | _           , Lazy s       -> Lazy (Lazy.from_fun (fun () -> zip fs (Lazy.force s)))
       | Lazy s      , _            -> Lazy (Lazy.from_fun (fun () -> zip (Lazy.force s) gs))
-      | Nil, _      | _, Nil       -> failwith "MiniKanren.Stream.zip: streams have different lengths"
+      | Nil, _      | _, Nil       -> failwith "OCanren fatal (Stream.zip): streams have different lengths"
 
-  end
+end
 ;;
 
 (* ************************************************ *)
@@ -1201,7 +1136,10 @@ module State =
   end
 
 type 'a goal' = State.t -> 'a
-type goal = MKStream.t goal'
+type goal = State.t Stream.internal goal'
+
+let success st = Stream.Internal.single st
+let failure _  = Stream.Internal.nil
 
 let call_fresh f : State.t -> _ = fun (env, subst, constr, scope) ->
   let x, env' = Env.fresh ~scope env in
@@ -1223,71 +1161,46 @@ let (===) ?loc (x: _ injected) y (env, subst, constr, scope) =
   (* incr unif_counter; *)
 
   match Subst.unify env x y scope subst with
-  | None -> MKStream.nil
+  | None -> Stream.Internal.nil
   | Some (prefix, s) ->
       try
         let constr' = Constraints.check ~prefix env s constr in
-        MKStream.single (env, s, constr', scope)
-      with Disequality_violated -> MKStream.nil
+        Stream.Internal.single (env, s, constr', scope)
+      with Disequality_violated -> Stream.Internal.nil
 
 let (=/=) x y ((env, subst, constrs, scope) as st) =
   (* For disequalities we unify in non-local scope to prevent defiling *)
   match Subst.unify env x y non_local_scope subst with
-  | None -> MKStream.single st
-  | Some ([],_) -> MKStream.nil (* this constraint can't be fulfilled *)
+  | None -> Stream.Internal.single st
+  | Some ([],_) -> Stream.Internal.nil
   | Some (prefix,_) ->
       let new_constrs = Constraints.extend ~prefix env constrs in
-      MKStream.single (env, subst, new_constrs, scope)
+      Stream.Internal.single (env, subst, new_constrs, scope)
 
-let delay : (unit -> goal) -> goal = fun g ->
-  fun st -> MKStream.from_fun (fun () -> g () st)
+let delay g st = Stream.Internal.from_fun (fun () -> g () st)
 
-let inc : goal -> goal = fun g st -> MKStream.from_fun (fun () -> g st)
+let inc : goal -> goal = fun g st -> Stream.Internal.from_fun (fun () -> g st)
 
-let conj f g st = MKStream.bind (f st) g
-
+let conj f g st = Stream.Internal.bind (f st) g
 let (&&&) = conj
+let (?&) gs = List.fold_right (&&&) gs success
 
-let disj f g st =
-  let open MKStream in
-  mplus (f st) (MKStream.from_fun (fun () -> g st))
+let disj_base f g st = Stream.Internal.mplus (f st) (Stream.Internal.from_fun (fun () -> g st))
+
+let disj f g st = let st = State.incr_scope st in disj_base f g |> (fun g -> Stream.Internal.inc (fun () -> g st))
 
 let (|||) = disj
 
-(* mplus_star *)
-let rec (?|) = function
-| []    -> failwith "wrong argument of ?|"
-| [h]   -> h
-| h::tl -> h ||| (?| tl)
-
-(* "bind*" *)
-let rec (?&) = function
-| []   -> failwith "wrong argument of ?&"
-| [h]  -> h
-| x::y::tl -> ?& ((x &&& y)::tl)
-
-let bind_star = (?&)
-
-let list_fold ~f ~initer xs =
-  match xs with
-  | [] -> failwith "bad argument"
-  | start::xs -> ListLabels.fold_left ~init:(initer start) ~f xs
-
-let list_fold_right0 ~f ~initer xs =
-  let rec helper = function
-  | [] -> failwith "bad_argument"
-  | x::xs -> list_fold ~initer ~f:(fun acc x -> f x acc) (x::xs)
-  in
-  helper (List.rev xs)
-
-let conde: goal list -> goal = fun xs st ->
+let (?|) gs st =
   let st = State.incr_scope st in
-  list_fold_right0 ~initer:(fun x -> x)
-    xs
-    ~f:(fun g acc st ->
-          MKStream.mplus (g st) @@ MKStream.inc (fun () -> acc st)
-      )
-  |> (fun g -> MKStream.inc (fun ()  -> g st))
+  let rec inner = function
+  | [g]   -> g
+  | g::gs -> disj_base g (inner gs)
+  in
+  inner gs |> (fun g -> Stream.Internal.inc (fun () -> g st))
+
+let conde = (?|)
+
 
 module Fresh =
   struct
@@ -1309,8 +1222,8 @@ module Fresh =
 
   end
 
-let success st = MKStream.single st
-let failure _  = MKStream.nil
+let success st = Stream.Internal.single st
+let failure _  = Stream.Internal.nil
 
 exception FreeVarFound
 let has_free_vars is_var x =
@@ -1464,7 +1377,7 @@ let unitrace ?loc shower x y = fun st ->
   (* printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (match loc with Some l -> printf " on %s" l | None -> ());
 
-  if MKStream.is_nil ans then printfn "  -"
+  if Stream.Internal.is_nil ans then printfn "  -"
   else  printfn "  +"; *)
   ans
 
@@ -1474,7 +1387,7 @@ let diseqtrace shower x y = fun st ->
   (* printf "%d: (=/=) '%s' and '%s'" !logged_diseq_counter
     (shower (helper_of_state st) x)
     (shower (helper_of_state st) y);
-  if MKStream.is_nil ans then printfn "  -"
+  if Stream.Internal.is_nil ans then printfn "  -"
   else  printfn "  +"; *)
   ans;;
 
@@ -1534,11 +1447,31 @@ module Cache3 = struct
 end
 
 exception RelDivergeExn
-let par_conj_exn f g st =
-  let (get_stream, next) =
-    try let stream = f st in
-        (fun () -> stream), g
-    with RelDivergeExn -> (fun () -> g st), f
+
+module Eff = struct
+  let wrap handler g st0
+end
+
+let rec par_conj_exn_gen ?(second_diverges=false) (f:goal) g st =
+  try let stream = f st in
+      let open Stream.Internal in
+      match stream with
+      | Nil -> Nil
+      | Thunk __ -> Thunk (fun () -> par_conj_exn_gen ~second_diverges f g st)
+      | Single a -> Thunk (fun () -> g a)
+      | Choice (a,f) as rez ->
+          (* use normal conjunction here for a while *)
+          (&&&) (fun _ -> Thunk (fun () -> rez)) g st
+  with RelDivergeExn ->
+    if second_diverges
+    then
+      let () = printfn "Both diverges" in
+      Stream.Internal.Nil
+    else
+      par_conj_exn_gen ~second_diverges:true g f st
+
+(*
+      (fun () -> g st), f
   in
   let stream =
     try get_stream ()
@@ -1546,4 +1479,6 @@ let par_conj_exn f g st =
       print_endline "both streams in par_conj_exn has been diverged";
       failure st
   in
-  MKStream.bind stream next
+  Stream.Internal.bind stream next
+*)
+let par_conj_exn f g st = par_conj_exn_gen f g st

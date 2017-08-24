@@ -34,39 +34,40 @@ let show_reify_key h (x,y,z) =
 
 type ask_result = Hang | Later of Cache3.t;;
 
-(* effect AskAppendoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
-effect AskReversoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 
-let rec appendo a b ab = fun st ->
-  let _ = ignore @@ project3 ~msg:"Entering appendo" a b ab st in
-
+effect AskAddoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
+let rec addo x y z st =
+  let () = ignore @@ project3 ~msg:"addo" x y z st in
   let cache =
-    let arg = Obj.(repr a, repr b, repr ab) in
+    let arg = Obj.(repr x, repr y, repr z) in
     try
-      match perform (AskAppendoCache (arg, st)) with
-      | Hang -> raise RelDivergeExn
-      | Later cache -> cache
+      match perform (AskAddoCache (arg, st)) with
+      | Hang ->
+          printfn "addo hangs";
+          raise RelDivergeExn
+      | Later cache ->
+          printfn "Addo will hang later: current size = %d" (Cache3.size cache);
+          cache
     with Unhandled -> Cache3.(extend arg empty)
   in
 
-  let appendo a b ab = fun st ->
-    match appendo a b ab st with
+  let addo a b ab = fun st ->
+    match addo a b ab st with
     | ss -> ss
-    | effect (AskAppendoCache (new_arg, st)) k ->
+    | effect (AskAddoCache (new_arg, st)) k ->
         if Cache3.alpha_contains new_arg st cache
-        then let () = print_endline "Hand" in continue k Hang
+        then let () = print_endline "Hang" in continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
-  conde
-    [ ((a === nil ()) &&& (b === ab))
-    ; Fresh.three @@ fun h t ab' ->
-        ?& [
-          (a === h%t);
-          (h%ab' === ab);
-          (appendo t b ab');
-        ]
-    ]
-    st *)
+  conde [
+    (x === Nat.zero) &&& (z === y);
+    Fresh.two (fun x' z' ->
+       (x === Nat.succ x') &&&
+       (z === Nat.succ z') &&&
+       (addo x' y z')
+    )
+  ] st
+
 
 effect AskMuloCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 let rec mulo x y z st =
@@ -93,7 +94,7 @@ let rec mulo x y z st =
   ; Fresh.two @@ fun xt zt ->
       (x === Nat.succ xt) &&&
       (par_conj_exn
-        (Nat.addo zt y z)
+        (addo zt y z)
         (mulo xt y zt)
       )
   ] st

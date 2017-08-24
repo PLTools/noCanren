@@ -26,23 +26,11 @@ val printfn : ('a, unit, string, unit) format4 -> 'a
 
 (** {2 Basic modules and types} *)
 
-(** {3 Lazy streams} *)
-module MKStream :
-  sig
-    (** Stream type *)
-    type t
-
-    val inc: (unit -> t) -> t
-    (* val inc2: (unit -> 'a -> 'b t) -> 'a -> 'b t
-    val inc3: ('a -> unit -> 'b t) -> 'a -> 'b t *)
-    val mplus : t -> t -> t
-    (* val mplus_star : 'a t list -> 'a t *)
-
-    val bind: t -> ('a ->  t) -> t
-  end
-
 module Stream :
   sig
+    (** Internal stream type *)
+    type 'a internal
+
     (** Stream type *)
     type 'a t
 
@@ -93,7 +81,7 @@ module State :
 
 (** Goal converts a state into a lazy stream of states *)
 type 'a goal' = State.t -> 'a
-type goal = MKStream.t goal'
+type goal = State.t Stream.internal goal'
 
 (** {3 Logical values and injections} *)
 
@@ -173,8 +161,6 @@ val conde : goal list -> goal
 (** [?& [s1; s2; ...; sk]] calculates [s1 &&& s2 && ... &&& sk] for a non-empty list of goals *)
 val (?&) : goal list -> goal
 
-val bind_star : goal list -> goal
-
 (** {2 Some predefined goals} *)
 
 (** [success] always succeeds *)
@@ -221,7 +207,7 @@ module Fresh :
     - [run (succ one) (fun q r -> q === !!5 ||| r === !!6) (fun qs rs -> ]{i the same as the above}[)]
  *)
 val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) *
-                      (('g Stream.t -> 'h -> 'e) * ('c -> 'h * MKStream.t))) ->
+                      (('g Stream.t -> 'h -> 'e) * ('c -> 'h * 'g Stream.internal))) ->
           'a -> 'd -> 'f
 
 (**
