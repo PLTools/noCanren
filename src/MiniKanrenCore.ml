@@ -1446,39 +1446,29 @@ module Cache3 = struct
 
 end
 
-exception RelDivergeExn
+exception RelDivergeExn of goal * State.t
 
-module Eff = struct
+(* module Eff = struct
   let wrap handler g st0
-end
+end *)
 
-let rec par_conj_exn_gen ?(second_diverges=false) (f:goal) g st =
-  try let stream = f st in
-      let open Stream.Internal in
-      match stream with
+let rec par_conj_exn_gen ?(second_diverges=false) (left: State.t Stream.Internal.thunk) g  =
+  let open Stream.Internal in
+  try
+      match left () with
       | Nil -> Nil
-      | Thunk __ -> Thunk (fun () -> par_conj_exn_gen ~second_diverges f g st)
+      | Thunk l -> Thunk (fun () -> par_conj_exn_gen ~second_diverges l g )
       | Single a -> Thunk (fun () -> g a)
-      | Choice (a,f) as rez ->
-          (* use normal conjunction here for a while *)
-          (&&&) (fun _ -> Thunk (fun () -> rez)) g st
-  with RelDivergeExn ->
+      | Choice (a,f)  ->
+          mplus (g a) (par_conj_exn_gen ~second_diverges (fun () -> f) g )
+  with RelDivergeExn (kont, st0) ->
     if second_diverges
     then
       let () = printfn "Both diverges" in
       Stream.Internal.Nil
     else
-      par_conj_exn_gen ~second_diverges:true g f st
+      let () = printfn "Doing swap:\n%s" (Subst.pretty_show (Env.is_var @@ State.env st0) (State.subst st0)) in
+      par_conj_exn_gen ~second_diverges:true (fun () -> g st0) (fun st -> let () = printfn "BLALBLA" in kont st)
 
-(*
-      (fun () -> g st), f
-  in
-  let stream =
-    try get_stream ()
-    with RelDivergeExn ->
-      print_endline "both streams in par_conj_exn has been diverged";
-      failure st
-  in
-  Stream.Internal.bind stream next
-*)
-let par_conj_exn f g st = par_conj_exn_gen f g st
+
+and par_conj_exn f g st = par_conj_exn_gen (fun () -> f st) g
