@@ -18,7 +18,7 @@ let show_reify_key h (x,y,z) =
     (show_reify_list h @@ Obj.magic x)
     (show_reify_list h @@ Obj.magic y)
     (show_reify_list h @@ Obj.magic z)
-
+(*
 exception RelDivergeExn
 let par_conj_exn f g st =
   let (get_stream, next) =
@@ -33,7 +33,7 @@ let par_conj_exn f g st =
       failure st
   in
   MKStream.bind stream next
-
+*)
 type ask_result = Hang | Later of Cache3.t;;
 effect AskAppendoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 effect AskReversoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
@@ -45,7 +45,7 @@ let rec appendo a b ab = fun st ->
     let arg = Obj.(repr a, repr b, repr ab) in
     try
       match perform (AskAppendoCache (arg, st)) with
-      | Hang -> raise RelDivergeExn
+      | Hang -> raise (RelDivergeExn (appendo a b ab, st))
       | Later cache -> cache
     with Unhandled -> Cache3.(extend arg empty)
   in
@@ -75,7 +75,7 @@ let rec reverso a b = fun st ->
     let arg = Obj.(repr a, repr b, repr 0) in
     try
       match perform (AskReversoCache (arg, st)) with
-      | Hang -> raise RelDivergeExn
+      | Hang -> raise (RelDivergeExn (reverso a b, st))
       | Later cache -> cache
     with Unhandled -> Cache3.(extend arg empty)
   in

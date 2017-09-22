@@ -1467,8 +1467,8 @@ let rec par_conj_exn_gen ?(second_diverges=false) (left: State.t Stream.Internal
       let () = printfn "Both diverges" in
       Stream.Internal.Nil
     else
-      let () = printfn "Doing swap:\n%s" (Subst.pretty_show (Env.is_var @@ State.env st0) (State.subst st0)) in
-      par_conj_exn_gen ~second_diverges:true (fun () -> g st0) (fun st -> let () = printfn "BLALBLA" in kont st)
+      (* let () = printfn "Doing swap:\n%s" (Subst.pretty_show (Env.is_var @@ State.env st0) (State.subst st0)) in *)
+      par_conj_exn_gen ~second_diverges:true (fun () -> g st0) (fun st -> (*let () = printfn "BLALBLA" in*) kont st)
 
 
 and par_conj_exn f g st = par_conj_exn_gen (fun () -> f st) g

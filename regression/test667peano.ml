@@ -38,7 +38,6 @@ effect AskAddoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 let rec addo x y z = fun st ->
   let () = ignore @@ project3 ~msg:"addo" x y z st in
 
-  (* let shit = ref (fun _ _ _ -> let () = printfn "XXXXXXX" in success) in *)
   let cache =
     let arg = Obj.(repr x, repr y, repr z) in
     try
@@ -52,20 +51,13 @@ let rec addo x y z = fun st ->
   let addo a b ab = fun st ->
     match addo a b ab st with
     | exception (RelDivergeExn _ as e) ->
-      printf "FUCK %s %d\n%!" __FILE__ __LINE__;
       raise e
     | ss -> ss
     | effect (AskAddoCache (new_arg, new_st)) k ->
-        (* let () =
-          printfn "got request for cache for";
-          ignore @@ project3 ~msg:"  old call addo" x y z st
-        in *)
         if Cache3.alpha_contains ~printer:show_reify_key new_arg new_st cache
         then continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
-
-  (* shit := addo; *)
 
   conde
     [ (x === Nat.zero) &&& (z === y)
@@ -80,14 +72,12 @@ effect AskMuloCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 let rec mulo x y z st =
   let () = ignore @@ project3 ~msg:"mulo" x y z st in
 
-  let shit = ref (fun _ _ _ -> success) in
-
   let cache =
     let arg = Obj.(repr x, repr y, repr z) in
     try
       match perform (AskMuloCache (arg, st)) with
-      | Hang -> raise (RelDivergeExn (!shit x y z, st))
-      | Later cache -> printfn "Got a cache of size %d" (Cache3.size cache); cache
+      | Hang -> raise (RelDivergeExn (mulo x y z, st))
+      | Later cache -> (*printfn "Got a cache of size %d" (Cache3.size cache); *) cache
     with Unhandled -> Cache3.(extend arg empty)
   in
 
@@ -96,11 +86,10 @@ let rec mulo x y z st =
     | ss -> ss
     | effect (AskMuloCache (new_arg, st)) k ->
         if Cache3.alpha_contains new_arg st cache
-        then let () = print_endline "Hang" in continue k Hang
+        then continue k Hang
         else continue k @@ Later Cache3.(extend new_arg cache)
   in
 
-  shit := mulo;
   conde
   [ (x === Nat.zero) &&& (x === z)
   ; Fresh.two @@ fun xt zt ->
