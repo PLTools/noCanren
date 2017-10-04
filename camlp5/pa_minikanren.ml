@@ -64,7 +64,7 @@ EXTEND
             let pb = <:patt< $lid:b$ >> in
             let pc = <:patt< $lid:c$ >> in
             <:expr< MiniKanren.Fresh.three (fun $pa$ $pb$ $pc$ -> $loop tl$) >>
-        | a::b::tl ->
+        | a::b::[] ->
             let rez = loop tl in
             let pa = <:patt< $lid:a$ >> in
             let pb = <:patt< $lid:b$ >> in

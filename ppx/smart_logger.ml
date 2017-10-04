@@ -166,7 +166,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
       let ans =
       [%expr
         mylog (fun () -> printfn " creating inc in conde");
-        MKStream.inc (fun () ->
+        Stream.inc (fun () ->
           let st = State.incr_scope st in
           mylog (fun () -> printfn " force a conde");
           [%e
@@ -178,8 +178,8 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
                 ~initer:(pamk_e ~need_st mapper)
                 ~f:(fun x acc ->
                   [%expr
-                    MKStream.mplus [%e pamk_e ~need_st mapper x]
-                      (MKStream.inc (fun () ->
+                    Stream.mplus [%e pamk_e ~need_st mapper x]
+                      (Stream.inc (fun () ->
                         mylog (fun () -> printfn " force inc from mplus*");
                         [%e acc]))
                   ]
@@ -207,46 +207,67 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         | [] -> assert false
         | [body] ->
             (* we omitte bind* here*)
-            pamk_e ~need_st:true mapper body
+            pamk_e ~need_st mapper body
         | body ->
             let xs = List.map (pamk_e ~need_st:false mapper) body in
-            [%expr ?& [%e Ast_convenience.list xs ] st ]
+            [%expr ?& [%e Ast_convenience.list xs ] ]
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
-          let pretty_names = StringLabels.concat ~sep:" " xs in
-          let msg2 = sprintf "create inc in fresh ==== (%s)" pretty_names in
-          let msg3 = sprintf "inc in fresh forced: (%s)" pretty_names in
-          let ans =
+          (* let pretty_names = StringLabels.concat ~sep:" " xs in *)
+          (* let msg2 = sprintf "create inc in fresh ==== (%s)" pretty_names in *)
+          (* let msg3 = sprintf "inc in fresh forced: (%s)" pretty_names in *)
+
+          let rec loop = function
+          | a::b::c::tl ->
+          let pa = Pat.var (Location.mknoloc a) in
+          let pb = Pat.var (Location.mknoloc b) in
+          let pc = Pat.var (Location.mknoloc c) in
+          [%expr Fresh.three (fun [%p pa] [%p pb] [%p pc] -> [%e loop tl])]
+          | a::b::[] ->
+          let pa = Pat.var (Location.mknoloc a) in
+          let pb = Pat.var (Location.mknoloc b) in
+          [%expr Fresh.two (fun [%p pa] [%p pb] -> [%e new_body])]
+          | a::[] ->
+          let pa = Pat.var (Location.mknoloc a) in
+          [%expr Fresh.one (fun [%p pa]  -> [%e new_body])]
+          | [] -> new_body
+
+          in
+
+          let ans = loop xs in
+          (* let ans =
             List.fold_right xs
               ~f:(fun ident acc ->
                   let msg = sprintf "create new variable %s as" ident in
                   let msg = msg ^ " _.%d" in
                   [%expr
                     let [%p pvar ident ], idx = State.new_var st in
-                    mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
+                    (* mylog (fun () -> printfn [%e  Exp.const_string msg] idx); *)
                     [%e acc]
                   ]
                  )
               ~init:[%expr
-                mylog (fun () -> printfn [%e Exp.const_string msg2]);
-                MKStream.inc (fun () ->
-                  mylog (fun () -> printfn [%e Exp.const_string msg3]);
+                (* mylog (fun () -> printfn [%e Exp.const_string msg2]); *)
+                Stream.inc (fun () ->
+                  (* mylog (fun () -> printfn [%e Exp.const_string msg3]); *)
                   [%e new_body ]
                 )]
-          in
+          in *)
 
-          if need_st then ans
-          else [%expr fun st -> [%e ans]]
+          ans
+          (* if need_st then ans
+          else [%expr fun st -> [%e ans]] *)
       | None ->
          eprintf "Can't reconstruct args of 'fresh'";
          {e with pexp_desc=Pexp_apply (e1,[Nolabel, new_body]) }
     end
   | Pexp_apply (d, [(_,body)]) when is_defer d ->
-      let ans = [%expr MKStream.inc (fun () -> [%e pamk_e ~need_st:false mapper body])] in
-      if need_st
+      let ans = [%expr delay (fun () -> [%e pamk_e ~need_st:false mapper body])] in
+      ans
+      (* if need_st
       then [%expr [%e ans] st]
-      else ans
+      else ans *)
   | Pexp_apply (d, body) when is_unif d ->
 
       let loc_str =
@@ -257,16 +278,19 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         Buffer.contents b
       in
       (* let ans = e in *)
-      let body = (Labelled "loc", Exp.const_string loc_str) :: body in
+      (* let body = (Labelled "loc", Exp.const_string loc_str) :: body in *)
       let ans = Exp.apply ~loc:e.pexp_loc d body in
-      if need_st then [%expr [%e ans ] st]
-      else ans
+      ans
+      (* if need_st then [%expr [%e ans ] st]
+      else ans *)
   | Pexp_apply (e, xs) ->
       let ans = Pexp_apply (mapper.expr mapper e,
                                    List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) in
       let ans = {e with pexp_desc = ans} in
-      if need_st then [%expr [%e ans] st]
-      else ans
+      ans
+
+      (* if need_st then [%expr [%e ans] st]
+      else ans *)
   | Pexp_fun (l,opt,pat,e) ->
      { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
 

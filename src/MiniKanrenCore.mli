@@ -22,6 +22,11 @@
 
 module Stream :
   sig
+
+    module Internal : sig
+      type 'a t
+      type 'a thunk
+    end
     (** Internal stream type *)
     type 'a internal
 
@@ -62,10 +67,12 @@ module State :
   sig
     (** State type *)
     type t
+
+    val new_var : t -> 'a * int
   end
 
 (** Goal converts a state into a lazy stream of states *)
-type 'a goal'
+type 'a goal' = State.t -> 'a
 type goal = State.t Stream.internal goal'
 
 (** {3 Logic values} *)

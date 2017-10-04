@@ -1,7 +1,7 @@
 true: debug, rectypes, color(auto), bin_annot, keep_asm
 true: short_paths
 
-<ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std)
+<ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.api)
 <ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
 
 <samples>: not_hygienic
@@ -20,6 +20,11 @@ true: short_paths
 
 <regression/test0*.ml> : syntax(camlp5o)
 <regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
+
+# prof
+<prof/*.*>: package(unix,mtime.clock.os)
+<prof/numero_decls.*> or <prof/logo1.*>: ppx(ppx/ppx_ocanren_all.native --as-ppx), package(GT)
+
 
 ####################################################################
 # JSOO toplevel related stuff

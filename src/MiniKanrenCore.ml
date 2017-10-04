@@ -1101,7 +1101,7 @@ module State =
 
     let new_var {env; scope} =
       let (x,_) = Env.fresh ~scope env in
-      let i = (!!!x : Var.t).index in
+      let i = (!!!x : Var.t).Var.index in
       (x,i)
 
     let incr_scope ({scope} as st) = {st with scope = Var.new_scope ()}
