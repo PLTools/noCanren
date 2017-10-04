@@ -18,10 +18,10 @@
 
 open MiniKanrenCore
 
-@type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr;;
-@type 'a nat = O | S of 'a with show, html, eq, compare, foldl, foldr, gmap;;
+@type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap;;
+@type 'a nat = O | S of 'a with show, gmap;;
 
-module Pair = 
+module Pair =
   struct
 
     type 'a logic' = 'a logic
@@ -38,11 +38,6 @@ module Pair =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    f g n   = GT.html   (GT.pair) f g n
-          method eq      f g n m = GT.eq     (GT.pair) f g n m
-          method compare f g n m = GT.compare(GT.pair) f g n m
-          method foldr   f g a n = GT.foldr  (GT.pair) f g a n
-          method foldl   f g a n = GT.foldl  (GT.pair) f g a n
           method gmap    f g n   = GT.gmap   (GT.pair) f g n
           method show    f g n   = GT.show   (GT.pair) f g n
         end
@@ -52,11 +47,6 @@ module Pair =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    f g n   = GT.html   (logic') (GT.html   (ground) f g) n
-          method eq      f g n m = GT.eq     (logic') (GT.eq     (ground) f g) n m
-          method compare f g n m = GT.compare(logic') (GT.compare(ground) f g) n m
-          method foldr   f g a n = GT.foldr  (logic') (GT.foldr  (ground) f g) a n
-          method foldl   f g a n = GT.foldl  (logic') (GT.foldl  (ground) f g) a n
           method gmap    f g n   = GT.gmap   (logic') (GT.gmap   (ground) f g) n
           method show    f g n   = GT.show   (logic') (GT.show   (ground) f g) n
         end
@@ -68,7 +58,7 @@ module Pair =
 
     module T =
       struct
-        type ('a, 'b) t = 'a * 'b 
+        type ('a, 'b) t = 'a * 'b
         let fmap f g x = GT.(gmap pair) f g x
       end
 
@@ -79,7 +69,7 @@ module Pair =
 
   end
 
-module Option = 
+module Option =
   struct
 
     type 'a logic' = 'a logic
@@ -96,11 +86,6 @@ module Option =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (GT.option) n
-          method eq      n m = GT.eq     (GT.option) n m
-          method compare n m = GT.compare(GT.option) n m
-          method foldr   n   = GT.foldr  (GT.option) n
-          method foldl   n   = GT.foldl  (GT.option) n
           method gmap    n   = GT.gmap   (GT.option) n
           method show    n   = GT.show   (GT.option) n
         end
@@ -110,11 +95,6 @@ module Option =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    f n   = GT.html   (logic') (GT.html   (ground) f) n
-          method eq      f n m = GT.eq     (logic') (GT.eq     (ground) f) n m
-          method compare f n m = GT.compare(logic') (GT.compare(ground) f) n m
-          method foldr   f a n = GT.foldr  (logic') (GT.foldr  (ground) f) a n
-          method foldl   f a n = GT.foldl  (logic') (GT.foldl  (ground) f) a n
           method gmap    f n   = GT.gmap   (logic') (GT.gmap   (ground) f) n
           method show    f n   = GT.show   (logic') (GT.show   (ground) f) n
         end
@@ -154,11 +134,6 @@ module Bool =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (GT.bool) n
-          method eq      n m = GT.eq     (GT.bool) n m
-          method compare n m = GT.compare(GT.bool) n m
-          method foldr   n   = GT.foldr  (GT.bool) n
-          method foldl   n   = GT.foldl  (GT.bool) n
           method gmap    n   = GT.gmap   (GT.bool) n
           method show    n   = GT.show   (GT.bool) n
         end
@@ -170,11 +145,6 @@ module Bool =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (logic') (GT.html   (ground)) n
-          method eq      n m = GT.eq     (logic') (GT.eq     (ground)) n m
-          method compare n m = GT.compare(logic') (GT.compare(ground)) n m
-          method foldr   a n = GT.foldr  (logic') (GT.foldr  (ground)) a n
-          method foldl   a n = GT.foldl  (logic') (GT.foldl  (ground)) a n
           method gmap    n   = GT.gmap   (logic') (GT.gmap   (ground)) n
           method show    n   = GT.show   (logic') (GT.show   (ground)) n
         end
@@ -230,16 +200,16 @@ let neqo x y t =
     (x === y) &&& (t === Bool.falso);
   ]
 
-module Nat = 
+module Nat =
   struct
 
     type 'a logic' = 'a logic
     let logic' = logic
 
-    module X = 
+    module X =
       struct
         type 'a t = 'a nat
-        let fmap f x = GT.(gmap nat) f x 
+        let fmap f x = GT.(gmap nat) f x
       end
 
     include X
@@ -254,11 +224,6 @@ module Nat =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n = GT.html   (nat) this#html    n
-          method eq      n = GT.eq     (nat) this#eq      n
-          method compare n = GT.compare(nat) this#compare n
-          method foldr   n = GT.foldr  (nat) this#foldr   n
-          method foldl   n = GT.foldl  (nat) this#foldl   n
           method gmap    n = GT.gmap   (nat) this#gmap    n
           method show    n = GT.show   (nat) this#show    n
         end
@@ -268,11 +233,6 @@ module Nat =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    n   = GT.html   (logic') (GT.html   (nat) this#html   ) n
-          method eq      n m = GT.eq     (logic') (GT.eq     (nat) this#eq     ) n m
-          method compare n m = GT.compare(logic') (GT.compare(nat) this#compare) n m
-          method foldr   a n = GT.foldr  (logic') (GT.foldr  (nat) this#foldr  ) a n
-          method foldl   a n = GT.foldl  (logic') (GT.foldl  (nat) this#foldl  ) a n
           method gmap    n   = GT.gmap   (logic') (GT.gmap   (nat) this#gmap   ) n
           method show    n   = GT.show   (logic') (GT.show   (nat) this#show   ) n
         end
@@ -347,7 +307,7 @@ module Nat =
 
   end
 
-let nat n = Nat.nat (Nat.of_int n) 
+let nat n = Nat.nat (Nat.of_int n)
 
 module List =
   struct
@@ -360,7 +320,7 @@ module List =
 
     type ('a, 'l) t = ('a, 'l) list
 
-    module X = 
+    module X =
       struct
         type ('a,'b) t = ('a, 'b) list
         let fmap f g x = GT.gmap list f g x
@@ -380,11 +340,6 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method html    fa l = GT.html   (list) fa (this#html    fa) l
-          method eq      fa l = GT.eq     (list) fa (this#eq      fa) l
-          method compare fa l = GT.compare(list) fa (this#compare fa) l
-          method foldr   fa l = GT.foldr  (list) fa (this#foldr   fa) l
-          method foldl   fa l = GT.foldl  (list) fa (this#foldl   fa) l
           method gmap    fa l = GT.gmap   (list) fa (this#gmap    fa) l
           method show    fa l = "[" ^
             let rec inner l =
@@ -406,12 +361,7 @@ module List =
       GT.gcata = ();
       GT.plugins =
         object(this)
-          method compare fa l = GT.compare (logic') (GT.compare (list) fa (this#compare fa)) l
           method gmap    fa l = GT.gmap    (logic') (GT.gmap    (list) fa (this#gmap    fa)) l
-          method eq      fa l = GT.eq      (logic') (GT.eq      (list) fa (this#eq      fa)) l
-          method foldl   fa l = GT.foldl   (logic') (GT.foldl   (list) fa (this#foldl   fa)) l
-          method foldr   fa l = GT.foldr   (logic') (GT.foldr   (list) fa (this#foldr   fa)) l
-          method html    fa l = GT.html    (logic') (GT.html    (list) fa (this#html    fa)) l
           method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
             GT.show(logic')
               (fun l -> "[" ^

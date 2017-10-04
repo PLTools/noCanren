@@ -27,7 +27,7 @@ module Stream :
 
     (** Stream type *)
     type 'a t
-    
+
     (** Emptiness test *)
     val is_empty : 'a t -> bool
 
@@ -73,17 +73,12 @@ type goal = State.t Stream.internal goal'
 (** A type of a logic value *)
 @type 'a logic = private
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a with show, gmap
 
 (** GT-compatible typeinfo for logics *)
 val logic :
   (unit,
    < show    : ('a -> string) -> 'a logic -> string;
-     html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
-     eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
-     compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
-     foldl   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
-     foldr   : ('syn -> 'a -> 'syn) -> 'syn -> 'a logic -> 'syn;
      gmap    : ('a -> 'sa) -> 'a logic -> 'sa logic
    >) GT.t
 
@@ -91,7 +86,7 @@ val logic :
 val to_logic : 'a -> 'a logic
 
 (** [from_logic x] makes a regular value from a logic one.
-    Raises exception [Not_a_value] if [x] contains free variables 
+    Raises exception [Not_a_value] if [x] contains free variables
 *)
 val from_logic : 'a logic -> 'a
 
@@ -110,7 +105,7 @@ val inj : ('a, 'b) injected -> ('a, 'b logic) injected
 val (!!) : 'a -> ('a, 'a logic) injected
 
 (** [prj x] returns a regular value from injected representation.
-    Raises exception [Not_a_value] if [x] contains free variables 
+    Raises exception [Not_a_value] if [x] contains free variables
 *)
 val prj : ('a, 'b) injected -> 'a
 
@@ -138,15 +133,15 @@ val disj : goal -> goal -> goal
 (** [|||] is a left-associative infix synonym for [disj] *)
 val (|||) : goal -> goal -> goal
 
-(** [?| [s1; s2; ...; sk]] calculates [s1 ||| (s2 ||| ... ||| sk)...)] for a non-empty list of goals 
-    (note the {i right} association) 
+(** [?| [s1; s2; ...; sk]] calculates [s1 ||| (s2 ||| ... ||| sk)...)] for a non-empty list of goals
+    (note the {i right} association)
 *)
 val (?|) : goal list -> goal
 
 (** [conde] is a synonym for [?|] *)
 val conde : goal list -> goal
 
-(** [?& [s1; s2; ...; sk]] calculates [s1 &&& (s2 && ... &&& sk)...)] for a non-empty list of goals 
+(** [?& [s1; s2; ...; sk]] calculates [s1 &&& (s2 && ... &&& sk)...)] for a non-empty list of goals
     (note the {i right} association)
 *)
 val (?&) : goal list -> goal
@@ -163,7 +158,7 @@ val failure : goal
 module Fresh :
   sig
     (** [succ num f] increments the number of free logic variables in
-        a goal; can be used to get rid of ``fresh'' syntax extension 
+        a goal; can be used to get rid of ``fresh'' syntax extension
     *)
     val succ : ('a -> 'b goal') -> ((_, _) injected -> 'a) -> 'b goal'
 
@@ -187,9 +182,9 @@ module Fresh :
 
 (** {2 Top-level running primitives} *)
 
-(** [run n g h] runs a goal [g] with [n] logical parameters and passes reified results to the handler [h]. 
-    The number of parameters is encoded using variadic machinery {a la} Olivier Danvy and represented by 
-    a number of predefined numerals and successor function (see below). The reification replaces each variable, 
+(** [run n g h] runs a goal [g] with [n] logical parameters and passes reified results to the handler [h].
+    The number of parameters is encoded using variadic machinery {a la} Olivier Danvy and represented by
+    a number of predefined numerals and successor function (see below). The reification replaces each variable,
     passed to [g], with the stream of values, associated with that variable as the goal succeeds.
 
     Examples:
@@ -216,7 +211,7 @@ type helper
 exception Not_a_value
 
 (** Reification result *)
-class type ['a,'b] reified = 
+class type ['a,'b] reified =
 object
   (** Returns [true] if the term has any free logic variable inside *)
   method is_open: bool

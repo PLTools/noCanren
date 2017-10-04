@@ -25,15 +25,15 @@ open MiniKanrenCore
 (** Abstract list type *)
 @type ('a, 'l) list =
 | Nil
-| Cons of 'a * 'l with show, gmap, html, eq, compare, foldl, foldr
+| Cons of 'a * 'l with show, gmap
 
 (** Abstract nat type *)
 @type 'a nat =
 | O
-| S of 'a with show, html, eq, compare, foldl, foldr, gmap
+| S of 'a with show, gmap
 
 (** {3 Relational pairs} *)
-module Pair : 
+module Pair :
   sig
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
@@ -51,24 +51,14 @@ module Pair :
     (** GT-compatible typeinfo for [ground] *)
     val ground :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> ('b -> 'b -> GT.comparison) -> ('a, 'b) ground -> ('a, 'b) ground -> GT.comparison;
-         eq      : ('a -> 'a -> bool) -> ('b -> 'b -> bool) -> ('a, 'b) ground -> ('a, 'b) ground -> bool;
-         foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
-         foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) ground -> 'c;
-         gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) ground;
-         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) ground -> HTML.viewer;
+       < gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) ground -> ('c, 'd) ground;
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> ('b -> 'b -> GT.comparison) -> ('a, 'b) logic -> ('a, 'b) logic -> GT.comparison;
-         eq      : ('a -> 'a -> bool) -> ('b -> 'b -> bool) -> ('a, 'b) logic -> ('a, 'b) logic -> bool;
-         foldl   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
-         foldr   : ('c -> 'a -> 'c) -> ('c -> 'b -> 'c) -> 'c -> ('a, 'b) logic -> 'c;
-         gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) logic -> ('c, 'd) logic;
-         html    : ('a -> HTML.viewer) -> ('b -> HTML.viewer) -> ('a, 'b) logic -> HTML.viewer;
+       < gmap    : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) logic -> ('c, 'd) logic;
          show    : ('a -> string) -> ('b -> string) -> ('a, 'b) logic -> string >)
       GT.t
 
@@ -87,7 +77,7 @@ module Pair :
   end
 
 (** {3 Relational [option]} *)
-module Option : 
+module Option :
   sig
 
     (** Type synonym to prevent toplevel [logic] from being hidden *)
@@ -105,24 +95,14 @@ module Option :
     (** GT-compatible typeinfo for [ground] *)
     val ground :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> 'a ground -> 'a ground -> GT.comparison;
-         eq      : ('a -> 'a -> bool) -> 'a ground -> 'a ground -> bool;
-         foldl   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
-         foldr   : ('a -> 'b -> 'a) -> 'a -> 'b ground -> 'a;
-         gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
-         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
+       < gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
       (unit,
-       < compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
-         eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
-         foldl   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
-         foldr   : ('a -> 'b -> 'a) -> 'a -> 'b logic -> 'a;
-         gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
-         html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
+       < gmap    : ('a -> 'b) -> 'a logic -> 'b logic;
          show    : ('a -> string) -> 'a logic -> string >)
       GT.t
 
@@ -152,7 +132,7 @@ module Bool :
 
     (** Synonym for boolean type *)
     type t = bool
-    
+
     (** Ground boolean (the regular one) *)
     type ground = bool
 
@@ -162,24 +142,14 @@ module Bool :
     (** GT-compatible typeinfo for [ground] *)
     val ground :
       (unit,
-       < compare : ground -> ground -> GT.comparison;
-         eq      : ground -> ground -> bool;
-         foldl   : 'a -> ground -> 'a;
-         foldr   : 'a -> ground -> 'a;
-         gmap    : ground -> ground;
-         html    : ground -> HTML.viewer;
+       < gmap    : ground -> ground;
          show    : ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
       (unit,
-       < compare : logic -> logic -> GT.comparison;
-         eq      : logic -> logic -> bool;
-         foldl   : 'a -> logic -> 'a;
-         foldr   : 'a -> logic -> 'a;
-         gmap    : logic -> logic;
-         html    : logic -> HTML.viewer;
+       < gmap    : logic -> logic;
          show    : logic -> string >)
       GT.t
 
@@ -231,8 +201,8 @@ module Nat :
     type 'a logic' = 'a logic
 
     (** Synonym for abstract nat type *)
-    type 'a t = 'a nat    
-    
+    type 'a t = 'a nat
+
     (** Ground nat are ismorphic for regular one *)
     type ground = ground t
 
@@ -242,24 +212,14 @@ module Nat :
     (** GT-compatible typeinfo for [ground] *)
     val ground :
       (unit,
-       < compare : ground -> ground -> GT.comparison;
-         eq      : ground -> ground -> bool;
-         foldl   : 'a -> ground -> 'a;
-         foldr   : 'a -> ground -> 'a;
-         gmap    : ground -> ground;
-         html    : ground -> HTML.viewer;
+       < gmap    : ground -> ground;
          show    : ground -> string >)
       GT.t
 
     (** GT-compatible typeinfo for [logic] *)
     val logic :
       (unit,
-       < compare : logic -> logic -> GT.comparison;
-         eq      : logic -> logic -> bool;
-         foldl   : 'a -> logic -> 'a;
-         foldr   : 'a -> logic -> 'a;
-         gmap    : logic -> logic;
-         html    : logic -> HTML.viewer;
+       < gmap    : logic -> logic;
          show    : logic -> string >)
       GT.t
 
@@ -335,11 +295,6 @@ module List :
     val ground :
       (unit,
        < gmap    : ('a -> 'b) -> 'a ground -> 'b ground;
-         compare : ('a -> 'a -> GT.comparison) -> 'a ground -> 'a ground -> GT.comparison;
-         eq      : ('a -> 'a -> bool) -> 'a ground -> 'a ground -> bool;
-         foldl   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
-         foldr   : ('b -> 'a -> 'b) -> 'b -> 'a ground -> 'b;
-         html    : ('a -> HTML.viewer) -> 'a ground -> HTML.viewer;
          show    : ('a -> string) -> 'a ground -> string >)
       GT.t
 
@@ -347,11 +302,6 @@ module List :
     val logic :
       (unit,
         < gmap    : ('a -> 'b) -> (('a, 'c) t logic' as 'c) -> (('b, 'd) t logic' as 'd);
-          compare : ('a -> 'a -> GT.comparison) -> 'a logic -> 'a logic -> GT.comparison;
-          eq      : ('a -> 'a -> bool) -> 'a logic -> 'a logic -> bool;
-          foldr   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
-          foldl   : ('b -> 'a -> 'b) -> 'b -> 'a logic -> 'b;
-          html    : ('a -> HTML.viewer) -> 'a logic -> HTML.viewer;
           show    : ('a -> string) -> 'a logic -> GT.string  >)
         GT.t
 

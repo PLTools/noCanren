@@ -221,18 +221,13 @@ module Stream =
 
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap, html, eq, compare, foldl, foldr
+| Value of 'a with show, gmap
 
 let logic = {logic with
   gcata = ();
   plugins =
     object
       method gmap      = logic.plugins#gmap
-      method html      = logic.plugins#html
-      method eq        = logic.plugins#eq
-      method compare   = logic.plugins#compare
-      method foldl     = logic.plugins#foldl
-      method foldr     = logic.plugins#foldr
       method show fa x =
         GT.transform(logic)
           (GT.lift fa)
