@@ -17,16 +17,18 @@ TESTS_ENVIRONMENT=./test.sh
 JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean clean_tests install uninstall tests test regression promote_all \
-	ppx doc \
+	ppx doc transl \
 	only-toplevel toplevel minikanren_stuff tester bundle plugin
 
 .DEFAULT_GOAL: all
 
-all: minikanren_stuff plugin bundle
+all: minikanren_stuff plugin transl bundle
 
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
+transl:
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs 
 
 celan: clean
 

@@ -14,3 +14,6 @@ true: short_paths
 
 # Deep tests
 <regression/test22*.*>: package(GT)
+
+# Translator based on Lozov's works
+<transl/ml_to_mk.*>: package(compiler-libs.common)
