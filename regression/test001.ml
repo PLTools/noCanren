@@ -4,7 +4,7 @@ open Std
 open Tester
 open Printf
 
-let ilist xs = list (!!) xs 
+let ilist xs = list (!!) xs
 let just_a a = a === !!5
 
 let a_and_b a =
@@ -49,20 +49,20 @@ let show_intl_list = (show(List.logic ) (show(logic) (show int)))
 let runL n         = runR (List.reify MiniKanren.reify) show_int_list show_intl_list n
 
 let _ =
-  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
-  run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
-  run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
-  run_exn show_int       2  q qh (REPR (fun q   -> a_and_b' q                                      ));
-  run_exn show_int      10  q qh (REPR (fun q   -> fives q                                         ))
+  run_exn show_int_list  1  q qh ("?",(fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  run_exn show_int_list  1  q qh ("?",(fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
+  run_exn show_int_list  1  q qh ("?",(fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
+  run_exn show_int_list  2  q qh ("?",(fun q   -> reverso q (ilist [1])                           ));
+  run_exn show_int_list  1  q qh ("?",(fun q   -> reverso (ilist [1]) q                           ));
+  run_exn show_int       1  q qh ("?",(fun q   -> a_and_b q                                       ));
+  run_exn show_int       2  q qh ("?",(fun q   -> a_and_b' q                                      ));
+  run_exn show_int      10  q qh ("?",(fun q   -> fives q                                         ))
 
 let _withFree =
-  runL          1  q  qh (REPR (fun q   -> reverso (ilist []) (ilist [])                ));
-  runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL          4 qr qrh (REPR (fun q r -> appendo q (ilist []) r                       ));
-  runL          1  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL          2  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL          3  q  qh (REPR (fun q   -> reverso q q                                  ));
-  runL         10  q  qh (REPR (fun q   -> reverso q q                                  ))
+  runL          1  q  qh ("?",(fun q   -> reverso (ilist []) (ilist [])                ));
+  runL          2  q  qh ("?",(fun q   -> reverso q q                                  ));
+  runL          4 qr qrh ("?",(fun q r -> appendo q (ilist []) r                       ));
+  runL          1  q  qh ("?",(fun q   -> reverso q q                                  ));
+  runL          2  q  qh ("?",(fun q   -> reverso q q                                  ));
+  runL          3  q  qh ("?",(fun q   -> reverso q q                                  ));
+  runL         10  q  qh ("?",(fun q   -> reverso q q                                  ))

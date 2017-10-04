@@ -15,23 +15,23 @@ let show_int = show(int)
 let show_fint = show(int)
 
 let _ =
-  run_exn show_fint    3    q   qh (REPR (fun q   -> g123 q                                                    ));
-  run_exn show_fint    3    q   qh (REPR (fun q   -> g12 q                                                     ));
-  run_exn show_fint   10   qr  qrh (REPR (fun q r -> gxy q r                                                   ));
-  run_exn show_fint   10   qr  qrh (REPR (fun q r -> gxy' q r                                                  ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (x === y)(x =/= y))                          ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (x =/= y)(x === y))                          ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (x =/= y)(!3 === x)(!3 === y))               ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (!3 === x)(x =/= x)(!3 === y))               ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (!3 === x)(!3 === y)(x =/= y))               ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y) (!3 === x)(!3 === y)(y =/= x))               ));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y z) (x === y)(y === z)(x =/= !4)(z === !(2+2)))));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y z) (x === y)(y === z)(z === !(2+2))(x =/= !4))));
-  run_exn show_fint (-1)    q   qh (REPR (fun q   -> (fresh (x y z) (x =/= !4)(y === z)(x === y)(z === !(2+2)))))
+  run_exn show_fint    3    q   qh ("?",(fun q   -> g123 q                                                    ));
+  run_exn show_fint    3    q   qh ("?",(fun q   -> g12 q                                                     ));
+  run_exn show_fint   10   qr  qrh ("?",(fun q r -> gxy q r                                                   ));
+  run_exn show_fint   10   qr  qrh ("?",(fun q r -> gxy' q r                                                  ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (x === y)(x =/= y))                          ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (x =/= y)(x === y))                          ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (x =/= y)(!3 === x)(!3 === y))               ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (!3 === x)(x =/= x)(!3 === y))               ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (!3 === x)(!3 === y)(x =/= y))               ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y) (!3 === x)(!3 === y)(y =/= x))               ));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y z) (x === y)(y === z)(x =/= !4)(z === !(2+2)))));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y z) (x === y)(y === z)(z === !(2+2))(x =/= !4))));
+  run_exn show_fint (-1)    q   qh ("?",(fun q   -> (fresh (x y z) (x =/= !4)(y === z)(x === y)(z === !(2+2)))))
 
 let runI n = runR MiniKanren.reify show_int (show(logic) show_int) n
 
 let _ =
-  runI (-1)  q qh (REPR (fun q   -> (q =/= !5)                                                ));
-  runI (-1)  q qh (REPR (fun q   -> ((q =/= !3) &&& (q === !3))                               ));
-  runI (-1)  q qh (REPR (fun q   -> ((q === !3) &&& (!3 =/= q))                               ))
+  runI (-1)  q qh ("?",(fun q   -> (q =/= !5)                                                ));
+  runI (-1)  q qh ("?",(fun q   -> ((q =/= !3) &&& (q === !3))                               ));
+  runI (-1)  q qh ("?",(fun q   -> ((q === !3) &&& (!3 =/= q))                               ))

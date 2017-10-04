@@ -72,14 +72,14 @@ let inj_list_p xs = List.list @@ List.map (fun (x,y) -> pair x y) xs
 
 (* Without free variables *)
 let () =
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [])  q                                   ));
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varX, v varX)]) q                    ));
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varY, v varY); (varX, v varX)]) q    ));
+  run_exn GLam.show_rlam    1 q qh ("?",(fun q -> lookupo varX (inj_list_p [])  q                                   ));
+  run_exn GLam.show_rlam    1 q qh ("?",(fun q -> lookupo varX (inj_list_p [(varX, v varX)]) q                    ));
+  run_exn GLam.show_rlam    1 q qh ("?",(fun q -> lookupo varX (inj_list_p [(varY, v varY); (varX, v varX)]) q    ));
 
-  run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varX)  ));
-  run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varY)  ));
+  run_exn (show string)  1 q qh ("?",(fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varX)  ));
+  run_exn (show string)  1 q qh ("?",(fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varY)  ));
 
-  run_exn GTyp.show_rtyp    1 q qh (REPR (fun q -> infero (abs varX (app (v varX) (v varX)))                q))
+  run_exn GTyp.show_rtyp    1 q qh ("?",(fun q -> infero (abs varX (app (v varX) (v varX)))                q))
 
 let show_env_logic = show(List.logic) @@ show(logic) (show(GT.pair) (show(logic) (fun s -> s)) show_llam)
 
@@ -96,8 +96,8 @@ let runT n = runR gtyp_reifier GTyp.show_rtyp GTyp.show_ltyp n
 let runL n = runR glam_reifier GLam.show_rlam GLam.show_llam n
 
 let () =
-  runEnv   1   q   qh (REPR (fun q -> lookupo varX q (v varY)                                       ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varX (v varX)) q                                  ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varF (abs varX (app (v varF) (v varX)))) q        ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varX (abs varF (app (v varF) (v varX)))) q        ));
-  runL     1   q   qh (REPR (fun q -> infero q (arr (p varX) (p varX))                              ))
+  runEnv   1   q   qh ("?",(fun q -> lookupo varX q (v varY)                                       ));
+  runT     1   q   qh ("?",(fun q -> infero (abs varX (v varX)) q                                  ));
+  runT     1   q   qh ("?",(fun q -> infero (abs varF (abs varX (app (v varF) (v varX)))) q        ));
+  runT     1   q   qh ("?",(fun q -> infero (abs varX (abs varF (app (v varF) (v varX)))) q        ));
+  runL     1   q   qh ("?",(fun q -> infero q (arr (p varX) (p varX))                              ))

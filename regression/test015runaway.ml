@@ -31,9 +31,9 @@ let show2 xs = show(List.logic) (show(logic) show_int) xs
 
 let runT n = runR intlist_reifier show_int_list show2 n
 let () =
-  runT 1 q qh (REPR(demo1));
+  runT 1 q qh ("?",(demo1));
   let () =
-    try runT 2 q qh (REPR(demo2))
+    try runT 2 q qh ("?",(demo2))
     with Failure s -> printf "Failure: \"%s\"\n%!" s
   in
   ()

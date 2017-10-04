@@ -51,18 +51,18 @@ let a_la_quine q r s =
     ]
 
 let _ =
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> substo (v varX) varX (v varY) q                       ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
-  run_exn show_rlam 2    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                           ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) (v varY))        q     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX))        q) (v varY)     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX        q) (v varY)) (v varY)     ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app            (v varX) (v varX)) q            ));
-  run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (v varX)    q                                   ))
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> substo (v varX) varX (v varY) q                       ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (abs varX (v varX)) q                           ));
+  run_exn show_rlam 2    q   qh ("?",(fun q   -> evalo (abs varX (v varX)) q                           ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (app (abs varX (v varX)) (v varY))        q     ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (app (abs varX (v varX))        q) (v varY)     ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (app (abs varX        q) (v varY)) (v varY)     ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (app            (v varX) (v varX)) q            ));
+  run_exn show_rlam 1    q   qh ("?",(fun q   -> evalo (v varX)    q                                   ))
 
 let runL n = runR glam_reifier show_rlam show_llam n
 
 let _withFree =
-  runL 1     q   qh (REPR (fun q     -> evalo (app q (v varX)) (v varX)             ));
-  runL 1    qr  qrh (REPR (fun q r   -> evalo (app r q)        (v varX)             ));
-  runL 2   qrs qrsh (REPR (fun q r s -> a_la_quine q r s                            ))
+  runL 1     q   qh ("?",(fun q     -> evalo (app q (v varX)) (v varX)             ));
+  runL 1    qr  qrh ("?",(fun q r   -> evalo (app r q)        (v varX)             ));
+  runL 2   qrs qrsh ("?",(fun q r s -> a_la_quine q r s                            ))

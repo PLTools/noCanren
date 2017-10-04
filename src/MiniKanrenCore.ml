@@ -1052,7 +1052,7 @@ let call_fresh f =
 
 let (===) (x: _ injected) y =
   let open State in fun {env; subst; ctrs; scope} as st ->
-  LOG[perf] (Log.unify#enter);
+  (* LOG[perf] (Log.unify#enter); *)
   let result =
     match Subst.unify env x y scope subst with
     | None -> Stream.Internal.nil
@@ -1062,7 +1062,7 @@ let (===) (x: _ injected) y =
         Stream.Internal.single {st with subst=s; ctrs=ctrs'}
       with Disequality_violated -> Stream.Internal.nil
   in
-  LOG[perf] (Log.unify#leave);
+  (* LOG[perf] (Log.unify#leave); *)
   result
 
 let (=/=) x y =
@@ -1208,7 +1208,7 @@ let pqrst = five
 let run n goalish f =
   let adder, currier, app, ext = n () in
   Log.clear ();
-  LOG[perf] (Log.run#enter);
+  (* LOG[perf] (Log.run#enter); *)
   let helper tup =
     let args, stream = ext tup in
     (* we normalize stream before reification *)
@@ -1218,10 +1218,10 @@ let run n goalish f =
     currier f @@ app (Stream.of_mkstream stream) args
   in
   let result = helper (adder goalish @@ State.empty ()) in
-  LOG[perf] (
+  (* LOG[perf] (
     Log.run#leave;
     printf "Run report:\n%s" @@ Log.report ()
-  );
+  ); *)
   result
 
 (* Tracing/debugging stuff *)

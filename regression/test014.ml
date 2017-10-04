@@ -323,20 +323,20 @@ let show_int_list   = GT.(show List.ground @@ show int)
 let show_intl_llist = GT.(show List.logic @@ show logic @@ show int)
 
 let _ffoo _ =
-  run_exn show_int_list (-1)  qr qrh (REPR (fun q r     -> multo q r (build_num 1)                          ));
-  run_exn show_int_list (-1)   q  qh (REPR (fun q       -> multo (build_num 7) (build_num 63) q             ));
-  run_exn show_int_list (-1)  qr qrh (REPR (fun q r     -> divo (build_num 3) (build_num 2) q r             ));
-  run_exn show_int_list (-1)   q  qh (REPR (fun q       -> logo (build_num 14) (build_num 2) (build_num 3) q));
-  run_exn show_int_list (-1)   q  qh (REPR (fun q       -> expo (build_num 3) (build_num 5) q               ))
+  run_exn show_int_list (-1)  qr qrh ("?",(fun q r     -> multo q r (build_num 1)                          ));
+  run_exn show_int_list (-1)   q  qh ("?",(fun q       -> multo (build_num 7) (build_num 63) q             ));
+  run_exn show_int_list (-1)  qr qrh ("?",(fun q r     -> divo (build_num 3) (build_num 2) q r             ));
+  run_exn show_int_list (-1)   q  qh ("?",(fun q       -> logo (build_num 14) (build_num 2) (build_num 3) q));
+  run_exn show_int_list (-1)   q  qh ("?",(fun q       -> expo (build_num 3) (build_num 5) q               ))
 
 let runL n = runR (List.reify MiniKanren.reify) show_int_list show_intl_llist n
 
 let _freeVars =
-  runL   22  qrs  qrsh (REPR (fun q r s   -> pluso q r s                                      ));
-  runL   34  qrs  qrsh (REPR (fun q r s   -> multo q r s                                      ));
-  runL   10   qr   qrh (REPR (fun q r     -> test17 q r                                       ));
-  runL   15   qr   qrh (REPR (fun q r     -> lelo q r                                         ));
-  runL  (-1)   q    qh (REPR (fun q       -> lto (build_num 5) q                              ));
-  runL  (-1)   q    qh (REPR (fun q       -> lto q (build_num 5)                              ));
-  runL    6 (succ qrs) qrsth (REPR (fun q r s t -> divo q r s t                                     ));
-  runL    5  qrs  qrsh (REPR (fun q r s   -> test27 q r s                                     ))
+  runL   22  qrs  qrsh ("?",(fun q r s   -> pluso q r s                                      ));
+  runL   34  qrs  qrsh ("?",(fun q r s   -> multo q r s                                      ));
+  runL   10   qr   qrh ("?",(fun q r     -> test17 q r                                       ));
+  runL   15   qr   qrh ("?",(fun q r     -> lelo q r                                         ));
+  runL  (-1)   q    qh ("?",(fun q       -> lto (build_num 5) q                              ));
+  runL  (-1)   q    qh ("?",(fun q       -> lto q (build_num 5)                              ));
+  runL    6 (succ qrs) qrsth ("?",(fun q r s t -> divo q r s t                                     ));
+  runL    5  qrs  qrsh ("?",(fun q r s   -> test27 q r s                                     ))
