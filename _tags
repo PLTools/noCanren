@@ -1,6 +1,8 @@
 true: debug, rectypes, color(auto), bin_annot, keep_asm
 true: short_paths
 
+<**/*.cmx>: O3
+
 <ppx/*>: package(ppx_tools_versioned,ppx_tools_versioned.metaquot_405,ppx_deriving.std)
 <ppx/*>: package(ocaml-migrate-parsetree ocaml-migrate-parsetree ppx_tools_versioned.metaquot_405)
 
