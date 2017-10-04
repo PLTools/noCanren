@@ -71,9 +71,66 @@ type goal = State.t Stream.internal goal'
 (** {3 Logic values} *)
 
 (** A type of a logic value *)
-@type 'a logic = private
-| Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap
+type 'a logic = private
+  | Var of GT.int * 'a logic GT.list
+  | Value of 'a
+class type virtual ['a,'ia,'sa,'inh,'syn] logic_tt =
+  object
+    method  c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method  c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+val logic :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,
+     < show:   ('a -> string) -> 'a logic -> string  ;
+       gmap:   ('a -> 'sa) -> 'a logic -> 'sa logic
+      > )
+    GT.t
+class virtual ['a,'ia,'sa,'inh,'syn] logic_t :
+  object
+    method  virtual c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method  virtual c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+class type ['a] show_logic_env_tt = object  end
+class type ['a,'sa] gmap_logic_env_tt = object  end
+class ['a] show_proto_logic :
+  'a show_logic_env_tt ref ->
+    object inherit ['a,unit,string,unit,string] logic_tt end
+class ['a,'sa] gmap_proto_logic :
+  ('a,'sa) gmap_logic_env_tt ref ->
+    object inherit ['a,unit,'sa,unit,'sa logic] logic_tt end
+class ['a] show_logic_t :
+  object
+    inherit ['a,unit,string,unit,string] logic_tt
+    inherit ['a] show_logic_env_tt
+  end
+class ['a,'sa] gmap_logic_t :
+  object
+    inherit ['a,unit,'sa,unit,'sa logic] logic_tt
+    inherit ['a,'sa] gmap_logic_env_tt
+  end
+val logic :
+  (unit,<
+          show: ('a -> string) -> 'a logic -> string  ;
+          gmap: ('a -> 'sa) ->
+                                                               'a logic ->
+                                                                 'sa logic
+          > )
+    GT.t
 
 (** GT-compatible typeinfo for logics *)
 val logic :

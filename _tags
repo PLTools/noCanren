@@ -9,7 +9,7 @@ true: short_paths
 
 #<src/MiniKanrenCore.ml>: use_time_log
 <src/MiniKanrenCore*.*> or <src/MiniKanrenStd*.*>: opaque
-<src/MiniKanren*.*>: package(unix),syntax(camlp5o),package(GT,GT.syntax.all)
+<src/MiniKanren*.*>: package(unix)
 <src/*.ml*>: package(GT)
 
 <regression/orig/*>: traverse

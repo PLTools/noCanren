@@ -219,19 +219,112 @@ module Stream =
   end
 ;;
 
-@type 'a logic =
-| Var   of GT.int * 'a logic GT.list
-| Value of 'a with show, gmap
+type 'a logic =
+  | Var of GT.int * 'a logic GT.list
+  | Value of 'a
+class type virtual ['a,'ia,'sa,'inh,'syn] logic_tt =
+  object
+    method  c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method  c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_logic : ('ia -> 'a -> 'sa) -> 'inh -> 'a logic -> 'syn
+  end
+let logic :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,unit)
+    GT.t
+  =
+  let rec logic_gcata fa trans inh subj =
+    let rec self = logic_gcata fa trans
 
-let logic = {logic with
-  gcata = ();
+    and tpo = object method a = fa end
+     in
+    match subj with
+    | Var (p0,p1) -> trans#c_Var inh (GT.make self subj tpo) p0 p1
+    | Value p0 ->
+        trans#c_Value inh (GT.make self subj tpo) (GT.make fa p0 tpo)
+     in
+  { GT.gcata = logic_gcata; GT.plugins = () }
+class virtual ['a,'ia,'sa,'inh,'syn] logic_t =
+  object (this)
+    method virtual  c_Var :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          GT.int -> 'a logic GT.list -> 'syn
+    method virtual  c_Value :
+      'inh ->
+        ('inh,'a logic,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method t_logic fa = GT.transform logic fa this
+  end
+class type ['a] show_logic_env_tt = object  end
+class type ['a,'sa] gmap_logic_env_tt = object  end
+class ['a] show_proto_logic env =
+  object (this)
+    inherit  ['a,unit,string,unit,string] logic_t
+    method c_Value inh subj p0 = ("Value (" ^ (p0.GT.fx ())) ^ ")"
+    method c_Var inh subj p0 p1 =
+      (("Var (" ^ (GT.lift (GT.int.GT.plugins)#show () p0)) ^
+         (", " ^
+            (GT.lift
+               ((GT.list.GT.plugins)#show
+                  (GT.transform logic (subj.GT.t)#a this ())) () p1)))
+        ^ ")"
+  end
+class ['a,'sa] gmap_proto_logic env =
+  object (this)
+    inherit  ['a,unit,'sa,unit,'sa logic] logic_t
+    method c_Value inh subj p0 = Value (p0.GT.fx ())
+    method c_Var inh subj p0 p1 =
+      Var
+        ((GT.lift (GT.int.GT.plugins)#gmap () p0),
+          (GT.lift
+             ((GT.list.GT.plugins)#gmap
+                (GT.transform logic (subj.GT.t)#a this ())) () p1))
+  end
+class ['a] show_logic_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,string,unit,string] logic_t
+    inherit  ((['a] show_proto_logic) self)
+    initializer self := (this :> 'a show_logic_t)
+  end
+class ['a,'sa] gmap_logic_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,'sa,unit,'sa logic] logic_t
+    inherit  ((['a,'sa] gmap_proto_logic) self)
+    initializer self := (this :> ('a,'sa) gmap_logic_t)
+  end
+let logic :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#logic_tt -> 'inh -> 'a logic -> 'syn,<
+         show: ('a -> string) -> 'a logic -> string  ;
+         gmap: ('a -> 'sa) -> 'a logic -> 'sa logic
+        > )
+    GT.t
+  =
+  {
+    GT.gcata = (logic.GT.gcata);
+    GT.plugins =
+      (object
+         method show a = GT.transform logic (GT.lift a) (new show_logic_t) ()
+         method gmap a = GT.transform logic (GT.lift a) (new gmap_logic_t) ()
+       end)
+  }
+
+let logic = {
+  GT.gcata = ();
   plugins =
     object
-      method gmap      = logic.plugins#gmap
+      method gmap      = logic.GT.plugins#gmap
       method show fa x =
         GT.transform(logic)
           (GT.lift fa)
-          (object inherit ['a] @logic[show]
+          (object inherit ['a] show_logic_t
              method c_Var _ s i cs =
                let c = match cs with
                | [] -> ""
@@ -935,19 +1028,19 @@ module Disequality :
         | Some (delta, s) ->
           let delta_subst = Subst.of_list delta in
           let is_subsumed = ListLabels.exists acc
-            ~f:(fun _,delta_subst',_ -> Subst.is_subsumed env delta_subst delta_subst')
+            ~f:(fun (_,delta_subst',_) -> Subst.is_subsumed env delta_subst delta_subst')
           in
           if is_subsumed
           then acc
           else
             let acc = ListLabels.filter acc
-              ~f:(fun _,delta_subst',_ -> not @@ Subst.is_subsumed env delta_subst' delta_subst)
+              ~f:(fun (_,delta_subst',_) -> not @@ Subst.is_subsumed env delta_subst' delta_subst)
             in
             (delta, delta_subst, s)::acc
       ) [] t
 
     let project' env subst t x =
-      let cs = refine env subst t |> List.map (fun delta,_,_ -> delta) in
+      let cs = refine env subst t |> List.map (fun (delta,_,_) -> delta) in
       (* fixpoint-like computation of disequalities relevant to variables in [fv] *)
       let rec helper fv =
         let open Subst in
@@ -1011,7 +1104,7 @@ module State =
       let i = (!!!x : Var.t).index in
       (x,i)
 
-    let incr_scope {scope} as st = {st with scope = Var.new_scope ()}
+    let incr_scope ({scope} as st) = {st with scope = Var.new_scope ()}
 
     let merge
       {env=env1; subst=subst1; ctrs=ctrs1; scope=scope1}
@@ -1046,12 +1139,12 @@ let success st = Stream.Internal.single st
 let failure _  = Stream.Internal.nil
 
 let call_fresh f =
-  let open State in fun {env; scope} as st ->
+  let open State in fun ({env; scope} as st) ->
     let x, env' = Env.fresh ~scope env in
     f x {st with env=env'}
 
 let (===) (x: _ injected) y =
-  let open State in fun {env; subst; ctrs; scope} as st ->
+  let open State in fun ({env; subst; ctrs; scope} as st) ->
   (* LOG[perf] (Log.unify#enter); *)
   let result =
     match Subst.unify env x y scope subst with
@@ -1066,7 +1159,7 @@ let (===) (x: _ injected) y =
   result
 
 let (=/=) x y =
-  let open State in fun {env; subst; ctrs; scope} as st ->
+  let open State in fun ({env; subst; ctrs; scope} as st) ->
   match Subst.unify env x y Var.non_local_scope subst with
   | None         -> Stream.Internal.single st
   | Some ([], _) -> Stream.Internal.nil

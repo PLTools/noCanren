@@ -23,14 +23,140 @@ open MiniKanrenCore
 (** {3 Some predefined types} *)
 
 (** Abstract list type *)
-@type ('a, 'l) list =
-| Nil
-| Cons of 'a * 'l with show, gmap
+type ('a,'l) list =
+  | Nil
+  | Cons of 'a * 'l
+
+class type virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] list_tt =
+  object
+    method  c_Nil :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a -> 'syn
+    method  c_Cons :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_list :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) list -> 'syn
+  end
+val list :
+  (('ia -> 'a -> 'sa) ->
+     ('il -> 'l -> 'sl) ->
+       ('a,'ia,'sa,'l,'il,'sl,'inh,'syn)#list_tt ->
+         'inh -> ('a,'l) list -> 'syn,<
+                                        show: ('a -> string) ->
+                                                ('l -> string) ->
+                                                  ('a,'l) list -> string  ;
+                                        gmap: ('a -> 'sa) ->
+                                                ('l -> 'sl) ->
+                                                  ('a,'l) list ->
+                                                    ('sa,'sl) list   > )
+    GT.t
+class virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] list_t :
+  object
+    method  virtual c_Nil :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a -> 'syn
+    method  virtual c_Cons :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_list :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) list -> 'syn
+  end
+class type ['a,'l] show_list_env_tt = object  end
+class type ['a,'sa,'l,'sl] gmap_list_env_tt = object  end
+class ['a,'l] show_proto_list :
+  ('a,'l) show_list_env_tt ref ->
+    object inherit ['a,unit,string,'l,unit,string,unit,string] list_tt end
+class ['a,'sa,'l,'sl] gmap_proto_list :
+  ('a,'sa,'l,'sl) gmap_list_env_tt ref ->
+    object inherit ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) list] list_tt end
+class ['a,'l] show_list_t :
+  object
+    inherit ['a,unit,string,'l,unit,string,unit,string] list_tt
+    inherit ['a,'l] show_list_env_tt
+  end
+class ['a,'sa,'l,'sl] gmap_list_t :
+  object
+    inherit ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) list] list_tt
+    inherit ['a,'sa,'l,'sl] gmap_list_env_tt
+  end
 
 (** Abstract nat type *)
-@type 'a nat =
-| O
-| S of 'a with show, gmap
+type 'a nat =
+  | O
+  | S of 'a
+class type virtual ['a,'ia,'sa,'inh,'syn] nat_tt =
+  object
+    method  c_O :
+      'inh -> ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  c_S :
+      'inh ->
+        ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_nat : ('ia -> 'a -> 'sa) -> 'inh -> 'a nat -> 'syn
+  end
+val nat :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#nat_tt -> 'inh -> 'a nat -> 'syn,<
+                                                               show:
+                                                                 ('a ->
+                                                                    string)
+                                                                   ->
+                                                                   'a nat ->
+                                                                    string  ;
+                                                               gmap:
+                                                                 ('a -> 'sa)
+                                                                   ->
+                                                                   'a nat ->
+                                                                    'sa nat
+                                                               > )
+    GT.t
+class virtual ['a,'ia,'sa,'inh,'syn] nat_t :
+  object
+    method  virtual c_O :
+      'inh -> ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  virtual c_S :
+      'inh ->
+        ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_nat : ('ia -> 'a -> 'sa) -> 'inh -> 'a nat -> 'syn
+  end
+class type ['a] show_nat_env_tt = object  end
+class type ['a,'sa] gmap_nat_env_tt = object  end
+class ['a] show_proto_nat :
+  'a show_nat_env_tt ref ->
+    object inherit ['a,unit,string,unit,string] nat_tt end
+class ['a,'sa] gmap_proto_nat :
+  ('a,'sa) gmap_nat_env_tt ref ->
+    object inherit ['a,unit,'sa,unit,'sa nat] nat_tt end
+class ['a] show_nat_t :
+  object
+    inherit ['a,unit,string,unit,string] nat_tt
+    inherit ['a] show_nat_env_tt
+  end
+class ['a,'sa] gmap_nat_t :
+  object
+    inherit ['a,unit,'sa,unit,'sa nat] nat_tt
+    inherit ['a,'sa] gmap_nat_env_tt
+  end
 
 (** {3 Relational pairs} *)
 module Pair :

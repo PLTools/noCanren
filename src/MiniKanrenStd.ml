@@ -18,8 +18,200 @@
 
 open MiniKanrenCore
 
-@type ('a, 'l) list = Nil | Cons of 'a * 'l with show, gmap;;
-@type 'a nat = O | S of 'a with show, gmap;;
+type ('a,'l) list =
+  | Nil
+  | Cons of 'a * 'l
+
+class type virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] list_tt =
+  object
+    method  c_Nil :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a -> 'syn
+    method  c_Cons :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method  t_list :
+      ('ia -> 'a -> 'sa) ->
+        ('il -> 'l -> 'sl) -> 'inh -> ('a,'l) list -> 'syn
+  end
+
+let list :
+  (('ia -> 'a -> 'sa) ->
+     ('il -> 'l -> 'sl) ->
+       ('a,'ia,'sa,'l,'il,'sl,'inh,'syn)#list_tt ->
+         'inh -> ('a,'l) list -> 'syn,unit)
+    GT.t
+  =
+  let rec list_gcata fa fl trans inh subj =
+    let rec self = list_gcata fa fl trans
+
+    and tpo = object method a = fa method l = fl end
+     in
+    match subj with
+    | Nil  -> trans#c_Nil inh (GT.make self subj tpo)
+    | Cons (p0,p1) ->
+        trans#c_Cons inh (GT.make self subj tpo) (GT.make fa p0 tpo)
+          (GT.make fl p1 tpo)
+     in
+  { GT.gcata = list_gcata; GT.plugins = () }
+class virtual ['a,'ia,'sa,'l,'il,'sl,'inh,'syn] list_t =
+  object (this)
+    method virtual  c_Nil :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a -> 'syn
+    method virtual  c_Cons :
+      'inh ->
+        ('inh,('a,'l) list,'syn,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl
+                                  > )
+          GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > ) GT.a
+            ->
+            ('il,'l,'sl,< a: 'ia -> 'a -> 'sa  ;l: 'il -> 'l -> 'sl   > )
+              GT.a -> 'syn
+    method t_list fa fl = GT.transform list fa fl this
+  end
+class type ['a,'l] show_list_env_tt = object  end
+class type ['a,'sa,'l,'sl] gmap_list_env_tt = object  end
+class ['a,'l] show_proto_list env =
+  object (this)
+    inherit  ['a,unit,string,'l,unit,string,unit,string] list_t
+    method c_Cons inh subj p0 p1 =
+      (("Cons (" ^ (p0.GT.fx ())) ^ (", " ^ (p1.GT.fx ()))) ^ ")"
+    method c_Nil inh subj = "Nil (" ^ ")"
+  end
+class ['a,'sa,'l,'sl] gmap_proto_list env =
+  object (this)
+    inherit  ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) list] list_t
+    method c_Cons inh subj p0 p1 = Cons ((p0.GT.fx ()), (p1.GT.fx ()))
+    method c_Nil inh subj = Nil
+  end
+class ['a,'l] show_list_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,string,'l,unit,string,unit,string] list_t
+    inherit  ((['a,'l] show_proto_list) self)
+    initializer self := (this :> ('a,'l) show_list_t)
+  end
+class ['a,'sa,'l,'sl] gmap_list_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,'sa,'l,unit,'sl,unit,('sa,'sl) list] list_t
+    inherit  ((['a,'sa,'l,'sl] gmap_proto_list) self)
+    initializer self := (this :> ('a,'sa,'l,'sl) gmap_list_t)
+  end
+
+let list :
+  (('ia -> 'a -> 'sa) ->
+     ('il -> 'l -> 'sl) ->
+       ('a,'ia,'sa,'l,'il,'sl,'inh,'syn)#list_tt ->
+         'inh -> ('a,'l) list -> 'syn,<
+                                        show: ('a -> string) ->
+                                                ('l -> string) ->
+                                                  ('a,'l) list -> string  ;
+                                        gmap: ('a -> 'sa) ->
+                                                ('l -> 'sl) ->
+                                                  ('a,'l) list ->
+                                                    ('sa,'sl) list   > )
+    GT.t
+  =
+  {
+    GT.gcata = (list.GT.gcata);
+    GT.plugins =
+      (object
+         method show a l =
+           GT.transform list (GT.lift a) (GT.lift l) (new show_list_t) ()
+         method gmap a l =
+           GT.transform list (GT.lift a) (GT.lift l) (new gmap_list_t) ()
+       end)
+  }
+
+type 'a nat =
+  | O
+  | S of 'a
+class type virtual ['a,'ia,'sa,'inh,'syn] nat_tt =
+  object
+    method  c_O :
+      'inh -> ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  c_S :
+      'inh ->
+        ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method  t_nat : ('ia -> 'a -> 'sa) -> 'inh -> 'a nat -> 'syn
+  end
+let nat :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#nat_tt -> 'inh -> 'a nat -> 'syn,unit)
+    GT.t
+  =
+  let rec nat_gcata fa trans inh subj =
+    let rec self = nat_gcata fa trans
+
+    and tpo = object method a = fa end
+     in
+    match subj with
+    | O  -> trans#c_O inh (GT.make self subj tpo)
+    | S p0 -> trans#c_S inh (GT.make self subj tpo) (GT.make fa p0 tpo)  in
+  { GT.gcata = nat_gcata; GT.plugins = () }
+class virtual ['a,'ia,'sa,'inh,'syn] nat_t =
+  object (this)
+    method virtual  c_O :
+      'inh -> ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method virtual  c_S :
+      'inh ->
+        ('inh,'a nat,'syn,< a: 'ia -> 'a -> 'sa   > ) GT.a ->
+          ('ia,'a,'sa,< a: 'ia -> 'a -> 'sa   > ) GT.a -> 'syn
+    method t_nat fa = GT.transform nat fa this
+  end
+class type ['a] show_nat_env_tt = object  end
+class type ['a,'sa] gmap_nat_env_tt = object  end
+class ['a] show_proto_nat env =
+  object (this)
+    inherit  ['a,unit,string,unit,string] nat_t
+    method c_S inh subj p0 = ("S (" ^ (p0.GT.fx ())) ^ ")"
+    method c_O inh subj = "O (" ^ ")"
+  end
+class ['a,'sa] gmap_proto_nat env =
+  object (this)
+    inherit  ['a,unit,'sa,unit,'sa nat] nat_t
+    method c_S inh subj p0 = S (p0.GT.fx ())
+    method c_O inh subj = O
+  end
+class ['a] show_nat_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,string,unit,string] nat_t
+    inherit  ((['a] show_proto_nat) self)
+    initializer self := (this :> 'a show_nat_t)
+  end
+class ['a,'sa] gmap_nat_t = let self = Obj.magic (ref ())  in
+  object (this)
+    inherit  ['a,unit,'sa,unit,'sa nat] nat_t
+    inherit  ((['a,'sa] gmap_proto_nat) self)
+    initializer self := (this :> ('a,'sa) gmap_nat_t)
+  end
+let nat :
+  (('ia -> 'a -> 'sa) ->
+     ('a,'ia,'sa,'inh,'syn)#nat_tt -> 'inh -> 'a nat -> 'syn,
+       < show: ('a ->  string) -> 'a nat ->  string  ;
+         gmap: ('a -> 'sa) -> 'a nat ->  'sa nat
+       > )
+    GT.t
+  =
+  {
+    GT.gcata = (nat.GT.gcata);
+    GT.plugins =
+      (object
+         method show a = GT.transform nat (GT.lift a) (new show_nat_t) ()
+         method gmap a = GT.transform nat (GT.lift a) (new gmap_nat_t) ()
+       end)
+  }
 
 module Pair =
   struct
@@ -346,7 +538,7 @@ module List =
               (GT.transform(list)
                  (GT.lift fa)
                  (GT.lift inner)
-                 (object inherit ['a,'a ground] @list[show]
+                 (object inherit ['a,'a ground] show_list_t
                     method c_Nil   _ _      = ""
                     method c_Cons  i s x xs = x.GT.fx () ^ (match xs.GT.x with Nil -> "" | _ -> "; " ^ xs.GT.fx ())
                   end)
@@ -369,7 +561,7 @@ module List =
                     GT.transform(list)
                       (GT.lift fa)
                       (GT.lift (GT.show(logic) inner))
-                      (object inherit ['a,'a logic] @list[show]
+                      (object inherit ['a,'a logic] show_list_t
                          method c_Nil   _ _      = ""
                          method c_Cons  i s x xs =
                            x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
