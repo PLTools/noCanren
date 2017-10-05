@@ -25,7 +25,8 @@ let () = dispatch (function
      (*   ); *)
 
      flag ["ocaml";"compile";"native";"keep_asm"] (S[A"-S"]);
-
+     pflag ["ocaml"] "plugin" (fun s -> S [A "-plugin"; A s]) ;
+     
      (* cppo-related stuff *)
      let cppo_rules ext =
        let dep   = "%(name).cppo"-.-ext
