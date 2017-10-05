@@ -22,3 +22,6 @@ true: short_paths
 <regression/test0*.ml> : use_pa_minikanren, package(GT.syntax.all)
 
 
+# Translator based on Lozov's works
+<transl/ml_to_mk.*>: package(compiler-libs.common)
+<transl/peano.*>: plugin(transl/ml_to_mk.cma)
