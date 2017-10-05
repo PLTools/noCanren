@@ -35,6 +35,10 @@ ppx:
 plugin:
 	$(OB) camlp5/pa_minikanren.cmo
 
+transl:
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs
+	$(OB) -Is transl peano.native
+
 celan: clean
 
 clean: clean_tests
