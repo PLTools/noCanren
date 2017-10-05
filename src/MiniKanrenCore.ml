@@ -514,7 +514,7 @@ module Env :
 
     val empty     : unit -> t
     val fresh     : (*?name:string -> *)scope:Var.scope -> t -> 'a
-    val var       : t -> 'a -> int option
+    (* val var       : t -> 'a -> int option *)
     val is_var    : t -> 'a -> bool
     val free_vars : t -> 'a -> VarSet.t
     val merge     : t -> t -> t
@@ -548,11 +548,23 @@ module Env :
       then
         let q = (!!!x : Var.t).Var.env in
         if (Obj.is_int !!!q) && q == env.anchor
-        then Some (!!!x : Var.t).index
+        then Some (!!!x : Var.t).Var.index
         else failwith "OCanren fatal (Env.var): wrong environment"
       else None
 
-    let is_var env v = None <> var env v
+    let is_var env x : bool =
+      let t = !!! x in
+      if Obj.tag  t = var_tag  &&
+         Obj.size t = var_size &&
+         (let token = (!!!x : Var.t).Var.anchor in (Obj.is_block !!!token) && token == !!!Var.global_anchor)
+      then
+        let q = (!!!x : Var.t).Var.env in
+        if (Obj.is_int !!!q) && q == env.anchor
+        then true
+        else failwith "OCanren fatal (Env.var): wrong environment"
+      else false
+
+     (* None <> var env v *)
 
     let free_vars env x =
       let rec helper fv t =
@@ -635,8 +647,8 @@ module Subst :
     let deepwalk ?(walk_ctrs = fun _ -> []) env subst x =
       let rec helper forbidden t =
         let var = walk env subst t in
-        match Env.var env var with
-        | None ->
+        match Env.is_var env var with
+        | false ->
           begin match wrap (Obj.repr var) with
           | Unboxed _ -> Obj.repr var
           | Boxed (tag, sx, fx) ->
@@ -652,14 +664,19 @@ module Subst :
             copy
           | Invalid n -> failwith (sprintf "OCanren fatal (Subst.deepwalk): invalid value (%d)" n)
           end
-        | Some n when List.mem n forbidden -> Obj.repr var
-        | Some n ->
+        (* | Some n when List.mem n forbidden -> Obj.repr var *)
+        | true ->
+            let n = (!!!var).Var.index in
+            if List.mem n forbidden then  Obj.repr var
+            else
             let cs =
               walk_ctrs !!!var |>
               List.filter (fun t ->
-                match Env.var env t with
-                | Some i  -> not (List.mem i forbidden)
-                | None    -> true
+                match Env.is_var env t with
+                | true   ->
+                    let i =  (!!!t).Var.index  in
+                    not (List.mem i forbidden)
+                | false    -> true
               ) |>
               List.map (fun t -> !!!(helper (n::forbidden) t))
             in
@@ -674,9 +691,9 @@ module Subst :
 
     let rec occurs env xi term subst =
       let y = walk env subst term in
-      match Env.var env y with
-      | Some yi -> xi = yi
-      | None ->
+      match Env.is_var env y with
+      | true -> xi = (!!!y).Var.index
+      | false ->
          let wy = wrap (Obj.repr y) in
          match wy with
          | Invalid n when n = Obj.closure_tag -> false
@@ -703,11 +720,11 @@ module Subst :
         if occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = {var = x; term = Obj.repr term} in
-          assert (Env.var env x <> Env.var env term);
+          (* assert (Env.var env x <> Env.var env term); *)
           let sub2 =
             if scope = x.Var.scope
             then begin
-              x.subst <- Some (Obj.repr term);
+              x.Var.subst <- Some (Obj.repr term);
               sub1
             end
             else M.add x.Var.index cnt sub1
@@ -719,11 +736,17 @@ module Subst :
         | Some ((delta, subs) as pair) as acc ->
             let x = walk env subs x in
             let y = walk env subs y in
-            match Env.var env x, Env.var env y with
-            | (Some xi, Some yi) when xi = yi -> acc
-            | (Some xi, Some _) -> extend xi x y pair
-            | Some xi, _        -> extend xi x y pair
-            | _      , Some yi  -> extend yi y x pair
+            match Env.is_var env x, Env.is_var env y with
+            | true, true    ->
+              let xi = !!!(x:Var.t).Var.index in
+              let yi = !!!(y:Var.t).Var.index in
+              if xi = yi then acc else extend xi x y pair
+            | true, false   ->
+              let xi = !!!(x:Var.t).Var.index in
+              extend xi x y pair
+            | false, true   ->
+              let yi = !!!(y:Var.t).Var.index in
+              extend yi y x pair
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -982,7 +1005,8 @@ module Disequality :
               with Disequality_fulfilled -> (stayed, rebound)
             )
       in
-      if Index.is_empty cstore then cstore
+      cstore
+      (* if Index.is_empty cstore then cstore
       else
       ListLabels.fold_left prefix ~init:cstore
         ~f:(fun cstore cnt ->
@@ -1011,7 +1035,7 @@ module Disequality :
             let cstore = extend rebound2 cstore in
             cstore
           with SkipConstraintsCheck -> cstore
-        )
+        ) *)
 
     let reify env subst t var =
       let conjs = Index.get var.Var.index t in
@@ -1057,7 +1081,8 @@ module Disequality :
         let open Subst in
         let is_relevant fv {var; term} =
           (VarSet.mem var fv) ||
-          (match Env.var env term with Some _ -> VarSet.mem (!!!term) fv | None -> false)
+          (if Env.is_var env term then VarSet.mem (!!!term) fv else false)
+          (* (match Env.var env term with Some _ -> VarSet.mem (!!!term) fv | None -> false) *)
         in
         (* filter irrelevant binding in each disjunction *)
         let cs' = List.map (List.filter (is_relevant fv)) cs in
