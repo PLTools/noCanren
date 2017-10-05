@@ -28,7 +28,8 @@ minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 transl:
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs 
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs
+	$(OB) -Is transl peano.native
 
 celan: clean
 
