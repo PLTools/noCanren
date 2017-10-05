@@ -39,4 +39,5 @@ let wrap (do_measure : verbose:bool -> unit) =
     (* do normal run *)
     let () = do_measure ~verbose:true in
     (* let () = MiniKanren.report_counters () in *)
+    let () = Gc.print_stat stdout in
     ()
