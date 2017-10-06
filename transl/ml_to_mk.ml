@@ -1,13 +1,13 @@
-
 (* Print all fully qualified names in expressions *)
-
+open Printf
 open Asttypes
 open Longident
 open Typedtree
-
-
 open Tast_mapper
 
+let () = Printexc.record_backtrace true
+
+(* plugin that come with an example *)
 let tast_mapper =
   { default with
     expr = (fun mapper expr ->
@@ -18,14 +18,17 @@ let tast_mapper =
           expr
       | other -> default.expr mapper other); }
 
+(* registering demo plugin *)
 let () =
-  Typemod.ImplementationHooks.add_hook "ml_to_ml"
+
+  (* Typemod.ImplementationHooks.add_hook "ml_to_mk_demo"
     (fun
       (hook_info : Misc.hook_info)
       ((ast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
         let ast = tast_mapper.structure tast_mapper ast in
         (ast, coercion)
-    );
+    ); *)
+
   (* Typemod.InterfaceHooks.add_hook "pptx_example"
     (fun (hook_info : Misc.hook_info)
       (ast : Typedtree.signature) ->
@@ -67,6 +70,7 @@ let rec fold_right0 f l =
   match l with
   | [x]     -> x
   | x :: xs -> fold_right0 f xs |> f x
+  | [] -> failwith "bad argument of fold_right0"
 
 (*****************************************************************************************************************************)
 
@@ -106,12 +110,13 @@ let create_constructor name args =
   let arity = List.length args in
 
   let c_desc = { Types.cstr_name  = name;  cstr_res       = type_expr; cstr_existentials = [];
-                 cstr_args        = [];    cstr_arity     = arity;     cstr_tag = Cstr_constant 0;
+                 cstr_args        = [];    cstr_arity     = arity;     cstr_tag = Types.Cstr_constant 0;
                  cstr_consts      = 0;     cstr_nonconsts = 0;         cstr_normal = 0;
                  cstr_generalized = false; cstr_private   = Public;    cstr_loc = loc;
                  cstr_attributes  = []
                  (* ;    cstr_inlined   = None  *)
-                } in
+                }
+  in
 
   let ident     = create_fullname name in
   let expr_desc = Texp_construct (ident, c_desc, args) in
@@ -178,6 +183,11 @@ let get_max_index tast =
 
 (*****************************************************************************************************************************)
 
+type error = NotYetSupported of string
+exception Error of error
+
+let report_error fmt  = function
+| NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
 let get_translator start_index =
 
@@ -212,10 +222,13 @@ let get_translator start_index =
     {cd with cd_args}
   in
 
-  let type_kind sub x =
+  (* let type_kind sub x =
     match x with
-    | Ttype_variant l -> Ttype_variant (List.map args_to_logic_args l) in
-
+    | Ttype_variant l -> Ttype_variant (List.map args_to_logic_args l)
+    | Ttype_record _  -> raise (Error (NotYetSupported "record types"))
+    | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
+    | Ttype_open      -> raise (Error (NotYetSupported "open types"))
+  in *)
   (****)
 
   let create_fresh_var_name () =
@@ -256,10 +269,10 @@ let get_translator start_index =
 
     let argument_names =
       let rec calculate (typ : Types.type_expr) =
-        match typ.desc with
-        | Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
+        match typ.Types.desc with
+        | Types.Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
                                          name :: calculate right_typ
-        | Tlink typ                   -> calculate typ
+        | Types.Tlink typ                   -> calculate typ
         | _                           -> [create_fresh_var_name ()] in
       calculate typ in
 
@@ -277,7 +290,9 @@ let get_translator start_index =
       let real_arg_pats =
         match pattern.pat_desc with
         | Tpat_constant _             -> []
-        | Tpat_construct (_, _, pats) -> pats in
+        | Tpat_construct (_, _, pats) -> pats
+        | _ -> raise (Error (NotYetSupported "anything other constants and constructores in the matching patterns"))
+      in
 
       let get_var_name var =
         let Tpat_var (ident, _) = var.pat_desc in
@@ -428,7 +443,18 @@ let get_translator start_index =
 
     | _ -> Tast_mapper.default.expr sub x in
 
-  { Tast_mapper.default with type_kind; expr }
+  let check_cd_is_ok (_cd: constructor_declaration list) = true in
+
+  { Tast_mapper.default with expr
+  (* ; type_kind = fun _ ->  *)
+  ; type_declaration = fun _ decl ->
+      match decl.typ_kind with
+      | Ttype_variant cds when check_cd_is_ok cds ->
+          { decl with typ_attributes = [(Location.mknoloc "put_distrib_here", Parsetree.PStr [])] }
+      | Ttype_record _  -> raise (Error (NotYetSupported "record types"))
+      | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
+      | Ttype_open      -> raise (Error (NotYetSupported "open types"))
+}
 
 (*****************************************************************************************************************************)
 
@@ -533,3 +559,55 @@ let beta_reductor =
 (*****************************************************************************************************************************)
 
 end
+
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
+
+(* registering actual translator *)
+let () =
+  Typemod.ImplementationHooks.add_hook "ml_to_mk"
+    (fun
+      (hook_info : Misc.hook_info)
+      ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
+      let open Lozov  in
+      let current_index = get_max_index tast + 1 in
+      let translator    = get_translator current_index in
+      let new_tast      = translator.structure translator tast |> add_packages in
+      let need_reduce   = true in
+      let reduced_tast  = if need_reduce
+                          then beta_reductor.structure beta_reductor new_tast
+                          else new_tast in
+
+      let new_ast       =
+        Untypeast.untype_structure reduced_tast |>
+        print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
+        print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+      in
+
+      try
+        let (retyped_ast,_,_env) =
+          Printexc.print
+          (Typemod.type_structure (Compmisc.initial_env()) new_ast)
+          Location.none
+        in
+        (retyped_ast, coercion)
+      with
+        | Error e as exc ->
+          report_error Format.std_formatter e;
+          raise exc
+        | Typecore.Error (_loc,_env,e) as exc ->
+          Typecore.report_error _env Format.std_formatter e;
+          Format.printf "\n%!";
+          raise exc
+        | Typemod.Error (_loc,_env,e) as exc ->
+          Typemod.report_error _env Format.std_formatter e;
+          Format.printf "\n%!";
+          raise exc
+        | Typetexp.Error (_loc,_env,e) as exc ->
+          Typetexp.report_error _env Format.std_formatter e;
+          Format.printf "\n%!";
+          raise exc
+        | Typemod.Error_forward e as exc ->
+          raise exc
+    );
