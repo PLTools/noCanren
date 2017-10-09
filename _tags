@@ -21,6 +21,9 @@ true: short_paths
 <regression/test*.ml> : syntax(camlp5o), package(logger.syntax)
 <regression/test0*.ml> : use_pa_ocanren, package(GT.syntax.all)
 
+<regression/test66*.*>: package(GT,mtime.clock.os)
+<regression/TimeHelper.*>: package(mtime.clock.os)
+
 
 # Translator based on Lozov's works
 <transl/ml_to_mk.*>: package(compiler-libs.common)
