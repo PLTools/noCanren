@@ -40,7 +40,7 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
-REGRES_CASES := 666 667peano 220simple 221appendo 222sorto 223binarith
+REGRES_CASES := 666 667peano 668sorto 220simple 221appendo 222sorto 223binarith
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte

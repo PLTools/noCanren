@@ -36,7 +36,7 @@ type ask_result = Hang | Later of Cache3.t;;
 
 effect AskAddoCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 let rec addo x y z = fun st ->
-  let () = ignore @@ project3 ~msg:"addo" x y z st in
+  (* let () = ignore @@ project3 ~msg:"addo" x y z st in *)
 
   let cache =
     let arg = Obj.(repr x, repr y, repr z) in
@@ -44,7 +44,7 @@ let rec addo x y z = fun st ->
       match perform (AskAddoCache (arg, st)) with
       | Hang -> raise (RelDivergeExn (addo x y z, st))
       | Later cache ->
-          printfn "Got an `addo` cache of size %d" (Cache3.size cache);
+          (* printfn "Got an `addo` cache of size %d" (Cache3.size cache); *)
           cache
     with Unhandled -> Cache3.(extend arg empty)
   in
@@ -70,7 +70,7 @@ let rec addo x y z = fun st ->
 
 effect AskMuloCache : (Obj.t * Obj.t * Obj.t) * State.t -> ask_result;;
 let rec mulo x y z st =
-  let () = ignore @@ project3 ~msg:"mulo" x y z st in
+  (* let () = ignore @@ project3 ~msg:"mulo" x y z st in *)
 
   let cache =
     let arg = Obj.(repr x, repr y, repr z) in
@@ -92,8 +92,11 @@ let rec mulo x y z st =
 
   conde
   [ (x === Nat.zero) &&& (x === z)
-  ; Fresh.two @@ fun xt zt ->
+  ; Fresh.one @@ fun xt ->
+      (x === Nat.succ xt) &&& (y === Nat.zero) &&& (y === z)
+  ; Fresh.three @@ fun xt yt zt ->
       (x === Nat.succ xt) &&&
+      (y === Nat.succ yt) &&&
       (par_conj_exn
         (addo zt y z)
         (mulo xt y zt)
@@ -101,7 +104,8 @@ let rec mulo x y z st =
   ] st
 
 let () =
-  runN (-1)  q  qh ("mulo q 2 6", (fun q   -> mulo q Nat.(inj@@of_int 2) Nat.(inj@@of_int 6)     ));
+  runN (-1)  q  qh  ("mulo q 2 6", (fun q   -> mulo q Nat.(inj@@of_int 2) Nat.(inj@@of_int 6)     ));
+  runN (-1)  qr qrh ("mulo q r 6", (fun q r -> mulo q r Nat.(inj@@of_int 6)     ));
   (* runN (-1)  q  qh ("mulo q 2 5", (fun q   -> mulo q Nat.(inj@@of_int 2) Nat.(inj@@of_int 5)     )); *)
   (* should diverge after 1st answer *)
   (* runN (-1)  q  qh ("mulo 3 2 ?", (fun q   -> mulo Nat.(inj@@of_int 3) Nat.(inj@@of_int 2) q     )); *)
