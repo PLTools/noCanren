@@ -203,7 +203,7 @@ let get_translator start_index =
         | _          ->
           let path       = create_path logic_type_name in
           let fullname   = create_fullname logic_type_name in
-  	  let type_desc  = Ttyp_constr (path, fullname, [t]) in
+      let type_desc  = Ttyp_constr (path, fullname, [t]) in
           { ctyp_desc = type_desc; ctyp_type = type_expr; ctyp_env = Env.empty; ctyp_loc = loc; ctyp_attributes = [] } in
 
   let rec type_to_logic_type x =
@@ -581,6 +581,7 @@ let () =
 
       let new_ast       =
         Untypeast.untype_structure reduced_tast |>
+        PutDistrib.process |>
         print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
         print_if Format.std_formatter Clflags.dump_source Pprintast.structure
       in
