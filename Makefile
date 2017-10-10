@@ -38,7 +38,7 @@ plugin:
 	$(OB) camlp5/pa_ocanren.cmo
 
 transl:
-	$(OB) -Is transl transl/ml_to_mk.cmxa transl/ml_to_mk.cmxs
+	$(OB) -Is transl transl/ml_to_mk.cmxs
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin
