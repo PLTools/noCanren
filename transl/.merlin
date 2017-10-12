@@ -1,0 +1,3 @@
+PKG ppx_tools.metaquot
+SRC .
+B ../_build/transl
