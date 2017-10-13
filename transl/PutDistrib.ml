@@ -120,7 +120,7 @@ let revisit_adt tdecl ctors =
       let alias_desc =
         let old_params = List.map fst tdecl.ptype_params  in
         let extra_params = FoldInfo.map ~f:(fun {FoldInfo.rtyp} -> rtyp)  mapa in
-        Ptyp_constr (Location.mknoloc (Longident.Lident functor_typ.ptype_name.txt), old_params @ extra_params)
+        Ptyp_constr (Location.mknoloc (Longident.Lident functor_typ.ptype_name.Asttypes.txt), old_params @ extra_params)
       in
       Pstr_type
         [ { tdecl with ptype_kind = Ptype_abstract

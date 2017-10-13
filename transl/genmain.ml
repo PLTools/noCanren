@@ -246,7 +246,11 @@ let get_translator start_index =
     create_fun output_var_name unify_const in
 
   (****)
-
+  let rec path_of_longident = function
+  | Lident s -> Path.Pident (Ident.create s)
+  | Lapply (l,r) -> Path.Papply (path_of_longident l, path_of_longident r)
+  | Ldot (t, s)  -> Path.Pdot (path_of_longident t, s, 0)
+  in
   let translate_construct (sub : Tast_mapper.mapper) name def args =
     let output_var_name   = create_fresh_var_name () in
     let output_var        = create_ident output_var_name in
@@ -256,6 +260,8 @@ let get_translator start_index =
 
     let new_cnstr         = Texp_construct (name, def, fresh_vars) |> expr_desc_to_expr in
     let inj_cnstr         = create_inj new_cnstr in
+    (*let inj_cnstr = Texp_apply
+      (Texp_ident (path_of_longident name.txt, name, ))*)
     let unify_cnstr       = create_unify output_var inj_cnstr in
 
     let unifies_list      = List.map (sub.expr sub) args |> List.map2 (fun v e -> create_apply e [v]) fresh_vars in
