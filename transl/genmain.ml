@@ -258,10 +258,21 @@ let get_translator start_index =
     let fresh_var_names   = List.map (fun _ -> create_fresh_var_name ()) args in
     let fresh_vars        = List.map create_ident fresh_var_names in
 
-    let new_cnstr         = Texp_construct (name, def, fresh_vars) |> expr_desc_to_expr in
-    let inj_cnstr         = create_inj new_cnstr in
-    (*let inj_cnstr = Texp_apply
-      (Texp_ident (path_of_longident name.txt, name, ))*)
+    (*let new_cnstr         = Texp_construct (name, def, fresh_vars) |> expr_desc_to_expr in
+    let inj_cnstr         = create_inj new_cnstr in*)
+    let dummy_val_desc =
+      let open Types in
+      let val_kind = Val_reg in
+      let val_type = { desc = Tvar (Some "a"); level = 0; id = 0} in
+      let val_loc = Location.none in
+      {val_kind; val_type; val_loc; val_attributes = []}
+    in
+    let inj_cnstr =
+      Typedtree.Texp_apply
+        (Texp_ident (path_of_longident name.txt, name, dummy_val_desc) |> expr_desc_to_expr,
+        List.map (fun v -> ("", Some v, Required)) fresh_vars )
+        |> expr_desc_to_expr
+    in
     let unify_cnstr       = create_unify output_var inj_cnstr in
 
     let unifies_list      = List.map (sub.expr sub) args |> List.map2 (fun v e -> create_apply e [v]) fresh_vars in
