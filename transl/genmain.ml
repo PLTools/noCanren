@@ -246,20 +246,27 @@ let get_translator start_index =
     create_fun output_var_name unify_const in
 
   (****)
-  let rec path_of_longident = function
-  | Lident s -> Path.Pident (Ident.create s)
-  | Lapply (l,r) -> Path.Papply (path_of_longident l, path_of_longident r)
-  | Ldot (t, s)  -> Path.Pdot (path_of_longident t, s, 0)
+  let rec path_of_longident ?(to_lower=false) = function
+  | Lident s ->
+      Path.Pident (Ident.create "wtf")
+      (*Path.Pident (Ident.create (if to_lower
+        then String.mapi (fun n -> if n=0 then Char.lowercase else fun c -> c) s
+        else s^"1"))*)
+  | Lapply (l,r) -> Path.Papply (path_of_longident ~to_lower l, path_of_longident ~to_lower r)
+  | Ldot (t, s)  -> Path.Pdot (path_of_longident ~to_lower t, s, 0)
   in
-  let translate_construct (sub : Tast_mapper.mapper) name def args =
+  let rec lowercase_lident ?(to_lower=false) = function
+  | Lident s -> Lident (String.mapi (fun n -> if n=0 then Char.lowercase else fun c -> c) s)
+  | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident ~to_lower r)
+  | Ldot (t, s)  -> Ldot (lowercase_lident ~to_lower t, s)
+  in
+  let translate_construct (sub : Tast_mapper.mapper) (name: Longident.t loc) def args =
     let output_var_name   = create_fresh_var_name () in
     let output_var        = create_ident output_var_name in
 
     let fresh_var_names   = List.map (fun _ -> create_fresh_var_name ()) args in
     let fresh_vars        = List.map create_ident fresh_var_names in
 
-    (*let new_cnstr         = Texp_construct (name, def, fresh_vars) |> expr_desc_to_expr in
-    let inj_cnstr         = create_inj new_cnstr in*)
     let dummy_val_desc =
       let open Types in
       let val_kind = Val_reg in
@@ -269,7 +276,7 @@ let get_translator start_index =
     in
     let inj_cnstr =
       Typedtree.Texp_apply
-        (Texp_ident (path_of_longident name.txt, name, dummy_val_desc) |> expr_desc_to_expr,
+        (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
         List.map (fun v -> ("", Some v, Required)) fresh_vars )
         |> expr_desc_to_expr
     in

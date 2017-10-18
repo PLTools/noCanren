@@ -1,4 +1,5 @@
 open Ast_mapper
+open Ast_helper
 open Parsetree
 
 module TypeNameMap = Map.Make(String)
@@ -30,7 +31,18 @@ module FoldInfo = struct
       {param_name; rtyp; ltyp} :: ts
 end
 
-let prepare_fmap tdecl =
+let prepare_distribs ~loc tdecl =
+  let open Location in
+  let open Longident in
+  let open Ast_helper in
+  let Ptype_variant constructors = tdecl.ptype_kind in
+
+  [ [%stri let () = ()]
+  ; Str.module_ @@ Mb.mk (mknoloc @@ "For_" ^ tdecl.ptype_name.txt) @@
+      Mod.apply Mod.(ident (mknoloc @@ Lident "FmapAsdf")) Mod.(ident (mknoloc @@ Lident "Asdf"))
+  ]
+
+let prepare_fmap ~loc tdecl =
   let open Location in
   let open Ast_helper in
   let extract_names = List.map (fun typ ->
@@ -77,7 +89,7 @@ let prepare_fmap tdecl =
       | name -> Exp.fun_ "" None Pat.(var @@ mknoloc name)
       ) param_names (Exp.function_ cases) ] ]
 
-let revisit_adt tdecl ctors =
+let revisit_adt ~loc tdecl ctors =
   let tdecl = {tdecl with ptype_attributes =
     List.filter (fun (name,_) -> name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
   in
@@ -105,7 +117,7 @@ let revisit_adt tdecl ctors =
       |> (fun (mapa, cs) -> mapa, {tdecl with ptype_kind = Ptype_variant cs})
   in
   (* now we need to add some parameters if we collected ones *)
-  if FoldInfo.is_empty mapa then [ Pstr_type [full_t] ]
+  if FoldInfo.is_empty mapa then [ Str.type_ ~loc [full_t] ]
   else
     let functor_typ =
       let extra_params = FoldInfo.map mapa
@@ -115,19 +127,21 @@ let revisit_adt tdecl ctors =
       {full_t with ptype_params = full_t.ptype_params @ extra_params;
                    ptype_name = { full_t.ptype_name with txt = "g" ^ full_t.ptype_name.txt }}
     in
-    let fmap_for_typ = prepare_fmap functor_typ in
+    let fmap_for_typ = prepare_fmap ~loc functor_typ in
     let non_logic_typ =
       let alias_desc =
         let old_params = List.map fst tdecl.ptype_params  in
         let extra_params = FoldInfo.map ~f:(fun {FoldInfo.rtyp} -> rtyp)  mapa in
         Ptyp_constr (Location.mknoloc (Longident.Lident functor_typ.ptype_name.Asttypes.txt), old_params @ extra_params)
       in
-      Pstr_type
+      Str.type_ ~loc
         [ { tdecl with ptype_kind = Ptype_abstract
           ; ptype_manifest = Some { ptyp_loc = Location.none; ptyp_attributes = []; ptyp_desc = alias_desc}
           } ]
     in
-    [ Pstr_type [functor_typ]; fmap_for_typ.pstr_desc; non_logic_typ ]
+    [ Str.type_ ~loc [functor_typ]
+    ; fmap_for_typ
+    ; non_logic_typ ] @ (prepare_distribs ~loc tdecl)
 
 let has_to_gen_attr (xs: attributes) =
   try let _ = List.find (fun (name,_) -> name.Location.txt = "put_distrib_here") xs in
@@ -135,12 +149,11 @@ let has_to_gen_attr (xs: attributes) =
   with Not_found -> false
 
 let main_mapper =
-  let wrap_tydecls ts =
+  let wrap_tydecls loc ts =
     let f tdecl =
       match tdecl.ptype_kind with
       | Ptype_variant cs when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-          revisit_adt tdecl cs
-(*          [Pstr_type [tdecl]]*)
+          revisit_adt ~loc tdecl cs
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
@@ -149,7 +162,7 @@ let main_mapper =
   { Ast_mapper.default_mapper with
     structure = fun self ss ->
       let f si = match si.pstr_desc with
-      | Pstr_type tydecls -> List.map (fun pstr_desc -> {si with pstr_desc}) (wrap_tydecls tydecls)
+      | Pstr_type tydecls -> wrap_tydecls si.pstr_loc tydecls
       | x -> [si]
       in
       List.flatten (List.map f ss)
