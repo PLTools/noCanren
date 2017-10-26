@@ -1,3 +1,4 @@
+open Printf
 open Ast_mapper
 open Ast_helper
 open Parsetree
@@ -31,26 +32,44 @@ module FoldInfo = struct
       {param_name; rtyp; ltyp} :: ts
 end
 
-let prepare_distribs ~loc tdecl =
+let extract_names = List.map (fun typ ->
+    match typ.ptyp_desc with
+    | Ptyp_var s -> s
+    | _ -> assert false
+  )
+
+
+let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
   let open Ast_helper in
   let Ptype_variant constructors = tdecl.ptype_kind in
 
+  let lower_lid lid = {lid with txt = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) lid.txt } in
+
+  let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
+  let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
   [ [%stri let () = ()]
-  ; Str.module_ @@ Mb.mk (mknoloc @@ "For_" ^ tdecl.ptype_name.txt) @@
-      Mod.apply Mod.(ident (mknoloc @@ Lident "FmapAsdf")) Mod.(ident (mknoloc @@ Lident "Asdf"))
+  ; Str.module_ @@ Mb.mk gen_module_str @@
+      Mod.(apply (ident (mknoloc @@ Lident (sprintf "Fmap%d" @@ List.length tdecl.ptype_params))) @@ structure
+        [ fmap_decl
+        ; Str.type_ [ Type.mk ~params:tdecl.ptype_params
+            ~kind:Ptype_abstract
+            ~manifest:(Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt) @@ List.map fst tdecl.ptype_params)
+            (mknoloc "t") ]
+        ])
+  ; Str.value Asttypes.Nonrecursive @@ List.map (fun {pcd_name; pcd_args} ->
+      let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [("",[%expr inj ])] ] ] in
+      let names = extract_names pcd_args in
+      Vb.mk (Pat.var @@ lower_lid pcd_name) @@
+        List.fold_right (fun name acc -> Exp.fun_ "" None (Pat.var @@ mknoloc name) acc) names body
+    ) constructors
   ]
 
 let prepare_fmap ~loc tdecl =
   let open Location in
   let open Ast_helper in
-  let extract_names = List.map (fun typ ->
-      match typ.ptyp_desc with
-      | Ptyp_var s -> s
-      | _ -> assert false
-    )
-  in
+
   let param_names = extract_names (List.map fst tdecl.ptype_params) in
   let Ptype_variant constructors = tdecl.ptype_kind in
   let cases = constructors |> List.map (fun cdecl ->
@@ -58,13 +77,13 @@ let prepare_fmap ~loc tdecl =
     let cname = cdecl.pcd_name.txt in
     let clid = mknoloc @@ Longident.Lident cname in
     let rec make_f_expr name =
-      if name = "self" then apply_self ()
-      else Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name)
-    and apply_self () =
+      (*if name = "self" then apply_self ()
+      else *)Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name)
+    (*and apply_self () =
       match List.filter ((<>)"self") argnames with
       | [] -> [%expr fmap]
       | xs -> Exp.(apply [%expr fmap] @@
-                List.map (fun s -> ("", ident @@ mknoloc @@ Longident.Lident ("f"^s))) xs)
+                List.map (fun s -> ("", ident @@ mknoloc @@ Longident.Lident ("f"^s))) xs)*)
     in
     let pc_lhs, pc_rhs =
       let wrap_one_arg s =
@@ -85,8 +104,8 @@ let prepare_fmap ~loc tdecl =
 
   [%stri let rec fmap = [%e
     List.fold_right (function
-      | "self" -> fun acc -> acc
-      | name -> Exp.fun_ "" None Pat.(var @@ mknoloc name)
+(*      | "self" -> fun acc -> acc*)
+      | name -> Exp.fun_ "" None Pat.(var @@ mknoloc ("f"^name))
       ) param_names (Exp.function_ cases) ] ]
 
 let revisit_adt ~loc tdecl ctors =
@@ -140,8 +159,7 @@ let revisit_adt ~loc tdecl ctors =
           } ]
     in
     [ Str.type_ ~loc [functor_typ]
-    ; fmap_for_typ
-    ; non_logic_typ ] @ (prepare_distribs ~loc tdecl)
+    ; non_logic_typ ] @ (prepare_distribs ~loc functor_typ fmap_for_typ)
 
 let has_to_gen_attr (xs: attributes) =
   try let _ = List.find (fun (name,_) -> name.Location.txt = "put_distrib_here") xs in

@@ -28,4 +28,4 @@ true: short_paths
 # Translator based on Lozov's works
 <transl/genmain.*>: package(compiler-libs.common), for-pack(Ml_to_mk)
 <transl/PutDistrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot)
-<transl/peano.*>: plugin(transl/ml_to_mk.cmxa), dsource
+<transl/peano.*>: plugin(transl/ml_to_mk.cmxa), dsource, rectypes
