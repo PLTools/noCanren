@@ -36,11 +36,11 @@ plugin:
 	$(OB) camlp5/pa_minikanren.cmo
 
 transl:
-	$(OB) -Is transl transl/ml_to_mk.cmxs
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin
-	$(OB) -Is transl,src peano.byte
+	$(OB) -Is transl,src peano_run.native
 
 celan: clean
 

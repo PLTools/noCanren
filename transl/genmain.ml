@@ -101,8 +101,15 @@ let create_fun param_name body =
   let pat_desc = Tpat_var (param, { txt = param_name; loc = loc }) in
   let pat      = { pat_desc = pat_desc; pat_loc = loc; pat_extra = [];
                    pat_type = type_expr; pat_env = Env.empty; pat_attributes = [] } in
-  let case     = { c_lhs = pat; c_guard = None; c_rhs = body; c_cont=None (* ?? *) } in
-  let func     = Texp_function ("", [case], Partial) in
+  let case     = { c_lhs = pat; c_guard = None; c_rhs = body(*; c_cont=None (* ?? *)*)  } in
+  let func     =
+    let cases = [case] in
+    let partial = Partial in
+(*    let arg_label = "" in*)
+    let arg_label = Nolabel in
+(*    Texp_function ("", cases, partial)*)
+    Texp_function {arg_label; param; cases; partial}
+  in
   expr_desc_to_expr func
 
 let create_constructor name args =
@@ -114,7 +121,7 @@ let create_constructor name args =
                  cstr_consts      = 0;     cstr_nonconsts = 0;         cstr_normal = 0;
                  cstr_generalized = false; cstr_private   = Public;    cstr_loc = loc;
                  cstr_attributes  = []
-                 (* ;    cstr_inlined   = None  *)
+                  ;    cstr_inlined   = None
                 }
   in
 
@@ -123,7 +130,9 @@ let create_constructor name args =
   expr_desc_to_expr expr_desc
 
 let create_apply e args =
-  Texp_apply (e, List.map (fun a -> ("", Some a, Required)) args) |> expr_desc_to_expr
+(*  let make a = ("", Some a , Required) in*)
+  let make a = (Nolabel, Some a) in
+  Texp_apply (e, List.map make args) |> expr_desc_to_expr
 
 let create_let rec_flag var_name body rest =
   let var      = Ident.create var_name in
@@ -215,9 +224,14 @@ let get_translator start_index =
 
   let args_to_logic_args cd =
     let cd_args =
-      List.map type_to_logic_type cd.cd_args
-      (* match cd.cd_args with
-      | Cstr_tuple l -> Cstr_tuple (List.map type_to_logic_type l) *)
+(*      let wrap f cd = f cd.cd_args in*)
+      let wrap f cd =
+        match cd.cd_args with
+        | Cstr_tuple l -> Cstr_tuple (List.map type_to_logic_type l)
+      in
+
+      wrap (List.map type_to_logic_type) cd
+
     in
     {cd with cd_args}
   in
@@ -275,9 +289,12 @@ let get_translator start_index =
       {val_kind; val_type; val_loc; val_attributes = []}
     in
     let inj_cnstr =
+      (*  let make a = ("", Some a , Required) in*)
+      let make a = (Nolabel, Some a) in
+
       Typedtree.Texp_apply
         (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
-        List.map (fun v -> ("", Some v, Required)) fresh_vars )
+        List.map make fresh_vars )
         |> expr_desc_to_expr
     in
     let unify_cnstr       = create_unify output_var inj_cnstr in
@@ -380,7 +397,10 @@ let get_translator start_index =
 
     let external_arguments = List.map create_ident external_argument_names in
 
-    let args = List.map (fun (_, Some a,_) -> a) args in
+    let args =
+(*      List.map (fun (_, Some a,_) -> a) args *)
+      List.map (fun (_, Some a) -> a) args
+    in
 
     let is_primary_list = List.map (fun a -> is_primary_type a.exp_type) args in
 
@@ -460,7 +480,7 @@ let get_translator start_index =
     match x.exp_desc with
     | Texp_constant _           -> tarnslate_constant x
     | Texp_construct (n, cd, l) -> translate_construct sub n cd l
-    | Texp_match (e, cs, _, _, _)  -> translate_match sub e cs x.exp_type
+    | Texp_match (e, cs, _, _(*, _*))  -> translate_match sub e cs x.exp_type
     | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub
@@ -511,16 +531,27 @@ let beta_reductor =
       let Longident.Lident name = ident.txt in
       if name = var then subst else expr
 
-    | Texp_function (label, [case], typ) ->
+    (*| Texp_function (label, [case], typ) ->
       if name_from_pat case.c_lhs = var then expr else
         let c_rhs    = substitutor case.c_rhs var subst in
         let new_case = { case with c_rhs } in
         let exp_desc = Texp_function (label, [new_case], typ) in
+        { expr with exp_desc }*)
+
+    | Texp_function {arg_label; param; cases=[case]; partial} ->
+        if name_from_pat case.c_lhs = var then expr else
+        let c_rhs    = substitutor case.c_rhs var subst in
+        let new_case = { case with c_rhs } in
+        let exp_desc = Texp_function {arg_label; param; cases=[new_case]; partial} in
         { expr with exp_desc }
 
     | Texp_apply (func, args) ->
       let new_func = substitutor func var subst in
-      let new_args = List.map (fun (l, Some arg, flg) -> (l, Some (substitutor arg var subst), flg)) args in
+      let new_args =
+(*        let make (l, Some arg, flg) = (l, Some (substitutor arg var subst), flg) in*)
+        let make (l, Some arg)      = (l, Some (substitutor arg var subst)     ) in
+        List.map make args
+      in
       let exp_desc = Texp_apply (new_func, new_args) in
       { expr with exp_desc }
 
@@ -546,11 +577,13 @@ let beta_reductor =
   let rec beta_reduction expr args =
     match expr.exp_desc with
     | Texp_apply (func, args') ->
-      let old_args = List.map (fun (_, Some a, _) -> a) args' in
+(*      let old_args = List.map (fun (_, Some a, _) -> a) args' in*)
+      let old_args = List.map (fun (_, Some a   ) -> a) args' in
       let new_args = List.map (fun a -> beta_reduction a []) old_args in
       List.append new_args args |> beta_reduction func
 
-    | Texp_function (_, [case], _) ->
+(*    | Texp_function (_, [case], _) ->*)
+    | Texp_function {arg_label; param; cases=[case]; partial} ->
       let Tpat_var (var, _) = case.c_lhs.pat_desc in
       begin
         match args with
@@ -611,12 +644,14 @@ let () =
       in
 
       try
+(*        let new_ast = [] in*)
         let (retyped_ast,_,_env) =
           Printexc.print
           (Typemod.type_structure (Compmisc.initial_env()) new_ast)
           Location.none
         in
-        (retyped_ast, coercion)
+        Printtyped.implementation_with_coercion Format.std_formatter (retyped_ast, coercion);
+        (retyped_ast, Tcoerce_none)
       with
         | Error e as exc ->
           report_error Format.std_formatter e;
