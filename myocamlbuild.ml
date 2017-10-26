@@ -24,8 +24,11 @@ let () = dispatch (function
      (*      ] *)
      (*   ); *)
 
+     flag ["ocaml";"compile";"use_ocanren_modules"] (S[A"-I"; A"src";A"-I"; A"regression"]);
+
      flag ["ocaml";"compile";"native";"keep_asm"] (S[A"-S"]);
      flag ["ocaml";"compile";"dsource"] (S[A"-dsource"]);
+     flag ["ocaml";"compile";"dparsetree"] (S[A"-dparsetree"]);
      pflag ["ocaml"; "dep"]     "plugin" (fun s -> S [A "-plugin"; A s]) ;
      pflag ["ocaml"; "compile"] "plugin" (fun s -> S [A "-plugin"; A s]) ;
 

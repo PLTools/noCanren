@@ -11,16 +11,16 @@ module FoldInfo = struct
   type t = item list
 
   let param_for_rtyp typ ts =
-    let typ_repr =
+    (*let typ_repr =
       Printast.core_type 0 Format.str_formatter typ;
       Format.flush_str_formatter ()
-    in
-    try List.iter (fun i ->
-                    let new_repr =
+    in*)
+    try List.iter (fun i -> ()
+                    (*let new_repr =
                       Printast.core_type 0 Format.str_formatter i.rtyp;
                       Format.flush_str_formatter ()
                     in
-                    if new_repr = typ_repr then raise (ItemFound i)
+                    if new_repr = typ_repr then raise (ItemFound i)*)
                   ) ts;
         None
     with ItemFound i -> Some i
@@ -38,6 +38,12 @@ let extract_names = List.map (fun typ ->
     | _ -> assert false
   )
 
+(*let nolabel = ""*)
+let nolabel = Asttypes.Nolabel
+
+let get_param_names pcd_args =
+  let Pcstr_tuple pcd_args  = pcd_args in
+  extract_names pcd_args
 
 let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
@@ -53,16 +59,25 @@ let prepare_distribs ~loc tdecl fmap_decl =
   ; Str.module_ @@ Mb.mk gen_module_str @@
       Mod.(apply (ident (mknoloc @@ Lident (sprintf "Fmap%d" @@ List.length tdecl.ptype_params))) @@ structure
         [ fmap_decl
-        ; Str.type_ [ Type.mk ~params:tdecl.ptype_params
+        ; Str.type_ Nonrecursive [ Type.mk ~params:tdecl.ptype_params
             ~kind:Ptype_abstract
             ~manifest:(Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt) @@ List.map fst tdecl.ptype_params)
             (mknoloc "t") ]
         ])
   ; Str.value Asttypes.Nonrecursive @@ List.map (fun {pcd_name; pcd_args} ->
-      let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [("",[%expr inj ])] ] ] in
-      let names = extract_names pcd_args in
+      let names = get_param_names pcd_args in
+      let open Exp in
+      let body =
+        let constr_itself = construct @@ mknoloc (Lident pcd_name.txt) in
+        match names with
+        | [] -> constr_itself None
+        | [one] -> constr_itself (Some (ident @@ mknoloc (Lident one)))
+        | xs -> (* construct tuple here *)
+            constr_itself (Some (tuple @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
+      in
+      let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [nolabel, body] ] ] in
       Vb.mk (Pat.var @@ lower_lid pcd_name) @@
-        List.fold_right (fun name acc -> Exp.fun_ "" None (Pat.var @@ mknoloc name) acc) names body
+        List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body
     ) constructors
   ]
 
@@ -72,9 +87,9 @@ let prepare_fmap ~loc tdecl =
 
   let param_names = extract_names (List.map fst tdecl.ptype_params) in
   let Ptype_variant constructors = tdecl.ptype_kind in
-  let cases = constructors |> List.map (fun cdecl ->
-    let argnames = extract_names cdecl.pcd_args in
-    let cname = cdecl.pcd_name.txt in
+  let cases = constructors |> List.map (fun {pcd_name; pcd_args} ->
+    let argnames = get_param_names pcd_args in
+    let cname = pcd_name.txt in
     let clid = mknoloc @@ Longident.Lident cname in
     let rec make_f_expr name =
       (*if name = "self" then apply_self ()
@@ -87,7 +102,7 @@ let prepare_fmap ~loc tdecl =
     in
     let pc_lhs, pc_rhs =
       let wrap_one_arg s =
-        Exp.(apply (make_f_expr s) ["", ident @@ mknoloc @@ Longident.Lident s] )
+        Exp.(apply (make_f_expr s) [nolabel, ident @@ mknoloc @@ Longident.Lident s] )
       in
       match argnames with
       | [] -> (None, None)
@@ -104,8 +119,7 @@ let prepare_fmap ~loc tdecl =
 
   [%stri let rec fmap = [%e
     List.fold_right (function
-(*      | "self" -> fun acc -> acc*)
-      | name -> Exp.fun_ "" None Pat.(var @@ mknoloc ("f"^name))
+      | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
       ) param_names (Exp.function_ cases) ] ]
 
 let revisit_adt ~loc tdecl ctors =
@@ -126,9 +140,11 @@ let revisit_adt ~loc tdecl ctors =
                       (FoldInfo.extend "self" typ typ map, [%type: 'self] :: args)
                   | arg -> (map, arg::args)
             )
-            cd.pcd_args
+            (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
+(*            cd.pcd_args*)
             (acc_map,[])
           in
+          let new_args = Pcstr_tuple new_args in
           (map2, { cd with pcd_args = new_args } :: cs)
       )
       ctors
@@ -136,7 +152,7 @@ let revisit_adt ~loc tdecl ctors =
       |> (fun (mapa, cs) -> mapa, {tdecl with ptype_kind = Ptype_variant cs})
   in
   (* now we need to add some parameters if we collected ones *)
-  if FoldInfo.is_empty mapa then [ Str.type_ ~loc [full_t] ]
+  if FoldInfo.is_empty mapa then [ Str.type_ ~loc Nonrecursive [full_t] ]
   else
     let functor_typ =
       let extra_params = FoldInfo.map mapa
@@ -153,13 +169,14 @@ let revisit_adt ~loc tdecl ctors =
         let extra_params = FoldInfo.map ~f:(fun {FoldInfo.rtyp} -> rtyp)  mapa in
         Ptyp_constr (Location.mknoloc (Longident.Lident functor_typ.ptype_name.Asttypes.txt), old_params @ extra_params)
       in
-      Str.type_ ~loc
+      Str.type_ ~loc Recursive
         [ { tdecl with ptype_kind = Ptype_abstract
           ; ptype_manifest = Some { ptyp_loc = Location.none; ptyp_attributes = []; ptyp_desc = alias_desc}
           } ]
     in
-    [ Str.type_ ~loc [functor_typ]
-    ; non_logic_typ ] @ (prepare_distribs ~loc functor_typ fmap_for_typ)
+    [ Str.type_ ~loc Nonrecursive [functor_typ]
+(*    ; non_logic_typ *)
+    ] @ (prepare_distribs ~loc functor_typ fmap_for_typ)
 
 let has_to_gen_attr (xs: attributes) =
   try let _ = List.find (fun (name,_) -> name.Location.txt = "put_distrib_here") xs in
@@ -180,7 +197,7 @@ let main_mapper =
   { Ast_mapper.default_mapper with
     structure = fun self ss ->
       let f si = match si.pstr_desc with
-      | Pstr_type tydecls -> wrap_tydecls si.pstr_loc tydecls
+      | Pstr_type (_,tydecls) -> wrap_tydecls si.pstr_loc tydecls
       | x -> [si]
       in
       List.flatten (List.map f ss)
