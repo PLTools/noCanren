@@ -42,7 +42,7 @@ transl:
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin
-	$(OB) -Is transl,src peano_run.native
+	$(OB) -Is transl,src peano_run.native peano_run.byte
 
 celan: clean
 
