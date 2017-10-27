@@ -38,17 +38,19 @@ let extract_names = List.map (fun typ ->
     | _ -> assert false
   )
 
-(*let nolabel = ""*)
-let nolabel = Asttypes.Nolabel
+type recu_flg = Nonrecursive | Recursive
+module Str = struct include Str let type_ ?(loc=Location.none) _rec_flg xs = type_ ~loc xs end
+let nolabel = ""
+(*let nolabel = Asttypes.Nolabel*)
 
 let get_param_names pcd_args =
-  let Pcstr_tuple pcd_args  = pcd_args in
+(*  let Pcstr_tuple pcd_args  = pcd_args in*)
   extract_names pcd_args
 
 let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
-  let open Ast_helper in
+(*  let open Ast_helper in*)
   let Ptype_variant constructors = tdecl.ptype_kind in
 
   let lower_lid lid = {lid with txt = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) lid.txt } in
@@ -76,8 +78,10 @@ let prepare_distribs ~loc tdecl fmap_decl =
             constr_itself (Some (tuple @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
       in
       let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [nolabel, body] ] ] in
-      Vb.mk (Pat.var @@ lower_lid pcd_name) @@
-        List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body
+      Vb.mk (Pat.var @@ lower_lid pcd_name)
+        (match names with
+        | [] -> Exp.fun_ nolabel None (Pat.construct (mknoloc (Lident "()")) None) body
+        | names -> List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body)
     ) constructors
   ]
 
@@ -140,11 +144,11 @@ let revisit_adt ~loc tdecl ctors =
                       (FoldInfo.extend "self" typ typ map, [%type: 'self] :: args)
                   | arg -> (map, arg::args)
             )
-            (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
-(*            cd.pcd_args*)
+(*            (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)*)
+            cd.pcd_args
             (acc_map,[])
           in
-          let new_args = Pcstr_tuple new_args in
+(*          let new_args = Pcstr_tuple new_args in*)
           (map2, { cd with pcd_args = new_args } :: cs)
       )
       ctors
@@ -152,7 +156,7 @@ let revisit_adt ~loc tdecl ctors =
       |> (fun (mapa, cs) -> mapa, {tdecl with ptype_kind = Ptype_variant cs})
   in
   (* now we need to add some parameters if we collected ones *)
-  if FoldInfo.is_empty mapa then [ Str.type_ ~loc Nonrecursive [full_t] ]
+  if FoldInfo.is_empty mapa then [ Str.type_ Nonrecursive ~loc  [full_t] ]
   else
     let functor_typ =
       let extra_params = FoldInfo.map mapa
@@ -197,7 +201,8 @@ let main_mapper =
   { Ast_mapper.default_mapper with
     structure = fun self ss ->
       let f si = match si.pstr_desc with
-      | Pstr_type (_,tydecls) -> wrap_tydecls si.pstr_loc tydecls
+(*      | Pstr_type (_,tydecls) -> wrap_tydecls si.pstr_loc tydecls*)
+      | Pstr_type (tydecls) -> wrap_tydecls si.pstr_loc tydecls
       | x -> [si]
       in
       List.flatten (List.map f ss)
