@@ -685,6 +685,7 @@ module Subst :
   end =
   struct
     type content = {var : Var.t; term : Obj.t }
+
     type t       = Obj.t VarMap.t
 
     let empty = VarMap.empty
@@ -733,58 +734,57 @@ module Subst :
 
     let is_bound = VarMap.mem
 
-    let rec occurs env xi term subst =
+    let rec occurs env var term subst =
       let y = walk env subst term in
       match Env.var env y with
-      | Some yi -> xi = yi
+      | Some yi -> var.Var.index = yi
       | None ->
-         let wy = wrap (Obj.repr y) in
-         match wy with
-         | Invalid n when n = Obj.closure_tag -> false
+         match wrap (Obj.repr y) with
          | Unboxed _ -> false
-         | Invalid n -> failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" n)
          | Boxed (_, s, f) ->
-            let rec inner i =
-              if i >= s then false
-              else occurs env xi (!!!(f i)) subst || inner (i+1)
-            in
-            inner 0
+           let rec inner i =
+            if i >= s then false
+            else occurs env var (!!!(f i)) subst || inner (i+1)
+           in
+           inner 0
+         | Invalid n when n = Obj.closure_tag -> false
+         | Invalid n -> failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" n)
 
-    let unify ~scope env main_subst x y =
+    let extend ~scope env var term subst =
+      if occurs env var term subst then raise Occurs_check
+      else
+        assert (Env.var env var <> Env.var env term);
+        (* It is safe to modify variables destructively if the case of scopes match.
+         * There are two cases:
+         * 1) If we do unification just after a conde, then the scope is already incremented and nothing goes into
+         *    the fresh variables.
+         * 2) If we do unification after a fresh, then in case of failure it doesn't matter if
+         *    the variable is be distructively substituted: we will not look on it in future.
+         *)
+        if scope = var.Var.scope
+        then begin
+          var.subst <- Some (Obj.repr term);
+          subst
+        end
+          else VarMap.add var (Obj.repr term) subst
 
-      (* The idea is to do the unification and collect the unification prefix during the process.
-         It is safe to modify variables on the go. There are two cases:
-         * if we do unification just after a conde, then the scope is already incremented and nothing goes into
-           the fresh variables.
-         * if we do unification after a fresh, then in case of failure it doesn't matter if
-           the variable is be distructively substituted: we will not look on it in future.
-      *)
+    let unify ~scope env subst x y =
 
-      let extend xi x term (prefix, sub1) =
-        if occurs env xi term sub1 then raise Occurs_check
-        else
-          let cnt = {var = x; term = Obj.repr term} in
-          assert (Env.var env x <> Env.var env term);
-          let sub2 =
-            if scope = x.Var.scope
-            then begin
-              x.subst <- Some (Obj.repr term);
-              sub1
-            end
-            else VarMap.add x (Obj.repr term) sub1
-          in
-          Some (cnt::prefix, sub2)
+      (* The idea is to do the unification and collect the unification prefix during the process *)
+      let extend var term (prefix, subst) =
+        let var = (!!!var: Var.t) in
+        let subst = extend ~scope env var term subst in
+        ({var; term = Obj.repr term}::prefix, subst)
       in
       let rec helper x y : (content list * t) option -> _ = function
         | None -> None
-        | Some ((delta, subs) as pair) as acc ->
-            let x = walk env subs x in
-            let y = walk env subs y in
+        | Some ((_, subst) as pair) as acc ->
+            let x = walk env subst x in
+            let y = walk env subst y in
             match Env.var env x, Env.var env y with
             | (Some xi, Some yi) when xi = yi -> acc
-            | (Some xi, Some _) -> extend xi x y pair
-            | Some xi, _        -> extend xi x y pair
-            | _      , Some yi  -> extend yi y x pair
+            | Some xi, _        -> Some (extend x y pair)
+            | _      , Some yi  -> Some (extend y x pair)
             | _ ->
                 let wx, wy = wrap (Obj.repr x), wrap (Obj.repr y) in
                 (match wx, wy with
@@ -794,10 +794,10 @@ module Subst :
                     then
                       let rec inner i = function
                         | None -> None
-                        | (Some delta) as rez ->
+                        | res ->
                           if i < sx
-                          then inner (i+1) (helper (!!!(fx i)) (!!!(fy i)) rez)
-                          else rez
+                          then inner (i+1) (helper (!!!(fx i)) (!!!(fy i)) res)
+                          else res
                       in
                       inner 0 acc
                     else None
@@ -806,7 +806,7 @@ module Subst :
                  | _ -> None
                 )
       in
-      try helper !!!x !!!y (Some ([], main_subst))
+      try helper !!!x !!!y (Some ([], subst))
       with Occurs_check -> None
 
       let merge env subst1 subst2 = VarMap.fold (fun var term -> function
