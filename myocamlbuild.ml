@@ -5,8 +5,12 @@ open Command;;
 
 let () = dispatch (function
  | Before_rules ->
-     ()
-
+    (* Options.ocamlopt := S[A"ocamlfind"; A"opt"; A"-dsource"]; *)
+    Options.ocamlc   := S[A"ocamlfind"; A"c"
+      (* ;   A"-dsource" *)
+      ; A"-verbose"
+      ];
+    ()
  | After_rules ->
      ocaml_lib "src/MiniKanren";
      (* miniKanren related stuff*)
