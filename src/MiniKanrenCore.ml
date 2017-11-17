@@ -299,18 +299,21 @@ module type T1 =
   sig
     type 'a t
     val fmap : ('a -> 'b) -> 'a t -> 'b t
+    val make_var : (int -> 'a t) option (* TODO: diseq constraints *)
   end
 
 module type T2 =
   sig
     type ('a, 'b) t
     val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
+    val make_var : (int -> ('a, 'b) t) option
   end
 
 module type T3 =
   sig
     type ('a, 'b, 'c) t
     val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('a, 'b, 'c) t -> ('q, 'r, 's) t
+    val make_var : (int -> ('a, 'b, 'c) t) option
   end
 
 module type T4 =
@@ -344,6 +347,14 @@ module Fmap (T : T1) =
   struct
     external distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected = "%identity"
 
+    let plain_reify : helper -> ('a T.t, 'b T.t) injected -> 'a T.t = fun c x ->
+      if c#isVar x
+      then let x : Var.t = !!!x in
+           match T.make_var with
+           | None -> failwith "to_var converter is not specified"
+           | Some f -> f x.Var.index
+      else !!!c
+
     let rec reify r (c : helper) x =
       if c#isVar x
       then to_var c x (reify r)
@@ -354,6 +365,15 @@ module Fmap2 (T : T2) =
   struct
     external distrib : (('a,'b) injected, ('c, 'd) injected) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) injected = "%identity"
 
+    let plain_reify: _ -> _ -> helper -> (('a,'b) T.t as 'r, _ T.t) injected -> 'r = fun r1 r2 c x ->
+(*      printf "Fmap2.plain_reify\n%!";*)
+      if c#isVar x
+      then let x : Var.t = !!!x in
+           match T.make_var with
+           | None -> failwith "to_var converter is not specified"
+           | Some f -> f x.Var.index
+      else !!!(T.fmap (r1 c) (r2 c) x)
+
     let rec reify r1 r2 (c : helper) x =
       if c#isVar x
       then to_var c x (reify r1 r2)
@@ -363,6 +383,15 @@ module Fmap2 (T : T2) =
 module Fmap3 (T : T3) =
   struct
     external distrib : (('a, 'b) injected, ('c, 'd) injected, ('e, 'f) injected) T.t -> (('a, 'c, 'e) T.t, ('b, 'd, 'f) T.t) injected = "%identity"
+
+    let plain_reify: _ -> _ -> _ -> helper -> (('a,'b,'c) T.t as 'r, _ T.t) injected -> 'r = fun r1 r2 r3 c x ->
+      printf "Fmap3.plain_reify\n%!";
+      if c#isVar x
+      then let x : Var.t = !!!x in
+           match T.make_var with
+           | None -> failwith "to_var converter is not specified"
+           | Some f -> f x.Var.index
+      else !!!(T.fmap (r1 c) (r2 c) (r3 c) x)
 
     let rec reify r1 r2 r3 (c : helper) x =
       if c#isVar x then to_var c x (reify r1 r2 r3)
@@ -403,6 +432,9 @@ let rec reify (c : helper) n =
   if c#isVar n
   then to_var c n reify
   else Value n
+
+let plain_reify : helper -> ('a, 'a logic) injected -> 'a = fun c n ->
+  if c#isVar n then failwith "plain_reify can't get a variable" else !!!n
 
 exception Not_a_value
 exception Occurs_check
@@ -453,6 +485,7 @@ module Env :
       Obj.tag !!!v, Obj.size !!!v
 
     let var env x =
+(*      printf "Env.var when x = `%s`\n%!" (generic_show x);*)
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
@@ -464,7 +497,13 @@ module Env :
         else failwith "OCanren fatal (Env.var): wrong environment"
       else None
 
-    let is_var env v = None <> var env v
+    let is_var env v =
+      var env v <> None
+      (*match var env v with
+      | Some n ->
+        printf "is_var says true\n%!"; true
+      | None -> printf "is_var says false\n%!"; false*)
+
 
     let free_vars env x =
       let rec helper fv t =
@@ -1156,6 +1195,7 @@ let helper_of_state st =
 class type ['a,'b] reified = object
   method is_open : bool
   method prj     : 'a
+  method prj2    : (helper -> ('a, 'b) injected -> 'a) -> 'a
   method reify   : (helper -> ('a, 'b) injected -> 'b) -> 'b
 end
 
@@ -1167,6 +1207,9 @@ let make_rr : ('a, 'b) injected -> State.t -> ('a, 'b) reified =
   object (self)
     method is_open            = is_open
     method prj                = if self#is_open then raise Not_a_value else !!!ans
+    method prj2  shallower    =
+(*      printf "================================== rr#prj2 called of `%s`\n%!" (generic_show ans);*)
+      shallower c ans
     method reify reifier      = reifier c ans
   end
 

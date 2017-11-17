@@ -26,6 +26,7 @@ module Result =
       struct
         @type ('a,'b) t = Ok of 'a | Error of 'b with show, gmap
         let fmap f g x = gmap(t) f g x
+        let make_var = None
       end
 
   include X

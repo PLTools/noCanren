@@ -14,6 +14,7 @@ module GLam =
         with show, gmap
 
         let fmap f g x = gmap(t) f g x
+        let make_var = None
       end
 
   include T

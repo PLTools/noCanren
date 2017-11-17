@@ -224,6 +224,7 @@ object
   (** Gets the answer as regular term. Raises exception [Not_a_value] when the answer contains free variables *)
   method prj: 'a
 
+  method prj2: (helper -> ('a, 'b) injected -> 'a) -> 'a
   (** Gets the answer as a logic value using provided injection function [inj] *)
   method reify: (helper -> ('a, 'b) injected -> 'b) -> 'b
 end
@@ -344,18 +345,21 @@ module type T1 =
   sig
     type 'a t
     val fmap : ('a -> 'b) -> 'a t -> 'b t
+    val make_var : (int -> 'a t) option
   end
 
 module type T2 =
   sig
-   type ('a, 'b) t
-   val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
+    type ('a, 'b) t
+    val fmap : ('a -> 'c) -> ('b -> 'd) -> ('a, 'b) t -> ('c, 'd) t
+    val make_var : (int -> ('a, 'b) t) option
   end
 
 module type T3 =
   sig
     type ('a, 'b, 'c) t
     val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('a, 'b, 'c) t -> ('q, 'r, 's) t
+    val make_var : (int -> ('a, 'b, 'c) t) option
   end
 
 module type T4 =
@@ -380,12 +384,17 @@ module Fmap (T : T1) :
   sig
     val distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected
     val reify : (helper -> ('a,'b) injected -> 'b) -> helper -> ('a T.t, 'b T.t logic as 'r) injected -> 'r
+    val plain_reify : helper -> ('a T.t as 'r, 'b T.t logic) injected -> 'r
   end
 
 module Fmap2 (T : T2) :
   sig
     val distrib : (('a,'c) injected, ('b,'d) injected) T.t -> (('a, 'b) T.t, ('c, 'd) T.t) injected
     val reify : (helper -> ('a, 'b) injected -> 'b) -> (helper -> ('c, 'd) injected -> 'd) -> helper -> (('a, 'c) T.t, ('b, 'd) T.t logic as 'r) injected -> 'r
+    val plain_reify:
+      (helper -> ('a, 'b) injected -> 'a) ->
+      (helper -> ('c, 'd) injected -> 'c) ->
+      helper -> (('a, 'c) T.t as 'r, ('b, 'd) T.t logic) injected -> 'r
   end
 
 module Fmap3 (T : T3) :
@@ -393,6 +402,9 @@ module Fmap3 (T : T3) :
     val distrib : (('a,'b) injected, ('c, 'd) injected, ('e, 'f) injected) T.t -> (('a, 'c, 'e) T.t, ('b, 'd, 'f) T.t) injected
     val reify : (helper -> ('a, 'b) injected -> 'b) -> (helper -> ('c, 'd) injected -> 'd) -> (helper -> ('e, 'f) injected -> 'f) ->
                 helper -> (('a, 'c, 'e) T.t, ('b, 'd, 'f) T.t logic as 'r) injected -> 'r
+    val plain_reify:
+      (helper -> ('a, 'b) injected -> 'a) -> (helper -> ('c, 'd) injected -> 'c) -> (helper -> ('e, 'f) injected -> 'e) ->
+      helper -> (('a, 'c, 'e) T.t as 'r, ('b, 'd, 'f) T.t logic) injected -> 'r
   end
 
 module Fmap4 (T : T4) :
@@ -427,3 +439,5 @@ module Fmap6 (T : T6) :
 
 (* A default shallow reifier *)
 val reify : helper -> ('a, 'a logic) injected -> 'a logic
+
+val plain_reify : helper -> ('a, 'a logic) injected -> 'a

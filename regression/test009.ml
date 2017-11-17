@@ -16,6 +16,7 @@ module GExpr =
         @type 'self t  = I | A of 'self * 'self | M of 'self * 'self with show, gmap
 
         let fmap f x = gmap(t) f x
+        let make_var = None
      end
 
   include T

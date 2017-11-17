@@ -1,0 +1,3 @@
+fun q -> demo1 q, 1 answer {
+q=Arr (Arr (P ("asdf"), MetaVar (11)), Arr (P ("asdf"), MetaVar (12)));
+}

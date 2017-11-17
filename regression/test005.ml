@@ -11,11 +11,12 @@ module GTyp =
     module T =
       struct
         @type ('a, 'b) t =
-	| P   of 'a      (* primitive *)
+        | P   of 'a      (* primitive *)
         | Arr of 'b * 'b (* arrow *)
         with gmap, show
 
        let fmap f g x = gmap(t) f g x
+       let make_var = None
      end
 
   include T

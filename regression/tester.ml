@@ -29,9 +29,7 @@ let run_gen onOK onFree n num handler (repr, goal) =
         match Stream.retrieve ~n:1 st with
         | [],_ -> raise NoMoreAnswers
         | [rr],tl ->
-          if rr#is_open
-          then onFree i name rr#reify
-          else onOK i name rr#prj;
+          (if rr#is_open then onFree else onOK) i name rr;
           (name,tl)
         | _ -> assert false
       ) pairs
@@ -47,8 +45,12 @@ let run_gen onOK onFree n num handler (repr, goal) =
   (i.e. reification is not required)
 *)
 let run_exn printer = run_gen
-  (fun i name x -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printer x) )
+  (fun i name r -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printer r#prj) )
   (fun _ _ _ -> failwith "Free logic variables in the answer")
+
+let run_exn2 shallower printer = run_gen
+  (fun i name r -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printer r#prj) )
+  (fun i name r -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printer @@ r#prj2 shallower) )
 
 (**
   [runR reifier print_plain print_injected n name_helper goal] prints answers both with free varibles and
@@ -56,8 +58,8 @@ let run_exn printer = run_gen
   reification using [reifier] and prints the result wit [print_ibjected]
 *)
 let runR reifier printerNoFree printerR = run_gen
-  (fun i name x -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printerNoFree x) )
-  (fun i name func ->
-    let ans = func reifier in
+  (fun i name r -> printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printerNoFree r#prj) )
+  (fun i name r ->
+    let ans = r#reify reifier in
     printf "%s%s=%s;%!" (if i<>0 then " " else "") name (printerR ans)
     )
