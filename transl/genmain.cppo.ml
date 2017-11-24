@@ -86,6 +86,13 @@ let create_fullname name =
 
 (*****************************************************************************************************************************)
 
+let nolabel =
+#if OCAML_VERSION > (4, 02, 2)
+      Asttypes.Nolabel
+#else
+      ""
+#endif
+
 let expr_desc_to_expr ed =
   { exp_desc = ed; exp_loc = loc; exp_extra = []; exp_type = type_expr; exp_env = Env.empty; exp_attributes = [] }
 
@@ -102,15 +109,20 @@ let create_fun param_name body =
   let pat      = { pat_desc = pat_desc; pat_loc = loc; pat_extra = [];
                    pat_type = type_expr; pat_env = Env.empty; pat_attributes = [] } in
   let case     = { c_lhs = pat; c_guard = None; c_rhs = body
-                 ; c_cont=None (* ?? *)
-                 } in
+#if OCAML_VERSION = (4, 02, 2)
+      ; c_cont=None (* ?? *)
+#endif
+  } in
   let func     =
     let cases = [case] in
     let partial = Partial in
+#if OCAML_VERSION > (4, 02, 2)
+    let arg_label = Nolabel in
+    Texp_function {arg_label; param; cases; partial}
+#else
     let arg_label = "" in
-(*    let arg_label = Nolabel in*)
-    Texp_function (arg_label, cases, partial)
-(*    Texp_function {arg_label; param; cases; partial}*)
+    Texp_function ("", cases, partial)
+#endif
   in
   expr_desc_to_expr func
 
@@ -123,8 +135,10 @@ let create_constructor name args =
                  cstr_consts      = 0;     cstr_nonconsts = 0;         cstr_normal = 0;
                  cstr_generalized = false; cstr_private   = Public;    cstr_loc = loc;
                  cstr_attributes  = []
-(*                  ;    cstr_inlined   = None*)
-                }
+#if OCAML_VERSION > (4, 02, 2)
+                  ;    cstr_inlined   = None
+#endif
+}
   in
 
   let ident     = create_fullname name in
@@ -132,8 +146,11 @@ let create_constructor name args =
   expr_desc_to_expr expr_desc
 
 let create_apply e args =
+#if OCAML_VERSION > (4, 02, 2)
+  let make a = (Nolabel, Some a) in
+#else
   let make a = ("", Some a , Required) in
-(*  let make a = (nolabel, Some a) in*)
+#endif
   Texp_apply (e, List.map make args) |> expr_desc_to_expr
 
 let create_let rec_flag var_name body rest =
@@ -226,14 +243,15 @@ let get_translator start_index =
 
   let args_to_logic_args cd =
     let cd_args =
-      let wrap f cd = f cd.cd_args in
-      (*let wrap f cd =
+      let wrap f cd =
+#if OCAML_VERSION > (4, 02, 2)
         match cd.cd_args with
         | Cstr_tuple l -> Cstr_tuple (List.map type_to_logic_type l)
-      in*)
-
+#else
+        f cd.cd_args
+#endif
+      in
       wrap (List.map type_to_logic_type) cd
-
     in
     {cd with cd_args}
   in
@@ -291,9 +309,11 @@ let get_translator start_index =
       {val_kind; val_type; val_loc; val_attributes = []}
     in
     let inj_cnstr =
-        let make a = ("", Some a , Required) in
-(*      let make a = (Nolabel, Some a) in*)
-
+#if OCAML_VERSION > (4, 02, 2)
+      let make a = (Nolabel, Some a) in
+#else
+      let make a = ("", Some a , Required) in
+#endif
       Typedtree.Texp_apply
         (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
         List.map make fresh_vars )
@@ -400,8 +420,11 @@ let get_translator start_index =
     let external_arguments = List.map create_ident external_argument_names in
 
     let args =
+#if OCAML_VERSION > (4, 02, 2)
+      List.map (fun (_, Some a) -> a) args
+#else
       List.map (fun (_, Some a,_) -> a) args
-(*      List.map (fun (_, Some a) -> a) args*)
+#endif
     in
 
     let is_primary_list = List.map (fun a -> is_primary_type a.exp_type) args in
@@ -482,7 +505,11 @@ let get_translator start_index =
     match x.exp_desc with
     | Texp_constant _           -> tarnslate_constant x
     | Texp_construct (n, cd, l) -> translate_construct sub n cd l
+#if OCAML_VERSION > (4, 02, 2)
+    | Texp_match (e, cs, _, _)  -> translate_match sub e cs x.exp_type
+#else
     | Texp_match (e, cs, _, _, _)  -> translate_match sub e cs x.exp_type
+#endif
     | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub
@@ -532,26 +559,29 @@ let beta_reductor =
     | Texp_ident (_, ident, _) ->
       let Longident.Lident name = ident.txt in
       if name = var then subst else expr
-
+#if OCAML_VERSION > (4, 02, 2)
+    | Texp_function {arg_label; param; cases=[case]; partial} ->
+        if name_from_pat case.c_lhs = var then expr else
+        let c_rhs    = substitutor case.c_rhs var subst in
+        let new_case = { case with c_rhs } in
+        let exp_desc = Texp_function {arg_label; param; cases=[new_case]; partial} in
+        { expr with exp_desc }
+#else
     | Texp_function (label, [case], typ) ->
       if name_from_pat case.c_lhs = var then expr else
         let c_rhs    = substitutor case.c_rhs var subst in
         let new_case = { case with c_rhs } in
         let exp_desc = Texp_function (label, [new_case], typ) in
         { expr with exp_desc }
-
-(*    | Texp_function {arg_label; param; cases=[case]; partial} ->
-        if name_from_pat case.c_lhs = var then expr else
-        let c_rhs    = substitutor case.c_rhs var subst in
-        let new_case = { case with c_rhs } in
-        let exp_desc = Texp_function {arg_label; param; cases=[new_case]; partial} in
-        { expr with exp_desc }*)
-
+#endif
     | Texp_apply (func, args) ->
       let new_func = substitutor func var subst in
       let new_args =
-        let make (l, Some arg, flg) = (l, Some (substitutor arg var subst), flg) in
-(*        let make (l, Some arg)      = (l, Some (substitutor arg var subst)     ) in*)
+#if OCAML_VERSION > (4, 02, 2)
+      let make (l, Some arg)      = (l, Some (substitutor arg var subst)     ) in
+#else
+      let make (l, Some arg, flg) = (l, Some (substitutor arg var subst), flg) in
+#endif
         List.map make args
       in
       let exp_desc = Texp_apply (new_func, new_args) in
@@ -579,13 +609,19 @@ let beta_reductor =
   let rec beta_reduction expr args =
     match expr.exp_desc with
     | Texp_apply (func, args') ->
+#if OCAML_VERSION > (4, 02, 2)
+      let old_args = List.map (fun (_, Some a   ) -> a) args' in
+#else
       let old_args = List.map (fun (_, Some a, _) -> a) args' in
-(*      let old_args = List.map (fun (_, Some a   ) -> a) args' in*)
+#endif
       let new_args = List.map (fun a -> beta_reduction a []) old_args in
       List.append new_args args |> beta_reduction func
 
-    | Texp_function (_, [case], _) ->
-(*    | Texp_function {arg_label; param; cases=[case]; partial} ->*)
+#if OCAML_VERSION > (4, 02, 2)
+      | Texp_function {arg_label; param; cases=[case]; partial} ->
+#else
+      | Texp_function (_, [case], _) ->
+#endif
       let Tpat_var (var, _) = case.c_lhs.pat_desc in
       begin
         match args with
@@ -628,7 +664,8 @@ let () =
   Typemod.ImplementationHooks.add_hook "ml_to_mk"
     (fun
       (hook_info : Misc.hook_info)
-      ((tast, _oldsig, coercion) : Typedtree.structure * Types.signature * Typedtree.module_coercion) ->
+      ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
+      printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
       let open Lozov  in
       let current_index = get_max_index tast + 1 in
       let translator    = get_translator current_index in
@@ -661,7 +698,7 @@ let () =
           let open Format in
           fprintf std_formatter "%a@."
             Printtyp.signature (Typemod.simplify_signature new_sig));
-        (retyped_ast, new_sig, Tcoerce_none)
+        (retyped_ast, Tcoerce_none)
       with
         | Error e as exc ->
           report_error Format.std_formatter e;

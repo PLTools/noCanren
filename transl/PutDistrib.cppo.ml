@@ -38,14 +38,29 @@ let extract_names = List.map (fun typ ->
     | _ -> assert false
   )
 
-type recu_flg = Nonrecursive | Recursive
-module Str = struct include Str let type_ ?(loc=Location.none) _rec_flg xs = type_ ~loc xs end
-let nolabel = ""
-(*let nolabel = Asttypes.Nolabel*)
+let str_type_ flg =
+#if OCAML_VERSION > (4, 02, 2)
+      fun xs -> Ast_helper.Str.type_ xs
+#else
+      fun ~loc xs -> Ast_helper.Str.type_ ~loc xs
+#endif
+
+let nolabel =
+#if OCAML_VERSION > (4, 02, 2)
+      Asttypes.Nolabel
+#else
+      ""
+#endif
 
 let get_param_names pcd_args =
-(*  let Pcstr_tuple pcd_args  = pcd_args in*)
+#if OCAML_VERSION > (4, 02, 2)
+  let Pcstr_tuple pcd_args  = pcd_args in
+#endif
   extract_names pcd_args
+
+#if OCAML_VERSION <= (4, 02, 2)
+type rec_flg_t = Nonrecursive | Recursive
+#endif
 
 let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
@@ -61,7 +76,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
   ; Str.module_ @@ Mb.mk gen_module_str @@
       Mod.(apply (ident (mknoloc @@ Lident (sprintf "Fmap%d" @@ List.length tdecl.ptype_params))) @@ structure
         [ fmap_decl
-        ; Str.type_ Nonrecursive [ Type.mk ~params:tdecl.ptype_params
+        ; str_type_ Nonrecursive ~loc [ Type.mk ~params:tdecl.ptype_params
             ~kind:Ptype_abstract
             ~manifest:(Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt) @@ List.map fst tdecl.ptype_params)
             (mknoloc "t") ]
@@ -144,11 +159,16 @@ let revisit_adt ~loc tdecl ctors =
                       (FoldInfo.extend "self" typ typ map, [%type: 'self] :: args)
                   | arg -> (map, arg::args)
             )
-(*            (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)*)
+#if OCAML_VERSION > (4, 02, 2)
+            (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
+#else
             cd.pcd_args
+#endif
             (acc_map,[])
           in
-(*          let new_args = Pcstr_tuple new_args in*)
+#if OCAML_VERSION > (4, 02, 2)
+          let new_args = Pcstr_tuple new_args in
+#endif
           (map2, { cd with pcd_args = new_args } :: cs)
       )
       ctors
@@ -156,7 +176,7 @@ let revisit_adt ~loc tdecl ctors =
       |> (fun (mapa, cs) -> mapa, {tdecl with ptype_kind = Ptype_variant cs})
   in
   (* now we need to add some parameters if we collected ones *)
-  if FoldInfo.is_empty mapa then [ Str.type_ Nonrecursive ~loc  [full_t] ]
+  if FoldInfo.is_empty mapa then [ str_type_ ~loc Nonrecursive [full_t] ]
   else
     let functor_typ =
       let extra_params = FoldInfo.map mapa
@@ -173,12 +193,12 @@ let revisit_adt ~loc tdecl ctors =
         let extra_params = FoldInfo.map ~f:(fun {FoldInfo.rtyp} -> rtyp)  mapa in
         Ptyp_constr (Location.mknoloc (Longident.Lident functor_typ.ptype_name.Asttypes.txt), old_params @ extra_params)
       in
-      Str.type_ ~loc Recursive
+      str_type_ ~loc Recursive
         [ { tdecl with ptype_kind = Ptype_abstract
           ; ptype_manifest = Some { ptyp_loc = Location.none; ptyp_attributes = []; ptyp_desc = alias_desc}
           } ]
     in
-    [ Str.type_ ~loc Nonrecursive [functor_typ]
+    [ str_type_ ~loc Nonrecursive [functor_typ]
 (*    ; non_logic_typ *)
     ] @ (prepare_distribs ~loc functor_typ fmap_for_typ)
 
@@ -201,8 +221,12 @@ let main_mapper =
   { Ast_mapper.default_mapper with
     structure = fun self ss ->
       let f si = match si.pstr_desc with
-(*      | Pstr_type (_,tydecls) -> wrap_tydecls si.pstr_loc tydecls*)
-      | Pstr_type (tydecls) -> wrap_tydecls si.pstr_loc tydecls
+#if OCAML_VERSION > (4, 02, 2)
+      | Pstr_type (_,tydecls) ->
+#else
+      | Pstr_type tydecls ->
+#endif
+        wrap_tydecls si.pstr_loc tydecls
       | x -> [si]
       in
       List.flatten (List.map f ss)
