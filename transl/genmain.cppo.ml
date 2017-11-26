@@ -4,6 +4,7 @@ open Asttypes
 open Longident
 open Typedtree
 open Tast_mapper
+open Smart_mapper
 
 let () = Printexc.record_backtrace true
 
