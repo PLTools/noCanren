@@ -7,39 +7,8 @@ open Tast_mapper
 
 let () = Printexc.record_backtrace true
 
-(* plugin that come with an example *)
-let tast_mapper =
-  { default with
-    expr = (fun mapper expr ->
-      match expr with
-      | { exp_desc = Texp_ident (path, _lid, _valdesc) }
-        ->
-        Printf.printf "Ident %S\n%!" (Path.name path);
-          expr
-      | other -> default.expr mapper other); }
-
-(* registering demo plugin *)
-let () =
-
-  (* Typemod.ImplementationHooks.add_hook "ml_to_mk_demo"
-    (fun
-      (hook_info : Misc.hook_info)
-      ((ast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
-        let ast = tast_mapper.structure tast_mapper ast in
-        (ast, coercion)
-    ); *)
-
-  (* Typemod.InterfaceHooks.add_hook "pptx_example"
-    (fun (hook_info : Misc.hook_info)
-      (ast : Typedtree.signature) ->
-
-        ast); *)
-  ()
-
-
 module Lozov = struct
 open Typedtree
-(* open TastGetter *)
 open Ident
 open Asttypes
 open Lexing
@@ -187,6 +156,10 @@ let create_fresh var_name body =
   let func  = create_fun var_name body in
   create_apply fresh [func]
 
+let create_conde xs =
+  let cnde = create_ident "conde" in
+  create_apply cnde [List.fold_right (fun x acc -> (create_constructor "::" [x;acc])) xs (create_constructor "[]" [])]
+
 (*****************************************************************************************************************************)
 
 let get_max_index tast =
@@ -208,6 +181,13 @@ let get_max_index tast =
   let finder = {Tast_mapper.default with expr} in
 
   finder.structure finder tast |> ignore; !max_index
+
+let dummy_val_desc =
+  let open Types in
+  let val_kind = Val_reg in
+  let val_type = { desc = Tvar (Some "a"); level = 0; id = 0} in
+  let val_loc = Location.none in
+  {val_kind; val_type; val_loc; val_attributes = []}
 
 (*****************************************************************************************************************************)
 
@@ -294,6 +274,23 @@ let get_translator start_index =
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident ~to_lower r)
   | Ldot (t, s)  -> Ldot (lowercase_lident ~to_lower t, s)
   in
+  let texp_unit =
+    let cd =
+      { Types.cstr_name = "()"; cstr_res = Obj.magic (); cstr_existentials = []
+      ; cstr_args = []
+      ; cstr_arity = 0
+      ; cstr_tag = Cstr_constant 0
+      ; cstr_consts = 1
+      ; cstr_nonconsts = 0
+      ; cstr_normal = 0
+      ; cstr_generalized = false
+      ; cstr_private = Public
+      ; cstr_loc = Location.none
+      ; cstr_attributes = []
+    } in
+    Texp_construct (mknoloc @@ Lident "()", cd, []) |> expr_desc_to_expr
+  in
+
   let translate_construct (sub : Tast_mapper.mapper) (name: Longident.t loc) def args =
     let output_var_name   = create_fresh_var_name () in
     let output_var        = create_ident output_var_name in
@@ -301,22 +298,19 @@ let get_translator start_index =
     let fresh_var_names   = List.map (fun _ -> create_fresh_var_name ()) args in
     let fresh_vars        = List.map create_ident fresh_var_names in
 
-    let dummy_val_desc =
-      let open Types in
-      let val_kind = Val_reg in
-      let val_type = { desc = Tvar (Some "a"); level = 0; id = 0} in
-      let val_loc = Location.none in
-      {val_kind; val_type; val_loc; val_attributes = []}
-    in
     let inj_cnstr =
 #if OCAML_VERSION > (4, 02, 2)
       let make a = (Nolabel, Some a) in
 #else
       let make a = ("", Some a , Required) in
 #endif
+      let args = match fresh_vars with
+      | [] -> [texp_unit]
+      | xs -> xs
+      in
       Typedtree.Texp_apply
         (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
-        List.map make fresh_vars )
+          List.map make args)
         |> expr_desc_to_expr
     in
     let unify_cnstr       = create_unify output_var inj_cnstr in
@@ -383,14 +377,35 @@ let get_translator start_index =
         | Tpat_constant const          -> Texp_constant const
         | Tpat_construct (name, cd, _) -> Texp_construct (name, cd, fresh_args) in
 
-      let cnstr             = cnstr_desc |> expr_desc_to_expr |> create_inj in
+      let cnstr             =
+        match pattern.pat_desc with
+        | Tpat_constant const          -> (Texp_constant const) |> expr_desc_to_expr |> create_inj
+        | Tpat_construct (name, cd, [])  ->
+            let flid =
+              let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
+              (* TODO: We lose module path here *)
+              Location.mkloc (Lident str.txt) name.loc
+            in
+            create_apply
+                (Texp_ident (path_of_longident flid.txt, flid, dummy_val_desc) |> expr_desc_to_expr)
+                [texp_unit]
+        | Tpat_construct (name, cd, _)  ->
+          create_apply
+              (Texp_ident (path_of_longident name.txt, name, dummy_val_desc) |> expr_desc_to_expr)
+              fresh_args
+          |> create_inj in
+
       let cnstr_unify       = create_unify unify_var cnstr in
 
       let cnstr_and_body    = create_and cnstr_unify body_with_subst in
 
-      List.fold_right create_fresh fresh_arg_names cnstr_and_body in
+      List.fold_right create_fresh fresh_arg_names cnstr_and_body
+    in
 
-    let translated_cases     = cases |> List.map translate_case |> fold_right0 create_or in
+    let translated_cases     = cases |> List.map translate_case
+(*      |> fold_right0 create_or *)
+      |> create_conde
+    in
     let upper_exp_with_cases = create_and unify_expr translated_cases in
     let all_without_lambda   = create_fresh unify_var_name upper_exp_with_cases in
 
@@ -659,62 +674,78 @@ let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;
   arg
 
+
+let only_generate hook_info tast =
+  try
+    printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
+    Format.printf ">>>>\n%!";
+    Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
+    Format.printf "\n<<<<\n%!";
+    let open Lozov  in
+    let current_index = get_max_index tast + 1 in
+    let translator    = get_translator current_index in
+    let new_tast      = translator.structure translator tast |> add_packages in
+    let need_reduce   = true in
+    let reduced_tast  = if need_reduce
+                        then beta_reductor.structure beta_reductor new_tast
+                        else new_tast in
+
+    Untypeast.untype_structure reduced_tast |>
+    PutDistrib.process |>
+    print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
+    print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+  with
+    | Lozov.Error e as exc ->
+      Lozov.report_error Format.std_formatter e;
+      raise exc
+
+let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
+  let new_ast       = only_generate hook_info tast in
+
+  try
+  (*        let new_ast = [] in*)
+    let old = ref (!Clflags.print_types) in
+    Clflags.print_types := true;
+    let (retyped_ast, new_sig, _env) =
+      let () = print_endline "retyping generated code" in
+      Printexc.print
+      (Typemod.type_structure (Compmisc.initial_env()) new_ast)
+      Location.none
+    in
+    Clflags.print_types := !old;
+  (*        Printtyped.implementation_with_coercion Format.std_formatter (retyped_ast, coercion);*)
+    Printtyp.wrap_printing_env (Compmisc.initial_env()) (fun () ->
+      let open Format in
+      fprintf std_formatter "%a@."
+        Printtyp.signature (Typemod.simplify_signature new_sig));
+    (retyped_ast, Tcoerce_none)
+  with
+    | Lozov.Error e as exc ->
+      Lozov.report_error Format.std_formatter e;
+      raise exc
+(*    | Error e as exc ->
+      report_error Format.std_formatter e;
+      raise exc*)
+    | Env.Error e as exc ->
+      Env.report_error Format.std_formatter e;
+      Format.printf "\n%!";
+      raise exc
+    | Typecore.Error (_loc,_env,e) as exc ->
+      Typecore.report_error _env Format.std_formatter e;
+      Format.printf "\n%!";
+      raise exc
+    | Typemod.Error (_loc,_env,e) as exc ->
+      Typemod.report_error _env Format.std_formatter e;
+      Format.printf "\n%!";
+      raise exc
+    | Typetexp.Error (_loc,_env,e) as exc ->
+      Typetexp.report_error _env Format.std_formatter e;
+      Format.printf "\n%!";
+      raise exc
+    | Typemod.Error_forward e as exc ->
+      raise exc
+
+(*
 (* registering actual translator *)
-let () =
-  Typemod.ImplementationHooks.add_hook "ml_to_mk"
-    (fun
-      (hook_info : Misc.hook_info)
-      ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
-      printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
-      let open Lozov  in
-      let current_index = get_max_index tast + 1 in
-      let translator    = get_translator current_index in
-      let new_tast      = translator.structure translator tast |> add_packages in
-      let need_reduce   = true in
-      let reduced_tast  = if need_reduce
-                          then beta_reductor.structure beta_reductor new_tast
-                          else new_tast in
-
-      let new_ast       =
-        Untypeast.untype_structure reduced_tast |>
-        PutDistrib.process |>
-        print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
-        print_if Format.std_formatter Clflags.dump_source Pprintast.structure
-      in
-
-      try
-(*        let new_ast = [] in*)
-        let old = ref (!Clflags.print_types) in
-        Clflags.print_types := true;
-        let (retyped_ast, new_sig, _env) =
-          let () = print_endline "retyping generated code" in
-          Printexc.print
-          (Typemod.type_structure (Compmisc.initial_env()) new_ast)
-          Location.none
-        in
-        Clflags.print_types := !old;
-(*        Printtyped.implementation_with_coercion Format.std_formatter (retyped_ast, coercion);*)
-        Printtyp.wrap_printing_env (Compmisc.initial_env()) (fun () ->
-          let open Format in
-          fprintf std_formatter "%a@."
-            Printtyp.signature (Typemod.simplify_signature new_sig));
-        (retyped_ast, Tcoerce_none)
-      with
-        | Error e as exc ->
-          report_error Format.std_formatter e;
-          raise exc
-        | Typecore.Error (_loc,_env,e) as exc ->
-          Typecore.report_error _env Format.std_formatter e;
-          Format.printf "\n%!";
-          raise exc
-        | Typemod.Error (_loc,_env,e) as exc ->
-          Typemod.report_error _env Format.std_formatter e;
-          Format.printf "\n%!";
-          raise exc
-        | Typetexp.Error (_loc,_env,e) as exc ->
-          Typetexp.report_error _env Format.std_formatter e;
-          Format.printf "\n%!";
-          raise exc
-        | Typemod.Error_forward e as exc ->
-          raise exc
-    );
+let () = Typemod.ImplementationHooks.add_hook "ml_to_mk" main
+*)

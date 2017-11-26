@@ -32,5 +32,6 @@ transl/ml_to_mk.mlpack
 transl/genmain.cppo.ml
 transl/PutDistrib.cppo.ml
 
-transl/peano.ml
+transl/peano.ml2mk.ml
 transl/peano_run.ml
+transl/ml2mk_pp.ml
