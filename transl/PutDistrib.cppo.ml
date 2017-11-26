@@ -62,13 +62,15 @@ let get_param_names pcd_args =
 type rec_flg_t = Nonrecursive | Recursive
 #endif
 
+
+let lower_lid lid = Location.{lid with txt = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) lid.Location.txt }
+
+
 let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
 (*  let open Ast_helper in*)
   let Ptype_variant constructors = tdecl.ptype_kind in
-
-  let lower_lid lid = {lid with txt = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) lid.txt } in
 
   let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
   let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in

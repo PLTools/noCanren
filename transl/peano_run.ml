@@ -14,4 +14,4 @@ let rec show_number num =
 (*let s self = inj Peano.(For_gnumber.distrib (S self))*)
 
 let () =
-  run_exn show_number (-1) q  qh ("incr ? 2", (fun q     -> Peano.(incr ((===)q) (s (s @@ o ()))  )) )
+  run_exn show_number (-1) q  qh ("incr ? 2", (fun q     -> Peano.(Peano.incr ((===)q) (s (s @@ o ()))  )) )

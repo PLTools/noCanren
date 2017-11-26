@@ -124,6 +124,23 @@ let () = dispatch (function
      pflag ["cppo"] "cppo_V" (fun s -> S [A "-V"; A s]);
      flag ["cppo"; "cppo_V_OCAML"] & S [A "-V"; A ("OCAML:" ^ Sys.ocaml_version)];
 
+
+    (* ml2mk conversion rules stuff *)
+    let ml2mk_rules ext =
+      let dep   = "%(name).ml2mk"-.-ext
+      and prod1 = "%(name: <*> and not <*.ml2mk> and not <*.cppo>)"-.-ext
+      and prod2 = "%(name: <**/*> and not <**/*.ml2mk> and not <**/*.cppo>)"-.-ext in
+      let ml2mk_rule prod env _build =
+        let dep = env dep in
+        let prod = env prod in
+        let tags = tags_of_pathname prod ++ "ml2mk" in
+        Cmd (S[A "transl/ml2mk_pp.native"; T tags; S [A"-rectypes"; A "-I";A"src";A"-o";P prod]; P dep ])
+      in
+      rule ("ml2mk: *.ml2mk."-.-ext^" -> *."-.-ext)        ~dep ~prod:prod1 (ml2mk_rule prod1);
+      rule ("ml2mk: **/*.ml2mk."-.-ext^" -> **/*."-.-ext)  ~dep ~prod:prod2 (ml2mk_rule prod2);
+    in
+    List.iter ml2mk_rules ["ml"; "mli"];
+
      flag ["compile"; "short_paths"] & S [A "-short-paths"];
      flag ["compile"; "backtrack"] & S [A "-backtrack"];
 
