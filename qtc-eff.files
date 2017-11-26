@@ -31,6 +31,7 @@ transl/.merlin
 transl/ml_to_mk.mlpack
 transl/genmain.cppo.ml
 transl/PutDistrib.cppo.ml
+transl/smart_mapper.ml
 
 transl/peano.ml2mk.ml
 transl/peano_run.ml
