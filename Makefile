@@ -27,12 +27,12 @@ all: minikanren_stuff plugin transl bundle
 minikanren_stuff:
 	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
-transl:
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml_to_mk.cmxs
+transl: minikanren_stuff
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/peano_run.native #transl/ml_to_mk.cmxs 
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin
-	$(OB) -Is transl,src peano_run.native peano_run.byte
+	#$(OB) -Is transl,src peano_run.native peano_run.byte
 
 celan: clean
 
