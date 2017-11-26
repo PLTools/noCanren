@@ -31,3 +31,4 @@ true: short_paths
 <transl/peano.*>: dsource, rectypes, use_ocanren_modules
 <transl/peano_run.*>: rectypes, use_ocanren_modules, package(GT)
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
+<transl/smart_mapper.*>: package(compiler-libs.common)
