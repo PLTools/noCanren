@@ -33,6 +33,8 @@ transl/genmain.cppo.ml
 transl/PutDistrib.cppo.ml
 transl/smart_mapper.ml
 
+transl/hm_inferencer.ml2mk.ml
+transl/hm_inferencer_run.ml
 transl/peano.ml2mk.ml
 transl/peano_run.ml
 transl/ml2mk_pp.ml
