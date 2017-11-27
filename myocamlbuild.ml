@@ -86,6 +86,7 @@ let () = dispatch (function
      (*   ); *)
 
      flag ["ocaml";"compile";"use_ocanren_modules"] (S[A"-I"; A"src";A"-I"; A"regression"]);
+     flag ["ocaml";"link";"link_ocanren_modules"] (S[A"-I"; A"src"; A"MiniKanren.cmxa"; A"-I"; A"regression"; A"tester.cmx"]);
 
      flag ["ocaml";"compile";"native";"keep_asm"] (S[A"-S"]);
      flag ["ocaml";"compile";"dsource"] (S[A"-dsource"]);
