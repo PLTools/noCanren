@@ -391,10 +391,15 @@ let get_translator start_index =
                 (Texp_ident (path_of_longident flid.txt, flid, dummy_val_desc) |> expr_desc_to_expr)
                 [texp_unit]
         | Tpat_construct (name, cd, _)  ->
+          let flid =
+            let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
+            (* TODO: We lose module path here *)
+            Location.mkloc (Lident str.txt) name.loc
+          in
           create_apply
-              (Texp_ident (path_of_longident name.txt, name, dummy_val_desc) |> expr_desc_to_expr)
+              (Texp_ident (path_of_longident flid.txt, flid, dummy_val_desc) |> expr_desc_to_expr)
               fresh_args
-          |> create_inj in
+          in
 
       let cnstr_unify       = create_unify unify_var cnstr in
 
