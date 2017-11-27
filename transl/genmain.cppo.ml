@@ -271,7 +271,7 @@ let get_translator start_index =
   | Ldot (t, s)  -> Path.Pdot (path_of_longident ~to_lower t, s, 0)
   in
   let rec lowercase_lident ?(to_lower=false) = function
-  | Lident s -> Lident (String.mapi (fun n -> if n=0 then Char.lowercase else fun c -> c) s)
+  | Lident s -> Lident (PutDistrib.mangle_construct_name s)
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident ~to_lower r)
   | Ldot (t, s)  -> Ldot (lowercase_lident ~to_lower t, s)
   in

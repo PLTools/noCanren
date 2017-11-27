@@ -63,7 +63,10 @@ type rec_flg_t = Nonrecursive | Recursive
 #endif
 
 
-let lower_lid lid = Location.{lid with txt = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) lid.Location.txt }
+let mangle_construct_name name =
+  String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) name ^ "_"
+
+let lower_lid lid = Location.{lid with txt = mangle_construct_name lid.Location.txt }
 
 
 let prepare_distribs ~loc tdecl fmap_decl =
