@@ -33,8 +33,14 @@ transl/genmain.cppo.ml
 transl/PutDistrib.cppo.ml
 transl/smart_mapper.ml
 
+transl/ml2mk_pp.ml
+
 transl/hm_inferencer.ml2mk.ml
 transl/hm_inferencer_run.ml
+transl/types_test.ml2mk.ml
 transl/peano.ml2mk.ml
 transl/peano_run.ml
-transl/ml2mk_pp.ml
+transl/logic.ml2mk.ml
+transl/logic_run.ml
+
+
