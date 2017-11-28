@@ -35,7 +35,7 @@ true: short_paths
 <transl/hm_inferencer.*>: dsource, rectypes, use_ocanren_modules
 <transl/hm_inferencer_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/logic.*>: dsource, rectypes, use_ocanren_modules
+<transl/logic.*>: rectypes, use_ocanren_modules
 <transl/*_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
