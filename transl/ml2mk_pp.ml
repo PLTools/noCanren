@@ -64,7 +64,6 @@ let (++) x f = f x
 
 let implementation ppf sourcefile outputprefix =
   Compmisc.init_path false;
-  Format.set_margin 120;
   let modulename = module_of_filename ppf sourcefile outputprefix in
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
@@ -73,7 +72,6 @@ let implementation ppf sourcefile outputprefix =
 (*    Format.printf "output prefix = %s, output_name = %s\n%!" !output_name outputprefix;*)
     let (typedtree, coercion) =
       Pparse.parse_implementation ~tool_name ppf sourcefile
-      ++ (fun p  -> print_endline "parsed"; p)
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation sourcefile outputprefix modulename env
@@ -87,7 +85,7 @@ let implementation ppf sourcefile outputprefix =
     let () =
       let ch = open_out where_to_print in
       let fmt = Format.formatter_of_out_channel ch in
-      Format.pp_set_margin fmt 160;
+      Format.pp_set_margin fmt 180;
       Pprintast.structure fmt untyped
     in
     ()
@@ -119,6 +117,10 @@ let implementation ppf sourcefile outputprefix =
         raise x
     end *)
   with
+    | Typetexp.Error (_loc,env,e) as exc ->
+      Typetexp.report_error env Format.std_formatter e;
+      Format.printf "\n%!";
+      raise exc
     | Misc.HookExnWrapper wr -> raise wr.Misc.error
     | x -> raise x
 
