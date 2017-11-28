@@ -253,7 +253,7 @@ let get_translator start_index =
 
   (****)
 
-  let tarnslate_constant const_expr =
+  let translate_constant const_expr =
     let output_var_name   = create_fresh_var_name () in
     let output_var        = create_ident output_var_name in
     let inj_expr          = create_inj const_expr in
@@ -419,7 +419,8 @@ let get_translator start_index =
     let upper_exp_with_cases = create_and unify_expr translated_cases in
     let all_without_lambda   = create_fresh unify_var_name upper_exp_with_cases in
 
-    List.fold_right create_fun argument_names all_without_lambda in
+    List.fold_right create_fun argument_names all_without_lambda
+  in
 
   (****)
 
@@ -528,7 +529,10 @@ let get_translator start_index =
 
   let expr sub x =
     match x.exp_desc with
-    | Texp_constant _           -> tarnslate_constant x
+    | Texp_constant _           -> translate_constant x
+    | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" ->
+        (* true and false are represented as constructors in the typed tree *)
+        translate_constant x
     | Texp_construct (n, cd, l) -> translate_construct sub n cd l
 #if OCAML_VERSION > (4, 02, 2)
     | Texp_match (e, cs, _, _)  -> translate_match sub e cs x.exp_type
@@ -687,10 +691,10 @@ let print_if ppf flag printer arg =
 
 let only_generate hook_info tast =
   try
-    printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
+    (*printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
     Format.printf ">>>>\n%!";
     Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
-    Format.printf "\n<<<<\n%!";
+    Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
     let current_index = get_max_index tast + 1 in
     let translator    = get_translator current_index in

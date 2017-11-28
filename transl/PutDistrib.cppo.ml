@@ -15,13 +15,11 @@ module FoldInfo = struct
       Pprintast.core_type Format.str_formatter typ;
       Format.flush_str_formatter ()
     in
-(*    printf "param_for_rtyp `%s`\n%!" typ_repr;*)
     try List.iter (fun i ->
                     let new_repr =
                       Pprintast.core_type Format.str_formatter i.rtyp;
                       Format.flush_str_formatter ()
                     in
-(*                    printf "new_repr - `%s`\n%!" new_repr;*)
                     if new_repr = typ_repr then raise (ItemFound i)
                   ) ts;
         None
@@ -70,7 +68,10 @@ type rec_flg_t = Nonrecursive | Recursive
 
 
 let mangle_construct_name name =
-  String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) name ^ "_"
+  let low = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) name in
+  match low with
+  | "val" | "if" | "else" | "for" | "do" | "let" | "open" | "not" -> low ^ "_"
+  | _ -> low
 
 let lower_lid lid = Location.{lid with txt = mangle_construct_name lid.Location.txt }
 
@@ -78,7 +79,6 @@ let lower_lid lid = Location.{lid with txt = mangle_construct_name lid.Location.
 let prepare_distribs ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
-(*  let open Ast_helper in*)
   let Ptype_variant constructors = tdecl.ptype_kind in
 
   let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
@@ -112,7 +112,6 @@ let prepare_distribs ~loc tdecl fmap_decl =
   ]
 
 let prepare_fmap ~loc tdecl =
-  print_endline "prepare_fmap";
   let open Location in
   let open Ast_helper in
 
@@ -156,7 +155,6 @@ let prepare_fmap ~loc tdecl =
       ) param_names (Exp.function_ cases) ] ]
 
 let revisit_adt ~loc tdecl ctors =
-  printf "revisit_adt\n%!";
   let tdecl = {tdecl with ptype_attributes =
     List.filter (fun (name,_) -> name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
   in
@@ -225,7 +223,6 @@ let revisit_adt ~loc tdecl ctors =
             } ]
       in*)
     [ str_type_ ~loc Nonrecursive [functor_typ]
-(*    ; non_logic_typ *)
     ] @ typ_to_add
 
 let has_to_gen_attr (xs: attributes) =
@@ -235,7 +232,6 @@ let has_to_gen_attr (xs: attributes) =
 
 let main_mapper =
   let wrap_tydecls loc ts =
-    print_endline "wrap_typdecls";
     let f tdecl =
       match tdecl.ptype_kind with
       | Ptype_variant cs when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
@@ -261,4 +257,4 @@ let main_mapper =
 
 let process x =
   main_mapper.structure main_mapper x
-(*  x*)
+
