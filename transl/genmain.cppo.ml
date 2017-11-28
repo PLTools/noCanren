@@ -354,7 +354,8 @@ let get_translator start_index =
 
       let get_var_name var =
         let Tpat_var (ident, _) = var.pat_desc in
-        ident.name in
+        ident.name
+      in
 
       let real_arg_names    = List.map get_var_name real_arg_pats in
       let real_args         = List.map create_ident real_arg_names in
@@ -381,6 +382,9 @@ let get_translator start_index =
       let cnstr             =
         match pattern.pat_desc with
         | Tpat_constant const          -> (Texp_constant const) |> expr_desc_to_expr |> create_inj
+        | Tpat_construct ({txt = Lident s}, _, _) when (s = "true" || s = "false") ->
+            let flid = Location.mknoloc (Lident s) in
+            Texp_ident (path_of_longident (Lident s), flid, dummy_val_desc) |> expr_desc_to_expr |> create_inj
         | Tpat_construct (name, cd, [])  ->
             let flid =
               let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
