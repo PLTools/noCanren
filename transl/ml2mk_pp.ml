@@ -87,6 +87,7 @@ let implementation ppf sourcefile outputprefix =
     let () =
       let ch = open_out where_to_print in
       let fmt = Format.formatter_of_out_channel ch in
+      Format.pp_set_margin fmt 160;
       Pprintast.structure fmt untyped
     in
     ()
