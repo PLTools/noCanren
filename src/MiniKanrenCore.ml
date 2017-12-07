@@ -742,11 +742,11 @@ module Subst :
          match wrap (Obj.repr y) with
          | Unboxed _ -> false
          | Boxed (_, s, f) ->
-           let rec inner i =
+           let rec inner s f i =
             if i >= s then false
-            else occurs env var (!!!(f i)) subst || inner (i+1)
+            else occurs env var (!!!(f i)) subst || inner s f (i+1)
            in
-           inner 0
+           inner s f 0
          | Invalid n when n = Obj.closure_tag -> false
          | Invalid n -> failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" n)
 
