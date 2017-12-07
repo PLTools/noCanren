@@ -1039,9 +1039,12 @@ module Disequality :
         let is_empty        = M.is_empty
         let get k m         = try M.find k m with Not_found -> []
         let add k v m       = M.add k (v::get k m) m
-        let replace k vs m  = M.add k vs (M.remove k m)
         let fold f acc m    = M.fold (fun _ disjs acc -> ListLabels.fold_left ~init:acc ~f disjs) m acc
         let merge           = M.union (fun _ d1 d2-> Some (d1 @ d2))
+
+        let replace k vs m =
+          let m = M.remove k m in
+          if vs <> [] then M.add k vs m else m
       end
 
     type t = Index.t
