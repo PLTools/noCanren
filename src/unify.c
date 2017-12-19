@@ -6,20 +6,9 @@
 #include <caml/memory.h>
 #include <caml/alloc.h>
 
-
-/*
-CAMLprim value
-caml_print_hello(value unit)
-{
-    printf("Hello\n");
-    return Val_unit;
-}
-*/
-
 #define Val_none Val_int(0)
 
 static value * lookup = NULL;
-/* static value * get_MK_anchor = NULL; */
 // extend (index, var, term subst) returns always Subst.t
 static value * extend = NULL;
 static value * real_anchor = NULL;
@@ -70,7 +59,6 @@ int is_var(value _term)
   CAMLreturnT(int, 1);
 }
 
-/* #define GLOBAL_ANCHOR_N = -8      */
 #define OK 0
 #define FAIL 1
 
@@ -158,6 +146,9 @@ int do_extend(value *new_prefix, value *new_subst,
   CAMLreturnT(int,OK);
 }
 
+#define OK 0
+#define FAIL 1
+
 int
 caml_unify_in_c_impl(value _x, value _y, value *_prefix, value *_subst)
 {
@@ -224,13 +215,6 @@ caml_unify_in_c(value _scope, value _env, value _subst, value _x, value _y)
 {
   CAMLparam5(_scope, _env, _subst, _x, _y);
   CAMLlocal4(_prefix, _new_subst, _pair, _answer);
-
-
-  // if (get_MK_anchor == NULL) {
-  //   get_MK_anchor = caml_named_value("get_MK_anchor");
-  //   assert(get_MK_anchor != NULL);
-  // }
-
 
   _new_subst = _subst;
   _prefix = Val_emptylist;

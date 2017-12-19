@@ -16,7 +16,6 @@
  * (enclosed in the file COPYING).
  *)
 
-
 open Printf
 
 module Timings = struct
@@ -813,6 +812,7 @@ module Subst :
     (* N.B. Fuck the scopes *)
     external unify_in_c : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option = "caml_unify_in_c"
 
+(*
     let unify ~scope env main_subst x y =
       (* The idea is to do the unification and collect the unification prefix during the process.
          It is safe to modify variables on the go. There are two cases:
@@ -871,6 +871,8 @@ module Subst :
       in
       try helper !!!x !!!y (Some ([], main_subst))
       with Occurs_check -> None
+
+*)
 
     let unify ~scope e subst x y =
       match unify_in_c ~scope e subst x y with
