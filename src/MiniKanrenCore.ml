@@ -86,30 +86,30 @@ let (!!!) = Obj.magic
 
 type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
 
-let is_valid_tag t =
-  Obj.(
-    not (List.mem t
-      [lazy_tag    ; closure_tag; object_tag; infix_tag    ; forward_tag    ; no_scan_tag;
-       abstract_tag; custom_tag ; custom_tag; unaligned_tag; out_of_heap_tag
-      ])
-  )
+let is_unboxed t =
+  (t = Obj.int_tag || t = Obj.string_tag || t = Obj.double_tag)
+
+let is_boxed t =
+  if (t <= Obj.last_non_constant_constructor_tag) &&
+     (t >= Obj.first_non_constant_constructor_tag)
+  then true
+  else false
+
+let is_double_array t =
+  t = Obj.double_array_tag
 
 let rec wrap x =
-  Obj.(
-    let is_unboxed obj =
-      is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
-    in
-    if is_unboxed x
+  let t = Obj.tag x in
+  if is_boxed t
+  then Boxed (t, Obj.size x, Obj.field x)
+  else
+    if is_unboxed t
     then Unboxed x
     else
-      let t = tag x in
-      if is_valid_tag t
-      then
-        let f = if t = double_array_tag then !!! double_field else field in
-        Boxed (t, size x, f x)
-      else Invalid t
-    )
+      if is_double_array t
+      then Boxed (t, Obj.size x, (!!! Obj.double_field) x)
+      else
+        Invalid t
 
 let copy handler x =
   match wrap x with
