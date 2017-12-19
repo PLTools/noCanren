@@ -414,19 +414,21 @@ module List =
           method html    fa l = GT.html    (logic') (GT.html    (list) fa (this#html    fa)) l
           method show : ('a -> string) -> 'a logic -> GT.string = fun fa l ->
             GT.show(logic')
-              (fun l -> "[" ^
+              (fun l -> "(" ^
                  let rec inner l =
                     GT.transform(list)
                       (GT.lift fa)
                       (GT.lift (GT.show(logic) inner))
                       (object inherit ['a,'a logic] @list[show]
-                         method c_Nil   _ _      = ""
+                         method c_Nil   _ _      = "[]"
                          method c_Cons  i s x xs =
-                           x.GT.fx () ^ (match xs.GT.x with Value Nil -> "" | _ -> "; " ^ xs.GT.fx ())
+                           Printf.sprintf "%s :: %s"
+                             (x.GT.fx ())
+                             (match xs.GT.x with Value Nil -> "[]" | _ -> xs.GT.fx ())
                        end)
 
                     () l
-                   in inner l ^ "]"
+                   in inner l ^ ")"
               )
               l
         end

@@ -110,18 +110,14 @@ caml_unify_in_c_impl(value _x, value _y, value *_prefix, value *_subst)
     if (get_var_idx(_x) == get_var_idx(_y)) {
       return OK;
     } else {
-      // _new_prefix = caml_alloc_small(2,0);
       do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
       return OK;
-      // тут вернуть пару из new_prefix и _new_subst
     }
   } else if (is_var_x) {
     // буквально то же самое
-    // _new_prefix = caml_alloc_small(2,0);
     do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
     return OK;
   } else if (is_var_y) {
-    // _new_prefix = caml_alloc_small(2,0);
     do_extend(_prefix, _subst, get_var_idx(_y), _y, _x );
     return OK;
   } else {
@@ -139,7 +135,7 @@ caml_unify_in_c_impl(value _x, value _y, value *_prefix, value *_subst)
         }
         for (int i=0; i<size; ++i) {
           int rez = caml_unify_in_c_impl(Field(_x, i), Field(_y, i), _prefix, _subst);
-          if (!rez)
+          if (rez == FAIL)
             return FAIL;
         }
         return OK;

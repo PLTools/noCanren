@@ -727,12 +727,15 @@ module Subst :
     let () =
       let lookup subst idx = try Some (M.find idx subst) with Not_found -> None in
       let extend idx var term subst =
-        (* let open Printf in
-        printf "idx: %d\n%!" idx;
-        printf "var: %s\n%!" (generic_show var);
-        printf "term: %s\n%!" (generic_show term);
-        printf "subst: %s\n%!" (generic_show subst); *)
-        M.add idx {var; term} subst
+        (* let open Printf in *)
+        (* printf "  idx: %d\n%!" idx; *)
+        (* printf "  var: %s\n%!" (generic_show var); *)
+        (* printf "  term: %s\n%!" (generic_show term); *)
+        (* printf "  subst: %s\n%!" (generic_show subst); *)
+        let ans = M.add idx {var; term} subst in
+        (* printf "  new subst: of size %d\n%!" (M.cardinal ans); *)
+        (* M.iter (fun key {term} -> printf "    %d -> %s\n%!" key (generic_show term)) ans; *)
+        ans
       in
       Callback.register "Subst.lookup" lookup;
       Callback.register "Subst.extend" extend
@@ -794,20 +797,7 @@ module Subst :
     (* N.B. Fuck the scopes *)
     external unify_in_c : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option = "caml_unify_in_c"
 
-    let unify ~scope e subst x y =
-      match unify_in_c ~scope e subst x y with
-      | (Some (prefix, subst2)) as rez ->
-          (* printf "Unif success with subst length = %d\n%!"
-            (M.cardinal subst2);
-          M.iter (fun key {term} ->
-            printf "%d -> %s \n%!" key (generic_show term);
-          ) subst2; *)
-
-          rez
-      | None -> None
-
-    (* let unify ~scope env main_subst x y = *)
-
+    let unify ~scope env main_subst x y =
       (* The idea is to do the unification and collect the unification prefix during the process.
          It is safe to modify variables on the go. There are two cases:
          * if we do unification just after a conde, then the scope is already incremented and nothing goes into
@@ -816,7 +806,7 @@ module Subst :
            the variable is be distructively substituted: we will not look on it in future.
       *)
 
-      (* let extend xi x term (prefix, sub1) =
+      let extend xi x term (prefix, sub1) =
         if occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = {var = x; term = Obj.repr term} in
@@ -864,7 +854,21 @@ module Subst :
                 )
       in
       try helper !!!x !!!y (Some ([], main_subst))
-      with Occurs_check -> None *)
+      with Occurs_check -> None
+
+    let unify ~scope e subst x y =
+      match unify_in_c ~scope e subst x y with
+      | (Some (prefix, subst2)) as rez ->
+          (* printf "Unif success with subst length = %d\n%!"
+            (M.cardinal subst2);
+          M.iter (fun key {term} ->
+            printf "%d -> %s \n%!" key (generic_show term);
+          ) subst2; *)
+
+          rez
+      | None -> None
+
+
 
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
         | Some s  -> begin
@@ -1942,3 +1946,14 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
+
+let unitrace shower x y : goal = fun st ->
+  (* incr logged_unif_counter;      *)
+
+  let ans = (x === y) st in
+  printf "    unify '%s' and '%s'"  (shower (helper_of_state st) !!!x) (shower (helper_of_state st) !!!y);
+  let () =
+    match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
+  in
+  ans
+

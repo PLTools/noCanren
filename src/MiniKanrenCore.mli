@@ -135,6 +135,7 @@ val call_fresh : (('a, 'b) injected -> goal) -> goal
 (** [x === y] creates a goal, which performs a unification of [x] and [y] *)
 val (===) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
 
+
 (** [x =/= y] creates a goal, which introduces a disequality constraint for [x] and [y] *)
 val (=/=) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
 
@@ -533,3 +534,5 @@ module Fmap6 (T : T6) :
 
 (* A default shallow reifier *)
 val reify : helper -> ('a, 'a logic) injected -> 'a logic
+
+val unitrace : (helper -> ('a, 'b logic) injected -> string) -> ('a, 'b logic) injected -> ('a, 'b logic) injected -> goal
