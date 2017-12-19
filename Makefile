@@ -25,7 +25,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 all: minikanren_stuff plugin bundle
 
 minikanren_stuff:
-	$(OB) -Is src $(BYTE_TARGETS) $(NATIVE_TARGETS)
+	$(OB) -Is src src/libunify.a $(BYTE_TARGETS) $(NATIVE_TARGETS)
 
 ppx:
 	$(OB) -Is src ppx/ppx_repr_bin.cmxa ppx/pa_minikanren_bin.cmxa \

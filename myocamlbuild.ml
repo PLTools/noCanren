@@ -17,7 +17,7 @@ let () = dispatch (function
      flag ["compile"; "use_time_log"]
        (S [ A"-package"; A"logger.syntax"; A"-ppopt";A"-LOG"]);
 
-     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]); 
+     flag ["hack_pr_o"; "compile"] (S[A"-ppopt"; A"pr_o.cmo"]);
      (* flag ["compile"; "link_minikanren"] *)
      (*   (S [ A"-ppopt";A"camlp5/pa_minikanren.cmo" *)
      (*      ; A"-ppopt";A"-L";A"-ppopt";A"plugin" *)
@@ -25,6 +25,10 @@ let () = dispatch (function
      (*   ); *)
 
      flag ["ocaml";"compile";"native";"keep_asm"] (S[A"-S"]);
+
+     flag ["compile";"c"] (S[A"-ccopt"; A"-Wall"(*; A"-ccopt"; A"-O3" *) ]);
+
+     flag ["ocaml";"link";"native";"use_lib_unify"] (S[A"src/libunify.a"]);
 
      (* cppo-related stuff *)
      let cppo_rules ext =

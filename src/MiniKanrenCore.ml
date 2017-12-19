@@ -16,6 +16,11 @@
  * (enclosed in the file COPYING).
  *)
 
+ external print_hello: unit -> unit = "caml_print_hello"
+
+ let () =
+   print_hello ()
+
 open Printf
 
 module Log =
@@ -296,7 +301,7 @@ module Var =
   struct
     type env    = int
     type scope  = int
-    type anchor = int list
+    type anchor = int
 
     let tabling_env = -1
 
@@ -310,7 +315,7 @@ module Var =
       let scope = ref 0 in
       fun () -> (incr scope; !scope)
 
-    let global_anchor = [-8]
+    let global_anchor = 78955
 
     type t = {
       anchor        : anchor;
@@ -604,7 +609,9 @@ module Env :
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
-         (let token = (!!!x : Var.t).Var.anchor in (Obj.is_block !!!token) && token == !!!Var.global_anchor)
+         (let token = (!!!x : Var.t).Var.anchor in
+          (* (Obj.is_block !!!token) &&  *)
+          token == !!!Var.global_anchor)
       then
         let q = (!!!x : Var.t).Var.env in
         if (Obj.is_int !!!q) && q == !!!env.anchor
@@ -678,6 +685,8 @@ module Subst :
      *)
     val unify : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option
 
+    external unify_in_c : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option = "caml_unify_in_c"
+
     (* [merge env s1 s2] merges two substituions *)
     val merge : Env.t -> t -> t -> t option
 
@@ -696,6 +705,37 @@ module Subst :
       )
 
     let split s = M.fold (fun _ x xs -> x::xs) s []
+
+    let generic_show ?(maxdepth=99999) x =
+      let x = Obj.repr x in
+      let b = Buffer.create 1024 in
+      let rec inner depth o =
+        if depth > maxdepth then Buffer.add_string b "..." else
+          match wrap o with
+          | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
+          | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+          | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+          | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
+          | Boxed  (t, l, f) ->
+              Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+              for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+              Buffer.add_string b ">"
+      in
+      inner 0 x;
+      Buffer.contents b
+
+    let () =
+      let lookup subst idx = try Some (M.find idx subst) with Not_found -> None in
+      let extend idx var term subst =
+        (* let open Printf in
+        printf "idx: %d\n%!" idx;
+        printf "var: %s\n%!" (generic_show var);
+        printf "term: %s\n%!" (generic_show term);
+        printf "subst: %s\n%!" (generic_show subst); *)
+        M.add idx {var; term} subst
+      in
+      Callback.register "Subst.lookup" lookup;
+      Callback.register "Subst.extend" extend
 
     let rec walk env subst t =
       if Env.is_var env t
@@ -751,7 +791,22 @@ module Subst :
             in
             inner 0
 
-    let unify ~scope env main_subst x y =
+    (* N.B. Fuck the scopes *)
+    external unify_in_c : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option = "caml_unify_in_c"
+
+    let unify ~scope e subst x y =
+      match unify_in_c ~scope e subst x y with
+      | (Some (prefix, subst2)) as rez ->
+          (* printf "Unif success with subst length = %d\n%!"
+            (M.cardinal subst2);
+          M.iter (fun key {term} ->
+            printf "%d -> %s \n%!" key (generic_show term);
+          ) subst2; *)
+
+          rez
+      | None -> None
+
+    (* let unify ~scope env main_subst x y = *)
 
       (* The idea is to do the unification and collect the unification prefix during the process.
          It is safe to modify variables on the go. There are two cases:
@@ -761,18 +816,19 @@ module Subst :
            the variable is be distructively substituted: we will not look on it in future.
       *)
 
-      let extend xi x term (prefix, sub1) =
+      (* let extend xi x term (prefix, sub1) =
         if occurs env xi term sub1 then raise Occurs_check
         else
           let cnt = {var = x; term = Obj.repr term} in
           assert (Env.var env x <> Env.var env term);
           let sub2 =
-            if scope = x.Var.scope
+            (* if scope = x.Var.scope
             then begin
               x.subst <- Some (Obj.repr term);
               sub1
             end
-            else M.add x.Var.index cnt sub1
+            else  *)
+              M.add x.Var.index cnt sub1
           in
           Some (cnt::prefix, sub2)
       in
@@ -808,7 +864,7 @@ module Subst :
                 )
       in
       try helper !!!x !!!y (Some ([], main_subst))
-      with Occurs_check -> None
+      with Occurs_check -> None *)
 
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
         | Some s  -> begin
