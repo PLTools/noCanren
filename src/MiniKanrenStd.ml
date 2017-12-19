@@ -442,7 +442,7 @@ module List =
                        end)
 
                     () l
-                   in inner l ^ "]"
+                   in inner l ^ ")"
               )
               l
         end

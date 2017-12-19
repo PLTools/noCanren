@@ -886,7 +886,6 @@ module Subst :
           rez
       | None -> None
 
-
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
         | Some s  -> begin
           match unify ~scope:Var.non_local_scope env s !!!var term with
