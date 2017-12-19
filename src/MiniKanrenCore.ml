@@ -600,7 +600,7 @@ module Env :
       let v = Var.make ~env ~scope index in
       Obj.tag !!!v, Obj.size !!!v
 
-    let var env x =
+    let is_var env x =
       let t = !!! x in
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
@@ -608,11 +608,12 @@ module Env :
       then
         let q = (!!!x : Var.t).Var.env in
         if (Obj.is_int !!!q) && q == !!!env.anchor
-        then Some (!!!x : Var.t).index
+        then true
         else failwith "OCanren fatal (Env.var): wrong environment"
-      else None
+      else false
 
-    let is_var env v = None <> var env v
+    let var env x =
+      if is_var env x then Some (!!!x: Var.t).index else None
 
     let free_vars env x =
       let rec helper fv t =
