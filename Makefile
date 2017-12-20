@@ -41,7 +41,8 @@ clean: clean_tests
 	$(RM) -r _build *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
-REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto 017tabling
+REGRES_CASES := 000 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto 017tabling
+#REGRES_CASES += 002sort
 
 define TESTRULES
 BYTE_TEST_EXECUTABLES += regression/test$(1).byte
@@ -66,7 +67,7 @@ test_$(1):
 	if [ $$$$? -ne 0 ] ; then echo "$(1) FAILED"; else echo "$(1) PASSED"; fi
 
 promote_all: promote_$(1)
-promite_test$(1): promote_$(1)
+promote_test$(1): promote_$(1)
 promote_$(1):
 	./test$(1).native > regression/orig/test$(1).log
 

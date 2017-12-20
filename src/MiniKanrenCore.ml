@@ -16,10 +16,6 @@
  * (enclosed in the file COPYING).
  *)
 
- external print_hello: unit -> unit = "caml_print_hello"
-
- let () =
-   print_hello ()
 
 open Printf
 
@@ -692,6 +688,9 @@ module Subst :
 
     (* [is_subsumed env s1 s2] checks that s1 is subsumed by s2 (i.e. s2 is more general than s1) *)
     val is_subsumed : Env.t -> t -> t -> bool
+
+    val print: t -> (Obj.t -> string) -> unit
+    val size: t -> int
   end =
   struct
     type content = {var : Var.t; term : Obj.t }
@@ -725,7 +724,7 @@ module Subst :
       Buffer.contents b
 
     let () =
-      let lookup subst idx = try Some (M.find idx subst) with Not_found -> None in
+      let lookup subst idx = M.find idx subst in
       let extend idx var term subst =
         (* let open Printf in *)
         (* printf "  idx: %d\n%!" idx; *)
@@ -855,7 +854,6 @@ module Subst :
       in
       try helper !!!x !!!y (Some ([], main_subst))
       with Occurs_check -> None
-
     let unify ~scope e subst x y =
       match unify_in_c ~scope e subst x y with
       | (Some (prefix, subst2)) as rez ->
@@ -867,7 +865,6 @@ module Subst :
 
           rez
       | None -> None
-
 
 
       let merge env subst1 subst2 = M.fold (fun _ {var; term} -> function
@@ -887,6 +884,11 @@ module Subst :
           | Some (_ , _)  -> false
         )
 
+      let size = M.cardinal
+      let print map f =
+        M.iter (fun key {term} ->
+            printf "\t\t%d -> %s\n%!" key (f @@ Obj.repr term)
+          ) map
   end
 
 exception Disequality_violated
@@ -1947,13 +1949,47 @@ let diseqtrace shower x y = fun st ->
 let report_counters () = ()
 *)
 
+(* TODO *)
+let pretty_generic_show ?(maxdepth= 99999) is_var x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth term =
+    if depth > maxdepth then Buffer.add_string b "..." else
+    if is_var !!!term then begin
+      let var = (!!!term : Var.t) in
+      match var.subst with
+      | Some term ->
+          bprintf b "{ _.%d with subst=" var.index;
+          inner (depth+1) term;
+          bprintf b " }"
+      | None -> bprintf b "_.%d" var.index
+    end else match wrap term with
+      | Invalid n                                         -> bprintf b "<invalid %d>" n
+      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+      | Unboxed n                                         -> bprintf b  "int<%d>" (!!!n)
+      | Boxed  (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner 0 x;
+  Buffer.contents b
+
+
 let unitrace shower x y : goal = fun st ->
   (* incr logged_unif_counter;      *)
 
+  let () =
+    let subst = (State.subst st) in
+    printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
+    Subst.print subst (pretty_generic_show (Env.is_var @@ State.env st) );
+  in
   let ans = (x === y) st in
-  printf "    unify '%s' and '%s'"  (shower (helper_of_state st) !!!x) (shower (helper_of_state st) !!!y);
+  printf "    unify '%s' and '%s'"
+    (shower (helper_of_state st) !!!x)
+    (shower (helper_of_state st) !!!y);
   let () =
     match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
   in
   ans
-
