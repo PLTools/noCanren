@@ -129,6 +129,7 @@ int do_extend(value *new_prefix, value *new_subst,
     /* printf ("occurs check failed\n");  */
     CAMLreturnT(int,FAIL);
   }
+
   value args[] = { Val_int(idx), _x, _y, *new_subst};
   _subst = caml_callbackN(*extend, 4, args);
   // now we do cons in C
@@ -145,9 +146,6 @@ int do_extend(value *new_prefix, value *new_subst,
 
   CAMLreturnT(int,OK);
 }
-
-#define OK 0
-#define FAIL 1
 
 int
 caml_unify_in_c_impl(value _x, value _y, value *_prefix, value *_subst)

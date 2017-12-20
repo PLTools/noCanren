@@ -705,6 +705,7 @@ module Subst :
     val is_subsumed : Env.t -> t -> t -> bool
 
     val register_externs : unit -> unit
+
     val print: t -> (Obj.t -> string) -> unit
     val size: t -> int
   end =
@@ -1996,6 +1997,7 @@ let pretty_generic_show ?(maxdepth= 99999) is_var x =
   Buffer.contents b
 
 let logged_unif_counter = ref 0
+
 let unitrace shower x y : goal = fun st ->
   incr logged_unif_counter;
 
@@ -2013,7 +2015,6 @@ let unitrace shower x y : goal = fun st ->
     match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
   in
   ans
-
 
 external unify_preload_stuff: unit -> unit = "caml_unify_preload_stuff"
 
