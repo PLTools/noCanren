@@ -854,6 +854,7 @@ module Subst :
       in
       try helper !!!x !!!y (Some ([], main_subst))
       with Occurs_check -> None
+
     let unify ~scope e subst x y =
       match unify_in_c ~scope e subst x y with
       | (Some (prefix, subst2)) as rez ->
@@ -1976,17 +1977,18 @@ let pretty_generic_show ?(maxdepth= 99999) is_var x =
   inner 0 x;
   Buffer.contents b
 
-
+let logged_unif_counter = ref 0
 let unitrace shower x y : goal = fun st ->
-  (* incr logged_unif_counter;      *)
+  incr logged_unif_counter;
 
-  let () =
-    let subst = (State.subst st) in
-    printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
-    Subst.print subst (pretty_generic_show (Env.is_var @@ State.env st) );
-  in
+  (* let () =
+   *   let subst = (State.subst st) in
+   *   printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
+   *   Subst.print subst (pretty_generic_show (Env.is_var @@ State.env st) );
+   * in *)
   let ans = (x === y) st in
-  printf "    unify '%s' and '%s'"
+  printf "  %d:  unify '%s' and '%s'"
+    !logged_unif_counter
     (shower (helper_of_state st) !!!x)
     (shower (helper_of_state st) !!!y);
   let () =

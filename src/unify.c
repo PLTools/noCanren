@@ -57,17 +57,18 @@ int get_var_idx(value _term)
 value
 caml_walk(value _subst, value _term)
 {
+  CAMLparam2(_subst,_term);
   if (is_var(_term)) {
     int idx = get_var_idx(_term);
     value _maybe_term = caml_callback2_exn(*lookup, _subst, Val_int(idx));
     if (Is_exception_result(_maybe_term))
-      return _term;
+      CAMLreturn(_term);
 
     // we take second element of pair which will be a term
     // TODO: return from OCaml only the term
-    return caml_walk(_subst, Field(_maybe_term, 1));
+    CAMLreturn( caml_walk(_subst, Field(_maybe_term, 1)) );
   } else {
-    return _term;
+    CAMLreturn(_term);
   }
 }
 
@@ -80,8 +81,9 @@ int occurs_check(value _subst, value _logicVar, int varIdx)
   _term = caml_walk(_subst, _logicVar);
   if (is_var(_term)) {
     if (get_var_idx(_term) == varIdx )
-      return FAIL;
-    else return OK;
+      CAMLreturnT(int, FAIL);
+    else
+      CAMLreturnT(int, OK);
   } else {
     if (Is_long(_term))
       CAMLreturnT(int, OK);
@@ -93,7 +95,7 @@ int occurs_check(value _subst, value _logicVar, int varIdx)
       unsigned size = Wosize_val(_term);
       for (unsigned i=0; i<size; ++i) {
         if (FAIL == occurs_check(_subst, Field(_term,i), varIdx) )
-          return FAIL;
+          CAMLreturnT(int, FAIL);
       }
       CAMLreturnT(int, OK);
     }
@@ -103,12 +105,16 @@ int occurs_check(value _subst, value _logicVar, int varIdx)
   CAMLreturnT(int, FAIL);
 }
 
-void do_extend(value *new_prefix, value *new_subst,
+int do_extend(value *new_prefix, value *new_subst,
   int idx, value _x, value _y )
 {
   CAMLparam0();
   CAMLlocal3(_subst, _prefix, _pair);
 
+  if (FAIL == occurs_check(*new_subst, _y, idx) ) {
+    /* printf ("occurs check failed\n");  */
+    CAMLreturnT(int,FAIL);
+  }
   value args[] = { Val_int(idx), _x, _y, *new_subst};
   _subst = caml_callbackN(*extend, 4, args);
   // now we do cons in C
@@ -123,7 +129,7 @@ void do_extend(value *new_prefix, value *new_subst,
   *new_prefix = _prefix;
   *new_subst  = _subst;
 
-  CAMLreturn0;
+  CAMLreturnT(int,OK);
 }
 
 int
@@ -140,42 +146,47 @@ caml_unify_in_c_impl(value _x, value _y, value *_prefix, value *_subst)
 
   if (is_var_x && is_var_y) {
     if (get_var_idx(_x) == get_var_idx(_y)) {
-      return OK;
+      CAMLreturnT(int,OK);
     } else {
-      do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
-      return OK;
+      int rez = do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
+      CAMLreturnT(int,rez);
     }
   } else if (is_var_x) {
     // буквально то же самое
-    do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
-    return OK;
+    int rez = do_extend(_prefix, _subst, get_var_idx(_x), _x, _y );
+    CAMLreturnT(int,rez);
   } else if (is_var_y) {
-    do_extend(_prefix, _subst, get_var_idx(_y), _y, _x );
-    return OK;
+    int rez = do_extend(_prefix, _subst, get_var_idx(_y), _y, _x );
+    CAMLreturnT(int,rez);
   } else {
     /* printf("last case of unification: %u and %u\n", _x, _y); */
       if (_x == _y) {
         // pointer equality
-        // return acc
-        return OK;
+        CAMLreturnT(int,OK);
       } else if (Is_block(_x) && Is_block(_y)) {
         if (Tag_val(_x) != Tag_val(_y) ) {
-          return FAIL;
+          CAMLreturnT(int,FAIL);
+        }
+        if (Tag_val(_x) == String_tag) {
+          if (Val_int(0) == caml_string_compare(_x,_y) )
+            CAMLreturnT(int,OK);
+          else
+            CAMLreturnT(int,FAIL);
         }
         int size = Wosize_val(_x);
         if (size != Wosize_val(_y) ) {
-          return FAIL;
+          CAMLreturnT(int,FAIL);
         }
         for (int i=0; i<size; ++i) {
           int rez = caml_unify_in_c_impl(Field(_x, i), Field(_y, i), _prefix, _subst);
           if (rez == FAIL)
-            return FAIL;
+            CAMLreturnT(int,FAIL);
         }
-        return OK;
+        CAMLreturnT(int,OK);
       } else if (Is_block(_x) ^ Is_block(_y))
-        return FAIL;
+        CAMLreturnT(int,FAIL);
       else
-        return FAIL;
+        CAMLreturnT(int,FAIL);
   }
 }
 

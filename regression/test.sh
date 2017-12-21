@@ -29,7 +29,7 @@ OLDPATH=${PATH}
 PATH=.:${PATH}
 
 for i in ${RUN}; do
-    ${i} ${ARGS} > ${CHECKS}.log
+    OCAMLRUNPARAM='s=250M,h=250M' ${i} ${ARGS} > ${CHECKS}.log
 done
 
 PATH=${OLDPATH}
