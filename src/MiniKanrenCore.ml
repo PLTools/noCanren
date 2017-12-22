@@ -71,11 +71,12 @@ module Log =
     let report () =
       let buf      = Buffer.create 1024      in
       let append s = Buffer.add_string buf s in
-      let rec show o l =
-        append @@ sprintf "%s%s: count=%d, time=%f\n" o l#name l#count l#elapsed;
-        List.iter (show (o ^ "  ")) l#subs
+      let rec show o time_of_parent l =
+        append @@ sprintf "%s%s: count=%d, time=%f (%f%%)\n" o l#name l#count l#elapsed
+         (100. *. l#elapsed /. time_of_parent );
+        List.iter (show (o ^ "  ") l#elapsed) l#subs
       in
-      show "" run;
+      show "" run#elapsed run;
       Buffer.contents buf
 
     let clear () = run#clear
@@ -1180,7 +1181,7 @@ module State =
     let incr_scope st = {st with scope = Var.new_scope ()}
 
     let unify x y ({env; subst; ctrs; scope} as st) =
-      LOG[perf] (Log.unify#enter);
+      (* let () = Log.unify#enter in *)
       let result =
         match Subst.unify ~scope env subst x y with
         | None -> None
@@ -1190,7 +1191,7 @@ module State =
             Some {st with subst=s; ctrs=ctrs'}
           with Disequality_violated -> None
       in
-      LOG[perf] (Log.unify#leave);
+      (* let () = Log.unify#leave in *)
       result
 
     let disunify x y ({env; subst; ctrs; scope} as st) =
@@ -1418,8 +1419,7 @@ let pqrst = five
 
 let run n goalish f =
   let adder, currier, app, ext = n () in
-  Log.clear ();
-  LOG[perf] (Log.run#enter);
+  (* let () = Log.clear (); Log.run#enter in *)
   let helper tup =
     let args, stream = ext tup in
     (* we normalize stream before reification *)
@@ -1429,10 +1429,10 @@ let run n goalish f =
     currier f @@ app (Stream.of_mkstream stream) args
   in
   let result = helper (adder goalish @@ State.empty ()) in
-  LOG[perf] (
-    Log.run#leave;
-    printf "Run report:\n%s" @@ Log.report ()
-  );
+  (* let () =
+   *   Log.run#leave;
+   *   printf "Run report:\n%s" @@ Log.report ()
+   * in *)
   result
 
 (** ************************************************************************* *)
