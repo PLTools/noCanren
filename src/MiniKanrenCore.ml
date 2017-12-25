@@ -793,6 +793,9 @@ module Subst :
 
     (* [is_subsumed env s1 s2] checks that s1 is subsumed by s2 (i.e. s2 is more general than s1) *)
     val is_subsumed : Env.t -> t -> t -> bool
+
+    val print: t -> (Obj.t -> string) -> unit
+    val size: t -> int
   end =
   struct
     type content = {var : Var.t; term : Obj.t }
@@ -901,7 +904,7 @@ module Subst :
               match walk !!!x, walk !!!y with
               | Var x, Var y ->
                 (* printf "unify vars!\n"; *)
-                if Var.equal x y then acc else raise Unification_failed
+                if Var.equal x y then acc else extend x !!!y acc
               | Var x, Value (_, y)         -> extend x y acc
               | Value (_, x), Var y         -> extend y x acc
               | Value (_, x), Value (_, y)  -> helper x y acc
@@ -988,6 +991,12 @@ module Subst :
         | _             -> false
       )
 
+
+      let size = VarMap.cardinal
+        let print map f =
+          VarMap.iter (fun key term ->
+              printf "\t\t%d -> %s\n%!" key.Var.index (f @@ Obj.repr term)
+            ) map
   end
 
 module Int = struct type t = int let compare = (-) end
@@ -2042,17 +2051,50 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
+let pretty_generic_show ?(maxdepth= 99999) is_var x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth term =
+    if depth > maxdepth then Buffer.add_string b "..." else
+    if is_var !!!term then begin
+      let var = (!!!term : Var.t) in
+      match var.subst with
+      | Some term ->
+          bprintf b "{ _.%d with subst=" var.index;
+          inner (depth+1) term;
+          bprintf b " }"
+      | None -> bprintf b "_.%d" var.index
+    end else match wrap term with
+      | Invalid n                                         -> bprintf b "<invalid %d>" n
+      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+      | Unboxed n                                         -> bprintf b  "int<%d>" (!!!n)
+      | Boxed  (t, l, f) ->
+        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+        Buffer.add_string b ">"
+  in
+  inner 0 x;
+  Buffer.contents b
+
+
 let logged_unif_counter = ref 0
 
 
 let unitrace shower x y = fun st ->
   incr logged_unif_counter;
 
+  let () =
+      let subst = (State.subst st) in
+      printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
+      Subst.print subst (pretty_generic_show (fun x -> Env.var (State.env st) x <> None));
+   in
+
   let ans = (x === y) st in
   printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
   (* (match loc with Some l -> printf " on %s" l | None -> ()); *)
 
-  if !logged_unif_counter > 1000 then assert false;
+  (* if !logged_unif_counter > 30 then assert false; *)
 
   if Stream.Internal.is_empty ans then printf "  -\n"
   else  printf "  +\n";

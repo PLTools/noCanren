@@ -29,7 +29,7 @@ let rec fives x =
   let show_int_list  = (show(List.ground) (show int))
   let show_intl_list = (show(List.logic ) (show(logic) (show int)))
 
-  let (===) = unitrace (fun h t -> show_intl_list @@ List.reify MiniKanren.reify h t)
+  (* let (===) = unitrace (fun h t -> show_intl_list @@ List.reify MiniKanren.reify h t) *)
 
 let rec appendo a b ab =
   conde
@@ -56,9 +56,9 @@ let runL n         = runR (List.reify MiniKanren.reify) show_int_list show_intl_
 let _ =
   (* run_exn show_int_list  1  q qh (REPR (fun q   -> q === !!1 % q)); *)
 
-  (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  )); *)
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1;2;3]) q                  ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
   run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));
