@@ -4,7 +4,7 @@ open Std
 open Tester
 open Printf
 
-let ilist xs = list (!!) xs 
+let ilist xs = list (!!) xs
 let just_a a = a === !!5
 
 let a_and_b a =
@@ -25,6 +25,12 @@ let rec fives x =
     ; defer (fives x)
     ]
 
+  let show_int       = show(int)
+  let show_int_list  = (show(List.ground) (show int))
+  let show_intl_list = (show(List.logic ) (show(logic) (show int)))
+
+  let (===) = unitrace (fun h t -> show_intl_list @@ List.reify MiniKanren.reify h t)
+
 let rec appendo a b ab =
   conde
     [ ((a === nil ()) &&& (b === ab))
@@ -33,6 +39,7 @@ let rec appendo a b ab =
         (h%ab' === ab)
         (appendo t b ab')
     ]
+
 
 let rec reverso a b =
   conde
@@ -43,15 +50,15 @@ let rec reverso a b =
         (defer (reverso t a'))
     ]
 
-let show_int       = show(int)
-let show_int_list  = (show(List.ground) (show int))
-let show_intl_list = (show(List.logic ) (show(logic) (show int)))
+
 let runL n         = runR (List.reify MiniKanren.reify) show_int_list show_intl_list n
 
 let _ =
-  run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  ));
-  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1; 2; 3; 4]) q                  ));
+  (* run_exn show_int_list  1  q qh (REPR (fun q   -> q === !!1 % q)); *)
+
+  (* run_exn show_int_list  1  q qh (REPR (fun q   -> appendo q (ilist [3; 4]) (ilist [1; 2; 3; 4])   ));
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso q (ilist [1; 2; 3; 4])                  )); *)
+  run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1;2;3]) q                  ));
   run_exn show_int_list  2  q qh (REPR (fun q   -> reverso q (ilist [1])                           ));
   run_exn show_int_list  1  q qh (REPR (fun q   -> reverso (ilist [1]) q                           ));
   run_exn show_int       1  q qh (REPR (fun q   -> a_and_b q                                       ));

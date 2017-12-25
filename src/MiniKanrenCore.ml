@@ -216,6 +216,56 @@ module Stream =
   end
 ;;
 
+
+let (!!!) = Obj.magic
+
+type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
+
+let is_valid_tag t =
+  Obj.(
+    not (List.mem t
+      [lazy_tag    ; closure_tag; object_tag; infix_tag    ; forward_tag    ; no_scan_tag;
+       abstract_tag; custom_tag ; custom_tag; unaligned_tag; out_of_heap_tag
+      ])
+  )
+
+let rec wrap x =
+  Obj.(
+    let is_unboxed obj =
+      is_int obj ||
+      (fun t -> t = string_tag || t = double_tag) (tag obj)
+    in
+    if is_unboxed x
+    then Unboxed x
+    else
+      let t = tag x in
+      if is_valid_tag t
+      then
+        let f = if t = double_array_tag then !!! double_field else field in
+        Boxed (t, size x, f x)
+      else Invalid t
+    )
+
+let generic_show ?(maxdepth=99999) x =
+  let x = Obj.repr x in
+  let b = Buffer.create 1024 in
+  let rec inner depth o =
+    if depth > maxdepth then Buffer.add_string b "..." else
+      match wrap o with
+      | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
+      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
+      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
+      | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
+      | Boxed  (t, l, f) ->
+          Buffer.add_string b (Printf.sprintf "boxed %d <" t);
+          for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
+          Buffer.add_string b ">"
+  in
+  inner 0 x;
+  Buffer.contents b
+
+;;
+
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a with show, gmap, html, eq, compare, foldl, foldr
@@ -310,7 +360,7 @@ module VarTbl = Hashtbl.Make(Var)
 
 module Term :
   sig
-    type t
+    type t = Obj.t
 
     type tag = int
 
@@ -396,22 +446,26 @@ module Term :
 
     let rec fold2 ~f ~fk ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
+      (* printf "fold2 %d %d\n" tx ty; *)
       if tx = ty then
-        let sx, sy = Obj.size x, Obj.size y in
-        assert(sx = sy);
-        if (is_box tx x) && not (is_var tx x) then
-          let fx, fy = Obj.field x, Obj.field y in
-          let rec inner i acc =
-            if i < sx then
-              let acc = fold2 ~f ~fk ~init:acc (fx i) (fy i) in
-              inner (i+1) acc
-            else acc
-          in
-          inner 0 init
-        else
-          f init tx x y
-      else
-        fk init tx ty x y
+        if (is_box tx x) then
+          let sx, sy = Obj.size x, Obj.size y in
+          if sx = sy then
+            match is_var tx x, is_var ty y with
+            | true, true    -> f init tx x y
+            | false, false  ->
+              let fx, fy = Obj.field x, Obj.field y in
+              let rec inner i acc =
+                if i < sx then
+                  let acc = fold2 ~f ~fk ~init:acc (fx i) (fy i) in
+                  inner (i+1) acc
+                else acc
+              in
+              inner 0 init
+            | _ -> fk init tx ty x y
+          else fk init tx ty x y
+        else f init tx x y
+      else fk init tx ty x y
 
   end
 
@@ -686,7 +740,7 @@ module Env :
         )
 
     let has_free_vars env x =
-      VarSet.is_empty @@ free_vars env x
+      not (VarSet.is_empty @@ free_vars env x)
 
     let merge {anchor=anchor1; next=next1} {anchor=anchor2; next=next2} =
       assert (anchor1 == anchor2);
@@ -773,12 +827,12 @@ module Subst :
       in
       walkv env subst x
 
-    let map ~f env subst x =
+    let rec map ~f env subst x =
       Term.map x ~f:(fun tx x ->
         if Env.is_var env tx x then
           match walk env subst !!!x with
           | Var v         -> Term.(f var_tag @@ repr v)
-          | Value (tx, x) -> f tx x
+          | Value (tx, x) -> map ~f env subst x
         else
           f tx x
       )
@@ -842,9 +896,11 @@ module Subst :
         let open Term in
         fold2 x y ~init:acc
           ~f:(fun acc t x y ->
+            (* printf "unify-f %d %d\n" t t; *)
             if Env.is_var env t x then
               match walk !!!x, walk !!!y with
               | Var x, Var y ->
+                (* printf "unify vars!\n"; *)
                 if Var.equal x y then acc else raise Unification_failed
               | Var x, Value (_, y)         -> extend x y acc
               | Value (_, x), Var y         -> extend y x acc
@@ -855,16 +911,26 @@ module Subst :
               failwith (sprintf "OCanren fatal (Subst.unify): invalid value (%d)" t)
           )
           ~fk:(fun acc tx ty x y ->
+            (* printf "unify-fk %d %d\n" tx ty; *)
             if Env.is_var env tx x then
+              (
+                (* printf "unify-fk-x-var %d\n" (!!!x : Var.t).Var.index; *)
               match walk !!!x with
               | Var x         -> extend x y acc
-              | Value (_, x)  -> helper x y acc
+              | Value (_, x)  -> helper x y acc)
             else if Env.is_var env ty y then
+              (
+                (* printf "unify-fk-y-var %d\n" (!!!y : Var.t).Var.index; *)
               match walk !!!y with
               | Var y         -> extend y x acc
-              | Value (_, y)  -> helper x y acc
+              | Value (_, y)  -> helper x y acc)
             else
+              (* (printf "tx:%d; sx:%d; ty:%d; sy:%d" tx (Obj.size x) ty (Obj.size y); *)
+              (
+                (* printf "x:%s; y:%s;\n" (generic_show x) (generic_show y); *)
               raise Unification_failed
+  )
+              (* raise Unification_failed *)
           )
       in
       let x, y = Term.(repr x, repr y) in
@@ -1976,3 +2042,18 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
+let logged_unif_counter = ref 0
+
+
+let unitrace shower x y = fun st ->
+  incr logged_unif_counter;
+
+  let ans = (x === y) st in
+  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
+  (* (match loc with Some l -> printf " on %s" l | None -> ()); *)
+
+  if !logged_unif_counter > 1000 then assert false;
+
+  if Stream.Internal.is_empty ans then printf "  -\n"
+  else  printf "  +\n";
+  ans
