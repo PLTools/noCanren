@@ -105,6 +105,8 @@ INSTALL_TARGETS=META \
 	_build/src/MiniKanren.cmx \
 	_build/src/MiniKanren.cma \
 	_build/src/MiniKanren.cmxa \
+	_build/src/libunify.a \
+	_build/src/dllunify.so \
 	$(wildcard _build/ppx/ppx_ocanren_all.cma) \
 	$(wildcard _build/ppx/ppx_ocanren_all.cmxa) \
 	$(wildcard _build/ppx/ppx_ocanren_all.cmxs) \

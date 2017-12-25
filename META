@@ -3,6 +3,7 @@ description = "ocanren"
 requires = "GT,unix"
 archive(byte) = "MiniKanren.cma"
 archive(native) = "MiniKanren.cmxa"
+linkopts = "-cclib -lunify"
 
 package "ppx" (
   description = "PPX syntax extensionon top of ppx_deriving"
