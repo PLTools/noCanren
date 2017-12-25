@@ -22,7 +22,33 @@ static value * lookup = NULL;
 /* static value * get_MK_anchor = NULL; */
 // extend (index, var, term subst) returns always Subst.t
 static value * extend = NULL;
-/* static value * real_anchor = NULL; */
+static value * real_anchor = NULL;
+
+CAMLprim value
+caml_unify_preload_stuff(value _unit)
+{
+  CAMLparam1(_unit);
+  if (lookup == NULL) {
+    lookup = caml_named_value("Subst.lookup");
+    assert(lookup != NULL);
+  }
+  caml_register_global_root(lookup);
+
+  if (extend == NULL) {
+    extend = caml_named_value("Subst.extend");
+    assert(extend != NULL);
+  }
+  caml_register_global_root(extend);
+
+  if (real_anchor == NULL) {
+    real_anchor = caml_named_value("global_anchor");
+    assert(real_anchor != NULL);
+  }
+  caml_register_global_root(real_anchor);
+  assert(Is_block(*real_anchor));
+
+  CAMLreturn(Val_unit);
+}
 
 int is_var(value _term)
 {
@@ -36,7 +62,7 @@ int is_var(value _term)
   // now we need to check that it is a variable
 
   _anchor = Field(_term, 0);
-  if (_anchor != Val_int(78955))
+  if (_anchor != *real_anchor)
     CAMLreturnT(int, 0);
 
   // We skip chekcing with the env
@@ -199,15 +225,6 @@ caml_unify_in_c(value _scope, value _env, value _subst, value _x, value _y)
   CAMLparam5(_scope, _env, _subst, _x, _y);
   CAMLlocal4(_prefix, _new_subst, _pair, _answer);
 
-  if (lookup == NULL) {
-    lookup = caml_named_value("Subst.lookup");
-    assert(lookup != NULL);
-  }
-
-  if (extend == NULL) {
-    extend = caml_named_value("Subst.extend");
-    assert(extend != NULL);
-  }
 
   // if (get_MK_anchor == NULL) {
   //   get_MK_anchor = caml_named_value("get_MK_anchor");

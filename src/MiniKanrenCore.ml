@@ -297,7 +297,7 @@ module Var =
   struct
     type env    = int
     type scope  = int
-    type anchor = int
+    type anchor = int list
 
     let tabling_env = -1
 
@@ -311,7 +311,9 @@ module Var =
       let scope = ref 0 in
       fun () -> (incr scope; !scope)
 
-    let global_anchor = 78955
+    let global_anchor = [7]
+    let register_global_anchor () =
+      Callback.register "global_anchor" global_anchor
 
     type t = {
       anchor        : anchor;
@@ -606,7 +608,7 @@ module Env :
       if Obj.tag  t = var_tag  &&
          Obj.size t = var_size &&
          (let token = (!!!x : Var.t).Var.anchor in
-          (* (Obj.is_block !!!token) &&  *)
+          (Obj.is_block !!!token) &&
           token == !!!Var.global_anchor)
       then
         let q = (!!!x : Var.t).Var.env in
@@ -689,6 +691,7 @@ module Subst :
     (* [is_subsumed env s1 s2] checks that s1 is subsumed by s2 (i.e. s2 is more general than s1) *)
     val is_subsumed : Env.t -> t -> t -> bool
 
+    val register_externs : unit -> unit
     val print: t -> (Obj.t -> string) -> unit
     val size: t -> int
   end =
@@ -723,7 +726,7 @@ module Subst :
       inner 0 x;
       Buffer.contents b
 
-    let () =
+    let register_externs () =
       let lookup subst idx = M.find idx subst in
       let extend idx var term subst =
         (* let open Printf in *)
@@ -1995,3 +1998,12 @@ let unitrace shower x y : goal = fun st ->
     match ans with Nil -> printf "  -\n%!" | _ -> printf "  +\n%!"
   in
   ans
+
+
+external unify_preload_stuff: unit -> unit = "caml_unify_preload_stuff"
+
+let () =
+  Var.register_global_anchor ();
+  Subst.register_externs ();
+  unify_preload_stuff ();
+  ()
