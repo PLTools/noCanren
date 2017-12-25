@@ -285,24 +285,13 @@ module Var =
       scope;
     }
 
-    let var_tag, var_size =
-      let index = 0 in (* dummy index *)
-      let env   = 0 in (* dummy env token *)
-      let scope = 0 in (* dummy scope *)
-      let v = Var.make ~env ~scope index in
-      Obj.tag !!!v, Obj.size !!!v
+    let dummy =
+      let env   = 0 in
+      let scope = 0 in
+      make ~env ~scope 0
 
-    let is_var x =
-      let t = !!! x in
-      if Obj.tag  t = var_tag  &&
-         Obj.size t = var_size &&
-         (let token = (!!!x : Var.t).Var.anchor in (Obj.is_block !!!token) && token == !!!Var.global_anchor)
-      then
-        let q = (!!!x : Var.t).Var.env in
-        if (Obj.is_int !!!q) && q == !!!env.anchor
-        then true
-        else failwith "OCanren fatal (Env.var): wrong environment"
-      else false
+    let valid_anchor anchor =
+      anchor == global_anchor
 
     let equal x y =
       assert (x.env = y.env);
@@ -321,33 +310,90 @@ module VarTbl = Hashtbl.Make(Var)
 
 module Term :
   sig
-    type 'a t = Var of Var.t | Value of 'a
+    type t
 
     type tag = int
 
-    val is_var : tag -> 'a -> bool
-    val is_int : tag -> 'a -> bool
-    val is_str : tag -> 'a -> bool
-    val is_dbl : tag -> 'a -> bool
-    val is_box : tag -> 'a -> bool
+    val repr : 'a -> t
+
+    val is_var : tag -> t -> bool
+    val is_int : tag -> t -> bool
+    val is_str : tag -> t -> bool
+    val is_dbl : tag -> t -> bool
+
+    (* val var : 'a -> Var.t *)
+
+    val map : f:(tag -> t -> t) -> t -> t
+
+    val fold : f:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
 
     val fold2 :
-      f:('b -> tag -> 'a -> 'a -> 'b) ->
-      fk:('b -> tag -> tag -> 'a -> 'a -> 'b) ->
-      init:'b -> 'a -> 'a -> 'b
+      f:('a -> tag -> t -> t -> 'a) ->
+      fk:('a -> tag -> tag -> t -> t -> 'a) ->
+      init:'a -> t -> t -> 'a
   end = struct
+    type t = Obj.t
+    type tag = int
+
+    let repr = Obj.repr
+
+    let is_box tx _ =
+      if (tx <= Obj.last_non_constant_constructor_tag) &&
+         (tx >= Obj.first_non_constant_constructor_tag)
+      then true
+      else false
+
+    let var_tag, var_size =
+      let dummy = Obj.repr Var.dummy in
+      Obj.tag dummy, Obj.size dummy
+
+    let is_var tx x =
+      if (tx = var_tag) && (Obj.size x = var_size) then
+         let anchor = (Obj.obj x : Var.t).Var.anchor in
+         (Obj.is_block @@ Obj.repr anchor) && (Var.valid_anchor anchor)
+      else false
+
+    let is_int tx _ = tx = Obj.int_tag
+    let is_str tx _ = tx = Obj.string_tag
+    let is_dbl tx _ = tx = Obj.double_tag
+
+    let rec map ~f x =
+      let tx = Obj.tag x in
+      if (is_box tx x) && not (is_var tx x) then
+        let sx = Obj.size x in
+        let y  = Obj.dup x in
+        for i = 0 to sx-1 do
+          Obj.set_field y i @@ map ~f (Obj.field x i)
+        done;
+        y
+      else
+        f tx x
+
+    let rec fold ~f ~init x =
+      let tx = Obj.tag x in
+      if (is_box tx x) && not (is_var tx x) then
+        let sx = Obj.size x in
+        let fx = Obj.field x in
+        let rec inner i acc =
+          if i < sx then
+            let acc = fold ~f ~init:acc (fx i) in
+            inner (i+1) acc
+          else acc
+        in
+        inner 0 init
+      else
+        f init tx x
 
     let rec fold2 ~f ~fk ~init x y =
-      let rx, ry = Obj.repr x, Obj.repr y in
-      let tx, ty = Obj.tag rx, Obj.tag ry in
+      let tx, ty = Obj.tag x, Obj.tag y in
       if tx = ty then
-        let sx, sy = Obj.size rx, Obj.size ry in
+        let sx, sy = Obj.size x, Obj.size y in
         assert(sx = sy);
-        if (is_box tx x) && !(is_var tx x) then
-          let fx, fy = Obj.field rx, Obj.field ry in
+        if (is_box tx x) && not (is_var tx x) then
+          let fx, fy = Obj.field x, Obj.field y in
           let rec inner i acc =
             if i < sx then
-              let acc = fold2 ~f ~init:acc (fx i) (fy i) in
+              let acc = fold2 ~f ~fk ~init:acc (fx i) (fy i) in
               inner (i+1) acc
             else acc
           in
@@ -355,8 +401,7 @@ module Term :
         else
           f init tx x y
       else
-        fk acc tx ty x y
-        (* invalid_arg "OCanren fatal (Term.fold2): terms have different shape" *)
+        fk init tx ty x y
 
   end
 
@@ -584,10 +629,10 @@ module Env :
 
     val empty     : unit -> t
     val create    : anchor:Var.env -> t
-    val fresh     : (*?name:string ->*) scope:Var.scope -> t -> 'a
-    val var       : t -> 'a -> int option
-    val is_var    : t -> 'a -> bool
-    val free_vars : t -> 'a -> VarSet.t
+    val fresh     : scope:Var.scope -> t -> 'a
+    (* val var       : t -> 'a -> int option *)
+    val is_var    : t -> Term.tag -> Term.t -> bool
+    val free_vars : t -> Term.t -> VarSet.t
     val merge     : t -> t -> t
   end =
   struct
@@ -602,50 +647,28 @@ module Env :
 
     let create ~anchor = {anchor; next = first_var}
 
-    let fresh (*?name *) ~scope e =
+    let fresh ~scope e =
       let v = !!!(Var.make ~env:e.anchor ~scope e.next) in
       e.next <- 1 + e.next;
       !!!v
 
-    let var_tag, var_size =
-      let index = 0 in (* dummy index *)
-      let env   = 0 in (* dummy env token *)
-      let scope = 0 in (* dummy scope *)
-      let v = Var.make ~env ~scope index in
-      Obj.tag !!!v, Obj.size !!!v
-
-    let is_var env x =
-      let t = !!! x in
-      if Obj.tag  t = var_tag  &&
-         Obj.size t = var_size &&
-         (let token = (!!!x : Var.t).Var.anchor in (Obj.is_block !!!token) && token == !!!Var.global_anchor)
-      then
-        let q = (!!!x : Var.t).Var.env in
-        if (Obj.is_int !!!q) && q == !!!env.anchor
-        then true
-        else failwith "OCanren fatal (Env.var): wrong environment"
+    let is_var env tx x =
+      if Term.is_var tx x then
+        let v = (!!!x : Var.t) in
+        if v.Var.env = env.anchor then true
+        else failwith "OCanren fatal (Env.is_var): wrong environment"
       else false
 
-    let var env x =
-      if is_var env x then Some (!!!x: Var.t).index else None
-
     let free_vars env x =
-      let rec helper fv t =
-        if is_var env t
-        then VarSet.add (!!!t : Var.t) fv
-        else
-          match wrap t with
-          | Unboxed vx -> fv
-          | Boxed (tx, sx, fx) ->
-            let rec inner fv i =
-              if i < sx
-              then inner (helper fv !!!(fx i)) (i+1)
-              else fv
-            in
-            inner fv 0
-          | Invalid n -> failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" n)
-      in
-      helper VarSet.empty (Obj.repr x)
+      Term.fold x ~init:VarSet.empty
+        ~f:(fun acc t x ->
+          if is_var env t x then
+            VarSet.add (!!!x : Var.t) acc
+          else
+            let open Term in
+            if (is_int t x) || (is_str t x) || (is_dbl t x) then acc
+            else failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" t)
+        )
 
     let merge {anchor=anchor1; next=next1} {anchor=anchor2; next=next2} =
       assert (anchor1 == anchor2);
@@ -662,8 +685,6 @@ module Subst :
     val of_list : content list -> t
 
     val split : t -> content list
-
-    val walk  : Env.t -> t -> 'a -> 'a
 
     (* [project env subst x] - performs a deepwalk of term [x],
      *   replacing every variable to relevant binding in [subst];
@@ -693,6 +714,8 @@ module Subst :
      *)
     val unify : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option
 
+    val reify : f:(Var.t -> Var.t) -> Env.t -> Subst.t -> 'a -> 'a
+
     (* [merge env s1 s2] merges two substituions *)
     val merge : Env.t -> t -> t -> t option
 
@@ -702,7 +725,7 @@ module Subst :
   struct
     type content = {var : Var.t; term : Obj.t }
 
-    type t       = Obj.t VarMap.t
+    type t       = Term.t VarMap.t
 
     let empty = VarMap.empty
 
@@ -713,21 +736,44 @@ module Subst :
 
     let split s = VarMap.fold (fun var term xs -> {var; term}::xs) s []
 
+    type lterm = Var of Var.t | Value of Term.tag * Term.t
+
     let rec walk env subst x =
       (* walk var *)
       let rec walkv env subst v =
-        match v.subst with
+        match v.Var.subst with
         | Some term -> walkt env subst term
         | None ->
             try walkt env subst (VarMap.find v subst)
-            with Not_found -> Term.Var t
+            with Not_found -> Var v
       (* walk term *)
       and walkt env subst t =
-        Term.map !!!t ~f:(fun t x ->
-          if Env.is_var env t x then walkv env subst !!!x else Term.Value x
+        (* TODO: smtng wrong here *)
+        Term.map t ~f:(fun t x ->
+          if Env.is_var env t x then walkv env subst !!!x else Value (t, x)
         )
       in
       walkv env subst x
+
+    let map ~f env subst x =
+      Term.map x ~f:(fun tx x ->
+        if Env.is_var env tx x then
+          match walk env subst x with
+          | Var v         -> Term.(f var_tag @@ repr v)
+          | Value (tx, x) -> f tx x
+        else
+          f tx x
+      )
+
+    let fold ~f ~init env subst x =
+      Term.fold x ~init ~f:(fun acc tx x ->
+        if Env.is_var env tx x then
+          match walk env subst x with
+          | Var v         -> Term.(f acc var_tag @@ repr v)
+          | Value (tx, x) -> f acc tx x
+        else
+          f acc tx x
+      )
 
     let rec occurs env subst var term =
       Term.fold term ~init:false ~f:(fun acc t x ->
@@ -735,8 +781,8 @@ module Subst :
           let open Term in
           if Env.is_var env t x then
             match walk env subst !!!x with
-            | Var u   -> Var.(u.index = var.index)
-            | Value x -> occurs env subst var x
+            | Var u         -> Var.(u.index = var.index)
+            | Value (_, x)  -> occurs env subst var x
           else if (is_int t x) || (is_str t x) || (is_dbl t x) then
             false
           else
@@ -775,12 +821,12 @@ module Subst :
         fold2 x y ~init:acc
           ~f:(fun acc t x y ->
             if Env.is_var env t x then
-              match walk !!!x, walk !!!y with
-              | Var x, Var y      ->
+              match walk x, walk y with
+              | Var x, Var y ->
                 if Var.unify env x y then acc else raise Unification_failed
-              | Var x, Value y    -> extend x y acc
-              | Value x, Var y    -> extend y x acc
-              | Value x, Value y  -> helper x y acc
+              | Var x, Value (_, y)         -> extend x y acc
+              | Value (_, x), Var y         -> extend y x acc
+              | Value (_, x), Value (_, y)  -> helper x y acc
             else if (is_int t x) || (is_str t x) || (is_dbl t x) then
               if x = y then acc else raise Unification_failed
             else
@@ -788,44 +834,49 @@ module Subst :
           )
           ~fk:(fun acc tx ty x y ->
             if Env.is_var env tx x then
-              match walk !!!x with
-              | Var x     -> extend x y acc
-              | Value x   -> helper x y acc
+              match walk x with
+              | Var x         -> extend x y acc
+              | Value (_, x)  -> helper x y acc
             else if Env.is_var env ty y then
-              match walk !!!y with
-              | Var y     -> extend y x acc
-              | Value y   -> helper x y acc
+              match walk y with
+              | Var y         -> extend y x acc
+              | Value (_, y)  -> helper x y acc
             else
               raise Unification_failed
           )
       in
+      let x, y = Term.(repr x, repr y) in
       try Some (helper x y ([], subst)) with Unification_failed | Occurs_check -> None
 
-    let rec project env subst x =
-      Term.map x ~f:(fun t x ->
-        let open Term in
-        if Env.is_var env t x then
-          match walk env subst !!!x with
-          | Var _   -> x
-          | Value x -> project env subst x
+    let reify ~f env subst x =
+      map env subst (Term.repr x) ~f:(fun t x ->
+        if (Env.is_var env t x) then Term.repr (f !!!x)
         else if (is_int t x) || (is_str t x) || (is_dbl t x) then x
+        else failwith (sprintf "OCanren fatal (Subst.reify): invalid value (%d)" t)
+      )
+
+    let rec project env subst x =
+      map env subst (Term.repr x) ~f:(fun t x ->
+        if (Env.is_var env t x) || (is_int t x) || (is_str t x) || (is_dbl t x)
+        then x
         else failwith (sprintf "OCanren fatal (Subst.project): invalid value (%d)" t)
       )
 
     let refresh ?(mapping = VarTbl.create 31) ~scope dst_env src_env subst x =
-      let rec helper t =
-        match Env.var src_env t with
-        | None    -> copy helper (Obj.repr t)
-        | Some n  ->
-          let var = (!!!t : Var.t) in
-          try
-            Obj.repr @@ VarTbl.find mapping var
-          with Not_found ->
-            let new_var = Env.fresh ~scope dst_env in
-            VarTbl.add mapping var !!!new_var;
-            Obj.repr @@ new_var
+      let rec helper x =
+        map env subst (Term.repr x) ~f:(fun t x ->
+          if (Env.is_var env t x) then
+            try
+              VarTbl.find mapping !!!x
+            with Not_found ->
+              let new_var = Term.repr @@ Env.fresh ~scope dst_env in
+              VarTbl.add mapping var new_var;
+              new_var
+          else if (is_int t x) || (is_str t x) || (is_dbl t x) then x
+          else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
+        )
       in
-      (mapping, !!!(helper @@ project src_env subst x))
+      mapping, helper @@ project src_env subst x
 
     let free_vars env subst x =
       Env.free_vars env @@ project env subst x
@@ -1318,24 +1369,23 @@ module State =
       | cs -> List.map (fun ctrs -> {env; subst; ctrs; scope}) cs
 
     let reify {env; subst; ctrs} x =
-      let rec helper forbidden t =
-        let var = Subst.walk env subst t in
-        match Env.var env var with
-        | None -> copy (helper forbidden) (Obj.repr var)
-        | Some n when List.mem n forbidden -> Obj.repr var
-        | Some n ->
+      let rec helper forbidden x =
+        Subst.reify env subst x ~f:(fun v ->
+          if List.mem v.Var.index then v
+          else
             let cs =
-              Disequality.reify env subst ctrs !!!var |>
+              Disequality.reify env subst ctrs v |>
               List.filter (fun t ->
                 match Env.var env t with
                 | Some i  -> not (List.mem i forbidden)
                 | None    -> true
               ) |>
-              List.map (fun t -> !!!(helper (n::forbidden) t))
+              List.map (fun t -> helper (n::forbidden) t)
             in
-            Obj.repr {!!!var with Var.constraints = cs}
+            {v with Var.constraints = cs}
+        )
       in
-      !!!(helper [] x)
+      helper [] x
 
   end
 
