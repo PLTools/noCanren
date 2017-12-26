@@ -376,9 +376,9 @@ module Term :
 
     val inspect : f:(tag -> t -> 'a) -> t -> 'a
 
-    val map : f:(tag -> t -> t) -> t -> t
+    val map : fvar:(Var.t -> t) -> fval:(t -> t) -> t -> t
 
-    val fold : f:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
+    val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> t -> 'a) -> init:'a -> t -> 'a
 
     val fold2 :
       f:('a -> tag -> t -> t -> 'a) ->
@@ -417,17 +417,20 @@ module Term :
 
     let inspect ~f x = f (Obj.tag x) @@ Obj.repr x
 
-    let rec map ~f x =
+    let rec map ~fvar ~fval x =
       let tx = Obj.tag x in
-      if (is_box tx x) && not (is_var tx x) then
+      if (is_box tx x) then
         let sx = Obj.size x in
-        let y  = Obj.dup x in
-        for i = 0 to sx-1 do
-          Obj.set_field y i @@ map ~f (Obj.field x i)
-        done;
-        y
+        if is_var tx sx x then
+          fvar @@ Obj.magic x
+        else
+          let y  = Obj.dup x in
+          for i = 0 to sx-1 do
+            Obj.set_field y i @@ map ~fvar ~fval (Obj.field x i)
+          done;
+          y
       else
-        f tx x
+        fval x
 
     let rec fold ~f ~init x =
       let tx = Obj.tag x in
@@ -446,7 +449,6 @@ module Term :
 
     let rec fold2 ~f ~fk ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
-      (* printf "fold2 %d %d\n" tx ty; *)
       if tx = ty then
         if (is_box tx x) then
           let sx, sy = Obj.size x, Obj.size y in
