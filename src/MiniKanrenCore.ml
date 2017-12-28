@@ -421,7 +421,7 @@ module Term :
       let tx = Obj.tag x in
       if (is_box tx x) then
         let sx = Obj.size x in
-        if is_var tx sx x then
+        if is_var tx x then
           fvar @@ Obj.magic x
         else
           let y  = Obj.dup x in
@@ -434,18 +434,21 @@ module Term :
 
     let rec fold ~f ~init x =
       let tx = Obj.tag x in
-      if (is_box tx x) && not (is_var tx x) then
+      if (is_box tx x) then
         let sx = Obj.size x in
-        let fx = Obj.field x in
-        let rec inner i acc =
-          if i < sx then
-            let acc = fold ~f ~init:acc (fx i) in
-            inner (i+1) acc
-          else acc
-        in
-        inner 0 init
+        if is_var tx x then
+          fvar init @@ Obj.magic x
+        else
+          let fx = Obj.field x in
+          let rec inner i acc =
+            if i < sx then
+              let acc = fold ~f ~init:acc (fx i) in
+              inner (i+1) acc
+            else acc
+          in
+          inner 0 init
       else
-        f init tx x
+        f init x
 
     let rec fold2 ~f ~fk ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
