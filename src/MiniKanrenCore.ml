@@ -842,16 +842,16 @@ module Subst :
           assert (Env.check env v);
           match walk env subst v with
           | Var v        -> fvar v
-          | Value (t, x) -> fval t x
+          | Value (t, x) -> map ~fval ~fvar env subst x
         )
 
-    let fold ~fvar ~fval ~init env subst x =
+    let rec fold ~fvar ~fval ~init env subst x =
       Term.fold x ~init ~fval
         ~fvar:(fun acc v ->
           assert (Env.check env v);
           match walk env subst v with
           | Var v        -> fvar acc v
-          | Value (t, x) -> fval acc t x
+          | Value (t, x) -> fold ~fval ~fvar ~init:acc env subst x
         )
 
     let rec occurs env subst var term =
@@ -969,7 +969,7 @@ module Subst :
             else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
           )
       in
-      mapping, helper src_env subst x
+      mapping, helper x
 
     let free_vars env subst x =
       Env.free_vars env @@ project env subst x
