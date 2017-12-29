@@ -376,9 +376,9 @@ module Term :
 
     val inspect : f:(tag -> t -> 'a) -> t -> 'a
 
-    val map : fvar:(Var.t -> t) -> fval:(t -> t) -> t -> t
+    val map : fvar:(Var.t -> t) -> fval:(tag -> t -> t) -> t -> t
 
-    val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> t -> 'a) -> init:'a -> t -> 'a
+    val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
 
     val fold2 :
       f:('a -> tag -> t -> t -> 'a) ->
@@ -430,9 +430,9 @@ module Term :
           done;
           y
       else
-        fval x
+        fval tx x
 
-    let rec fold ~f ~init x =
+    let rec fold ~fvar ~fval ~init x =
       let tx = Obj.tag x in
       if (is_box tx x) then
         let sx = Obj.size x in
@@ -442,13 +442,13 @@ module Term :
           let fx = Obj.field x in
           let rec inner i acc =
             if i < sx then
-              let acc = fold ~f ~init:acc (fx i) in
+              let acc = fold ~fvar ~fval ~init:acc (fx i) in
               inner (i+1) acc
             else acc
           in
           inner 0 init
       else
-        f init x
+        fval init tx x
 
     let rec fold2 ~f ~fk ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
@@ -698,6 +698,7 @@ module Env :
     val empty         : unit -> t
     val create        : anchor:Var.env -> t
     val fresh         : scope:Var.scope -> t -> 'a
+    val check         : t -> Var.t -> bool
     val is_var        : t -> Term.tag -> Term.t -> bool
     val var           : t -> 'a -> Var.t option
     val free_vars     : t -> 'a -> VarSet.t
@@ -721,6 +722,8 @@ module Env :
       e.next <- 1 + e.next;
       !!!v
 
+    let check env v = (v.Var.env = env.anchor)
+
     let is_var env tx x =
       if Term.is_var tx x then
         let v = (!!!x : Var.t) in
@@ -735,13 +738,10 @@ module Env :
 
     let free_vars env x =
       Term.fold (Term.repr x) ~init:VarSet.empty
-        ~f:(fun acc t x ->
-          if is_var env t x then
-            VarSet.add (!!!x : Var.t) acc
-          else
-            let open Term in
-            if (is_int t x) || (is_str t x) || (is_dbl t x) then acc
-            else failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" t)
+        ~fvar:(fun acc v   -> VarSet.add v acc)
+        ~fval:(fun acc t x ->
+          if Term.(is_int t x || is_str t x || is_dbl t x) then acc
+          else failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" t)
         )
 
     let has_free_vars env x =
@@ -805,7 +805,7 @@ module Subst :
   struct
     type content = {var : Var.t; term : Obj.t }
 
-    type t       = Term.t VarMap.t
+    type t = Term.t VarMap.t
 
     let empty = VarMap.empty
 
@@ -821,6 +821,7 @@ module Subst :
     let rec walk env subst x =
       (* walk var *)
       let rec walkv env subst v =
+        assert (Env.check env v);
         match v.Var.subst with
         | Some term -> walkt env subst !!!term
         | None ->
@@ -835,40 +836,32 @@ module Subst :
       in
       walkv env subst x
 
-    let rec map ~f env subst x =
-      Term.map x ~f:(fun tx x ->
-        if Env.is_var env tx x then
-          match walk env subst !!!x with
-          | Var v         -> Term.(f var_tag @@ repr v)
-          | Value (tx, x) -> map ~f env subst x
-        else
-          f tx x
-      )
+    let rec map ~fvar ~fval env subst x =
+      Term.map x ~fval
+        ~fvar:(fun v ->
+          assert (Env.check env v);
+          match walk env subst v with
+          | Var v        -> fvar v
+          | Value (t, x) -> fval t x
+        )
 
-    let fold ~f ~init env subst x =
-      Term.fold x ~init ~f:(fun acc tx x ->
-        if Env.is_var env tx x then
-          match walk env subst !!!x with
-          | Var v         -> Term.(f acc var_tag @@ repr v)
-          | Value (tx, x) -> f acc tx x
-        else
-          f acc tx x
-      )
+    let fold ~fvar ~fval ~init env subst x =
+      Term.fold x ~init ~fval
+        ~fvar:(fun acc v ->
+          assert (Env.check env v);
+          match walk env subst v with
+          | Var v        -> fvar acc v
+          | Value (t, x) -> fval acc t x
+        )
 
     let rec occurs env subst var term =
-      Term.fold term ~init:false ~f:(fun acc t x ->
-        acc || (
-          let open Term in
-          if Env.is_var env t x then
-            match walk env subst !!!x with
-            | Var u         -> Var.(u.index = var.index)
-            | Value (_, x)  -> occurs env subst var x
-          else if (is_int t x) || (is_str t x) || (is_dbl t x) then
-            false
+      fold env subst term ~init:false
+        ~fvar:(fun acc v -> acc || Var.(v.index = var.index))
+        ~fval:(fun acc t x ->
+          if Term.(is_int t x || is_str t x || is_dbl t x) then false
           else
             failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" t)
         )
-      )
 
     exception Occurs_check
 
@@ -945,34 +938,38 @@ module Subst :
       try Some (helper x y ([], subst)) with Unification_failed | Occurs_check -> None
 
     let reify ~f env subst x = Obj.magic @@
-      map env subst (Term.repr x) ~f:(fun t x ->
-        if (Env.is_var env t x) then Term.repr (f !!!x)
-        else if Term.(is_int t x || is_str t x || is_dbl t x) then x
-        else failwith (sprintf "OCanren fatal (Subst.reify): invalid value (%d)" t)
-      )
+      map env subst (Term.repr x)
+        ~fvar:(fun v -> Term.repr (f v))
+        ~fval:(fun t x ->
+          if Term.(is_int t x || is_str t x || is_dbl t x) then x
+          else failwith (sprintf "OCanren fatal (Subst.reify): invalid value (%d)" t)
+        )
 
-    let rec project env subst x = Obj.magic @@
-      map env subst (Term.repr x) ~f:(fun t x ->
-        if Env.is_var env t x || Term.(is_int t x || is_str t x || is_dbl t x)
-        then x
-        else failwith (sprintf "OCanren fatal (Subst.project): invalid value (%d)" t)
-      )
+    let project env subst x = Obj.magic @@
+      map env subst (Term.repr x)
+        ~fvar:(fun v -> Term.repr v)
+        ~fval:(fun t x ->
+          if Term.(is_int t x || is_str t x || is_dbl t x) then x
+          else failwith (sprintf "OCanren fatal (Subst.project): invalid value (%d)" t)
+        )
 
     let refresh ?(mapping = VarTbl.create 31) ~scope dst_env src_env subst x =
       let rec helper x = Obj.magic @@
-        map src_env subst (Term.repr x) ~f:(fun t x ->
-          if (Env.is_var src_env t x) then
+        map src_env subst (Term.repr x)
+          ~fvar:(fun v ->
             try
-              !!!(VarTbl.find mapping !!!x : Var.t)
+              Term.repr @@ VarTbl.find mapping v
             with Not_found ->
               let new_var = Env.fresh ~scope dst_env in
-              VarTbl.add mapping !!!x !!!new_var;
+              VarTbl.add mapping v !!!new_var;
               Term.repr @@ new_var
-          else if Term.(is_int t x || is_str t x || is_dbl t x) then x
-          else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
-        )
+          )
+          ~fval:(fun t x ->
+            if Term.(is_int t x || is_str t x || is_dbl t x) then x
+            else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
+          )
       in
-      mapping, helper @@ project src_env subst x
+      mapping, helper src_env subst x
 
     let free_vars env subst x =
       Env.free_vars env @@ project env subst x
