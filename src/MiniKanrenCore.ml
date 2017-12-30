@@ -1549,7 +1549,7 @@ let run n goalish f =
   let () =
     let () = Log.get_timings timings in
     Log.run#leave;
-    printf "Run report:\n%s" @@ Log.report ()
+    (* printf "Run report:\n%s" @@ Log.report () *)
   in
   result
 
@@ -1580,8 +1580,7 @@ module RunCurried =
 
     let run n goalish f =
       let adder, appN, ext = n () in
-      Log.clear ();
-      LOG[perf] (Log.run#enter);
+      let () = Log.clear (); Log.run#enter in
       let timings = Timings.make ~enabled:false in
 
       let helper tup =
@@ -1593,10 +1592,11 @@ module RunCurried =
         f timings @@ ApplyAsStream.wrap (appN args) (Stream.of_mkstream stream)
       in
       let result = helper (adder goalish @@ State.empty ()) in
-      LOG[perf] (
+      let () =
+        let () = Log.get_timings timings in
         Log.run#leave;
-        printf "Run report:\n%s" @@ Log.report ()
-      );
+        (* printf "Run report:\n%s" @@ Log.report () *)
+      in
       result
 
 
