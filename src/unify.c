@@ -8,6 +8,8 @@
 #include <caml/fail.h>
 
 #define Val_none Val_int(0)
+#define caml_alloc_some() caml_alloc_small(1,0)
+#define caml_alloc_cons() caml_alloc_small(2,0)
 
 static value * lookup = NULL;
 // extend (index, var, term subst) returns always Subst.t
@@ -41,6 +43,7 @@ caml_unify_preload_stuff(value _unit)
 }
 
 static value env_anchor = Val_int(-1);
+static value cur_scope  = Val_int(-1000);
 
 int is_var(value _term)
 {
@@ -81,14 +84,19 @@ caml_walk(value _subst, value _term)
 {
   CAMLparam2(_subst,_term);
   if (is_var(_term)) {
-    int idx = get_var_idx(_term);
-    value _maybe_term = caml_callback2_exn(*lookup, _subst, Val_int(idx));
-    if (Is_exception_result(_maybe_term))
-      CAMLreturn(_term);
+    if (Is_long(Field(_term,3))) {
+      int idx = get_var_idx(_term);
+      value _maybe_term = caml_callback2_exn(*lookup, _subst, Val_int(idx));
+      if (Is_exception_result(_maybe_term))
+        CAMLreturn(_term);
 
-    // we take second element of pair which will be a term
-    // TODO: return from OCaml only the term
-    CAMLreturn( caml_walk(_subst, Field(_maybe_term, 1)) );
+      // we take second element of pair which will be a term
+      // TODO: return from OCaml only the term
+      CAMLreturn( caml_walk(_subst, Field(_maybe_term, 1)) );
+    } else {
+      // there is inline substitution
+      CAMLreturn( caml_walk(_subst, Field(Field(_term,3), 0)) );
+    }
   } else {
     CAMLreturn(_term);
   }
@@ -128,26 +136,37 @@ int occurs_check(value _subst, value _logicVar, int varIdx)
 }
 
 int do_extend(value *new_prefix, value *new_subst,
-  int idx, value _x, value _y )
+  int key_idx, value _key, value _term)
 {
   CAMLparam0();
-  CAMLlocal3(_subst, _prefix, _pair);
+  CAMLlocal5(_subst, _prefix, _cnt, _var_scope, _inline_term);
 
-  if (FAIL == occurs_check(*new_subst, _y, idx) ) {
-    /* printf ("occurs check failed\n");  */
+  if (FAIL == occurs_check(*new_subst, _term, key_idx) ) {
     CAMLreturnT(int,FAIL);
   }
 
-  value args[] = { Val_int(idx), _x, _y, *new_subst};
-  _subst = caml_callbackN(*extend, 4, args);
   // now we do cons in C
-  _pair = caml_alloc_tuple(2);
-  Store_field( _pair, 0, _x );              // var
-  Store_field( _pair, 1, _y );              // term
+  _cnt = caml_alloc_tuple(2);
+  Store_field( _cnt, 0, _key);              // var
+  Store_field( _cnt, 1, _term);              // term
 
-  _prefix = caml_alloc_small(2,0);
-  Store_field( _prefix, 0, _pair );     // head
-  Store_field( _prefix, 1, *new_prefix );       // tail
+  _var_scope = Field(_key, 4);
+  if (_var_scope == cur_scope) {
+    // set-var-val! optimization
+    _inline_term = caml_alloc_some();
+    Store_field( _inline_term, 0, _term);     // head
+
+    Store_field( _key, 3, _inline_term);     // head
+
+    _subst = *new_subst;
+  } else {
+    value args[] = { Val_int(key_idx), _key, _term, *new_subst};
+    _subst = caml_callbackN(*extend, 4, args);
+  }
+
+  _prefix = caml_alloc_cons();
+  Store_field( _prefix, 0, _cnt);        // head
+  Store_field( _prefix, 1, *new_prefix); // tail
 
   *new_prefix = _prefix;
   *new_subst  = _subst;
@@ -223,7 +242,9 @@ caml_unify_in_c(value _scope, value _env, value _subst, value _x, value _y)
   CAMLlocal4(_prefix, _new_subst, _pair, _answer);
 
   env_anchor = Field(_env, 0);
-  assert(Is_long(env_anchor));
+  cur_scope = _scope;
+
+  /* assert(Is_long(env_anchor)); */
 
   _new_subst = _subst;
   _prefix = Val_emptylist;
