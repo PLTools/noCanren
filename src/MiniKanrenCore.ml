@@ -92,6 +92,17 @@ module Log =
       show "" run;
       Buffer.contents buf
 
+    let get_timings tims =
+      let rec helper acc l =
+        let acc  = (l#name, l#elapsed) :: acc in
+        List.fold_left helper acc l#subs
+      in
+      let info = helper [] run in
+      List.fold_left (fun t -> function
+      | "run",rez    -> Timings.set_whole_time t rez
+      | "unify", rez -> Timings.set_unif_time t rez
+      ) tims info |> ignore
+
     let clear () = run#clear
 
   end
@@ -1524,8 +1535,7 @@ let pqrst = five
 
 let run n goalish f =
   let adder, currier, app, ext = n () in
-  Log.clear ();
-  LOG[perf] (Log.run#enter);
+  let () = Log.clear (); Log.run#enter in
   let timings = Timings.make ~enabled:false in
   let helper tup =
     let args, stream = ext tup in
@@ -1536,10 +1546,11 @@ let run n goalish f =
     currier (f timings) @@ app (Stream.of_mkstream stream) args
   in
   let result = helper (adder goalish @@ State.empty ()) in
-  LOG[perf] (
+  let () =
+    let () = Log.get_timings timings in
     Log.run#leave;
     printf "Run report:\n%s" @@ Log.report ()
-  );
+  in
   result
 
 module ApplyAsStream = struct
