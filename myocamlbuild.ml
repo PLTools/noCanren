@@ -26,8 +26,8 @@ let () = dispatch (function
 
      flag ["ocaml";"compile";"native";"keep_asm"] (S[A"-S"]);
 
-     flag ["compile";"c"] (S[A"-ccopt"; A"-Wall"(*; A"-ccopt"; A"-O3" *) ]);
-
+     flag ["compile";"c"] (S[A"-ccopt"; A"-Wall"; A"-ccopt"; A"-O3"  ]);
+     dep  ["use_lib_unify"] [ "src/libunify.a" ];
      flag ["ocaml";"link";"native";"use_lib_unify"] (S[A"src/libunify.a"]);
 
      (* cppo-related stuff *)

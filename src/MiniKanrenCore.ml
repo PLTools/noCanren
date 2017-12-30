@@ -324,7 +324,7 @@ module Var =
       let scope = ref 0 in
       fun () -> (incr scope; !scope)
 
-    let global_anchor = [7]
+    let global_anchor = [-8]
     let register_global_anchor () =
       Callback.register "global_anchor" global_anchor
 
