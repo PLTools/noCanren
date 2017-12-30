@@ -5,6 +5,7 @@
 #include <caml/callback.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
+#include <caml/fail.h>
 
 #define Val_none Val_int(0)
 
@@ -39,6 +40,8 @@ caml_unify_preload_stuff(value _unit)
   CAMLreturn(Val_unit);
 }
 
+static value env_anchor = Val_int(-1);
+
 int is_var(value _term)
 {
   CAMLparam1(_term);
@@ -56,6 +59,11 @@ int is_var(value _term)
 
   // We skip chekcing with the env
   // it should be a list with
+  if ( !Is_long(Field(_term,1)) || (Field(_term,1) != env_anchor) ) {
+    caml_failwith("OCanren fatal (Env.var): wrong environment");
+    CAMLreturnT(int, 0);
+  }
+
   CAMLreturnT(int, 1);
 }
 
@@ -213,6 +221,9 @@ caml_unify_in_c(value _scope, value _env, value _subst, value _x, value _y)
 {
   CAMLparam5(_scope, _env, _subst, _x, _y);
   CAMLlocal4(_prefix, _new_subst, _pair, _answer);
+
+  env_anchor = Field(_env, 0);
+  assert(Is_long(env_anchor));
 
   _new_subst = _subst;
   _prefix = Val_emptylist;
