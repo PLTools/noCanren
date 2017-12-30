@@ -1,5 +1,5 @@
 (*
- * MiniKanrenCode: miniKanren implementation.
+ * MiniKanrenCore: miniKanren implementation.
  * Copyright (C) 2015-2017
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
@@ -18,6 +18,20 @@
 
 
 open Printf
+
+module Timings = struct
+  type t = { mutable whole_time: float; mutable unif_time: float; enabled: bool}
+  let make ~enabled = { whole_time=0.0; unif_time=0.0; enabled }
+  let unif  {unif_time}  = unif_time
+  let whole {whole_time} = whole_time
+  let is_enabled {enabled} = enabled
+  let set_whole_time t ~time =
+    t.whole_time <- time;
+    t
+  let set_unif_time t ~time =
+    t.unif_time <- time;
+    t
+end
 
 module Log =
   struct
@@ -2007,3 +2021,4 @@ let () =
   Subst.register_externs ();
   unify_preload_stuff ();
   ()
+

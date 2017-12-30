@@ -198,6 +198,14 @@ module Fresh :
     val pqrst : (_ injected -> _ injected -> _ injected -> _ injected -> _ injected -> goal) -> goal
   end
 
+module Timings : sig
+  type t
+  val unif : t -> float
+  val whole: t -> float
+  val is_enabled: t -> bool
+end
+
+
 (** {2 Top-level running primitives} *)
 
 (** [run n g h] runs a goal [g] with [n] logical parameters and passes reified results to the handler [h].
