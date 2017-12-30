@@ -61,7 +61,7 @@ let rec sorto x y =
 
 let _ =
   run four  (fun q1 q2 q3 p -> sorto (q1 % (q2 % (q3 % nil ()))) p)
-            (fun _  _  _  p ->
+            (fun _timings _  _  _  p ->
               Stream.take ~n:10 p |> List.iter (fun rr ->
                 printf "%s\n%!"  @@ (if rr#is_open
                 then
@@ -77,7 +77,7 @@ let _ =
 let sort l =
   List.to_list Nat.to_int @@
   run q (sorto @@ nat_list l)
-        (fun qs -> Stream.hd qs |> (fun rr -> rr#prj))
+        (fun _ qs -> Stream.hd qs |> (fun rr -> rr#prj))
 
 (* Veeeeery straightforward implementation of factorial *)
 let rec fact = function 0 -> 1 | n -> n * fact (n-1)
@@ -87,7 +87,7 @@ let rec fact = function 0 -> 1 | n -> n * fact (n-1)
 let perm l =
   List.map (List.to_list Nat.to_int) @@
   run q (fun q -> sorto q @@ nat_list (List.sort Pervasives.compare l))
-        (fun qs ->
+        (fun _ qs ->
           qs |> Stream.take ~n:(fact @@ List.length l) |>
           List.map (fun rr -> rr#prj))
 
@@ -95,7 +95,7 @@ let perm l =
 let perm' l =
   List.map (List.to_list Nat.to_int) @@
   run q (fun q -> fresh (r) (sorto (nat_list l) r) (sorto q r))
-        (fun qs ->
+        (fun _ qs ->
           qs |> Stream.take ~n:(fact @@ List.length l)
           |> List.map (fun rr -> rr#prj))
 

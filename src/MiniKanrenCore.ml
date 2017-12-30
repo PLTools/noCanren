@@ -1,5 +1,5 @@
 (*
- * MiniKanrenCode: miniKanren implementation.
+ * MiniKanrenCore: miniKanren implementation.
  * Copyright (C) 2015-2017
  * Dmitri Boulytchev, Dmitry Kosarev, Alexey Syomin, Evgeny Moiseenko
  * St.Petersburg State University, JetBrains Research
@@ -17,6 +17,20 @@
  *)
 
 open Printf
+
+module Timings = struct
+  type t = { mutable whole_time: float; mutable unif_time: float; enabled: bool}
+  let make ~enabled = { whole_time=0.0; unif_time=0.0; enabled }
+  let unif  {unif_time}  = unif_time
+  let whole {whole_time} = whole_time
+  let is_enabled {enabled} = enabled
+  let set_whole_time t ~time =
+    t.whole_time <- time;
+    t
+  let set_unif_time t ~time =
+    t.unif_time <- time;
+    t
+end
 
 module Log =
   struct
@@ -1404,7 +1418,7 @@ let succ n () =
   let adder, currier, app, ext = n () in
   (LogicAdder.succ adder, Uncurry.succ currier, ApplyTuple.succ app, ExtractDeepest.succ ext)
 
-let one   () = (fun x -> LogicAdder.(succ zero) x), Uncurry.one, ApplyTuple.one, ExtractDeepest.ext2
+let one   () = (LogicAdder.(succ zero)), Uncurry.one, ApplyTuple.one, ExtractDeepest.ext2
 let two   () = succ one   ()
 let three () = succ two   ()
 let four  () = succ three ()
@@ -1420,13 +1434,14 @@ let run n goalish f =
   let adder, currier, app, ext = n () in
   Log.clear ();
   LOG[perf] (Log.run#enter);
+  let timings = Timings.make ~enabled:false in
   let helper tup =
     let args, stream = ext tup in
     (* we normalize stream before reification *)
     let stream =
       Stream.Internal.bind stream (fun st -> Stream.Internal.of_list @@ State.normalize st args)
     in
-    currier f @@ app (Stream.of_mkstream stream) args
+    currier (f timings) @@ app (Stream.of_mkstream stream) args
   in
   let result = helper (adder goalish @@ State.empty ()) in
   LOG[perf] (
@@ -1807,3 +1822,6 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
+
+
+

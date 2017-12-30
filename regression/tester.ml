@@ -39,7 +39,10 @@ let run_gen onOK onFree n num handler (repr, goal) =
     printf "\n%!";
     loop new_pairs (k-1)
   in
-  let () = try loop (MiniKanren.run num goal handler) n with NoMoreAnswers -> () in
+  let () =
+    try loop (MiniKanren.run num goal (fun _ -> handler)) n
+    with NoMoreAnswers -> ()
+  in
   printf "}\n%!"
 
 (**

@@ -185,6 +185,14 @@ module Fresh :
     val pqrst : (_ injected -> _ injected -> _ injected -> _ injected -> _ injected -> goal) -> goal
   end
 
+module Timings : sig
+  type t
+  val unif : t -> float
+  val whole: t -> float
+  val is_enabled: t -> bool
+end
+
+
 (** {2 Top-level running primitives} *)
 
 (** [run n g h] runs a goal [g] with [n] logical parameters and passes reified results to the handler [h].
@@ -199,7 +207,7 @@ module Fresh :
     - [run (succ one) (fun q r -> q === !!5 ||| r === !!6) (fun qs rs -> ]{i the same as the above}[)]
 *)
 val run : (unit -> ('a -> 'c goal') * ('d -> 'e -> 'f) * (State.t Stream.t -> 'h -> 'e) * ('c -> 'h * State.t Stream.internal)) ->
-          'a -> 'd -> 'f
+          'a -> (Timings.t -> 'd) -> 'f
 
 (** The primitive [delay] helps to construct recursive goals, which depend on themselves. For example,
     we can't write [let rec fives q = (q === !!5) ||| (fives q)] because the generation of this goal leads to
