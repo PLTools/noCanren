@@ -368,13 +368,14 @@ module Term :
 
     val var_tag : tag
 
+    val is_var : 'a -> bool
+    val var    : 'a -> Var.t option
+
     val is_var : tag -> t -> bool
     (* val is_val : tag -> t -> bool *)
     val is_int : tag -> t -> bool
     val is_str : tag -> t -> bool
     val is_dbl : tag -> t -> bool
-
-    val inspect : f:(tag -> t -> 'a) -> t -> 'a
 
     val map : fvar:(Var.t -> t) -> fval:(tag -> t -> t) -> t -> t
 
@@ -413,7 +414,10 @@ module Term :
     let is_str tx _ = tx = Obj.string_tag
     let is_dbl tx _ = tx = Obj.double_tag
 
-    let inspect ~f x = f (Obj.tag x) @@ Obj.repr x
+    let var x =
+      let x = Obj.repr x in
+      let tx, sx = Obj.(tag x, size x) in
+      if is_var tx x then Some (Obj.magic x) else None
 
     let rec map ~fvar ~fval x =
       let tx = Obj.tag x in
@@ -707,7 +711,8 @@ module Env :
     val create        : anchor:Var.env -> t
     val fresh         : scope:Var.scope -> t -> 'a
     val check         : t -> Var.t -> bool
-    val is_var        : t -> Term.tag -> Term.t -> bool
+    val check_exn     : t -> Var.t -> unit
+    val is_var        : t -> 'a -> bool
     val var           : t -> 'a -> Var.t option
     val free_vars     : t -> 'a -> VarSet.t
     val has_free_vars : t -> 'a -> bool
@@ -732,17 +737,15 @@ module Env :
 
     let check env v = (v.Var.env = env.anchor)
 
-    let is_var env tx x =
-      if Term.is_var tx x then
-        let v = (!!!x : Var.t) in
-        if v.Var.env = env.anchor then true
-        else failwith "OCanren fatal (Env.is_var): wrong environment"
-      else false
+    let check_exn env v =
+      if check env v then () else failwith "OCanren fatal (Env.check): wrong environment"
 
     let var env x =
-      Term.(inspect (repr x)) ~f:(fun tx x ->
-        if is_var env tx x then Some !!!x else None
-      )
+      match Term.var x with
+      | (Some v) as res -> check_exn env v; res
+      | None            -> None
+
+    let is_var env x = (var env x) <> None
 
     let free_vars env x =
       Term.fold (Term.repr x) ~init:VarSet.empty
@@ -824,12 +827,12 @@ module Subst :
 
     let split s = VarMap.fold (fun var term xs -> {var; term = !!!term}::xs) s []
 
-    type lterm = Var of Var.t | Value of Term.tag * Term.t
+    type lterm = Var of Var.t | Value of Term.t
 
     let rec walk env subst x =
       (* walk var *)
       let rec walkv env subst v =
-        assert (Env.check env v);
+        Env.check_exn env v;
         match v.Var.subst with
         | Some term -> walkt env subst !!!term
         | None ->
@@ -837,29 +840,28 @@ module Subst :
             with Not_found -> Var v
       (* walk term *)
       and walkt env subst t =
-        (* TODO: smtng wrong here *)
-        Term.inspect t ~f:(fun t x ->
-          if Env.is_var env t x then walkv env subst !!!x else Value (t, x)
-        )
+        match Env.var env t with
+        | Some v -> walkv env subst v
+        | None   -> Value t
       in
       walkv env subst x
 
     let rec map ~fvar ~fval env subst x =
       Term.map x ~fval
         ~fvar:(fun v ->
-          assert (Env.check env v);
+          Env.check_exn env v;
           match walk env subst v with
           | Var v        -> fvar v
-          | Value (t, x) -> map ~fval ~fvar env subst x
+          | Value x -> map ~fval ~fvar env subst x
         )
 
     let rec fold ~fvar ~fval ~init env subst x =
       Term.fold x ~init ~fval
         ~fvar:(fun acc v ->
-          assert (Env.check env v);
+          Env.check_exn env v;
           match walk env subst v with
           | Var v        -> fvar acc v
-          | Value (t, x) -> fold ~fval ~fvar ~init:acc env subst x
+          | Value x -> fold ~fval ~fvar ~init:acc env subst x
         )
 
     let rec occurs env subst var term =
@@ -898,7 +900,6 @@ module Subst :
       let walk = walk env subst in
       (* The idea is to do the unification and collect the unification prefix during the process *)
       let extend var term (prefix, subst) =
-
         let subst = extend ~scope env subst var term in
         ({var; term = Obj.repr term}::prefix, subst)
       in
@@ -907,11 +908,11 @@ module Subst :
         fold2 x y ~init:acc
           ~fvar:(fun acc x y ->
             match walk x, walk y with
-            | Var x, Var y ->
+            | Var x, Var y      ->
               if Var.equal x y then acc else extend x (Term.repr y) acc
-            | Var x, Value (_, y)         -> extend x y acc
-            | Value (_, x), Var y         -> extend y x acc
-            | Value (_, x), Value (_, y)  -> helper x y acc
+            | Var x, Value y    -> extend x y acc
+            | Value x, Var y    -> extend y x acc
+            | Value x, Value y  -> helper x y acc
           )
           ~fval:(fun acc t x y ->
             if (is_int t x) || (is_str t x) || (is_dbl t x) then
@@ -921,8 +922,8 @@ module Subst :
           )
           ~fvarval:(fun acc v _ y ->
             match walk v with
-            | Var v         -> extend v y acc
-            | Value (_, x)  -> helper x y acc
+            | Var v    -> extend v y acc
+            | Value x  -> helper x y acc
           )
       in
       let x, y = Term.(repr x, repr y) in
@@ -1555,15 +1556,8 @@ module Fresh =
     let pqrst = five
   end
 
-(* let helper_of_state st =
-  !!!(object method isVar x = Env.is_var (State.env st) (Obj.repr x) end) *)
-
 let helper_of_state st =
-  !!!(object method isVar x =
-      Term.inspect (Term.repr x) ~f:(fun tx x ->
-        if Env.is_var (State.env st) tx x then true else false
-      )
-    end)
+  !!!(object method isVar x = Env.is_var (State.env st) x end)
 
 class type ['a,'b] reified = object
   method is_open : bool
