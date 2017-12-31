@@ -366,16 +366,9 @@ module Term :
 
     val repr : 'a -> t
 
-    val var_tag : tag
+    val var : 'a -> Var.t option
 
-    val is_var : 'a -> bool
-    val var    : 'a -> Var.t option
-
-    val is_var : tag -> t -> bool
-    (* val is_val : tag -> t -> bool *)
-    val is_int : tag -> t -> bool
-    val is_str : tag -> t -> bool
-    val is_dbl : tag -> t -> bool
+    val is_val : tag -> bool
 
     val map : fvar:(Var.t -> t) -> fval:(tag -> t -> t) -> t -> t
 
@@ -394,36 +387,41 @@ module Term :
 
     let repr = Obj.repr
 
-    let is_box tx _ =
-      if (tx <= Obj.last_non_constant_constructor_tag) &&
-         (tx >= Obj.first_non_constant_constructor_tag)
-      then true
-      else false
-
     let var_tag, var_size =
       let dummy = Obj.repr Var.dummy in
       Obj.tag dummy, Obj.size dummy
 
-    let is_var tx x =
-      if (tx = var_tag) && (Obj.size x = var_size) then
+    let is_var tx sx x =
+      if (tx = var_tag) && (sx = var_size) then
          let anchor = (Obj.obj x : Var.t).Var.anchor in
          (Obj.is_block @@ Obj.repr anchor) && (Var.valid_anchor anchor)
       else false
 
-    let is_int tx _ = tx = Obj.int_tag
-    let is_str tx _ = tx = Obj.string_tag
-    let is_dbl tx _ = tx = Obj.double_tag
+    let is_box t =
+      if (t <= Obj.last_non_constant_constructor_tag) &&
+         (t >= Obj.first_non_constant_constructor_tag)
+      then true
+      else false
+
+    let is_int = (=) Obj.int_tag
+    let is_str = (=) Obj.string_tag
+    let is_dbl = (=) Obj.double_tag
+
+    let is_val t = (is_box t) || (is_int t) || (is_str t) || (is_dbl t)
 
     let var x =
       let x = Obj.repr x in
-      let tx, sx = Obj.(tag x, size x) in
-      if is_var tx x then Some (Obj.magic x) else None
+      let tx = Obj.tag x in
+      if is_box tx then
+        let sx = Obj.size x in
+        if is_var tx sx x then Some (Obj.magic x) else None
+      else None
 
     let rec map ~fvar ~fval x =
       let tx = Obj.tag x in
-      if (is_box tx x) then
+      if (is_box tx) then
         let sx = Obj.size x in
-        if is_var tx x then
+        if is_var tx sx x then
           fvar @@ Obj.magic x
         else
           let y  = Obj.dup x in
@@ -436,9 +434,9 @@ module Term :
 
     let rec fold ~fvar ~fval ~init x =
       let tx = Obj.tag x in
-      if (is_box tx x) then
+      if (is_box tx) then
         let sx = Obj.size x in
-        if is_var tx x then
+        if is_var tx sx x then
           fvar init @@ Obj.magic x
         else
           let fx = Obj.field x in
@@ -456,10 +454,10 @@ module Term :
 
     let rec fold2 ~fvar ~fval ~fvarval ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
-      match is_box tx x, is_box ty y with
+      match is_box tx, is_box ty with
       | true, true -> begin
         let sx, sy = Obj.size x, Obj.size y in
-        match is_var tx x, is_var ty y with
+        match is_var tx sx x, is_var ty sy y with
         | true, true    -> fvar init (Obj.magic x) (Obj.magic y)
         | true, false   -> fvarval init (Obj.magic x) ty y
         | false, true   -> fvarval init (Obj.magic y) tx x
@@ -477,10 +475,10 @@ module Term :
         end
       | true, false ->
         let sx = Obj.size x in
-        if is_var tx x then fvarval init (Obj.magic x) ty y else raise Different_shape
+        if is_var tx sx x then fvarval init (Obj.magic x) ty y else raise Different_shape
       | false, true ->
         let sy = Obj.size y in
-        if is_var ty y then fvarval init (Obj.magic y) tx x else raise Different_shape
+        if is_var ty sy y then fvarval init (Obj.magic y) tx x else raise Different_shape
       | false, false ->
         if tx = ty then fval init tx x y else raise Different_shape
 
@@ -751,7 +749,7 @@ module Env :
       Term.fold (Term.repr x) ~init:VarSet.empty
         ~fvar:(fun acc v   -> VarSet.add v acc)
         ~fval:(fun acc t x ->
-          if Term.(is_int t x || is_str t x || is_dbl t x) then acc
+          if Term.is_val t then acc
           else failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" t)
         )
 
@@ -868,7 +866,7 @@ module Subst :
       fold env subst term ~init:false
         ~fvar:(fun acc v -> acc || Var.(v.index = var.index))
         ~fval:(fun acc t x ->
-          if Term.(is_int t x || is_str t x || is_dbl t x) then false
+          if Term.is_val t then false
           else
             failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" t)
         )
@@ -915,19 +913,21 @@ module Subst :
             | Value x, Value y  -> helper x y acc
           )
           ~fval:(fun acc t x y ->
-            if (is_int t x) || (is_str t x) || (is_dbl t x) then
+            if Term.is_val t then
               if x = y then acc else raise Unification_failed
             else
               failwith (sprintf "OCanren fatal (Subst.unify): invalid value (%d)" t)
           )
-          ~fvarval:(fun acc v _ y ->
-            match walk v with
-            | Var v    -> extend v y acc
-            | Value x  -> helper x y acc
+          ~fvarval:(fun acc v t y ->
+            if Term.is_val t then
+              match walk v with
+              | Var v    -> extend v y acc
+              | Value x  -> helper x y acc
+            else
+              failwith (sprintf "OCanren fatal (Subst.unify): invalid value (%d)" t)
           )
       in
       let x, y = Term.(repr x, repr y) in
-      (* try Some (helper x y ([], subst)) with Unification_failed | Occurs_check -> None *)
       try
         Some (helper x y ([], subst))
       with Term.Different_shape | Unification_failed | Occurs_check -> None
@@ -936,7 +936,7 @@ module Subst :
       map env subst (Term.repr x)
         ~fvar:(fun v -> Term.repr (f v))
         ~fval:(fun t x ->
-          if Term.(is_int t x || is_str t x || is_dbl t x) then x
+          if Term.is_val t then x
           else failwith (sprintf "OCanren fatal (Subst.reify): invalid value (%d)" t)
         )
 
@@ -944,7 +944,7 @@ module Subst :
       map env subst (Term.repr x)
         ~fvar:(fun v -> Term.repr v)
         ~fval:(fun t x ->
-          if Term.(is_int t x || is_str t x || is_dbl t x) then x
+          if Term.is_val t then x
           else failwith (sprintf "OCanren fatal (Subst.project): invalid value (%d)" t)
         )
 
@@ -960,7 +960,7 @@ module Subst :
               Term.repr @@ new_var
           )
           ~fval:(fun t x ->
-            if Term.(is_int t x || is_str t x || is_dbl t x) then x
+            if Term.is_val t then x
             else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
           )
       in
