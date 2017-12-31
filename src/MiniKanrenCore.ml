@@ -380,9 +380,12 @@ module Term :
 
     val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
 
+    exception Different_shape
+
     val fold2 :
-      f:('a -> tag -> t -> t -> 'a) ->
-      fk:('a -> tag -> tag -> t -> t -> 'a) ->
+      fvar:('a -> Var.t -> Var.t -> 'a) ->
+      fval:('a -> tag -> t -> t -> 'a)  ->
+      fvarval:('a -> Var.t -> tag -> t -> 'a) ->
       init:'a -> t -> t -> 'a
   end = struct
     type t = Obj.t
@@ -409,11 +412,6 @@ module Term :
     let is_int tx _ = tx = Obj.int_tag
     let is_str tx _ = tx = Obj.string_tag
     let is_dbl tx _ = tx = Obj.double_tag
-
-    (* let is_val tx x =
-      if is_box tx x then
-        not is_var tx x
-      else true *)
 
     let inspect ~f x = f (Obj.tag x) @@ Obj.repr x
 
@@ -450,27 +448,37 @@ module Term :
       else
         fval init tx x
 
-    let rec fold2 ~f ~fk ~init x y =
+    exception Different_shape
+
+    let rec fold2 ~fvar ~fval ~fvarval ~init x y =
       let tx, ty = Obj.tag x, Obj.tag y in
-      if tx = ty then
-        if (is_box tx x) then
-          let sx, sy = Obj.size x, Obj.size y in
-          if sx = sy then
-            match is_var tx x, is_var ty y with
-            | true, true    -> f init tx x y
-            | false, false  ->
-              let fx, fy = Obj.field x, Obj.field y in
-              let rec inner i acc =
-                if i < sx then
-                  let acc = fold2 ~f ~fk ~init:acc (fx i) (fy i) in
-                  inner (i+1) acc
-                else acc
-              in
-              inner 0 init
-            | _ -> fk init tx ty x y
-          else fk init tx ty x y
-        else f init tx x y
-      else fk init tx ty x y
+      match is_box tx x, is_box ty y with
+      | true, true -> begin
+        let sx, sy = Obj.size x, Obj.size y in
+        match is_var tx x, is_var ty y with
+        | true, true    -> fvar init (Obj.magic x) (Obj.magic y)
+        | true, false   -> fvarval init (Obj.magic x) ty y
+        | false, true   -> fvarval init (Obj.magic y) tx x
+        | false, false  ->
+          if (tx = ty) && (sx = sy) then
+            let fx, fy = Obj.field x, Obj.field y in
+            let rec inner i acc =
+              if i < sx then
+                let acc = fold2 ~fvar ~fval ~fvarval ~init:acc (fx i) (fy i) in
+                inner (i+1) acc
+              else acc
+            in
+            inner 0 init
+          else raise Different_shape
+        end
+      | true, false ->
+        let sx = Obj.size x in
+        if is_var tx x then fvarval init (Obj.magic x) ty y else raise Different_shape
+      | false, true ->
+        let sy = Obj.size y in
+        if is_var ty y then fvarval init (Obj.magic y) tx x else raise Different_shape
+      | false, false ->
+        if tx = ty then fval init tx x y else raise Different_shape
 
   end
 
@@ -890,52 +898,38 @@ module Subst :
       let walk = walk env subst in
       (* The idea is to do the unification and collect the unification prefix during the process *)
       let extend var term (prefix, subst) =
+
         let subst = extend ~scope env subst var term in
         ({var; term = Obj.repr term}::prefix, subst)
       in
       let rec helper x y acc =
         let open Term in
         fold2 x y ~init:acc
-          ~f:(fun acc t x y ->
-            (* printf "unify-f %d %d\n" t t; *)
-            if Env.is_var env t x then
-              match walk !!!x, walk !!!y with
-              | Var x, Var y ->
-                (* printf "unify vars!\n"; *)
-                if Var.equal x y then acc else extend x !!!y acc
-              | Var x, Value (_, y)         -> extend x y acc
-              | Value (_, x), Var y         -> extend y x acc
-              | Value (_, x), Value (_, y)  -> helper x y acc
-            else if (is_int t x) || (is_str t x) || (is_dbl t x) then
+          ~fvar:(fun acc x y ->
+            match walk x, walk y with
+            | Var x, Var y ->
+              if Var.equal x y then acc else extend x (Term.repr y) acc
+            | Var x, Value (_, y)         -> extend x y acc
+            | Value (_, x), Var y         -> extend y x acc
+            | Value (_, x), Value (_, y)  -> helper x y acc
+          )
+          ~fval:(fun acc t x y ->
+            if (is_int t x) || (is_str t x) || (is_dbl t x) then
               if x = y then acc else raise Unification_failed
             else
               failwith (sprintf "OCanren fatal (Subst.unify): invalid value (%d)" t)
           )
-          ~fk:(fun acc tx ty x y ->
-            (* printf "unify-fk %d %d\n" tx ty; *)
-            if Env.is_var env tx x then
-              (
-                (* printf "unify-fk-x-var %d\n" (!!!x : Var.t).Var.index; *)
-              match walk !!!x with
-              | Var x         -> extend x y acc
-              | Value (_, x)  -> helper x y acc)
-            else if Env.is_var env ty y then
-              (
-                (* printf "unify-fk-y-var %d\n" (!!!y : Var.t).Var.index; *)
-              match walk !!!y with
-              | Var y         -> extend y x acc
-              | Value (_, y)  -> helper x y acc)
-            else
-              (* (printf "tx:%d; sx:%d; ty:%d; sy:%d" tx (Obj.size x) ty (Obj.size y); *)
-              (
-                (* printf "x:%s; y:%s;\n" (generic_show x) (generic_show y); *)
-              raise Unification_failed
-  )
-              (* raise Unification_failed *)
+          ~fvarval:(fun acc v _ y ->
+            match walk v with
+            | Var v         -> extend v y acc
+            | Value (_, x)  -> helper x y acc
           )
       in
       let x, y = Term.(repr x, repr y) in
-      try Some (helper x y ([], subst)) with Unification_failed | Occurs_check -> None
+      (* try Some (helper x y ([], subst)) with Unification_failed | Occurs_check -> None *)
+      try
+        Some (helper x y ([], subst))
+      with Term.Different_shape | Unification_failed | Occurs_check -> None
 
     let reify ~f env subst x = Obj.magic @@
       map env subst (Term.repr x)
