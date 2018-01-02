@@ -864,9 +864,9 @@ module Subst :
 
     let rec occurs env subst var term =
       fold env subst term ~init:false
-        ~fvar:(fun acc v -> acc || Var.(v.index = var.index))
+        ~fvar:(fun acc v -> acc || Var.equal v var)
         ~fval:(fun acc t x ->
-          if Term.is_val t then false
+          if Term.is_val t then acc
           else
             failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" t)
         )
