@@ -34,6 +34,7 @@ transl/PutDistrib.cppo.ml
 transl/smart_mapper.ml
 
 transl/ml2mk_pp.ml
+transl/util.ml
 
 transl/hm_inferencer.ml2mk.ml
 transl/hm_inferencer_run.ml
