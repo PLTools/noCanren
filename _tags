@@ -40,4 +40,4 @@ true: short_paths
 
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
 
-<transl/smart_mapper.*>: package(compiler-libs.common)
+<transl/smart_mapper.*>: package(compiler-libs.common,ppx_tools.metaquot)

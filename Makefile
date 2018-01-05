@@ -37,8 +37,7 @@ ppx:
 plugin:
 	$(OB) camlp5/pa_ocanren.cmo
 
-transl: lib
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/logic_run.native #transl/hm_inferencer_run.native
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/peano_run.native #transl/hm_inferencer_run.native
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin

@@ -271,7 +271,7 @@ let get_translator start_index =
   | Ldot (t, s)  -> Path.Pdot (path_of_longident ~to_lower t, s, 0)
   in
   let rec lowercase_lident ?(to_lower=false) = function
-  | Lident s -> Lident (PutDistrib.mangle_construct_name s)
+  | Lident s -> Lident (Util.mangle_construct_name s)
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident ~to_lower r)
   | Ldot (t, s)  -> Ldot (lowercase_lident ~to_lower t, s)
   in
@@ -331,8 +331,10 @@ let get_translator start_index =
         | Types.Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
                                          name :: calculate right_typ
         | Types.Tlink typ                   -> calculate typ
-        | _                           -> [create_fresh_var_name ()] in
-      calculate typ in
+        | _                           -> [create_fresh_var_name ()]
+      in
+      calculate typ
+    in
 
     let arguments = List.map create_ident argument_names in
 
@@ -689,8 +691,9 @@ let print_if ppf flag printer arg =
   arg
 
 
-let only_generate hook_info tast =
-  try
+let only_generate ~oldstyle hook_info tast =
+  if oldstyle
+  then try
     (*printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
     Format.printf ">>>>\n%!";
     Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
@@ -712,9 +715,21 @@ let only_generate hook_info tast =
     | Lozov.Error e as exc ->
       Lozov.report_error Format.std_formatter e;
       raise exc
+  else
+  try
+    print_endline "new style";
+    let reduced_ast = Smart_mapper.process tast in
+    reduced_ast |>
+    (*PutDistrib.process |>*)
+    print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
+    print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+  with exc ->
+    Printexc.print_backtrace stdout;
+    raise exc
+
 
 let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
-  let new_ast       = only_generate hook_info tast in
+  let new_ast       = only_generate ~oldstyle:false hook_info tast in
 
   try
   (*        let new_ast = [] in*)

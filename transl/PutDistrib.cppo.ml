@@ -67,13 +67,8 @@ type rec_flg_t = Nonrecursive | Recursive
 #endif
 
 
-let mangle_construct_name name =
-  let low = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) name in
-  match low with
-  | "val" | "if" | "else" | "for" | "do" | "let" | "open" | "not" -> low ^ "_"
-  | _ -> low
 
-let lower_lid lid = Location.{lid with txt = mangle_construct_name lid.Location.txt }
+let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
 
 
 let prepare_distribs ~loc tdecl fmap_decl =
