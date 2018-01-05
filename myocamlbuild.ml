@@ -136,7 +136,11 @@ let () = dispatch (function
         let dep = env dep in
         let prod = env prod in
         let tags = tags_of_pathname prod ++ "ml2mk" in
-        Cmd (S[A "transl/ml2mk_pp.native"; T tags; S [A"-rectypes";(* A"-dtypedtree";*) A "-I";A"src";A"-o";P prod]; P dep ])
+        let default_args = [A"-rectypes";(* A"-dtypedtree";*) A "-I";A"src";A"-o";P prod] in
+        let extra_args = [
+          (*  A"-newstyle" *)
+        ] in
+        Cmd (S[A "transl/ml2mk_pp.native"; T tags; S (extra_args @ default_args); P dep ])
       in
       rule ("ml2mk: *.ml2mk."-.-ext^" -> *."-.-ext)        ~dep ~prod:prod1 (ml2mk_rule prod1);
       rule ("ml2mk: **/*.ml2mk."-.-ext^" -> **/*."-.-ext)  ~dep ~prod:prod2 (ml2mk_rule prod2);

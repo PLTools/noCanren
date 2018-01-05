@@ -9,6 +9,7 @@ let dict x y z n = cons !!"y" y @@ cons !!"x" x @@ cons n  z (empty())
 let print x =
   print_endline (match x with Nothing -> "N" | Just v -> if v then "1" else "0")
 
+let (_:int) = dict
 let () =
   let l = [false; true] in
   List.iter (fun x -> List.iter (fun y -> List.iter (fun z -> dict x y z "z" |> calc_left f |> print) l) l) l;
