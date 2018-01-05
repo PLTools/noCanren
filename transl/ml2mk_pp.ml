@@ -27,6 +27,8 @@ open Compenv
 
 (* Keep in sync with the copy in optcompile.ml *)
 
+let old_style_ml2mk = ref true
+
 let tool_name = "ocamlc"
 
 let interface ppf sourcefile outputprefix =
@@ -78,8 +80,7 @@ let implementation ppf sourcefile outputprefix =
       ++ print_if ppf Clflags.dump_typedtree
         Printtyped.implementation_with_coercion
     in
-    let untyped = Genmain.only_generate { Misc.sourcefile = sourcefile } typedtree in
-    print_endline "plugin finished";
+    let untyped = Genmain.only_generate ~oldstyle:(!old_style_ml2mk) { Misc.sourcefile = sourcefile } typedtree in
     let () = Pprintast.structure Format.std_formatter untyped in
 
     let () =
@@ -263,9 +264,13 @@ module Options = Main_args.Make_bytecomp_options (struct
   let anonymous = anonymous
 end)
 
+let all_options =
+  ("-newstyle", Arg.Unit (fun () -> print_endline "PIZDA"; Compile.old_style_ml2mk := false),
+               "switch from old Lozov-style to new style of generation")
+  :: Options.list
 
 let () =
     readenv ppf Before_args;
-    Arg.parse Options.list anonymous usage;
+    Arg.parse all_options anonymous usage;
     ()
 
