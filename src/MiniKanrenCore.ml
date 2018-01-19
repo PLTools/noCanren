@@ -383,6 +383,10 @@ module Term :
       fval:('a -> tag -> t -> t -> 'a)  ->
       fvarval:('a -> Var.t -> tag -> t -> 'a) ->
       init:'a -> t -> t -> 'a
+
+    val equal   : t -> t -> bool
+    val compare : t -> t -> int
+    val hash    : t -> int
   end = struct
     type t = Obj.t
     type tag = int
@@ -496,6 +500,19 @@ module Term :
       | false, false ->
         if tx = ty then fval init tx x y else raise Different_shape
 
+    let equal = fold2 ~init:true
+      ~fvar:(fun acc v u -> acc && (Var.equal v u))
+      ~fval:(fun acc _ x y -> acc && (x = y))
+      ~fvarval:(fun _ _ _ _ -> false)
+
+    let compare = fold2 ~init:0
+      ~fvar:(fun acc v u -> if acc <> 0 then acc else (Var.compare v u))
+      ~fval:(fun acc _ x y -> if acc <> 0 then acc else (compare x y))
+      ~fvarval:(fun _ _ _ _ -> -1)
+
+    let hash = fold ~init:1
+      ~fvar:(fun acc v -> Hashtbl.hash (acc, Var.hash v))
+      ~fval:(fun acc _ x -> Hashtbl.hash (acc, Hashtbl.hash x))
   end
 
 let (!!!) = Obj.magic
@@ -775,16 +792,48 @@ module Env :
       {anchor=anchor1; next = max next1 next2}
   end
 
+module Binding :
+  sig
+    type t =
+      { var   : Var.t
+      ; term  : Term.t
+      }
+
+    val is_relevant : Env.t -> VarSet.t -> t -> bool
+
+    val equal : t -> t -> bool
+    val compare : t -> t -> int
+    val hash : t -> int
+  end =
+  struct
+    type t =
+      { var   : Var.t
+      ; term  : Term.t
+      }
+
+    let is_relevant env vs {var; term} =
+      (VarSet.mem var vs) ||
+      (match Env.var env term with Some v -> VarSet.mem v vs | None -> false)
+
+    let equal {var=v; term=t} {var=u; term=p} =
+      (Var.equal v u) || (Term.equal t p)
+
+    let compare {var=v; term=t} {var=u; term=p} =
+      let res = Var.compare v u in
+      if res <> 0 then res else Term.compare t p
+
+    let hash {var; term} = Hashtbl.hash (Var.hash var, Term.hash term)
+  end
+
 module Subst :
   sig
     type t
-    type content = {var : Var.t; term : Obj.t }
 
     val empty : t
 
-    val of_list : content list -> t
+    val of_list : Binding.t list -> t
 
-    val split : t -> content list
+    val split : t -> Binding.t list
 
     (* [project env subst x] - performs a deepwalk of term [x],
      *   replacing every variable to relevant binding in [subst];
@@ -812,7 +861,7 @@ module Subst :
      *   Otherwise it returns a pair of prefix and new substituion.
      *   Prefix is a list of pairs (var, term) that were added to the original substituion.
      *)
-    val unify : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (content list * t) option
+    val unify : scope:Var.scope -> Env.t -> t -> 'a -> 'a -> (Binding.t list * t) option
 
     val reify : f:(Var.t -> Var.t) -> Env.t -> t -> 'a -> 'a
 
@@ -826,18 +875,16 @@ module Subst :
     val size: t -> int
   end =
   struct
-    type content = {var : Var.t; term : Obj.t }
-
     type t = Term.t VarMap.t
 
     let empty = VarMap.empty
 
     let of_list =
-      ListLabels.fold_left ~init:empty ~f:(fun subst cnt ->
-        VarMap.add cnt.var !!!(cnt.term) subst
+      ListLabels.fold_left ~init:empty ~f:(let open Binding in fun subst {var; term} ->
+        VarMap.add var term subst
       )
 
-    let split s = VarMap.fold (fun var term xs -> {var; term = !!!term}::xs) s []
+    let split s = VarMap.fold (fun var term xs -> Binding.({var; term})::xs) s []
 
     type lterm = Var of Var.t | Value of Term.t
 
@@ -923,7 +970,7 @@ module Subst :
       (* The idea is to do the unification and collect the unification prefix during the process *)
       let extend var term (prefix, subst) =
         let subst = extend ~scope env subst var term in
-        ({var; term = Obj.repr term}::prefix, subst)
+        (Binding.({var; term})::prefix, subst)
       in
       let rec helper x y acc =
         let open Term in
@@ -1042,12 +1089,12 @@ module Disequality :
     (* [of_disj env subst] build a disequality constraint store from a list of bindings
      *   Ex. [(x, 5); (y, 6)] --> (x =/= 5) \/ (y =/= 6)
      *)
-    val of_disj : Env.t -> Subst.content list -> t
+    val of_disj : Env.t -> Binding.t list -> t
 
     (* [of_conj env subst] build a disequality constraint store from a list of bindings
      *   Ex. [(x, 5); (y, 6)] --> (x =/= 5) /\ (y =/= 6)
      *)
-    val of_conj : Env.t -> Subst.content list -> t
+    val of_conj : Env.t -> Binding.t list -> t
 
     (* [to_cnf env subst diseq] - returns new disequality in cnf representation *)
     val to_cnf : Env.t -> Subst.t -> t -> cnf
@@ -1075,13 +1122,13 @@ module Disequality :
      *   This function may rebuild internal representation of constraints and thus it returns new object.
      *   Raises [Disequality_violated].
      *)
-    val check : prefix:Subst.content list -> Env.t -> Subst.t -> t -> t
+    val check : prefix:Binding.t list -> Env.t -> Subst.t -> t -> t
 
     (* [extend ~prefix env diseq] - extends disequality with new bindings.
      *   New bindings are interpreted as formula in DNF.
      *   Ex. [(x, 5); (y, 6)] --> (x =/= 5) \/ (y =/= 6)
      *)
-    val extend : prefix:Subst.content list -> Env.t -> t -> t
+    val extend : prefix:Binding.t list -> Env.t -> t -> t
 
     (* [merge env diseq1 diseq2] - merges two disequality stores *)
     val merge : Env.t -> t -> t -> t
@@ -1128,7 +1175,7 @@ module Disequality :
         type t
 
         (* [of_list diseqs] build single disjunction from list of disequalities *)
-        val of_list : Subst.content list -> t
+        val of_list : Binding.t list -> t
 
         (* [check env subst disj] - checks that disjunction of disequalities is
          *   not violated in (current) substitution.
@@ -1146,7 +1193,7 @@ module Disequality :
          *   2) When we want to reify an answer we again try to unify current substitution with disequalities.
          *        Then we look into `disequality` prefix for bindings that should not be met.
          *)
-        val refine : Env.t -> Subst.t -> t -> (Subst.content list * Subst.t) option
+        val refine : Env.t -> Subst.t -> t -> (Binding.t list * Subst.t) option
 
         (* returns an index of variable involved in some disequality inside disjunction *)
         val index : t -> int
@@ -1154,7 +1201,7 @@ module Disequality :
         val reify : Var.t -> t -> 'a
       end =
       struct
-        type t = { sample : Subst.content; unchecked : Subst.content list }
+        type t = { sample : Binding.t; unchecked : Binding.t list }
 
         let choose_sample unchecked =
           assert (unchecked <> []);
@@ -1167,11 +1214,11 @@ module Disequality :
         type status =
           | Fulfiled
           | Violated
-          | Refined of Subst.content list * Subst.t
+          | Refined of Binding.t list * Subst.t
 
         let refine' env subst =
-        let open Subst in fun { var; term } ->
-          match unify ~scope:Var.non_local_scope env subst !!!var term with
+        let open Binding in fun { var; term } ->
+          match Subst.unify ~scope:Var.non_local_scope env subst !!!var term with
           | None                  -> Fulfiled
           | Some ([], _)          -> Violated
           | Some (prefix, subst)  -> Refined (prefix, subst)
@@ -1203,13 +1250,14 @@ module Disequality :
             result
 
         let reify var {sample; unchecked} =
+          let open Binding in
           if unchecked <> []
           then invalid_arg "OCanren fatal (Disequality.reify): attempting to reify unnormalized disequalities"
           else
-            assert (var.Var.index = sample.Subst.var.Var.index);
-            !!!(sample.Subst.term)
+            assert (Var.equal var sample.var);
+            !!!(sample.term)
 
-        let index {sample} = sample.Subst.var.index
+        let index {sample} = sample.Binding.var.index
       end
 
     module Index :
@@ -1241,9 +1289,9 @@ module Disequality :
 
     type t = Index.t
 
-    type cnf = Subst.content list list
+    type cnf = Binding.t list list
 
-    type dnf = Subst.content list list
+    type dnf = Binding.t list list
 
     let empty = Index.empty
 
@@ -1278,10 +1326,10 @@ module Disequality :
       else
       ListLabels.fold_left prefix ~init:cstore
         ~f:(fun cstore cnt ->
-          let var_idx = cnt.Subst.var.Var.index in
+          let var_idx = cnt.Binding.var.Var.index in
           let conj = Index.get var_idx cstore in
           let stayed1, rebound1 = revisit_conjuncts var_idx conj in
-          let cstore, rebound2 = match Env.var env cnt.Subst.term with
+          let cstore, rebound2 = match Env.var env cnt.Binding.term with
             | Some v ->
               let n = v.Var.index in
               let stayed2, rebound2 = revisit_conjuncts n @@ Index.get n cstore in
@@ -1319,26 +1367,19 @@ module Disequality :
       )
 
     let normalize cnf =
-      let compare_bindings =
-        let open Subst in fun {var=v1; term=t1} {var=v2; term=t2} ->
-        if Var.equal v1 v2 then
-          compare t1 t2
-        else
-          Var.compare v1 v2
-      in
       let compare_disj ds1 ds2 =
         let rec helper ds1 ds2 =
           match ds1, ds2 with
           | [], [] -> 0
           | (d1::ds1), (d2::ds2) ->
-            let res = compare_bindings d1 d2 in
+            let res = Binding.compare d1 d2 in
             if res <> 0 then res else helper ds1 ds2
         in
         let l1, l2 = List.length ds1, List.length ds2 in
         let res = compare l1 l2 in
         if res <> 0 then res else helper ds1 ds2
       in
-      let sort_disj = List.sort compare_bindings in
+      let sort_disj = List.sort Binding.compare in
       List.sort compare_disj @@ List.map sort_disj cnf
 
     let cnf_to_dnf =
@@ -1355,15 +1396,11 @@ module Disequality :
     let project env subst cs fv =
       (* fixpoint-like computation of disequalities relevant to variables in [fv] *)
       let rec helper fv =
-        let open Subst in
-        let is_relevant fv {var; term} =
-          (VarSet.mem var fv) ||
-          (match Env.var env term with Some v -> VarSet.mem v fv | None -> false)
-        in
+        let open Binding in
         (* left those disjuncts that contains binding only for variables from [fv] *)
         let cs' = ListLabels.fold_left cs ~init:[]
           ~f:(fun acc disj ->
-            if List.for_all (is_relevant fv) disj then
+            if List.for_all (is_relevant env fv) disj then
               disj::acc
             else
               acc
@@ -1398,7 +1435,7 @@ module Disequality :
 
     let refresh ?(mapping = VarTbl.create 31) ~scope dst_env src_env subst cs =
       let refresh_binding =
-        let open Subst in fun {var; term} ->
+        let open Binding in fun {var; term} ->
         let new_var =
           try
             VarTbl.find mapping var
