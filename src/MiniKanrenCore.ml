@@ -372,6 +372,8 @@ module Term :
 
     val map : fvar:(Var.t -> t) -> fval:(tag -> t -> t) -> t -> t
 
+    val iter : fvar:(Var.t -> unit) -> fval:(tag -> t -> unit) -> t -> unit
+
     val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
 
     exception Different_shape
@@ -424,11 +426,24 @@ module Term :
         if is_var tx sx x then
           fvar @@ Obj.magic x
         else
-          let y  = Obj.dup x in
-          for i = 0 to sx-1 do
+          let y = Obj.dup x in
+          for i = 0 to sx - 1 do
             Obj.set_field y i @@ map ~fvar ~fval (Obj.field x i)
           done;
           y
+      else
+        fval tx x
+
+    let rec iter ~fvar ~fval x =
+      let tx = Obj.tag x in
+      if (is_box tx) then
+        let sx = Obj.size x in
+        if is_var tx sx x then
+          fvar @@ Obj.magic x
+        else
+          for i = 0 to sx - 1 do
+            iter ~fvar ~fval (Obj.field x i)
+          done;
       else
         fval tx x
 
@@ -439,10 +454,9 @@ module Term :
         if is_var tx sx x then
           fvar init @@ Obj.magic x
         else
-          let fx = Obj.field x in
           let rec inner i acc =
             if i < sx then
-              let acc = fold ~fvar ~fval ~init:acc (fx i) in
+              let acc = fold ~fvar ~fval ~init:acc (Obj.field x i) in
               inner (i+1) acc
             else acc
           in
@@ -844,53 +858,63 @@ module Subst :
       in
       walkv env subst x
 
-    let rec map ~fvar ~fval env subst x =
-      Term.map x ~fval
-        ~fvar:(fun v ->
-          Env.check_exn env v;
-          match walk env subst v with
-          | Var v        -> fvar v
-          | Value x -> map ~fval ~fvar env subst x
-        )
+    let map ~fvar ~fval env subst x =
+      let rec deepfvar v =
+        Env.check_exn env v;
+        match walk env subst v with
+        | Var v   -> fvar v
+        | Value x -> Term.map x ~fval ~fvar:deepfvar
+      in
+      Term.map x ~fval ~fvar:deepfvar
 
-    let rec fold ~fvar ~fval ~init env subst x =
-      Term.fold x ~init ~fval
-        ~fvar:(fun acc v ->
-          Env.check_exn env v;
-          match walk env subst v with
-          | Var v        -> fvar acc v
-          | Value x -> fold ~fval ~fvar ~init:acc env subst x
-        )
+    let iter ~fvar ~fval env subst x =
+      let rec deepfvar v =
+        Env.check_exn env v;
+        match walk env subst v with
+        | Var v   -> fvar v
+        | Value x -> Term.iter x ~fval ~fvar:deepfvar
+      in
+      Term.iter x ~fval ~fvar:deepfvar
+
+    let fold ~fvar ~fval ~init env subst x =
+      let rec deepfvar acc v =
+        Env.check_exn env v;
+        match walk env subst v with
+        | Var v   -> fvar acc v
+        | Value x -> Term.fold x ~fval ~fvar:deepfvar ~init:acc
+      in
+      Term.fold x ~init ~fval ~fvar:deepfvar
+
+    exception Occurs_check
 
     let rec occurs env subst var term =
-      fold env subst term ~init:false
-        ~fvar:(fun acc v -> acc || Var.equal v var)
-        ~fval:(fun acc t x ->
-          if Term.is_val t then acc
+      iter env subst term
+        (* ~fvar:(fun acc v -> acc || Var.equal v var) *)
+        ~fvar:(fun v -> if Var.equal v var then raise Occurs_check)
+        ~fval:(fun t x ->
+          if Term.is_val t then ()
           else
             failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" t)
         )
 
-    exception Occurs_check
-
     let extend ~scope env subst var term  =
-      if occurs env subst var term then raise Occurs_check
-      else
+      (* if occurs env subst var term then raise Occurs_check *)
+      occurs env subst var term;
         (* assert (Env.var env var <> Env.var env term); *)
 
-        (* It is safe to modify variables destructively if the case of scopes match.
-         * There are two cases:
-         * 1) If we do unification just after a conde, then the scope is already incremented and nothing goes into
-         *    the fresh variables.
-         * 2) If we do unification after a fresh, then in case of failure it doesn't matter if
-         *    the variable is be distructively substituted: we will not look on it in future.
-         *)
-        if scope = var.scope
-        then begin
-          var.subst <- Some (Obj.repr term);
-          subst
-        end
-          else VarMap.add var (Term.repr term) subst
+      (* It is safe to modify variables destructively if the case of scopes match.
+       * There are two cases:
+       * 1) If we do unification just after a conde, then the scope is already incremented and nothing goes into
+       *    the fresh variables.
+       * 2) If we do unification after a fresh, then in case of failure it doesn't matter if
+       *    the variable is be distructively substituted: we will not look on it in future.
+       *)
+      if scope = var.scope
+      then begin
+        var.subst <- Some (Obj.repr term);
+        subst
+      end
+        else VarMap.add var (Term.repr term) subst
 
     exception Unification_failed
 
