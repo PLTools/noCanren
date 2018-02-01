@@ -216,56 +216,6 @@ module Stream =
   end
 ;;
 
-
-let (!!!) = Obj.magic
-
-type w = Unboxed of Obj.t | Boxed of int * int * (int -> Obj.t) | Invalid of int
-
-let is_valid_tag t =
-  Obj.(
-    not (List.mem t
-      [lazy_tag    ; closure_tag; object_tag; infix_tag    ; forward_tag    ; no_scan_tag;
-       abstract_tag; custom_tag ; custom_tag; unaligned_tag; out_of_heap_tag
-      ])
-  )
-
-let rec wrap x =
-  Obj.(
-    let is_unboxed obj =
-      is_int obj ||
-      (fun t -> t = string_tag || t = double_tag) (tag obj)
-    in
-    if is_unboxed x
-    then Unboxed x
-    else
-      let t = tag x in
-      if is_valid_tag t
-      then
-        let f = if t = double_array_tag then !!! double_field else field in
-        Boxed (t, size x, f x)
-      else Invalid t
-    )
-
-let generic_show ?(maxdepth=99999) x =
-  let x = Obj.repr x in
-  let b = Buffer.create 1024 in
-  let rec inner depth o =
-    if depth > maxdepth then Buffer.add_string b "..." else
-      match wrap o with
-      | Invalid n                                         -> Buffer.add_string b (Printf.sprintf "<invalid %d>" n)
-      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
-      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
-      | Unboxed n                                         -> Buffer.add_string b (Printf.sprintf "int<%d>" (!!!n))
-      | Boxed  (t, l, f) ->
-          Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-          for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
-          Buffer.add_string b ">"
-  in
-  inner 0 x;
-  Buffer.contents b
-
-;;
-
 @type 'a logic =
 | Var   of GT.int * 'a logic GT.list
 | Value of 'a with show, gmap, html, eq, compare, foldl, foldr
@@ -358,26 +308,49 @@ module VarSet = Set.Make(Var)
 module VarMap = Map.Make(Var)
 module VarTbl = Hashtbl.Make(Var)
 
+(* [Term] - encapsulates unsafe operations on OCaml's values extended with logic variables;
+ *   provides set of functions to traverse these values
+ *)
 module Term :
   sig
-    type t = Obj.t
+    type t
 
     type tag = int
 
     val repr : 'a -> t
 
+    (* [var x] if [x] is logic variable returns it, otherwise returns [None] *)
     val var : 'a -> Var.t option
 
-    val is_val : tag -> bool
+    (* [is_valid_tag t] checks that tag is correct;
+     *   (some OCaml's tags such as [closure_tag] are forbidden because
+     *    the unification of such values is not supported currently)
+     *)
+    val is_valid_tag : tag -> bool
 
+    (* [map ~fvar ~fval x] map over OCaml's value extended with logic variables;
+     *   handles primitive types with the help of [fval] and logic variables with the help of [fvar]
+     *)
     val map : fvar:(Var.t -> t) -> fval:(tag -> t -> t) -> t -> t
 
+    (* [iter ~fvar ~fval x] iteration over OCaml's value extended with logic variables;
+     *   handles primitive types with the help of [fval] and logic variables with the help of [fvar]
+     *)
     val iter : fvar:(Var.t -> unit) -> fval:(tag -> t -> unit) -> t -> unit
 
+    (* [fold ~fvar ~fval ~init x] fold over OCaml's value extended with logic variables;
+     *   handles primitive types with the help of [fval] and logic variables with the help of [fvar]
+     *)
     val fold : fvar:('a -> Var.t -> 'a) -> fval:('a -> tag -> t -> 'a) -> init:'a -> t -> 'a
 
     exception Different_shape
 
+    (* [fold ~fvar ~fval ~fvarval ~init x y] folds two OCaml's value extended with logic variables simultaneously;
+     *   handles primitive types with the help of [fval] and logic variables with the help of [fvar];
+     *   if it finds logic variable in one term but regular value in another in same place,
+     *   it calls [fvarval];
+     *   if two terms cannot be traversed simultaneously raises exception [Different_shape]
+     *)
     val fold2 :
       fvar:('a -> Var.t -> Var.t -> 'a) ->
       fval:('a -> tag -> t -> t -> 'a)  ->
@@ -413,7 +386,7 @@ module Term :
     let is_str = (=) Obj.string_tag
     let is_dbl = (=) Obj.double_tag
 
-    let is_val t = (is_box t) || (is_int t) || (is_str t) || (is_dbl t)
+    let is_valid_tag t = (is_box t) || (is_int t) || (is_str t) || (is_dbl t)
 
     let var x =
       let x = Obj.repr x in
@@ -780,7 +753,7 @@ module Env :
       Term.fold (Term.repr x) ~init:VarSet.empty
         ~fvar:(fun acc v   -> VarSet.add v acc)
         ~fval:(fun acc t x ->
-          if Term.is_val t then acc
+          if Term.is_valid_tag t then acc
           else failwith (sprintf "OCanren fatal (Env.free_vars): invalid value (%d)" t)
         )
 
@@ -870,9 +843,6 @@ module Subst :
 
     (* [is_subsumed env s1 s2] checks that s1 is subsumed by s2 (i.e. s2 is more general than s1) *)
     val is_subsumed : Env.t -> t -> t -> bool
-
-    val print: t -> (Obj.t -> string) -> unit
-    val size: t -> int
   end =
   struct
     type t = Term.t VarMap.t
@@ -905,6 +875,7 @@ module Subst :
       in
       walkv env subst x
 
+    (* same as [Term.map] but performs [walk] on the road *)
     let map ~fvar ~fval env subst x =
       let rec deepfvar v =
         Env.check_exn env v;
@@ -914,6 +885,7 @@ module Subst :
       in
       Term.map x ~fval ~fvar:deepfvar
 
+    (* same as [Term.iter] but performs [walk] on the road *)
     let iter ~fvar ~fval env subst x =
       let rec deepfvar v =
         Env.check_exn env v;
@@ -923,6 +895,7 @@ module Subst :
       in
       Term.iter x ~fval ~fvar:deepfvar
 
+    (* same as [Term.fold] but performs [walk] on the road *)
     let fold ~fvar ~fval ~init env subst x =
       let rec deepfvar acc v =
         Env.check_exn env v;
@@ -939,7 +912,7 @@ module Subst :
         (* ~fvar:(fun acc v -> acc || Var.equal v var) *)
         ~fvar:(fun v -> if Var.equal v var then raise Occurs_check)
         ~fval:(fun t x ->
-          if Term.is_val t then ()
+          if Term.is_valid_tag t then ()
           else
             failwith (sprintf "OCanren fatal (Subst.occurs): invalid value (%d)" t)
         )
@@ -984,13 +957,13 @@ module Subst :
             | Value x, Value y  -> helper x y acc
           )
           ~fval:(fun acc t x y ->
-            if Term.is_val t then
+            if Term.is_valid_tag t then
               if x = y then acc else raise Unification_failed
             else
               failwith (sprintf "OCanren fatal (Subst.unify): invalid value (%d)" t)
           )
           ~fvarval:(fun acc v t y ->
-            if Term.is_val t then
+            if Term.is_valid_tag t then
               match walk v with
               | Var v    -> extend v y acc
               | Value x  -> helper x y acc
@@ -1007,7 +980,7 @@ module Subst :
       map env subst (Term.repr x)
         ~fvar:(fun v -> Term.repr (f v))
         ~fval:(fun t x ->
-          if Term.is_val t then x
+          if Term.is_valid_tag t then x
           else failwith (sprintf "OCanren fatal (Subst.reify): invalid value (%d)" t)
         )
 
@@ -1015,7 +988,7 @@ module Subst :
       map env subst (Term.repr x)
         ~fvar:(fun v -> Term.repr v)
         ~fval:(fun t x ->
-          if Term.is_val t then x
+          if Term.is_valid_tag t then x
           else failwith (sprintf "OCanren fatal (Subst.project): invalid value (%d)" t)
         )
 
@@ -1031,7 +1004,7 @@ module Subst :
               Term.repr @@ new_var
           )
           ~fval:(fun t x ->
-            if Term.is_val t then x
+            if Term.is_valid_tag t then x
             else failwith (sprintf "OCanren fatal (Subst.refresh): invalid value (%d)" t)
           )
       in
@@ -1058,13 +1031,6 @@ module Subst :
         | Some ([], _)  -> true
         | _             -> false
       )
-
-
-      let size = VarMap.cardinal
-        let print map f =
-          VarMap.iter (fun key term ->
-              printf "\t\t%d -> %s\n%!" key.Var.index (f @@ Obj.repr term)
-            ) map
   end
 
 module Int = struct type t = int let compare = (-) end
@@ -2102,51 +2068,3 @@ let diseqtrace shower x y = fun st ->
 
 let report_counters () = ()
 *)
-let pretty_generic_show ?(maxdepth= 99999) is_var x =
-  let x = Obj.repr x in
-  let b = Buffer.create 1024 in
-  let rec inner depth term =
-    if depth > maxdepth then Buffer.add_string b "..." else
-    if is_var !!!term then begin
-      let var = (!!!term : Var.t) in
-      match var.subst with
-      | Some term ->
-          bprintf b "{ _.%d with subst=" var.index;
-          inner (depth+1) term;
-          bprintf b " }"
-      | None -> bprintf b "_.%d" var.index
-    end else match wrap term with
-      | Invalid n                                         -> bprintf b "<invalid %d>" n
-      | Unboxed s when Obj.(string_tag = (tag @@ repr s)) -> bprintf b "\"%s\"" (!!!s)
-      | Unboxed n when !!!n = 0                           -> Buffer.add_string b "[]"
-      | Unboxed n                                         -> bprintf b  "int<%d>" (!!!n)
-      | Boxed  (t, l, f) ->
-        Buffer.add_string b (Printf.sprintf "boxed %d <" t);
-        for i = 0 to l - 1 do (inner (depth+1) (f i); if i<l-1 then Buffer.add_string b " ") done;
-        Buffer.add_string b ">"
-  in
-  inner 0 x;
-  Buffer.contents b
-
-
-let logged_unif_counter = ref 0
-
-
-let unitrace shower x y = fun st ->
-  incr logged_unif_counter;
-
-  let () =
-      let subst = (State.subst st) in
-      printf " Performing unification on substutution of length %d\n%!" (Subst.size subst);
-      Subst.print subst (pretty_generic_show (fun x -> Env.var (State.env st) x <> None));
-   in
-
-  let ans = (x === y) st in
-  printf "%d: unify '%s' and '%s'" !logged_unif_counter (shower (helper_of_state st) x) (shower (helper_of_state st) y);
-  (* (match loc with Some l -> printf " on %s" l | None -> ()); *)
-
-  (* if !logged_unif_counter > 30 then assert false; *)
-
-  if Stream.Internal.is_empty ans then printf "  -\n"
-  else  printf "  +\n";
-  ans
