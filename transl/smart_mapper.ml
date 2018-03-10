@@ -6,11 +6,14 @@ open Ast_helper
 module Untypeast = struct
   include Untypeast
 
-  let untype_pattern {pat_desc; pat_loc=loc} =
+  let pattern {pat_desc; pat_loc=loc} =
     match pat_desc with
     | Tpat_any -> Pat.any ~loc ()
     | Tpat_var (_,str) -> Pat.var ~loc str
     | _ -> failwith "Not implemented"
+
+  let type_declaration = default_mapper.type_declaration default_mapper
+  let expr = default_mapper.expr default_mapper
 end
 module Exp = struct
   include Exp
@@ -32,37 +35,39 @@ end
 class virtual ['self] transformation = object(self: 'self)
   inherit ['self ] smart_mapper
 
-  method type_declaration _ = Untypeast.untype_type_declaration
+  method type_declaration _ = Untypeast.type_declaration
 
   method expression inh e = match e.exp_desc with
     | Texp_constant _           -> self#translate_constant e
     | Texp_construct (n, _cd, es) -> self#translate_construct n.txt n.loc es
-    (*#if OCAML_VERSION > (4, 02, 2)
-    | Texp_match (e, cs, _, _)  -> translate_match sub e cs x.exp_type
-    #else*)
-    | Texp_match (e, cs, _, _, _)  -> self#translate_match e cs e.exp_type
-(*    #endif*)
+    (* #if OCAML_VERSION > (4, 02, 2) *)
+    | Texp_match (e, cs, _, _)  -> self#translate_match e cs e.exp_type
+    (* #else
+    *  | Texp_match (e, cs, _, _, _)  -> self#translate_match e cs e.exp_type
+    * #endif *)
     | Texp_apply (func, args)   -> self#translate_apply func args e.exp_type
-    | Texp_function (label, [{c_lhs=p; c_guard=None; c_rhs=e}], _) ->
-        Exp.fun_ label None (Untypeast.untype_pattern p) (self#expression inh e)
-    | Texp_function ("", cases, _) ->
+    | Texp_function {cases=[case1]; arg_label} when arg_label <> Nolabel ->
+        Exp.fun_ arg_label None (Untypeast.pattern case1.c_lhs)
+          (self#expression inh case1.c_rhs)
+    | Texp_function {cases} ->
         let untype_case {c_lhs; c_guard; c_rhs} =
-          { Parsetree.pc_lhs = Untypeast.untype_pattern c_lhs
+          { Parsetree.pc_lhs = Untypeast.pattern c_lhs
           ; pc_rhs = self#expression inh c_rhs
           ; pc_guard = None (* TODO: finish implementation *)
           }
         in
         Exp.function_ (List.map untype_case cases)
-    | Texp_function _ -> assert false
+    (* | Texp_function _ -> assert false *)
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = "===" -> self#translate_eq e
-    | _ -> Untypeast.untype_expression e
+    | _ -> Untypeast.expr e
 
   method structure {str_items; str_type; str_final_env} =
     List.concat @@ List.map (self#structure_item str_type str_final_env) str_items
   method structure_item _typ _env item =
     match item.str_desc with
-    | Tstr_type tdecls -> Untypeast.untype_structure {str_items=[item]; str_type=_typ; str_final_env = _env }
+    | Tstr_type (_,tdecls) -> Untypeast.untype_structure {str_items=[item]; str_type=_typ; str_final_env = _env }
     | Tstr_value (flg, vbs) -> self#value_bindings flg vbs
+    | _ -> failwith "wtf"
 
   method virtual value_bindings : rec_flag -> Typedtree.value_binding list -> Parsetree.structure_item list
   method virtual translate_constant : expression -> Parsetree.expression
@@ -71,7 +76,7 @@ class virtual ['self] transformation = object(self: 'self)
   method virtual translate_eq : expression -> Parsetree.expression
   method virtual translate_apply :
         Typedtree.expression ->
-        (Asttypes.label * Typedtree.expression option * Typedtree.optional) list ->
+        (Asttypes.arg_label * Typedtree.expression option) list ->
         Types.type_expr ->
         Parsetree.expression
 end
@@ -98,7 +103,7 @@ class ['self] transformation_impl = object(self: 'self)
   method value_bindings flg xs =
     (*List.map (fun {vb_expr;vb_loc} -> [%stri let x = 1]) xs*)
     List.map (fun {vb_expr;vb_loc; vb_pat} ->
-      Str.value flg [Vb.mk (Untypeast.untype_pattern vb_pat) @@ self#expression () vb_expr]
+      Str.value flg [Vb.mk (Untypeast.pattern vb_pat) @@ self#expression () vb_expr]
     ) xs
   method translate_constant _ = assert false
   method translate_construct lident loc args =

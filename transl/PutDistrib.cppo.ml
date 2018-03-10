@@ -42,12 +42,13 @@ let extract_names = List.map (fun typ ->
       failwith (sprintf "Don't know what to do with %s" (Format.flush_str_formatter ()))
   )
 
-let str_type_ flg =
-#if OCAML_VERSION > (4, 02, 2)
-      fun xs -> Ast_helper.Str.type_ xs
-#else
-      fun ~loc xs -> Ast_helper.Str.type_ ~loc xs
-#endif
+let str_type_ = Ast_helper.Str.type_
+(* let str_type_ flg =
+ * #if OCAML_VERSION > (4, 02, 2)
+ *       fun xs -> Ast_helper.Str.type_ xs
+ * #else
+ *       fun ~loc xs -> Ast_helper.Str.type_ ~loc xs
+ * #endif *)
 
 let nolabel =
 #if OCAML_VERSION > (4, 02, 2)
@@ -171,16 +172,16 @@ let revisit_adt ~loc tdecl ctors =
                           let new_name = sprintf "a%d" n in
                           (n+1, FoldInfo.extend new_name arg arg map, (Typ.var new_name)::args)
             )
-(*#if OCAML_VERSION > (4, 02, 2)
+#if OCAML_VERSION > (4, 02, 2)
             (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
-#else*)
+#else
             cd.pcd_args
-(*#endif*)
+#endif
             (n, acc_map,[])
           in
-(*#if OCAML_VERSION > (4, 02, 2)
+#if OCAML_VERSION > (4, 02, 2)
           let new_args = Pcstr_tuple new_args in
-#endif*)
+#endif
           (n, map2, { cd with pcd_args = new_args } :: cs)
       )
       ctors

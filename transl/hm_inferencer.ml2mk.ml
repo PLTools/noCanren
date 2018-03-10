@@ -55,7 +55,7 @@ type 'a lambda =
 (*********************************************************************************)
 (*********************************************************************************)
 (*********************************************************************************)
-(*
+
 let rec remove e l =
   match l with
   | Nil           -> Nil
@@ -376,5 +376,3 @@ let nat_type_inference term = type_inference Z (fun n -> S n) term
 
 let term1 = Let ("f", Abst("x", Var "x"), App(Var "f", Abst("x", App(Var "f", Var "x"))))
 let term2 = App(Abst("f", App(Var "f", Abst("x", App(Var "f", Var "x")))), Abst("x", Var "x"))
-
-*)
