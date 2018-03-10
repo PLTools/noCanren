@@ -122,7 +122,7 @@ let implementation ppf sourcefile outputprefix =
       Typetexp.report_error env Format.std_formatter e;
       Format.printf "\n%!";
       raise exc
-    | Misc.HookExnWrapper wr -> raise wr.Misc.error
+    (* | Misc.HookExnWrapper wr -> raise wr.Misc.error *)
     | x -> raise x
 
 let c_file name =
@@ -174,13 +174,17 @@ let usage = "Usage: ocamlc <options> <files>\nOptions are:"
 
 let ppf = Format.err_formatter
 
+let before_compile s =
+  (* in 4.02 we ignore argument *)
+  Before_compile s
+
 (* Error messages to standard error formatter *)
 let anonymous filename =
-  readenv ppf Before_compile; process_file ppf filename;;
+  readenv ppf (before_compile filename); process_file ppf filename;;
 let impl filename =
-  readenv ppf Before_compile; process_implementation_file ppf filename;;
+  readenv ppf (before_compile filename); process_implementation_file ppf filename;;
 let intf filename =
-  readenv ppf Before_compile; process_interface_file ppf filename;;
+  readenv ppf (before_compile filename); process_interface_file ppf filename;;
 
 let show_config () =
   Config.print_config stdout;
@@ -261,6 +265,28 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _drawlambda = set dump_rawlambda
   let _dlambda = set dump_lambda
   let _dinstr = set dump_instr
+
+  let _opaque = set opaque
+  let _no_principal = unset principal
+  let _no_rectypes = unset recursive_types
+  let _no_strict_sequence = unset strict_sequence
+  let _no_strict_formats = unset strict_formats
+  let _unboxed_types = set unboxed_types
+  let _no_unboxed_types = unset unboxed_types
+  let _color option =
+    begin match parse_color_setting option with
+          | None -> ()
+          | Some setting -> color := Some setting
+    end
+  let _dtimings () = profile_columns := [ `Time ]
+  let _dprofile () = profile_columns := Profile.all_columns
+  let _alias_deps = unset transparent_modules
+  let _app_funct = set applicative_functors
+  let _args = Arg.read_arg
+  let _args0 = Arg.read_arg0
+  let _no_keep_docs = unset keep_docs
+  let _no_keep_locs = unset keep_locs
+
   let anonymous = anonymous
 end)
 
