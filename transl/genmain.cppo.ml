@@ -288,7 +288,10 @@ let get_translator start_index =
       ; cstr_private = Public
       ; cstr_loc = Location.none
       ; cstr_attributes = []
-    } in
+#if OCAML_VERSION > (4, 02, 2)
+      ; cstr_inlined = None
+#endif
+      } in
     Texp_construct (mknoloc @@ Lident "()", cd, []) |> expr_desc_to_expr
   in
 
