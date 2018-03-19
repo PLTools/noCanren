@@ -138,7 +138,7 @@ let () = dispatch (function
         let tags = tags_of_pathname prod ++ "ml2mk" in
         let default_args = [A"-rectypes";(* A"-dtypedtree";*) A "-I";A"src";A"-o";P prod] in
         let extra_args = [
-           A"-newstyle" 
+           (* A"-newstyle" *)
         ] in
         Cmd (S[A "transl/ml2mk_pp.native"; T tags; S (extra_args @ default_args); P dep ])
       in
