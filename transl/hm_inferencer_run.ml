@@ -29,5 +29,5 @@ let () =
   ()
 
 let () =
-  run_exn myshow (-1) q  qh  ("typeof term1", (fun q -> nat_type_inference term0 q  ) );
+  run_exn myshow (-1) q  qh  ("typeof term1", (fun q -> nat_type_inference term2 q  ) );
   ()
