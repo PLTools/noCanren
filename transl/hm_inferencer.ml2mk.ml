@@ -1,6 +1,6 @@
-type 'a my_list =
- | Nil
- | Cons of 'a * 'a my_list
+type num =
+ | Z
+ | S of num
 
 (*********************************************************************************)
 
@@ -10,9 +10,9 @@ type 'a maybe =
 
 (*********************************************************************************)
 
-type num =
- | Z
- | S of num
+type 'a my_list =
+ | Nil
+ | Cons of 'a * 'a my_list
 
 (*********************************************************************************)
 
@@ -304,8 +304,8 @@ let rec ti fv fresher env term =
     match lookup v env with
     | Nothing -> Nothing
     | Just gt ->
-      let pair = instantiate fv fresher gt in
-      match pair with
+      let pair0 = instantiate fv fresher gt in
+      match pair0 with
       | Pair (t, fv') -> ret Nil t fv'
   end
   | Lit l       -> ret Nil (ti_literal l) fv
@@ -313,8 +313,8 @@ let rec ti fv fresher env term =
     let gt    = Gen (Nil, TVar fv) in
     let env'  = Cons (Pair(v, gt), env) in
     let fv'   = fresher fv in
-    let tuple = ti fv' fresher env' b in
-    mb_bind tuple
+    let tuple0 = ti fv' fresher env' b in
+    mb_bind tuple0
     (fun tpl ->
       match tpl with
       | Tuple (s, t, fv'') ->
@@ -361,8 +361,8 @@ let rec ti fv fresher env term =
 (*********************************************************************************)
 
 let type_inference first_var fresher term =
- let tuple = ti first_var fresher Nil term in
-  mb_bind tuple
+ let tuple0 = ti first_var fresher Nil term in
+  mb_bind tuple0
   (fun tpl ->
     match tpl with
     | Tuple (s, t, fv) -> Just (apply s t)
@@ -374,5 +374,10 @@ let nat_type_inference term = type_inference Z (fun n -> S n) term
 
 (*********************************************************************************)
 
+let test0 = Var "x"
+let term0 = Abst("x", Var "x")
 let term1 = Let ("f", Abst("x", Var "x"), App(Var "f", Abst("x", App(Var "f", Var "x"))))
 let term2 = App(Abst("f", App(Var "f", Abst("x", App(Var "f", Var "x")))), Abst("x", Var "x"))
+
+
+let the_true = true=false
