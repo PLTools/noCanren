@@ -89,7 +89,11 @@ let prepare_distribs ~loc tdecl fmap_decl =
             (mknoloc "t") ]
         ])
   ; Str.value Asttypes.Nonrecursive @@ List.map (fun {pcd_name; pcd_args} ->
-      let names = get_param_names pcd_args in
+        let names =
+          let Pcstr_tuple xs = pcd_args in
+          List.mapi (fun n _ -> Printf.sprintf "x__%d" n) xs
+        in
+
       let open Exp in
       let body =
         let constr_itself = construct @@ mknoloc (Lident pcd_name.txt) in
