@@ -17,13 +17,8 @@ let rec show_number num =
 let () =
   run_exn show_number (-1) q  qh ("incr ? 2", (fun q     -> Peano.(incr ((===)q) (s (s @@ o ()))  )) );
 
-  run_exn show_number (-1) q  qh ("mul  2 4 ?", (fun q     ->
+  run_exn show_number (-1) q  qh ("incr ? 2 4", (fun q     ->
       let open Peano in
-      mul  ((===)(s (s @@ o ()))) ((===)(s @@ s @@ s @@ s @@ o ()))  q
-  ));
-
-  (* run_exn show_number (-1) q  qh ("incr ? 2 4", (fun q     ->
-   *     let open Peano in
-   *     mul ((===)q) ((===)(s (s @@ o ()))) (s (s @@ (s (s @@ o ())))) )
-   * ); *)
+      mul ((===)q) ((===)(s (s @@ o ()))) (s (s @@ (s (s @@ o ())))) )
+  );
   ()
