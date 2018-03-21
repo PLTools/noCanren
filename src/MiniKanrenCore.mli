@@ -380,6 +380,12 @@ val qrst : unit ->
      ('b1 * ('c1 * ('d1 * 'e1)))  * 'f1))
 
 (** {2 Building reifiers compositionally } *)
+module type T0 = 
+sig
+  type t
+  val fmap :  t -> t
+end
+
 module type T1 =
   sig
     type 'a t
@@ -415,6 +421,13 @@ sig
   type ('a, 'b, 'c, 'd, 'e, 'f) t
   val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('f -> 'v) -> ('a, 'b, 'c, 'd, 'e, 'f) t -> ('q, 'r, 's, 't, 'u, 'v) t
 end
+
+
+module Fmap0 (T : T0) :
+  sig
+    val distrib : T.t -> (T.t, T.t) injected
+    val reify : helper -> (T.t, T.t logic as 'r) injected -> 'r
+  end
 
 module Fmap1 (T : T1) :
   sig

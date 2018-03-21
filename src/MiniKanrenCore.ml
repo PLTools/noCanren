@@ -324,6 +324,11 @@ external lift: 'a -> ('a, 'a) injected = "%identity"
 external inj: ('a, 'b) injected -> ('a, 'b logic) injected = "%identity"
 
 (* ************************************************************************** *)
+module type T0 = sig
+  type t
+  val fmap :  t -> t
+end
+
 module type T1 = sig
   type 'a t
   val fmap : ('a -> 'b) -> 'a t -> 'b t
@@ -358,6 +363,16 @@ let var_of_injected_exn : helper -> ('a,'b) injected -> (helper -> ('a,'b) injec
     let x : inner_logic = !!!x in
     !!!(Var (x.index, List.map (!!!(r c)) x.constraints))
   else failwith "Bad argument of var_of_injected: it should be logic variable"
+
+module Fmap0 (T : T0) = struct
+  external distrib : T.t -> (T.t, T.t) injected = "%identity"
+
+  let rec reify: helper -> (T.t, T.t logic as 'r) injected -> 'r
+    = fun c x ->
+      if c#isVar x
+      then var_of_injected_exn c x reify
+      else Value (T.fmap x)
+end
 
 module Fmap1 (T : T1) = struct
   external distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected = "%identity"
