@@ -491,6 +491,41 @@ let get_translator start_index =
 
   (****)
 
+  let translate_if (sub : Tast_mapper.mapper) cond th el typ =
+   let argument_names =
+      let rec calculate (typ : Types.type_expr) =
+        match typ.Types.desc with
+        | Types.Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
+                                         name :: calculate right_typ
+        | Types.Tlink typ                   -> calculate typ
+        | _                           -> [create_fresh_var_name ()]
+      in
+      calculate typ
+    in
+
+    let arguments = List.map create_ident argument_names in
+
+    let cond_var_name = create_fresh_var_name () in
+    let cond_var = create_ident cond_var_name in
+
+    let create_branch case branch =
+      let tanslated_branch = sub.expr sub branch in
+      let branch_with_args = create_apply tanslated_branch arguments in
+      let case_checker     = create_unify cond_var case in
+      create_and case_checker branch_with_args in
+
+
+   let const_true  = create_constructor true_name [] |> create_inj in
+   let const_false = create_constructor false_name [] |> create_inj in
+   let both_cases = create_conde [create_branch const_true th; create_branch const_false el] in
+
+   let translated_cond = create_apply (sub.expr sub cond) [cond_var] in
+   let cond_with_cases = create_and translated_cond both_cases in
+   let body_with_fresh = create_fresh cond_var_name cond_with_cases in
+   List.fold_right create_fun argument_names body_with_fresh in
+
+  (****)
+
   let translate_eq (sub : Tast_mapper.mapper) =
 
     let name_arg_l  = create_fresh_var_name () in
@@ -544,6 +579,8 @@ let get_translator start_index =
 #else
     | Texp_match (e, cs, _, _, _)  -> translate_match sub e cs x.exp_type
 #endif
+    | Texp_ifthenelse (cond, th, Some el) -> translate_if sub cond th el x.exp_type
+
     | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub
@@ -672,6 +709,11 @@ let beta_reductor =
       let new_vbs  = List.map (fun v -> let vb_expr = beta_reduction v.vb_expr [] in { v with vb_expr } ) val_binds in
       let new_rest = beta_reduction rest args in
       let exp_desc = Texp_let (rec_flag, new_vbs, new_rest) in
+      { expr with exp_desc }
+
+    | Texp_construct (name, desc, exprs) ->
+      let new_exprs = List.map (fun x -> beta_reduction x []) exprs in
+      let exp_desc = Texp_construct (name, desc, new_exprs) in
       { expr with exp_desc }
 
     | _ ->
