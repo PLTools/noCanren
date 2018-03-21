@@ -1521,6 +1521,10 @@ end : sig
 
   val prjc : (int -> 'a list -> 'a) -> Env.t -> ('a, 'a logic) injected -> 'a
 
+module type T0 = sig
+  type t
+  val fmap :  t -> t
+end
 module type T1 =
   sig
     type 'a t
@@ -1556,6 +1560,16 @@ module type T6 =
     type ('a, 'b, 'c, 'd, 'e, 'f) t
     val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('f -> 'v) -> ('a, 'b, 'c, 'd, 'e, 'f) t -> ('q, 'r, 's, 't, 'u, 'v) t
   end
+
+module Fmap0 (T : T0) = struct
+  external distrib : T.t -> (T.t, T.t) injected = "%identity"
+
+  let rec reify: helper -> (T.t, T.t logic as 'r) injected -> 'r
+    = fun c x ->
+      if c#isVar x
+      then var_of_injected_exn c x reify
+      else Value (T.fmap x)
+end
 
 module Fmap (T : T1) :
   sig
