@@ -18,6 +18,7 @@ open Location
 (*****************************************************************************************************************************)
 
 let eq_name          = "="
+let neq_name         = "<>"
 let true_name        = "true"
 let false_name       = "false"
 
@@ -527,7 +528,7 @@ let get_translator start_index =
 
   (****)
 
-  let translate_eq (sub : Tast_mapper.mapper) =
+  let translate_eq (sub : Tast_mapper.mapper) is_equality =
 
     let name_arg_l  = create_fresh_var_name () in
     let name_arg_r  = create_fresh_var_name () in
@@ -544,12 +545,12 @@ let get_translator start_index =
     let const_true  = create_constructor true_name [] |> create_inj in
     let const_false = create_constructor false_name [] |> create_inj in
 
-    let out_unify_true  = create_unify ident_out const_true in
-    let out_unify_false = create_unify ident_out const_false in
+    let out_unify_eq    = create_unify ident_out (if is_equality then const_true else const_false) in
+    let out_unify_neq   = create_unify ident_out (if is_equality then const_false else const_true) in
     let l_unify_r       = create_unify ident_l ident_r in
     let l_des_constr_r  = create_des_constr ident_l ident_r in
-    let first_and       = create_and l_unify_r out_unify_true in
-    let second_and      = create_and l_des_constr_r out_unify_false in
+    let first_and       = create_and l_unify_r out_unify_eq in
+    let second_and      = create_and l_des_constr_r out_unify_neq in
     let full_or         = create_or first_and second_and in
 
     let apply_l = create_apply ident_arg_l [ident_l] in
@@ -584,7 +585,9 @@ let get_translator start_index =
 
     | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
 
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub true
+
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq sub false
 
     | _ -> Tast_mapper.default.expr sub x in
 
