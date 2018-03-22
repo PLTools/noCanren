@@ -675,6 +675,10 @@ let beta_reductor =
       let new_rest = if var_in_binds then rest else substitutor rest var subst in
       let exp_desc = Texp_let (rec_flag, new_vbs, new_rest) in
       { expr with exp_desc }
+    | Texp_construct (name, desc, exprs) ->
+      let new_exprs = List.map (fun x -> substitutor x var subst) exprs in
+      let exp_desc = Texp_construct (name, desc, new_exprs) in
+      {  expr with exp_desc }
     | _ -> expr in
 
   let rec beta_reduction expr args =
