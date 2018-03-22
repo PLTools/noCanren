@@ -306,14 +306,18 @@ let get_translator start_index =
 #if OCAML_VERSION > (4, 02, 2)
       let make a = (Nolabel, Some a) in
 #else
-      let make a = ("", Some a , Required) in
+      let make a = ("", Some a, Required) in
 #endif
       let args = match fresh_vars with
       | [] -> [texp_unit]
       | xs -> xs
       in
+      let gen_constr_name name = match name with
+      | Lident "[]" -> Lident "nil"
+      | Lident "::" -> Lident "%"
+      | _           -> lowercase_lident ~to_lower:true name in
       Typedtree.Texp_apply
-        (Texp_ident (path_of_longident name.txt, {name with txt = lowercase_lident ~to_lower:true @@ name.txt}, dummy_val_desc) |> expr_desc_to_expr,
+        (Texp_ident (path_of_longident name.txt, {name with txt = gen_constr_name name.txt}, dummy_val_desc) |> expr_desc_to_expr,
           List.map make args)
         |> expr_desc_to_expr
     in
@@ -379,17 +383,14 @@ let get_translator start_index =
       let funs_for_subst    = List.map2 create_fun lambda_arg_names unifies_for_subst |> List.map (fun x -> [x]) in
       let body_with_subst   = List.fold_left create_apply body_with_lambda funs_for_subst in
 
-      let cnstr_desc =
-        match pattern.pat_desc with
-        | Tpat_constant const          -> Texp_constant const
-        | Tpat_construct (name, cd, _) -> Texp_construct (name, cd, fresh_args) in
-
       let cnstr             =
         match pattern.pat_desc with
         | Tpat_constant const          -> (Texp_constant const) |> expr_desc_to_expr |> create_inj
         | Tpat_construct ({txt = Lident s}, _, _) when (s = "true" || s = "false") ->
             let flid = Location.mknoloc (Lident s) in
             Texp_ident (path_of_longident (Lident s), flid, dummy_val_desc) |> expr_desc_to_expr |> create_inj
+        | Tpat_construct ({txt = Lident "[]"}, _, _) -> create_apply (create_ident "nil") [texp_unit]
+        | Tpat_construct ({txt = Lident "::"}, _, _) -> create_apply (create_ident "%") fresh_args
         | Tpat_construct (name, cd, [])  ->
             let flid =
               let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
