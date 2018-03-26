@@ -38,7 +38,12 @@ plugin:
 transl: lib
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/peano_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/test4_run.native
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/hm_inferencer_run.native
+        #$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/hm_inferencer_run.native
+
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game1_GCW_run.native
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game2_bridge_run.native
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game3_bottles_run.native
+
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
 	@# undefined symbol: caml_int_of_string while loading argument of -plugin

@@ -37,6 +37,15 @@ true: short_paths
 <transl/hm_inferencer.*>: dsource, rectypes, use_ocanren_modules
 <transl/hm_inferencer_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
+<transl/games/game1_GCW.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game1_GCW_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
+
+<transl/games/game2_bridge.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game2_bridge_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
+
+<transl/games/game3_bottles.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game3_bottles_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
+
 <transl/logic.*>: rectypes, use_ocanren_modules
 <transl/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
 
