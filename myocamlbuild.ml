@@ -1,63 +1,6 @@
 open Printf
 open Ocamlbuild_plugin;;
 
-let ends_with ~suffix s =
-  let slen = String.length suffix in
-  (String.length s >= slen) && (Str.last_chars s slen = suffix)
-
-let fold f =
-  let l = ref [] in
-  (try while true do l @:= [f ()] done with _ -> ());
-  !l
-
-let split_comma = Str.split_delim (Str.regexp ",")
-
-let fold_pflag scan =
-  List.fold_left
-    (fun acc x -> try split_comma (scan x (fun x -> x)) @ acc with _ -> acc)
-    []
-
-let ocamlfind cmd f =
-  let p = Printf.sprintf in
-  let cmd = List.map (p "\"%s\"") cmd in
-  let cmd = p "ocamlfind query %s" (String.concat " " cmd) in
-  Pack.My_unix.run_and_open cmd (fun ic -> fold (fun () -> f ic))
-
-let link_opts prod =
-  let (all_pkgs, predicates) =
-    let tags = Tags.elements (tags_of_pathname prod) in
-    let pkgs = fold_pflag (fun x -> Scanf.sscanf x "package(%[^)])") tags in
-    let predicates = fold_pflag (fun x -> Scanf.sscanf x "predicate(%[^)])") tags in
-    ("js_of_ocaml" :: pkgs, predicates)
-  in
-
-  (* Findlib usualy set pkg_* predicate for all selected packages *)
-  (* It doesn't do it with 'query' command, we have to it manualy. *)
-  let cmd = "-format" :: "pkg_%p" :: "-r" :: all_pkgs in
-  let predicates_pkgs = ocamlfind cmd (fun ic -> input_line ic) in
-
-  let all_predicates = String.concat "," ("javascript" :: predicates @ predicates_pkgs) in
-
-  (* query findlib for linking option *)
-  let cmd = "-o-format" :: "-r" :: "-predicates" :: all_predicates :: all_pkgs in
-  ocamlfind cmd (fun ic -> A (input_line ic))
-
-
-(*let library_index = Hashtbl.create 32
-let package_index = Hashtbl.create 32
-let hidden_packages: string list ref = ref []
-
-let hide_package_contents package = hidden_packages := package :: !hidden_packages*)
-
-(*module Ocaml_dependencies_input = struct
-  let fold_dependencies = Pack.Resource.Cache.fold_dependencies
-  let fold_libraries f = Hashtbl.fold f library_index
-  let fold_packages f = Hashtbl.fold f package_index
-end
-module Ocaml_dependencies = Pack.Ocaml_dependencies.Make(Ocaml_dependencies_input)
-*)
-
-
 open Command;;
 
 let () = dispatch (function
