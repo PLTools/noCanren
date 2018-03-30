@@ -1,4 +1,5 @@
 open MiniKanren
+open MiniKanrenStd
 open Game2_bridge
 open Tester
 
