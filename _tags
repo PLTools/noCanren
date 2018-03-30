@@ -51,6 +51,7 @@ true: short_paths
 
 <transl/logic.*>: rectypes, use_ocanren_modules
 <transl/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
+<transl/games/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
 
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
 

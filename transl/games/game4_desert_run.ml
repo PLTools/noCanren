@@ -1,4 +1,5 @@
 open MiniKanren
+open MiniKanrenStd
 open Game4_desert
 open Tester
 

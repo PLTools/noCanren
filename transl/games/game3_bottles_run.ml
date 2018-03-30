@@ -1,4 +1,5 @@
 open MiniKanren
+open MiniKanrenStd
 open Game3_bottles
 open Tester
 
