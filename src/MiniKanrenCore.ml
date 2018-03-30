@@ -1378,6 +1378,12 @@ include (struct
 
 type ('a, 'b) injected = 'a
 
+module type T0 =
+  sig
+    type t
+    val fmap :  t -> t
+  end
+
 module type T1 =
   sig
     type 'a t
@@ -1424,7 +1430,22 @@ let rec prjc of_int env x =
   | Some v -> let i, cs = Var.reify (prjc of_int env) v in of_int i cs
   | None   -> Obj.magic x
 
-module Fmap (T : T1) =
+module Fmap0 (T : T0) =
+  struct
+    external distrib : T.t -> (T.t, T.t) injected = "%identity"
+
+    let rec reify env x =
+      match Env.var env x with
+      | Some v -> let i, cs = Var.reify (reify env) v in Var (i, cs)
+      | None   -> Value (T.fmap x)
+
+    let rec prjc of_int env x =
+      match Env.var env x with
+      | Some v -> let i, cs = Var.reify (prjc of_int env) v in of_int i cs
+      | None   -> T.fmap x
+end
+
+module Fmap1 (T : T1) =
   struct
     external distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected = "%identity"
 
@@ -1561,17 +1582,16 @@ module type T6 =
     val fmap : ('a -> 'q) -> ('b -> 'r) -> ('c -> 's) -> ('d -> 't) -> ('e -> 'u) -> ('f -> 'v) -> ('a, 'b, 'c, 'd, 'e, 'f) t -> ('q, 'r, 's, 't, 'u, 'v) t
   end
 
-module Fmap0 (T : T0) = struct
-  external distrib : T.t -> (T.t, T.t) injected = "%identity"
+module Fmap0 (T : T0) :
+  sig
+    val distrib : T.t -> (T.t, T.t) injected
+    val reify : Env.t -> (T.t, T.t logic as 'r) injected -> 'r
+    val prjc  :
+      (int -> 'r list -> (T.t as 'r)) ->
+      Env.t -> ('r, T.t logic) injected -> 'r
+  end
 
-  let rec reify: helper -> (T.t, T.t logic as 'r) injected -> 'r
-    = fun c x ->
-      if c#isVar x
-      then var_of_injected_exn c x reify
-      else Value (T.fmap x)
-end
-
-module Fmap (T : T1) :
+module Fmap1 (T : T1) :
   sig
     val distrib : ('a,'b) injected T.t -> ('a T.t, 'b T.t) injected
 

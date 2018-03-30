@@ -15,7 +15,7 @@ module Nat =
   *)    
 @type 'nat move = Forward of 'nat | Backward of 'nat | Unload of 'nat | Fill of 'nat with show, gmap
 
-module M = Fmap (struct type 'a t = 'a move let fmap f = gmap(move) f end)
+module M = Fmap1 (struct type 'a t = 'a move let fmap f = gmap(move) f end)
 
 let show_move  m = show(logic) (show(move) (show(Nat.logic))) m
 let show_moves m = show(List.logic) show_move m

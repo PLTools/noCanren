@@ -131,7 +131,7 @@ module Option =
       end
 
     include T
-    include Fmap (T)
+    include Fmap1 (T)
 
     let some x  = MiniKanrenCore.inj @@ distrib (Some x)
     let none () = MiniKanrenCore.inj @@ distrib None
@@ -244,7 +244,7 @@ module Nat =
 
     include X
 
-    module F = Fmap (X)
+    module F = Fmap1 (X)
 
     type ground = ground t
     type logic = logic t logic'

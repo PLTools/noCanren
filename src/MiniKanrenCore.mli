@@ -464,10 +464,10 @@ module Tabling :
 
 (** {2 Building reifiers for a custom type compositionally} *)
 module type T0 =
-sig
-  type t
-  val fmap :  t -> t
-end
+  sig
+    type t
+    val fmap :  t -> t
+  end
 
 module type T1 =
   sig
@@ -508,7 +508,10 @@ module type T6 =
 module Fmap0 (T : T0) :
   sig
     val distrib : T.t -> (T.t, T.t) injected
-    val reify : helper -> (T.t, T.t logic as 'r) injected -> 'r
+    val reify : Env.t -> (T.t, T.t logic as 'r) injected -> 'r
+    val prjc  :
+      (int -> 'r list -> (T.t as 'r)) ->
+      Env.t -> ('r, T.t logic) injected -> 'r
   end
 
 module Fmap1 (T : T1) :
