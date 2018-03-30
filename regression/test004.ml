@@ -14,7 +14,7 @@ module Peano =
      end
 
   include T
-  include Fmap (T)
+  include Fmap1 (T)
 
   type ground = ground T.t
   type lnat = lnat t logic
