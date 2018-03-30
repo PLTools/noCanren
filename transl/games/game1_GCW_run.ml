@@ -1,4 +1,5 @@
 open MiniKanren
+open MiniKanrenStd
 open Game1_GCW
 open Tester
 
