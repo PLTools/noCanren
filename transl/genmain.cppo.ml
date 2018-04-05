@@ -569,14 +569,14 @@ let get_translator start_index need_tabling =
     let rec is_func_type (t : Types.type_expr) =
       match t.desc with
       | Tarrow _ -> true
-      | Tlink t' -> is_primary_type t'
+      | Tlink t' -> is_func_type t'
       | _        -> false in
 
     let rec has_func_arg (t : Types.type_expr) =
       match t.desc with
       | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
-      | Tlink t' -> has_func_arg t'
-      | _        -> false in
+      | Tlink t'         -> has_func_arg t'
+      | _                -> false in
 
     let translate_binding bind =
       let body            = bind.vb_expr in
