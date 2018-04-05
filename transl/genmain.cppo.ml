@@ -17,19 +17,26 @@ open Location
 
 (*****************************************************************************************************************************)
 
-let eq_name          = "="
-let neq_name         = "<>"
-let true_name        = "true"
-let false_name       = "false"
+let dummy_name          = "dummy"
 
-let logic_type_name  = "logic"
-let inj_name         = "!!"
-let uniq_name        = "==="
-let des_constr_name  = "=/="
-let or_name          = "|||"
-let and_name         = "&&&"
-let fresh_name       = "call_fresh"
-let fresh_var_prefix = "q"
+let eq_name             = "="
+let neq_name            = "<>"
+let true_name           = "true"
+let false_name          = "false"
+
+let logic_type_name     = "logic"
+let inj_name            = "!!"
+let uniq_name           = "==="
+let des_constr_name     = "=/="
+let or_name             = "|||"
+let and_name            = "&&&"
+let fresh_name          = "call_fresh"
+let fresh_var_prefix    = "q"
+
+let tabling_module_name = "Tabling"
+let tabling_one_name    = "one"
+let tabling_succ_name   = "succ"
+let tabling_rec_name    = "tabledrec"
 
 (*****************************************************************************************************************************)
 
@@ -68,8 +75,15 @@ let expr_desc_to_expr ed =
   { exp_desc = ed; exp_loc = loc; exp_extra = []; exp_type = type_expr; exp_env = Env.empty; exp_attributes = [] }
 
 let create_ident name =
-  let path     = create_path name in
+  let path     = create_path dummy_name in
   let fullname = create_fullname name in
+  let val_desc = {Types.val_type = type_expr; val_kind = Types.Val_reg; val_loc = loc; val_attributes = [] } in
+  let exp_desc = Texp_ident (path, fullname, val_desc) in
+  expr_desc_to_expr exp_desc
+
+let create_ident_with_dot nl nr =
+  let path     = create_path dummy_name in
+  let fullname = { txt = Longident.parse (nl ^ "." ^ nr); loc = loc } in
   let val_desc = {Types.val_type = type_expr; val_kind = Types.Val_reg; val_loc = loc; val_attributes = [] } in
   let exp_desc = Texp_ident (path, fullname, val_desc) in
   expr_desc_to_expr exp_desc
@@ -199,7 +213,7 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
-let get_translator start_index =
+let get_translator start_index need_tabling =
 
   (****)
 
@@ -245,12 +259,21 @@ let get_translator start_index =
     | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
     | Ttype_open      -> raise (Error (NotYetSupported "open types"))
   in *)
+
   (****)
 
   let create_fresh_var_name () =
     let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
     curr_index := !curr_index + 1;
     name in
+
+  (****)
+
+  let rec create_fresh_argument_names_by_type (typ : Types.type_expr) need_for_res =
+    match typ.Types.desc with
+    | Types.Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ need_for_res
+    | Types.Tlink typ                   -> create_fresh_argument_names_by_type typ need_for_res
+    | _                                 -> if need_for_res then [create_fresh_var_name ()] else [] in
 
   (****)
 
@@ -262,6 +285,7 @@ let get_translator start_index =
     create_fun output_var_name unify_const in
 
   (****)
+
   let rec path_of_longident ?(to_lower=false) = function
   | Lident s ->
       Path.Pident (Ident.create "wtf")
@@ -333,18 +357,8 @@ let get_translator start_index =
 
   let translate_match (sub : Tast_mapper.mapper) expr cases (typ : Types.type_expr) =
 
-    let argument_names =
-      let rec calculate (typ : Types.type_expr) =
-        match typ.Types.desc with
-        | Types.Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
-                                         name :: calculate right_typ
-        | Types.Tlink typ                   -> calculate typ
-        | _                           -> [create_fresh_var_name ()]
-      in
-      calculate typ
-    in
-
-    let arguments = List.map create_ident argument_names in
+    let argument_names = create_fresh_argument_names_by_type typ true in
+    let arguments      = List.map create_ident argument_names in
 
     let translated_expr = sub.expr sub expr in
     let unify_var_name  = create_fresh_var_name() in
@@ -431,26 +445,18 @@ let get_translator start_index =
 
   (****)
 
+  let rec is_primary_type (t : Types.type_expr) =
+    match t.desc with
+    | Tarrow _ -> false
+    | Tlink t' -> is_primary_type t'
+    | _        -> true in
+
   let translate_apply (sub : Tast_mapper.mapper) func args parent_type =
 
     let func = sub.expr sub func in
 
-    let rec is_primary_type (t : Types.type_expr) =
-      match t.desc with
-      | Tarrow _ -> false
-      | Tlink t' -> is_primary_type t'
-      | _        -> true in
-
-    let external_argument_names =
-      let rec calculate (typ : Types.type_expr) =
-        match typ.desc with
-        | Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
-                                         name :: calculate right_typ
-        | Tlink typ                   -> calculate typ
-        | _                           -> [create_fresh_var_name ()] in
-      calculate parent_type in
-
-    let external_arguments = List.map create_ident external_argument_names in
+    let external_argument_names = create_fresh_argument_names_by_type parent_type true in
+    let external_arguments      = List.map create_ident external_argument_names in
 
     let args =
 #if OCAML_VERSION > (4, 02, 2)
@@ -494,21 +500,11 @@ let get_translator start_index =
   (****)
 
   let translate_if (sub : Tast_mapper.mapper) cond th el typ =
-   let argument_names =
-      let rec calculate (typ : Types.type_expr) =
-        match typ.Types.desc with
-        | Types.Tarrow (_, _, right_typ, _) -> let name = create_fresh_var_name () in
-                                         name :: calculate right_typ
-        | Types.Tlink typ                   -> calculate typ
-        | _                           -> [create_fresh_var_name ()]
-      in
-      calculate typ
-    in
-
-    let arguments = List.map create_ident argument_names in
+    let argument_names = create_fresh_argument_names_by_type typ true in
+    let arguments      = List.map create_ident argument_names in
 
     let cond_var_name = create_fresh_var_name () in
-    let cond_var = create_ident cond_var_name in
+    let cond_var      = create_ident cond_var_name in
 
     let create_branch case branch =
       let tanslated_branch = sub.expr sub branch in
@@ -569,6 +565,99 @@ let get_translator start_index =
 
   (****)
 
+  let translate_letrec_bindings_with_tibling sub binds =
+    let rec is_func_type (t : Types.type_expr) =
+      match t.desc with
+      | Tarrow _ -> true
+      | Tlink t' -> is_primary_type t'
+      | _        -> false in
+
+    let rec has_func_arg (t : Types.type_expr) =
+      match t.desc with
+      | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
+      | Tlink t' -> has_func_arg t'
+      | _        -> false in
+
+    let translate_binding bind =
+      let body            = bind.vb_expr in
+      let transtated_body = sub.expr sub body in
+      let typ             = body.exp_type in
+
+      if has_func_arg typ then let vb_expr = transtated_body in { bind with vb_expr } else
+        let Tpat_var (name, _)    = bind.vb_pat.pat_desc in
+        let unrec_body            = create_fun name.name transtated_body in
+
+        let recfunc_argument_name = create_fresh_var_name () in
+        let recfunc_argument      = create_ident recfunc_argument_name in
+
+        let argument_names1       = create_fresh_argument_names_by_type typ false in
+        let arguments1            = List.map create_ident argument_names1 in
+        let res_arg_name_1        = create_fresh_var_name () in
+        let rec_arg_1             = create_ident res_arg_name_1 in
+
+        let argument_names2       = create_fresh_argument_names_by_type typ false in
+        let arguments2            = List.map create_ident argument_names2 in
+
+        let recfunc_with_args     = create_apply recfunc_argument (List.append arguments2 [rec_arg_1]) in
+        let conjuncts1            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments1 arguments2 in
+        let conjs_and_recfunc     = List.fold_right create_and conjuncts1 recfunc_with_args in
+        let freshing_and_recfunc  = List.fold_right create_fresh argument_names2 conjs_and_recfunc in
+        let lambdas_and_recfunc   = List.fold_right create_fun (List.append argument_names1 [res_arg_name_1]) freshing_and_recfunc in
+
+        let argument_names3       = create_fresh_argument_names_by_type typ false in
+        let arguments3            = List.map create_ident argument_names3 in
+
+        let argument_names4       = create_fresh_argument_names_by_type typ false in
+        let arguments4            = List.map create_ident argument_names4 in
+        let unified_vars1         = List.map2 create_unify arguments3 arguments4 in
+        let lambda_vars1          = List.map2 create_fun argument_names3 unified_vars1 in
+
+        let new_nody              = create_apply unrec_body (lambdas_and_recfunc :: lambda_vars1) in
+        let lambda_new_body       = List.fold_right create_fun (recfunc_argument_name :: argument_names4) new_nody in
+
+        let succ                  = create_ident_with_dot tabling_module_name tabling_succ_name in
+        let one                   = create_ident_with_dot tabling_module_name tabling_one_name in
+        let tabledrec             = create_ident_with_dot tabling_module_name tabling_rec_name in
+
+        let rec get_tabling_rank (typ : Types.type_expr) =
+          match typ.Types.desc with
+          | Types.Tarrow (_, _, right_typ, _) -> create_apply succ [get_tabling_rank right_typ]
+          | Types.Tlink typ                   -> get_tabling_rank typ
+          | _                                 -> one in
+
+        let tabling_rank          = get_tabling_rank typ in
+        let tabled_body           = create_apply tabledrec [tabling_rank; lambda_new_body] in
+
+        let argument_names5       = create_fresh_argument_names_by_type typ false in
+        let arguments5            = List.map create_ident argument_names5 in
+        let res_arg_name_5        = create_fresh_var_name () in
+        let rec_arg_5             = create_ident res_arg_name_5 in
+
+        let argument_names6       = create_fresh_argument_names_by_type typ false in
+        let arguments6            = List.map create_ident argument_names6 in
+
+        let tabled_body_with_args = create_apply tabled_body (List.append arguments6 [rec_arg_5]) in
+
+        let conjuncts2            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments5 arguments6 in
+        let conjs_and_tabled      = List.fold_right create_and conjuncts2 tabled_body_with_args in
+        let freshing_and_tabled   = List.fold_right create_fresh argument_names6 conjs_and_tabled in
+        let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
+
+        let vb_expr = lambdas_and_tabled in
+        { bind with vb_expr } in
+
+    List.map translate_binding binds in
+
+  (****)
+
+  let structure_item sub x =
+    match x.str_desc with
+    | Tstr_value (Recursive, bingings) when need_tabling ->
+      let new_bindings = translate_letrec_bindings_with_tibling sub bingings in
+      let str_desc = Tstr_value (Recursive, new_bindings) in
+      { x with str_desc }
+    | _ -> Tast_mapper.default.structure_item sub x in
+
   let expr sub x =
     match x.exp_desc with
     | Texp_constant _           -> translate_constant x
@@ -589,11 +678,16 @@ let get_translator start_index =
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq sub false
 
+    | Texp_let (Recursive, bindings, expr) when need_tabling ->
+      let new_bindings = translate_letrec_bindings_with_tibling sub bindings in
+      let transl_expr  = sub.expr sub expr in
+      expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
+
     | _ -> Tast_mapper.default.expr sub x in
 
   let check_cd_is_ok (_cd: constructor_declaration list) = true in
 
-  { Tast_mapper.default with expr
+  { Tast_mapper.default with expr; structure_item
   (* ; type_kind = fun _ ->  *)
   ; type_declaration = fun _ decl ->
       match decl.typ_kind with
@@ -753,7 +847,8 @@ let only_generate ~oldstyle hook_info tast =
     Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
     let current_index = get_max_index tast + 1 in
-    let translator    = get_translator current_index in
+    let need_tabling  = true in
+    let translator    = get_translator current_index need_tabling in
     let new_tast      = translator.structure translator tast |> add_packages in
     let need_reduce   = true in
     let reduced_tast  = if need_reduce
