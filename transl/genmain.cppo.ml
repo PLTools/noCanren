@@ -774,7 +774,7 @@ let beta_reductor =
 
     match expr.exp_desc with
     | Texp_ident (_, ident, _) ->
-      let name = last ident.txt in Printf.printf "%!%s\n" name;
+      let name = last ident.txt in
       if name = var then subst else expr
 #if OCAML_VERSION > (4, 02, 2)
     | Texp_function {arg_label; param; cases=[case]; partial} ->
