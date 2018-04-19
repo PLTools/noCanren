@@ -38,6 +38,8 @@ let tabling_one_name    = "one"
 let tabling_succ_name   = "succ"
 let tabling_rec_name    = "tabledrec"
 
+let tabling_attr_name   = "tabled"
+
 (*****************************************************************************************************************************)
 
 let packages = ["MiniKanren"; "MiniKanrenStd"]
@@ -213,7 +215,7 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
-let get_translator start_index need_tabling =
+let get_translator start_index =
 
   (****)
 
@@ -583,7 +585,10 @@ let get_translator start_index need_tabling =
       let transtated_body = sub.expr sub body in
       let typ             = body.exp_type in
 
-      if has_func_arg typ then let vb_expr = transtated_body in { bind with vb_expr } else
+      let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
+
+
+      if not has_tabled_attr || has_func_arg typ then let vb_expr = transtated_body in { bind with vb_expr } else
         let Tpat_var (name, _)    = bind.vb_pat.pat_desc in
         let unrec_body            = create_fun name.name transtated_body in
 
@@ -652,7 +657,7 @@ let get_translator start_index need_tabling =
 
   let structure_item sub x =
     match x.str_desc with
-    | Tstr_value (Recursive, bingings) when need_tabling ->
+    | Tstr_value (Recursive, bingings) ->
       let new_bindings = translate_letrec_bindings_with_tibling sub bingings in
       let str_desc = Tstr_value (Recursive, new_bindings) in
       { x with str_desc }
@@ -678,7 +683,7 @@ let get_translator start_index need_tabling =
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq sub false
 
-    | Texp_let (Recursive, bindings, expr) when need_tabling ->
+    | Texp_let (Recursive, bindings, expr) ->
       let new_bindings = translate_letrec_bindings_with_tibling sub bindings in
       let transl_expr  = sub.expr sub expr in
       expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
@@ -847,8 +852,7 @@ let only_generate ~oldstyle hook_info tast =
     Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
     let current_index = get_max_index tast + 1 in
-    let need_tabling  = true in
-    let translator    = get_translator current_index need_tabling in
+    let translator    = get_translator current_index in
     let new_tast      = translator.structure translator tast |> add_packages in
     let need_reduce   = true in
     let reduced_tast  = if need_reduce
