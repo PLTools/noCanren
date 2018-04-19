@@ -79,22 +79,21 @@ let getTime state times =
   | Two (p, q) -> max (times p) (times q)
 
 
-let getAnswer answer times time =
+let getAnswer answer times =
   let start  = St (true, true, true, true, true) in
   let finish = St (false, false, false, false, false) in
 
-  let rec getAnswer answer state num =
-    if greater num time then false else
+  let[@tabled] rec getAnswer answer state =
       match answer with
       | x :: xs ->
         if checkStep state x then
-          let newNum   = add (getTime x times) num in
-          let newState = step state x in
-          getAnswer xs newState newNum
-        else false
-      | [] -> if state = finish then num = time else false in
+          match getAnswer xs (step state x) with
+          | Nothing -> Nothing
+          | Just t1 -> Just (add (getTime x times) t1)
+        else Nothing
+      | [] -> if state = finish then Just O else Nothing in
 
-  getAnswer answer start O
+  getAnswer answer start
         
 
 let standartTimes p = 
