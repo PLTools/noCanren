@@ -453,6 +453,12 @@ let get_translator start_index =
     | Tlink t' -> is_primary_type t'
     | _        -> true in
 
+  let create_unify_with_one_argument a =
+    let arg = create_fresh_var_name () in
+    let uni = create_unify (create_ident arg) a in
+    create_fun arg uni in
+
+
   let translate_apply (sub : Tast_mapper.mapper) func args parent_type =
 
     let func = sub.expr sub func in
@@ -477,7 +483,7 @@ let get_translator start_index =
 
     let update_arg name_opt arg =
       match name_opt with
-      | Some name -> create_apply (create_ident uniq_name) [create_ident name]
+      | Some name -> create_unify_with_one_argument @@ create_ident name
       | _         -> arg in
 
     let new_args = List.map2 update_arg fresh_names_if_primary args in
@@ -496,6 +502,41 @@ let get_translator start_index =
       | None      -> body in
 
     let with_fresh = List.fold_right create_fresh fresh_names_if_primary args_and_apply in
+
+    List.fold_right create_fun external_argument_names with_fresh in
+
+  (****)
+
+  let translate_nonrec_let (sub : Tast_mapper.mapper) bindings expr typ =
+    let transl_expr             = sub.expr sub expr in
+    let external_argument_names = create_fresh_argument_names_by_type typ true in
+    let external_arguments      = List.map create_ident external_argument_names in
+    let expr_with_args          = create_apply transl_expr external_arguments in
+
+    let values                 = List.map (fun b -> b.vb_expr) bindings in
+    let is_primary_list        = List.map (fun v -> is_primary_type v.exp_type) values in
+    let fresh_names_if_primary = List.map (fun b -> if b then Some (create_fresh_var_name ()) else None) is_primary_list in
+
+    let update_bind b v =
+      match v with
+      | None   -> { b with vb_expr = sub.expr sub b.vb_expr }
+      | Some x -> { b with vb_expr = create_unify_with_one_argument (create_ident x) } in
+
+    let new_binds = List.map2 update_bind bindings fresh_names_if_primary in
+    let full_let  = expr_desc_to_expr (Texp_let (Nonrecursive, new_binds, expr_with_args)) in
+
+    let conjs = List.combine fresh_names_if_primary values
+             |> List.filter (fun (n, _) -> n != None)
+             |> List.map (fun (Some n, a) -> create_apply (sub.expr sub a) [create_ident n]) in
+
+    let with_conjs = List.fold_right create_and conjs full_let in
+
+    let create_fresh name_opt body =
+      match name_opt with
+      | Some name -> create_fresh name body
+      | None      -> body in
+
+    let with_fresh = List.fold_right create_fresh fresh_names_if_primary with_conjs in
 
     List.fold_right create_fun external_argument_names with_fresh in
 
@@ -688,6 +729,8 @@ let get_translator start_index =
       let transl_expr  = sub.expr sub expr in
       expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
 
+    | Texp_let (Nonrecursive, bindings, expr) -> translate_nonrec_let sub bindings expr x.exp_type
+
     | _ -> Tast_mapper.default.expr sub x in
 
   let check_cd_is_ok (_cd: constructor_declaration list) = true in
@@ -731,7 +774,7 @@ let beta_reductor =
 
     match expr.exp_desc with
     | Texp_ident (_, ident, _) ->
-      let Longident.Lident name = ident.txt in
+      let name = last ident.txt in Printf.printf "%!%s\n" name;
       if name = var then subst else expr
 #if OCAML_VERSION > (4, 02, 2)
     | Texp_function {arg_label; param; cases=[case]; partial} ->
