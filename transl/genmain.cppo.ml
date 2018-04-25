@@ -215,11 +215,12 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
-let get_translator start_index =
+let get_translator start_index need_sort_goals =
 
   (****)
 
-  let curr_index  = ref start_index in
+  let curr_index     = ref start_index in
+  let curr_rec_names = ref [] in
 
   (****)
 
@@ -261,6 +262,25 @@ let get_translator start_index =
     | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
     | Ttype_open      -> raise (Error (NotYetSupported "open types"))
   in *)
+
+  (****)
+
+  let add_rec_names l = curr_rec_names := List.append !curr_rec_names l in
+
+  let rem_rec_names l = curr_rec_names := List.filter (fun n -> List.for_all ((<>) n) l) !curr_rec_names in
+
+  let transl_without_rec_names f e l =
+    let old_names = !curr_rec_names in
+    rem_rec_names l;
+    let transl_e = f e in
+    curr_rec_names := old_names;
+    transl_e in
+
+  let rec expr_has_rec_vars expr = (* TODO: find in let-expressions *)
+    match expr.exp_desc with
+    | Texp_apply (func, args)                            -> expr_has_rec_vars func || List.exists (fun (_, Some e) -> expr_has_rec_vars e) args
+    | Texp_ident (_, { txt = Longident.Lident name }, _) -> List.exists ((=) name) !curr_rec_names
+    | _                                                  -> false in
 
   (****)
 
@@ -389,7 +409,7 @@ let get_translator start_index =
       let fresh_arg_names   = List.map (fun _ -> create_fresh_var_name ()) real_args in
       let fresh_args        = List.map create_ident fresh_arg_names in
 
-      let translated_body   = sub.expr sub body in
+      let translated_body   = transl_without_rec_names (sub.expr sub) body real_arg_names in
       let body_with_args    = create_apply translated_body arguments in
       let body_with_lambda  = List.fold_right create_fun real_arg_names body_with_args in
 
@@ -435,11 +455,11 @@ let get_translator start_index =
       List.fold_right create_fresh fresh_arg_names cnstr_and_body
     in
 
-    let translated_cases     = cases |> List.map translate_case
-(*      |> fold_right0 create_or *)
-      |> create_conde
-    in
-    let upper_exp_with_cases = create_and unify_expr translated_cases in
+    let translated_cases     = cases |> List.map translate_case |> create_conde in
+
+    let upper_exp_with_cases = if need_sort_goals && expr_has_rec_vars expr then create_and translated_cases unify_expr
+                                                                            else create_and unify_expr translated_cases in
+
     let all_without_lambda   = create_fresh unify_var_name upper_exp_with_cases in
 
     List.fold_right create_fun argument_names all_without_lambda
@@ -458,6 +478,10 @@ let get_translator start_index =
     let uni = create_unify (create_ident arg) a in
     create_fun arg uni in
 
+  let get_pattern_names bindings =
+    List.map (fun v -> v.vb_pat.pat_desc) bindings |> List.map (fun (Tpat_var (n, _)) -> n.name) in
+
+  (****)
 
   let translate_apply (sub : Tast_mapper.mapper) func args parent_type =
 
@@ -508,7 +532,7 @@ let get_translator start_index =
   (****)
 
   let translate_nonrec_let (sub : Tast_mapper.mapper) bindings expr typ =
-    let transl_expr             = sub.expr sub expr in
+    let transl_expr             = transl_without_rec_names (sub.expr sub) expr (get_pattern_names bindings) in
     let external_argument_names = create_fresh_argument_names_by_type typ true in
     let external_arguments      = List.map create_ident external_argument_names in
     let expr_with_args          = create_apply transl_expr external_arguments in
@@ -621,6 +645,8 @@ let get_translator start_index =
       | Tlink t'         -> has_func_arg t'
       | _                -> false in
 
+    add_rec_names (get_pattern_names binds);
+
     let translate_binding bind =
       let body            = bind.vb_expr in
       let transtated_body = sub.expr sub body in
@@ -704,7 +730,7 @@ let get_translator start_index =
       { x with str_desc }
     | _ -> Tast_mapper.default.structure_item sub x in
 
-  let expr sub x =
+  let expr sub x = (*TODO: Update rec names for abstraction*)
     match x.exp_desc with
     | Texp_constant _           -> translate_constant x
     | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" ->
@@ -727,6 +753,7 @@ let get_translator start_index =
     | Texp_let (Recursive, bindings, expr) ->
       let new_bindings = translate_letrec_bindings_with_tibling sub bindings in
       let transl_expr  = sub.expr sub expr in
+      rem_rec_names (get_pattern_names bindings);
       expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
 
     | Texp_let (Nonrecursive, bindings, expr) -> translate_nonrec_let sub bindings expr x.exp_type
@@ -894,8 +921,9 @@ let only_generate ~oldstyle hook_info tast =
     Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
     Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
+    let need_sort_goals = true in
     let current_index = get_max_index tast + 1 in
-    let translator    = get_translator current_index in
+    let translator    = get_translator current_index need_sort_goals in
     let new_tast      = translator.structure translator tast |> add_packages in
     let need_reduce   = true in
     let reduced_tast  = if need_reduce
