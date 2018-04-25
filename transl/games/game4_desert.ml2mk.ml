@@ -81,7 +81,7 @@ let step step state len cop =
       | S x -> 
         let stationFuel = elem sts x in
         let totalFuel   = fuel |+| stationFuel in
-        if totalFuel |>=| cop then St (pos, cop,       changeElem sts x (fun e -> stationFuel |-| cop))
+        if totalFuel |>=| cop then St (pos, cop,       changeElem sts x (fun e -> totalFuel |-| cop))
                               else St (pos, totalFuel, changeElem sts x (fun e -> O))
 
 
@@ -90,17 +90,17 @@ let isFinishState state len =
   | St (pos, fuel, sts) -> pos = len
 
 
-let updateTotalFuel step state prevFuel cop =
+let getFuel step state cop =
   match step with
-  | Left d  -> prevFuel
-  | Right d -> prevFuel
-  | Pour f  -> prevFuel
+  | Left d  -> O
+  | Right d -> O
+  | Pour f  -> O
   | Fill    ->
     match state with
     | St (pos, fuel, sts) ->
       match pos with
-      | O   -> (cop |+| prevFuel) |-| fuel
-      | S x -> prevFuel
+      | O   -> cop |-| fuel
+      | S x -> O
 
 
 let isMove step =
@@ -111,17 +111,17 @@ let isMove step =
   | Pour  x -> false
 
 
-let checkAnswer answer len cop totalFuel =  
-  let rec check state ans prevIsMove currentFuel =
+let checkAnswer answer len cop =  
+  let rec calcFuel state ans prevIsMove =
     match ans with
-    | []    -> (currentFuel = totalFuel) |&| isFinishState state len
-    | x::xs ->
-      let currIsMove = isMove x in
-      if prevIsMove = currIsMove then false else
-        if checkStep x state len cop then
-          let newCF = updateTotalFuel x state currentFuel cop in
-          if totalFuel |>=| newCF then check (step x state len cop) xs currIsMove newCF else false
-        else false in
+    | []    -> if isFinishState state len then Just cop else Nothing
+    | x::xs -> let currIsMove = isMove x in
+               if prevIsMove = currIsMove then Nothing 
+               else if checkStep x state len cop then
+                 match calcFuel (step x state len cop) xs currIsMove with
+                 | Nothing  -> Nothing
+                 | Just res -> Just (getFuel x state cop |+| res)
+               else Nothing in
 
   let startState =
     let rec stations n =
@@ -130,7 +130,7 @@ let checkAnswer answer len cop totalFuel =
       | S m -> O :: stations m in
     St (O, cop, stations len) in
 
-  check startState answer false cop
+  calcFuel startState answer false
 
 
 (****************************************************************************)
@@ -154,10 +154,13 @@ let answer = [Right two; Pour one; Left two;
               Fill; Right two; Fill;     Right fiv]
 
 
-let ans = [Right fiv]
 
+let ans = [Right one; Pour two; Left one;
+           Fill; Right two; Pour one; Left two;
+           Fill; Right one; Fill; Right one; Fill; Right one; Pour one; Left thr;
+           Fill; Right two; Pour one; Left two;
+           Fill; Right one; Fill; Right one; Fill; Right one; Fill; Right fiv]
 
-let f x = checkAnswer x sev fiv best
 
 
 let o = 1
