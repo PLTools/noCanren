@@ -7,13 +7,23 @@ let rec add a b =
 
 let (|&|) a b = if a then b else false
 
-let rec fib n = 
+let rec fibB n =
   match n with
   | O    -> true
   | S n0 ->
     match n0 with
     | O    -> true
-    | S n1 -> (fib n1) |&| (fib n0)
+    | S n1 -> (fibB n1) |&| (fibB n0)
+
+
+let[@tabled] rec fib n =
+  match n with
+  | O    -> O
+  | S n0 ->
+    match n0 with
+    | O    -> S O
+    | S n1 -> add (fib n1) (fib n0)
+
 
 let mul2 n = add n n
 
