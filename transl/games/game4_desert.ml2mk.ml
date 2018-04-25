@@ -111,12 +111,12 @@ let isMove step =
   | Pour  x -> false
 
 
-let checkAnswer answer len cop =  
-  let rec calcFuel state ans prevIsMove =
+let checkAnswer answer len cop =
+  let[@tabled] rec calcFuel state ans prevIsMove =
     match ans with
     | []    -> if isFinishState state len then Just cop else Nothing
     | x::xs -> let currIsMove = isMove x in
-               if prevIsMove = currIsMove then Nothing 
+               if prevIsMove = currIsMove then Nothing
                else if checkStep x state len cop then
                  match calcFuel (step x state len cop) xs currIsMove with
                  | Nothing  -> Nothing
