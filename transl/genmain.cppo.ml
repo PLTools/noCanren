@@ -37,6 +37,8 @@ let tabling_module_name = "Tabling"
 let tabling_one_name    = "one"
 let tabling_succ_name   = "succ"
 let tabling_rec_name    = "tabledrec"
+let tabling_name        = "tabled"
+
 
 let tabling_attr_name   = "tabled"
 
@@ -215,7 +217,7 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
-let get_translator start_index need_sort_goals need_unnest =
+let get_translator start_index need_sort_goals need_tabled_args =
 
   (****)
 
@@ -483,12 +485,9 @@ let get_translator start_index need_sort_goals need_unnest =
 
   (****)
 
-  let translate_apply (sub : Tast_mapper.mapper) func args parent_type =
+  let translate_apply (sub : Tast_mapper.mapper) func args =
 
     let func = sub.expr sub func in
-
-    let external_argument_names = create_fresh_argument_names_by_type parent_type true in
-    let external_arguments      = List.map create_ident external_argument_names in
 
     let args =
 #if OCAML_VERSION > (4, 02, 2)
@@ -498,71 +497,35 @@ let get_translator start_index need_sort_goals need_unnest =
 #endif
     in
 
-    let is_primary_list = List.map (fun a -> is_primary_type a.exp_type) args in
-
     let args = List.map (sub.expr sub) args in
 
-    let fresh_names_if_primary =
-      List.map (fun a -> if a then Some (create_fresh_var_name ()) else None) is_primary_list in
+    let one    = create_ident_with_dot tabling_module_name tabling_one_name in
+    let tabled = create_ident_with_dot tabling_module_name tabling_name in
 
-    let update_arg name_opt arg =
-      match name_opt with
-      | Some name -> create_unify_with_one_argument @@ create_ident name
-      | _         -> arg in
+    let args_with_tabling =
+      List.map (fun e -> if is_primary_type e.exp_type then create_apply tabled [one; e] else e) args in
 
-    let new_args = List.map2 update_arg fresh_names_if_primary args in
+    create_apply func args_with_tabling in
 
-    let apply = create_apply func (new_args @ external_arguments) in
-
-    let calculated_args = List.combine fresh_names_if_primary args
-                       |> List.filter (fun (n, _) -> n != None)
-                       |> List.map (fun (Some n, a) -> create_apply a [create_ident n]) in
-
-    let args_and_apply = List.fold_right create_and calculated_args apply in
-
-    let create_fresh name_opt body =
-      match name_opt with
-      | Some name -> create_fresh name body
-      | None      -> body in
-
-    let with_fresh = List.fold_right create_fresh fresh_names_if_primary args_and_apply in
-
-    List.fold_right create_fun external_argument_names with_fresh in
 
   (****)
 
-  let translate_nonrec_let (sub : Tast_mapper.mapper) bindings expr typ =
-    let transl_expr             = transl_without_rec_names (sub.expr sub) expr (get_pattern_names bindings) in
-    let external_argument_names = create_fresh_argument_names_by_type typ true in
-    let external_arguments      = List.map create_ident external_argument_names in
-    let expr_with_args          = create_apply transl_expr external_arguments in
+  let translate_nonrec_let (sub : Tast_mapper.mapper) bindings expr =
+    let transl_expr = transl_without_rec_names (sub.expr sub) expr (get_pattern_names bindings) in
 
-    let values                 = List.map (fun b -> b.vb_expr) bindings in
-    let is_primary_list        = List.map (fun v -> is_primary_type v.exp_type) values in
-    let fresh_names_if_primary = List.map (fun b -> if b then Some (create_fresh_var_name ()) else None) is_primary_list in
+    let one    = create_ident_with_dot tabling_module_name tabling_one_name in
+    let tabled = create_ident_with_dot tabling_module_name tabling_name in
 
-    let update_bind b v =
-      match v with
-      | None   -> { b with vb_expr = sub.expr sub b.vb_expr }
-      | Some x -> { b with vb_expr = create_unify_with_one_argument (create_ident x) } in
+    let update_binding b =
+      let e  = b.vb_expr in
+      let ne = sub.expr sub e in
+      if is_primary_type e.exp_type
+        then { b with vb_expr = create_apply tabled [one; ne] }
+        else { b with vb_expr = ne } in
 
-    let new_binds = List.map2 update_bind bindings fresh_names_if_primary in
-    let full_let  = expr_desc_to_expr (Texp_let (Nonrecursive, new_binds, expr_with_args)) in
+    let new_binds = List.map update_binding bindings in
 
-    let conjs = List.combine fresh_names_if_primary values
-             |> List.filter (fun (n, _) -> n != None)
-             |> List.map (fun (Some n, a) -> create_apply (sub.expr sub a) [create_ident n]) in
-
-    let with_conjs = List.fold_right create_and conjs full_let in
-
-    let create_fresh name_opt body =
-      match name_opt with
-      | Some name -> create_fresh name body
-      | None      -> body in
-
-    let with_fresh = List.fold_right create_fresh fresh_names_if_primary with_conjs in
-
-    List.fold_right create_fun external_argument_names with_fresh in
+    expr_desc_to_expr (Texp_let (Nonrecursive, new_binds, transl_expr)) in
 
   (****)
 
@@ -744,7 +707,7 @@ let get_translator start_index need_sort_goals need_unnest =
 #endif
     | Texp_ifthenelse (cond, th, Some el) -> translate_if sub cond th el x.exp_type
 
-    | Texp_apply (func, args) when need_unnest -> translate_apply sub func args x.exp_type
+    | Texp_apply (func, args) when need_tabled_args -> translate_apply sub func args
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub true
 
@@ -756,7 +719,7 @@ let get_translator start_index need_sort_goals need_unnest =
       rem_rec_names (get_pattern_names bindings);
       expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
 
-    | Texp_let (Nonrecursive, bindings, expr) -> translate_nonrec_let sub bindings expr x.exp_type
+    | Texp_let (Nonrecursive, bindings, expr) when need_tabled_args -> translate_nonrec_let sub bindings expr
 
     | _ -> Tast_mapper.default.expr sub x in
 
@@ -921,10 +884,10 @@ let only_generate ~oldstyle hook_info tast =
     Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
     Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
-    let need_sort_goals = true in
-    let need_unnest     = true in
+    let need_sort_goals  = true in
+    let need_tabled_args = true in
     let current_index = get_max_index tast + 1 in
-    let translator    = get_translator current_index need_sort_goals need_unnest in
+    let translator    = get_translator current_index need_sort_goals need_tabled_args in
     let new_tast      = translator.structure translator tast |> add_packages in
     let need_reduce   = true in
     let reduced_tast  = if need_reduce
@@ -1002,4 +965,3 @@ let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.struct
 (* registering actual translator *)
 let () = Typemod.ImplementationHooks.add_hook "ml_to_mk" main
 *)
-
