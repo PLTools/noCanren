@@ -191,10 +191,3 @@ let answer = State (
   Person (Ivory , Spaniard  , Orange_juice, Lacky_Strike, Dog   ),
   Person (Green , Japanese  , Coffee      , Parliament  , Zebra ))
 
-
-
-let check_state0 p1 p2 =
-    (fun b -> match p1 with true -> b) (match p2 with | true -> p2 | false -> p1)
- 
-let x = 0
-
