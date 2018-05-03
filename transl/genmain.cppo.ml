@@ -215,7 +215,7 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
-let get_translator start_index need_sort_goals =
+let get_translator start_index need_sort_goals need_unnest =
 
   (****)
 
@@ -744,7 +744,7 @@ let get_translator start_index need_sort_goals =
 #endif
     | Texp_ifthenelse (cond, th, Some el) -> translate_if sub cond th el x.exp_type
 
-    | Texp_apply (func, args)   -> translate_apply sub func args x.exp_type
+    | Texp_apply (func, args) when need_unnest -> translate_apply sub func args x.exp_type
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub true
 
@@ -922,8 +922,9 @@ let only_generate ~oldstyle hook_info tast =
     Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
     let need_sort_goals = true in
+    let need_unnest     = true in
     let current_index = get_max_index tast + 1 in
-    let translator    = get_translator current_index need_sort_goals in
+    let translator    = get_translator current_index need_sort_goals need_unnest in
     let new_tast      = translator.structure translator tast |> add_packages in
     let need_reduce   = true in
     let reduced_tast  = if need_reduce
@@ -1001,3 +1002,4 @@ let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.struct
 (* registering actual translator *)
 let () = Typemod.ImplementationHooks.add_hook "ml_to_mk" main
 *)
+
