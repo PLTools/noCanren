@@ -180,9 +180,9 @@ let all_present st =
 
 let check_state st =
   all_different st <&> 
-  (*clue02 st <&> clue03 st <&>*) clue04 st <&> (*clue05 st <&>*) clue06 st (*<&> clue07 st <&> clue08 st <&>
+  clue02 st <&> clue03 st <&> clue04 st <&> clue05 st <&> clue06 st <&> clue07 st <&> clue08 st <&>
   clue09 st <&> clue10 st <&> clue11 st <&> clue12 st <&> clue13 st <&> clue14 st <&> clue15 st <&>
-  all_present st*)
+  all_present st
 
 let answer = State (
   Person (Yellow, Norwegian , Water       , Kools       , Fox   ),
