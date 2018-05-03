@@ -52,6 +52,9 @@ true: short_paths
 <transl/games/game4_desert.*>: dsource, rectypes, use_ocanren_modules
 <transl/games/game4_desert_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
+<transl/games/game5_einstein.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game5_einstein_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
+
 <transl/logic.*>: rectypes, use_ocanren_modules
 <transl/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
 <transl/games/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
