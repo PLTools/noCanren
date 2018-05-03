@@ -52,17 +52,8 @@ let myshow = show_state
 let show_bool b = if b then "true" else "false"
 let show_lbool = show(logic) (show_bool) 
 
-let run n         = runR (MiniKanren.reify) show_bool show_lbool n
-
 let () =
-  (*run_exn myshow (-1) q qh ("answers", (fun q -> (check_state0 ((===) q) (!!true))));*)
-  
-  run_exn (fun a -> if a then "T" else "F") (-1) qr qrh ("answers", (fun q r -> check_state0 ((===) q) ((===) r) (!!true)));
-
-  run_exn (fun a -> if a then "T" else "F") (-1) qr qrh ("answers", (fun q r -> check_state1 ((===) q) ((===) r) (!!true)));
-
-  (*run (-1) qr qrh ("answers", (fun q r -> (q =/= (!!true)) &&& (q === r)));*)
-
+  run_exn myshow (-1) q qh ("answers", (fun q -> (check_state ((===) q) (!!true))));
   ()
 
 
