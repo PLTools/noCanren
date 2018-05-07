@@ -34,5 +34,3 @@ let () =
 (*run_exn myshow (1) q qh ("answers", (fun q -> (checkAnswer ((===)q) eig fiv (just @@ of_int 22))));*)
   run_exn myshow (1) q qh ("answers", (fun q -> call_fresh (fun x -> (checkAnswer ((===)q) eig fiv (just x)))));
   ()
-
-
