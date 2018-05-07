@@ -50,10 +50,7 @@ let show_state = function
 let myshow = show_state
 
 let show_bool b = if b then "true" else "false"
-let show_lbool = show(logic) (show_bool) 
 
 let () =
   run_exn myshow (-1) q qh ("answers", (fun q -> (check_state ((===) q) (!!true))));
   ()
-
-
