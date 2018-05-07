@@ -1,7 +1,7 @@
 type nat = O | S of nat
 
-type step = Left  of nat 
-          | Right of nat 
+type step = Left  of nat
+          | Right of nat
           | Fill
           | Pour  of nat
 
@@ -34,15 +34,12 @@ let rec (|-|) a b =
     | S x -> x |-| y
 
 
-let (|&|) a b =
-  if a then b else false
-
 let rec elem l n =
   match l with
   | x::xs ->
     match n with
     | O   -> x
-    | S m -> elem xs m 
+    | S m -> elem xs m
 
 
 let rec changeElem l n f =
@@ -50,20 +47,20 @@ let rec changeElem l n f =
   | x::xs ->
     match n with
     | O   -> f x :: xs
-    | S m -> x   :: changeElem xs m f    
+    | S m -> x   :: changeElem xs m f
 
 
 let checkStep step state len cop =
   match state with
   | St (pos, fuel, sts) ->
     match step with
-    | Left  d -> (pos |>=| d)           |&| (fuel |>=| d) |&| (d <> O)
-    | Right d -> (len |>=| (pos |+| d)) |&| (fuel |>=| d) |&| (d <> O)
-    | Pour  f -> (pos <> len) |&| (pos <> O) |&| (f <> O) |&| (fuel |>=| f)
+    | Left  d -> pos |>=| d           && fuel |>=| d && d <> O
+    | Right d -> len |>=| (pos |+| d) && fuel |>=| d && d <> O
+    | Pour  f -> pos <> len && pos <> O && f <> O && fuel |>=| f
     | Fill    ->
       match pos with
       | O   -> fuel <> cop
-      | S x -> (fuel <> cop) |&| (elem sts x <> O)
+      | S x -> fuel <> cop && elem sts x <> O
 
 
 let step step state len cop =
@@ -78,7 +75,7 @@ let step step state len cop =
     | Fill    ->
       match pos with
       | O   -> St (pos, cop, sts)
-      | S x -> 
+      | S x ->
         let stationFuel = elem sts x in
         let totalFuel   = fuel |+| stationFuel in
         if totalFuel |>=| cop then St (pos, cop,       changeElem sts x (fun e -> totalFuel |-| cop))
@@ -164,5 +161,3 @@ let ans = [Right one; Pour two; Left one;
 
 
 let o = 1
-
-

@@ -23,6 +23,9 @@ let eq_name             = "="
 let neq_name            = "<>"
 let true_name           = "true"
 let false_name          = "false"
+let bool_and_name       = "&&"
+let bool_or_name        = "||"
+let bool_not_name       = "not"
 
 let logic_type_name     = "logic"
 let inj_name            = "!!"
@@ -483,12 +486,18 @@ let get_translator start_index need_sort_goals need_unnest =
 
   (****)
 
+  let rec normalize_apply func args =
+    match func.exp_desc with
+    | Texp_apply (f, a) -> normalize_apply f @@ a @ args
+    | _                 -> (func, args) in
+
+  let get_ident e =
+    match e.exp_desc with
+    | Texp_ident (_, { txt = Longident.Lident name }, _) -> Some name
+    | _                                                  -> None in
+
   let translate_apply (sub : Tast_mapper.mapper) func args parent_type =
-
-    let func = sub.expr sub func in
-
-    let external_argument_names = create_fresh_argument_names_by_type parent_type true in
-    let external_arguments      = List.map create_ident external_argument_names in
+    let func, args = normalize_apply func args in
 
     let args =
 #if OCAML_VERSION > (4, 02, 2)
@@ -497,6 +506,15 @@ let get_translator start_index need_sort_goals need_unnest =
       List.map (fun (_, Some a,_) -> a) args
 #endif
     in
+    match get_ident func with
+    | Some x when x = bool_or_name || x = bool_and_name ->
+      Printf.printf "%! %s\n" x; create_apply (sub.expr sub func) (List.map (sub.expr sub) args)
+    | _ ->
+
+    let func = sub.expr sub func in
+
+    let external_argument_names = create_fresh_argument_names_by_type parent_type true in
+    let external_arguments      = List.map create_ident external_argument_names in
 
     let is_primary_list = List.map (fun a -> is_primary_type a.exp_type) args in
 
@@ -591,7 +609,7 @@ let get_translator start_index need_sort_goals need_unnest =
 
   (****)
 
-  let translate_eq (sub : Tast_mapper.mapper) is_equality =
+  let translate_eq is_equality =
 
     let name_arg_l  = create_fresh_var_name () in
     let name_arg_r  = create_fresh_var_name () in
@@ -626,6 +644,43 @@ let get_translator start_index need_sort_goals need_unnest =
     let second_fresh = create_fresh name_l first_fresh in
 
     let fun1 = create_fun name_out second_fresh in
+    let fun2 = create_fun name_arg_r fun1 in
+
+    create_fun name_arg_l fun2 in
+
+  (****)
+
+  let translate_bool_funs is_or =
+
+    let name_arg_l  = create_fresh_var_name () in
+    let name_arg_r  = create_fresh_var_name () in
+    let name_out    = create_fresh_var_name () in
+    let name_l      = create_fresh_var_name () in
+
+    let ident_arg_l = create_ident name_arg_l in
+    let ident_arg_r = create_ident name_arg_r in
+    let ident_out   = create_ident name_out in
+    let ident_l     = create_ident name_l in
+
+    let const_true  = create_constructor true_name [] |> create_inj in
+    let const_false = create_constructor false_name [] |> create_inj in
+
+    let l_true    = create_unify ident_l (if is_or then const_true else const_false) in
+    let l_false   = create_unify ident_l (if is_or then const_false else const_true) in
+    let q_true    = create_unify ident_out (if is_or then const_true else const_false) in
+    let calc_r    = create_apply ident_arg_r [ident_out] in
+
+    let first_and       = create_and l_true q_true in
+    let second_and      = create_and l_false calc_r in
+    let full_or         = create_or first_and second_and in
+
+    let apply_l = create_apply ident_arg_l [ident_l] in
+
+    let full_and  = create_and apply_l full_or in
+
+    let with_fresh = create_fresh name_l full_and in
+
+    let fun1 = create_fun name_out with_fresh in
     let fun2 = create_fun name_arg_r fun1 in
 
     create_fun name_arg_l fun2 in
@@ -746,9 +801,13 @@ let get_translator start_index need_sort_goals need_unnest =
 
     | Texp_apply (func, args) when need_unnest -> translate_apply sub func args x.exp_type
 
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq sub true
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq true
 
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq sub false
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq false
+
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_or_name  -> translate_bool_funs true
+
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_and_name -> translate_bool_funs false
 
     | Texp_let (Recursive, bindings, expr) ->
       let new_bindings = translate_letrec_bindings_with_tibling sub bindings in
@@ -1002,4 +1061,3 @@ let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.struct
 (* registering actual translator *)
 let () = Typemod.ImplementationHooks.add_hook "ml_to_mk" main
 *)
-

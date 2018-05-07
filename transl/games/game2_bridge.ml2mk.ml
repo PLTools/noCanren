@@ -30,9 +30,6 @@ let rec add a0 b0 =
   | S x -> add x (S b0)
 
 
-let conj a0 b0 =
-  if a0 then b0 else false
-
 let not a0 =
   if a0 then false else true
 
@@ -50,12 +47,12 @@ let checkPerson state person =
 let checkStep state step =
   match step with
   | One p      -> checkPerson state p
-  | Two (p, q) -> conj (conj (checkPerson state p) (checkPerson state q)) (grForPerson p q)
+  | Two (p, q) -> checkPerson state p && checkPerson state q && grForPerson p q
 
 
 let moveLight state =
   match state with
-  | St (l, a0, b0, c0, d0) -> St (not l, a0, b0, c0, d0) 
+  | St (l, a0, b0, c0, d0) -> St (not l, a0, b0, c0, d0)
 
 
 let movePerson state person =
@@ -94,9 +91,9 @@ let getAnswer answer times =
       | [] -> if state = finish then Just O else Nothing in
 
   getAnswer answer start
-        
 
-let standartTimes p = 
+
+let standartTimes p =
   match p with
   | A -> S O
   | B -> S (S O)

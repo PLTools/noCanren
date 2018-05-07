@@ -33,10 +33,6 @@ let not b =
   if b then false else true
 
 
-let disj a b =
-  if a then true else b
-
-
 let anotherBottle b =
   match b with
   | Fst -> Snd
@@ -55,13 +51,13 @@ let checkStep state0 step0 capacities =
     match step0 with
     | Step (t, b) ->
       let lvl1 = match b with | Fst -> f | Snd -> s in
-      let lvl2 = match b with | Fst -> s | Snd -> f in 
+      let lvl2 = match b with | Fst -> s | Snd -> f in
         match t with
         | Fill  -> lvl1 = O
         | Empty -> lvl1 = capacities b
-        | Pour  -> 
+        | Pour  ->
           let b'      = anotherBottle b in
-          not (disj (lvl1 = O) (lvl2 = capacities b'))
+          not (lvl1 = O || lvl2 = capacities b')
 
 
 let doStep state0 step0 capacities =
@@ -82,16 +78,16 @@ let doStep state0 step0 capacities =
 
 let isFinishState state0 reqLvl =
   match state0 with
-  | State (f, s) -> disj (f = reqLvl) (s = reqLvl)
+  | State (f, s) -> f = reqLvl || s = reqLvl
 
 
 let checkAnswer answer capacities reqLvl =
-  let rec checkAnswer state0 answer = 
+  let rec checkAnswer state0 answer =
     match answer with
     | []      -> isFinishState state0 reqLvl
     | x :: xs ->
-      if checkStep state0 x capacities then 
-        checkAnswer (doStep state0 x capacities) xs 
+      if checkStep state0 x capacities then
+        checkAnswer (doStep state0 x capacities) xs
       else false in
 
    let startState = State (O, O) in
@@ -116,10 +112,9 @@ let capacities1 b =
 
 let reqLvl1 = S (S (S (S (S (S O)))))
 
-let answer = [ Step (Fill, Fst);   Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst); 
+let answer = [ Step (Fill, Fst);   Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst);
                Step (Fill, Fst);   Step (Pour, Fst);  Step (Empty, Snd);  Step (Pour, Fst);
                Step (Fill, Fst);   Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst);
                Step (Empty, Snd);  Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst)]
 
 let badAns =  Step (Empty, Fst) :: answer
-
