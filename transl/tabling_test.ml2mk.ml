@@ -5,15 +5,13 @@ let rec add a b =
   | O   -> b
   | S x -> add x (S b)
 
-let (|&|) a b = if a then b else false
-
 let rec fibB n =
   match n with
   | O    -> true
   | S n0 ->
     match n0 with
     | O    -> true
-    | S n1 -> (fibB n1) |&| (fibB n0)
+    | S n1 -> fibB n1 && fibB n0
 
 
 let[@tabled] rec fib n =

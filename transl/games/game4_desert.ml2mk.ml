@@ -140,6 +140,7 @@ let fiv = S fou
 let six = S fiv
 let sev = S six
 let eig = S sev
+let nin = S eig
 
 let best = six |+| sev
 let total = S (sev |+| sev)
