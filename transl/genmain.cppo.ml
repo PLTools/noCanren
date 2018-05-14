@@ -33,7 +33,6 @@ let uniq_name           = "==="
 let des_constr_name     = "=/="
 let or_name             = "|||"
 let and_name            = "&&&"
-let fresh_name          = "call_fresh"
 let fresh_var_prefix    = "q"
 
 let tabling_module_name = "Tabling"
@@ -42,6 +41,14 @@ let tabling_succ_name   = "succ"
 let tabling_rec_name    = "tabledrec"
 
 let tabling_attr_name   = "tabled"
+
+let fresh_module_name   = "Fresh"
+let fresh_one_name      = "one"
+let fresh_two_name      = "two"
+let fresh_three_name    = "three"
+let fresh_four_name     = "four"
+let fresh_five_name     = "five"
+let fresh_succ_name     = "succ"
 
 (*****************************************************************************************************************************)
 
@@ -172,10 +179,21 @@ let create_and e1 e2 =
   let and_ident = create_ident and_name in
   create_apply and_ident [e1; e2]
 
-let create_fresh var_name body =
-  let fresh = create_ident fresh_name in
-  let func  = create_fun var_name body in
-  create_apply fresh [func]
+  let create_fresh var_names body =
+    let abstr_body = List.fold_right create_fun var_names body in
+    let in_fresh   = create_ident_with_dot fresh_module_name in
+
+    let rec create_numeral = function
+      | 1 -> in_fresh fresh_one_name
+      | 2 -> in_fresh fresh_two_name
+      | 3 -> in_fresh fresh_three_name
+      | 4 -> in_fresh fresh_four_name
+      | 5 -> in_fresh fresh_five_name
+      | n -> create_apply (in_fresh fresh_succ_name) [create_numeral (n - 1)] in
+
+    let len = List.length var_names in
+    if len = 0 then body else create_apply (create_numeral len) [abstr_body]
+
 
 let create_conde xs =
   let cnde = create_ident "conde" in
@@ -371,7 +389,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
     let unifies_list      = List.map (fun (v, e) -> create_apply (sub.expr sub e) [create_ident v]) fv in
     let cnstr_and_unifies = List.fold_left create_and unify_cnstr unifies_list in
-    let translated_cnstr  = List.fold_right create_fresh var_names cnstr_and_unifies in
+    let translated_cnstr  = create_fresh var_names cnstr_and_unifies in
     create_fun output_var_name translated_cnstr in
 
   (****)
@@ -451,7 +469,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
       let cnstr_and_body    = create_and cnstr_unify body_with_subst in
 
-      List.fold_right create_fresh fresh_arg_names cnstr_and_body
+      create_fresh fresh_arg_names cnstr_and_body
     in
 
     let translated_cases     = cases |> List.map translate_case |> create_conde in
@@ -459,7 +477,7 @@ let get_translator start_index need_sort_goals need_unlazy =
     let upper_exp_with_cases = if need_sort_goals && expr_has_rec_vars expr then create_and translated_cases unify_expr
                                                                             else create_and unify_expr translated_cases in
 
-    let all_without_lambda   = create_fresh unify_var_name upper_exp_with_cases in
+    let all_without_lambda   = create_fresh [unify_var_name] upper_exp_with_cases in
 
     List.fold_right create_fun argument_names all_without_lambda
   in
@@ -556,7 +574,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
     let conjs                   = List.map2 (fun a b -> create_apply (create_ident a) @@ [create_ident b]) bad_vars fresh_vars in
     let full_conj               = List.fold_right create_and conjs body_with_ags in
-    let with_fresh              = List.fold_right create_fresh fresh_vars full_conj in
+    let with_fresh              = create_fresh fresh_vars full_conj in
     let first_fun               = create_fun result_var with_fresh in
 
     List.fold_right create_fun (List.map fst eta_vars) first_fun in
@@ -599,7 +617,7 @@ let get_translator start_index need_sort_goals need_unlazy =
    let cond_with_cases = if need_sort_goals && expr_has_rec_vars cond
                          then create_and both_cases translated_cond
                          else create_and translated_cond both_cases in
-   let body_with_fresh = create_fresh cond_var_name cond_with_cases in
+   let body_with_fresh = create_fresh [cond_var_name] cond_with_cases in
    List.fold_right create_fun argument_names body_with_fresh in
 
   (****)
@@ -635,10 +653,9 @@ let get_translator start_index need_sort_goals need_unlazy =
     let party_and = create_and apply_r full_or in
     let full_and  = create_and apply_l party_and in
 
-    let first_fresh  = create_fresh name_r full_and in
-    let second_fresh = create_fresh name_l first_fresh in
+    let fresh  = create_fresh [name_l; name_r] full_and in
 
-    let fun1 = create_fun name_out second_fresh in
+    let fun1 = create_fun name_out fresh in
     let fun2 = create_fun name_arg_r fun1 in
 
     create_fun name_arg_l fun2 in
@@ -673,7 +690,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
     let full_and  = create_and apply_l full_or in
 
-    let with_fresh = create_fresh name_l full_and in
+    let with_fresh = create_fresh [name_l] full_and in
 
     let fun1 = create_fun name_out with_fresh in
     let fun2 = create_fun name_arg_r fun1 in
@@ -704,7 +721,7 @@ let get_translator start_index need_sort_goals need_unlazy =
     let apply       = create_apply ident_arg [fr_ident] in
     let full_and    = create_and apply full_or in
 
-    let with_fresh  = create_fresh fr_arg full_and in
+    let with_fresh  = create_fresh [fr_arg] full_and in
     let fun1        = create_fun name_out with_fresh in
     create_fun name_arg fun1 in
 
@@ -751,7 +768,7 @@ let get_translator start_index need_sort_goals need_unlazy =
         let recfunc_with_args     = create_apply recfunc_argument (List.append arguments2 [rec_arg_1]) in
         let conjuncts1            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments1 arguments2 in
         let conjs_and_recfunc     = List.fold_right create_and conjuncts1 recfunc_with_args in
-        let freshing_and_recfunc  = List.fold_right create_fresh argument_names2 conjs_and_recfunc in
+        let freshing_and_recfunc  = create_fresh argument_names2 conjs_and_recfunc in
         let lambdas_and_recfunc   = List.fold_right create_fun (List.append argument_names1 [res_arg_name_1]) freshing_and_recfunc in
 
         let argument_names3       = create_fresh_argument_names_by_type typ false in
@@ -790,7 +807,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
         let conjuncts2            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments5 arguments6 in
         let conjs_and_tabled      = List.fold_right create_and conjuncts2 tabled_body_with_args in
-        let freshing_and_tabled   = List.fold_right create_fresh argument_names6 conjs_and_tabled in
+        let freshing_and_tabled   = create_fresh argument_names6 conjs_and_tabled in
         let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
 
         let vb_expr = lambdas_and_tabled in
