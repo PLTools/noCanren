@@ -302,15 +302,6 @@ let get_translator start_index need_sort_goals need_unlazy =
 
   (****)
 
-  let translate_constant const_expr =
-    let output_var_name   = create_fresh_var_name () in
-    let output_var        = create_ident output_var_name in
-    let inj_expr          = create_inj const_expr in
-    let unify_const       = create_unify output_var inj_expr in
-    create_fun output_var_name unify_const in
-
-  (****)
-
   let rec path_of_longident ?(to_lower=false) = function
   | Lident s ->
       Path.Pident (Ident.create "wtf")
@@ -345,37 +336,42 @@ let get_translator start_index need_sort_goals need_unlazy =
     Texp_construct (mknoloc @@ Lident "()", cd, []) |> expr_desc_to_expr
   in
 
-  let translate_construct (sub : Tast_mapper.mapper) (name: Longident.t loc) args =
+  let rec unnest_constuct expr =
+    match expr.exp_desc with
+    | Texp_constant _  -> create_inj expr, []
+    | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" -> create_inj expr, []
+    | Texp_construct (name, _, args) ->
+      let new_args, fv = List.map unnest_constuct args |> List.split in
+      let fv           = List.concat fv in
+      let new_args     =
+        match new_args with
+        | [] -> [texp_unit]
+        | l  -> l in
+      let new_name     =
+        match name.txt with
+        | Lident "[]" -> Lident "nil"
+        | Lident "::" -> Lident "%"
+        | txt         -> lowercase_lident ~to_lower:true txt in
+      let inj_constr   = expr_desc_to_expr @@ Texp_ident (path_of_longident name.txt, {name with txt = new_name}, dummy_val_desc) in
+      let new_expr     = create_apply inj_constr new_args in
+      new_expr, fv
+    | _ ->
+      let fr_var = create_fresh_var_name () in
+      create_ident fr_var, [(fr_var, expr)] in
+
+
+  let translate_construct (sub : Tast_mapper.mapper) expr =
     let output_var_name   = create_fresh_var_name () in
     let output_var        = create_ident output_var_name in
 
-    let fresh_var_names   = List.map (fun _ -> create_fresh_var_name ()) args in
-    let fresh_vars        = List.map create_ident fresh_var_names in
+    let new_constr, fv    = unnest_constuct expr in
+    let var_names         = List.map fst fv in
 
-    let inj_cnstr =
-#if OCAML_VERSION > (4, 02, 2)
-      let make a = (Nolabel, Some a) in
-#else
-      let make a = ("", Some a, Required) in
-#endif
-      let args = match fresh_vars with
-      | [] -> [texp_unit]
-      | xs -> xs
-      in
-      let gen_constr_name name = match name with
-      | Lident "[]" -> Lident "nil"
-      | Lident "::" -> Lident "%"
-      | _           -> lowercase_lident ~to_lower:true name in
-      Typedtree.Texp_apply
-        (Texp_ident (path_of_longident name.txt, {name with txt = gen_constr_name name.txt}, dummy_val_desc) |> expr_desc_to_expr,
-          List.map make args)
-        |> expr_desc_to_expr
-    in
-    let unify_cnstr       = create_unify output_var inj_cnstr in
+    let unify_cnstr       = create_unify output_var new_constr in
 
-    let unifies_list      = List.map (sub.expr sub) args |> List.map2 (fun v e -> create_apply e [v]) fresh_vars in
+    let unifies_list      = List.map (fun (v, e) -> create_apply (sub.expr sub e) [create_ident v]) fv in
     let cnstr_and_unifies = List.fold_left create_and unify_cnstr unifies_list in
-    let translated_cnstr  = List.fold_right create_fresh fresh_var_names cnstr_and_unifies in
+    let translated_cnstr  = List.fold_right create_fresh var_names cnstr_and_unifies in
     create_fun output_var_name translated_cnstr in
 
   (****)
@@ -814,11 +810,8 @@ let get_translator start_index need_sort_goals need_unlazy =
 
   let expr sub x = (*TODO: Update rec names for abstraction*)
     match x.exp_desc with
-    | Texp_constant _           -> translate_constant x
-    | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" ->
-        (* true and false are represented as constructors in the typed tree *)
-        translate_constant x
-    | Texp_construct (n, _, l) -> translate_construct sub n l
+    | Texp_constant _           -> translate_construct sub x
+    | Texp_construct (_, _, _)  -> translate_construct sub x
 #if OCAML_VERSION > (4, 02, 2)
     | Texp_match (e, cs, _, _)  -> translate_match sub e cs x.exp_type
 #else
