@@ -600,7 +600,9 @@ let get_translator start_index need_sort_goals need_unlazy =
    let both_cases = create_conde [create_branch const_true th; create_branch const_false el] in
 
    let translated_cond = create_apply (sub.expr sub cond) [cond_var] in
-   let cond_with_cases = create_and translated_cond both_cases in
+   let cond_with_cases = if need_sort_goals && expr_has_rec_vars cond
+                         then create_and both_cases translated_cond
+                         else create_and translated_cond both_cases in
    let body_with_fresh = create_fresh cond_var_name cond_with_cases in
    List.fold_right create_fun argument_names body_with_fresh in
 
