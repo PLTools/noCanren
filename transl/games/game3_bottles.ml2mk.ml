@@ -29,10 +29,6 @@ let rec sub a b =
     | S x -> sub x y
 
 
-let not b =
-  if b then false else true
-
-
 let anotherBottle b =
   match b with
   | Fst -> Snd
