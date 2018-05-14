@@ -31,8 +31,8 @@ let logic_type_name     = "logic"
 let inj_name            = "!!"
 let uniq_name           = "==="
 let des_constr_name     = "=/="
-let or_name             = "|||"
-let and_name            = "&&&"
+let or_name             = "disj"
+let and_name            = "conj"
 let fresh_name          = "call_fresh"
 let fresh_var_prefix    = "q"
 
@@ -42,6 +42,14 @@ let tabling_succ_name   = "succ"
 let tabling_rec_name    = "tabledrec"
 
 let tabling_attr_name   = "tabled"
+
+let fresh_module_name   = "Fresh"
+let fresh_one_name      = "one"
+let fresh_two_name      = "two"
+let fresh_three_name    = "three"
+let fresh_four_name     = "four"
+let fresh_five_name     = "five"
+let fresh_succ_name     = "succ"
 
 (*****************************************************************************************************************************)
 
@@ -325,7 +333,7 @@ let get_translator start_index need_sort_goals need_unlazy =
       ; cstr_consts = 1
       ; cstr_nonconsts = 0
       ; cstr_normal = 0
-      ; cstr_generalized = false
+      ; cstr_generalized = falseconj
       ; cstr_private = Public
       ; cstr_loc = Location.none
       ; cstr_attributes = []
@@ -544,7 +552,7 @@ let get_translator start_index need_sort_goals need_unlazy =
     let translated_body         = sub.expr sub body in
 
     let result_var              = create_fresh_var_name () in
-    let body_with_eta_args      = create_apply translated_body @@ List.map (fun (n, _) -> create_ident n) eta_vars @ [create_ident result_var] in
+    let body_with_eta_args      = create_applyconj translated_body @@ List.map (fun (n, _) -> create_ident n) eta_vars @ [create_ident result_var] in
 
     let primary_vars_with_types = List.filter (fun (_, t) -> is_primary_type t) @@ real_vars @ eta_vars in
     let primary_vars            = List.map fst primary_vars_with_types in
@@ -987,6 +995,44 @@ let beta_reductor =
 
 (*****************************************************************************************************************************)
 
+let fresh_merger =
+
+  let rec fresh_finder x =
+    match x.exp_desc with
+    | Texp_apply (
+      { exp_desc = Texp_ident (_, { txt = Longident.Lident name }, _) },
+      [(Nolabel, Some { exp_desc = Texp_function { cases=[case] } })])
+      when name = fresh_name ->
+      let body, vars = fresh_finder case.c_rhs in
+      let Tpat_var ({ name }, _) = case.c_lhs.pat_desc in
+      body, name :: vars
+    | _ -> x, [] in
+
+  let expr sub x =
+    match x.exp_desc with
+    | Texp_apply ({ exp_desc = Texp_ident (_, { txt = Longident.Lident name }, _) }, [(Nolabel, Some a)]) when name = fresh_name ->
+      let body, vars = fresh_finder x in
+      let body       = sub.expr sub body in
+      let abstr_body = List.fold_right create_fun vars body in
+      let in_fresh   = create_ident_with_dot fresh_module_name in
+
+      let rec create_numeral = function
+        | 1 -> in_fresh fresh_one_name
+        | 2 -> in_fresh fresh_two_name
+        | 3 -> in_fresh fresh_three_name
+        | 4 -> in_fresh fresh_four_name
+        | 5 -> in_fresh fresh_five_name
+        | n -> create_apply (in_fresh fresh_succ_name) [create_numeral (n - 1)] in
+
+      let len = List.length vars in
+      if len = 0 then body else create_apply (create_numeral len) [abstr_body]
+
+    | _ -> Tast_mapper.default.expr sub x in
+
+  { Tast_mapper.default with expr }
+
+(*****************************************************************************************************************************)
+
 end
 
 let print_if ppf flag printer arg =
@@ -1011,8 +1057,9 @@ let only_generate ~oldstyle hook_info tast =
     let reduced_tast  = if need_reduce
                         then beta_reductor.structure beta_reductor new_tast
                         else new_tast in
+    let fr_merge_tast = fresh_merger.structure fresh_merger reduced_tast in
 
-    Untypeast.untype_structure reduced_tast |>
+    Untypeast.untype_structure fr_merge_tast |>
     PutDistrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
