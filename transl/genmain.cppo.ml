@@ -684,6 +684,34 @@ let get_translator start_index need_sort_goals need_unlazy =
 
     create_fun name_arg_l fun2 in
 
+  let translate_not =
+    let name_arg    = create_fresh_var_name () in
+    let name_out    = create_fresh_var_name () in
+    let fr_arg      = create_fresh_var_name () in
+
+    let ident_arg   = create_ident name_arg in
+    let ident_out   = create_ident name_out in
+    let fr_ident    = create_ident fr_arg in
+
+    let const_true  = create_constructor true_name [] |> create_inj in
+    let const_false = create_constructor false_name [] |> create_inj in
+
+    let arg_true    = create_unify fr_ident const_true in
+    let arg_false   = create_unify fr_ident const_false in
+    let out_true    = create_unify ident_out const_true in
+    let out_false   = create_unify ident_out const_false in
+
+    let fst_and     = create_and arg_true out_false in
+    let snd_and     = create_and arg_false out_true in
+    let full_or     = create_or fst_and snd_and in
+
+    let apply       = create_apply ident_arg [fr_ident] in
+    let full_and    = create_and apply full_or in
+
+    let with_fresh  = create_fresh fr_arg full_and in
+    let fun1        = create_fun name_out with_fresh in
+    create_fun name_arg fun1 in
+
   (****)
 
   let translate_letrec_bindings_with_tibling sub binds =
@@ -807,6 +835,8 @@ let get_translator start_index need_sort_goals need_unlazy =
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_or_name  -> translate_bool_funs true
 
     | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_and_name -> translate_bool_funs false
+
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_not_name -> translate_not
 
     | Texp_let (Recursive, bindings, expr) ->
       let new_bindings = translate_letrec_bindings_with_tibling sub bindings in

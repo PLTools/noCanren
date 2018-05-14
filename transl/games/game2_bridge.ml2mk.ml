@@ -30,10 +30,6 @@ let rec add a0 b0 =
   | S x -> add x (S b0)
 
 
-let not a0 =
-  if a0 then false else true
-
-
 let checkPerson state person =
   match state with
   | St (l, a0, b0, c0, d0) ->
