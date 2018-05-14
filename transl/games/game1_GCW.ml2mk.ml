@@ -2,10 +2,6 @@ type person = G | C | W | N
 type state = St of bool * bool * bool * bool
 
 
-let not a = 
-  if a then false else true
-
-
 let checkState s =
   match s with
   | St (i0, g0, c0, w0) ->
@@ -30,7 +26,7 @@ let step s p =
     | C -> St (not i0, g0, not c0, w0)
     | W -> St (not i0, g0, c0, not w0)
     | N -> St (not i0, g0, c0, w0)
-    
+
 
 let checkAnswer a =
   let startState  = St (true, true, true, true) in
@@ -38,15 +34,15 @@ let checkAnswer a =
   let rec checkAnswer a state =
     match a with
     | []    -> state = finishState
-    | x::xs -> 
+    | x::xs ->
       if checkStep state x then
         let newState = step state x in
           if checkState newState then checkAnswer xs newState else false
       else false in
-   
+
   checkAnswer a startState
 
-let t = true 
+let t = true
 
 (*
 (****************************************************************************)
