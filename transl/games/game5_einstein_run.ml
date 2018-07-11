@@ -3,7 +3,6 @@ open MiniKanrenStd
 open Game5_einstein
 open Tester
 
-open GT
 
 let show_hause_color = function
   | Yellow       -> "Yellow      "
@@ -48,8 +47,6 @@ let show_state = function
   | State (p1, p2, p3, p4, p5) -> Printf.sprintf "\n  %s\n  %s\n  %s\n  %s\n  %s\n" (show_person p1) (show_person p2) (show_person p3) (show_person p4) (show_person p5)
 
 let myshow = show_state
-
-let show_bool b = if b then "true" else "false"
 
 let () =
   run_exn myshow (-1) q qh ("answers", (fun q -> (check_state ((===) q) (!!true))));
