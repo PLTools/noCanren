@@ -266,11 +266,24 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
         create_apply (lowercase_lident ident.txt |> mknoloc |> Exp.ident) args, vars
       | _ -> failwith "Incorrect pattern in pattern matching" in
 
+    let rec rename var1 var2 pat =
+      match pat.pexp_desc with
+      | Pexp_ident { txt = Lident name } -> if name = var1 then create_id var2 else pat
+      | Pexp_apply (f, args) -> List.map snd args |> List.map (rename var1 var2) |> create_apply f
+      | _ -> pat in
+
     let translate_case case =
-      let pat, vars = translate_pat case.c_lhs in
-      let unify     = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-      let body      = create_apply (translate_expression case.c_rhs) (List.map create_id args) in
-      let conj      = create_conj [unify; body] in
+      let pat, vars  = translate_pat case.c_lhs in
+
+      let is_overlap = List.exists ((=) scrutinee_var) vars in
+      let new_var    = if is_overlap then create_fresh_var_name () else "" in
+      let pat        = if is_overlap then rename scrutinee_var new_var pat else pat in
+      let vars       = if is_overlap then List.map (fun n -> if n = scrutinee_var then new_var else n) vars else vars in
+
+      let unify      = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+      let body       = create_apply (translate_expression case.c_rhs) (List.map create_id args) in
+      let body       = if is_overlap then create_apply (create_fun scrutinee_var body) [create_id new_var] else body in
+      let conj       = create_conj [unify; body] in
       List.fold_right create_fresh vars conj in
 
     let new_cases  = List.map translate_case cases in
@@ -310,7 +323,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     let q  = create_fresh_var_name () in
     [%expr fun [%p create_pat a] [%p create_pat q] ->
              conde [([%e create_id a] === !!true ) &&& ([%e create_id q] === !!false);
-                    ([%e create_id a] =/= !!false) &&& ([%e create_id q] === !!true )]]
+                    ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
 
 
   and translaet_if cond th el typ =
@@ -409,13 +422,21 @@ let add_packages ast =
 
 let beta_reductor minimal_index =
 
-  let check_var_name name =
+  let need_subst name arg =
+    let arg_is_var =
+      match arg.pexp_desc with
+      | Pexp_ident _ -> true
+      | _            -> false in
+
     let prefix_length = String.length fresh_var_prefix in
-    let length = String.length name in
-    if length > prefix_length && (String.sub name 0 prefix_length) = fresh_var_prefix then
-    let index = try String.sub name prefix_length (length - prefix_length) |> int_of_string
-                with Failure _ -> -1 in
-    index >= minimal_index else false in
+    let length        = String.length name in
+
+    let index = if length > prefix_length && (String.sub name 0 prefix_length) = fresh_var_prefix
+                then try String.sub name prefix_length (length - prefix_length) |> int_of_string
+                     with Failure _ -> -1
+                else -1 in
+
+    index >= minimal_index || arg_is_var in
 
   let name_from_pat pat =
     match pat.ppat_desc with
@@ -461,8 +482,8 @@ let beta_reductor minimal_index =
                 | Ppat_var v -> v.txt
                 | _          -> failwith "Incorrect arg name in beta reduction" in
       begin match args with
-        | arg::args' when check_var_name var -> beta_reduction (substitute body var arg) args'
-        | _                                  -> beta_reduction body [] |> create_fun var
+        | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
+        | _                                  -> create_apply (beta_reduction body [] |> create_fun var) args
       end
 
     | Pexp_let (flag, vbs, expr) ->
@@ -1084,7 +1105,7 @@ let only_generate ~oldstyle hook_info tast =
   if oldstyle
   then try
     let open Lozov  in
-    let need_reduce = true in
+    let need_reduce = false in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
     translate tast start_index |>

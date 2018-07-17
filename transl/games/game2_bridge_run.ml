@@ -27,5 +27,5 @@ let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
 let myshow x = show_list (show_step show_person) x
 
 let () =
- run_exn myshow (20) q qh ("answers", (fun q -> getAnswer q standartTimes (of_int 17 |> just)));
+ run_exn myshow (2) q qh ("answers", (fun q -> getAnswer q standartTimes (of_int 17 |> just)));
  ()
