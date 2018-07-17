@@ -3,8 +3,8 @@ open Printf
 open Asttypes
 open Longident
 open Typedtree
+open Ast_helper
 open Tast_mapper
-open Smart_mapper
 
 let () = Printexc.record_backtrace true
 
@@ -14,25 +14,10 @@ open Ident
 open Asttypes
 open Lexing
 open Location
+open Parsetree
 
 (*****************************************************************************************************************************)
 
-let dummy_name          = "dummy"
-
-let eq_name             = "="
-let neq_name            = "<>"
-let true_name           = "true"
-let false_name          = "false"
-let bool_and_name       = "&&"
-let bool_or_name        = "||"
-let bool_not_name       = "not"
-
-let logic_type_name     = "logic"
-let inj_name            = "!!"
-let uniq_name           = "==="
-let des_constr_name     = "=/="
-let or_name             = "|||"
-let and_name            = "&&&"
 let fresh_var_prefix    = "q"
 
 let tabling_module_name = "Tabling"
@@ -56,148 +41,11 @@ let packages = ["MiniKanren"; "MiniKanrenStd"]
 
 (*****************************************************************************************************************************)
 
-let rec fold_right0 f l =
-  match l with
-  | [x]     -> x
-  | x :: xs -> fold_right0 f xs |> f x
-  | [] -> failwith "bad argument of fold_right0"
+type error = NotYetSupported of string
+exception Error of error
 
-(*****************************************************************************************************************************)
-
-let pos         = { pos_fname = ""; pos_lnum = -1; pos_bol = -1; pos_cnum = -1 }
-let loc         = { loc_start = pos; loc_end = pos; loc_ghost = true }
-let type_expr   = { Types.desc = Types.Tvar None; level = -1; id = -1 }
-
-let create_path name =
-  Path.Pident { stamp = -1; name = name; flags = 0 }
-
-let create_fullname name =
-  { txt = Longident.Lident (name); loc = loc }
-
-(*****************************************************************************************************************************)
-
-let nolabel =
-#if OCAML_VERSION > (4, 02, 2)
-      Asttypes.Nolabel
-#else
-      ""
-#endif
-
-let expr_desc_to_expr ed =
-  { exp_desc = ed; exp_loc = loc; exp_extra = []; exp_type = type_expr; exp_env = Env.empty; exp_attributes = [] }
-
-let create_ident name =
-  let path     = create_path dummy_name in
-  let fullname = create_fullname name in
-  let val_desc = {Types.val_type = type_expr; val_kind = Types.Val_reg; val_loc = loc; val_attributes = [] } in
-  let exp_desc = Texp_ident (path, fullname, val_desc) in
-  expr_desc_to_expr exp_desc
-
-let create_ident_with_dot nl nr =
-  let path     = create_path dummy_name in
-  let fullname = { txt = Longident.parse (nl ^ "." ^ nr); loc = loc } in
-  let val_desc = {Types.val_type = type_expr; val_kind = Types.Val_reg; val_loc = loc; val_attributes = [] } in
-  let exp_desc = Texp_ident (path, fullname, val_desc) in
-  expr_desc_to_expr exp_desc
-
-let create_fun param_name body =
-  let param    = Ident.create param_name in
-  let pat_desc = Tpat_var (param, { txt = param_name; loc = loc }) in
-  let pat      = { pat_desc = pat_desc; pat_loc = loc; pat_extra = [];
-                   pat_type = type_expr; pat_env = Env.empty; pat_attributes = [] } in
-  let case     = { c_lhs = pat; c_guard = None; c_rhs = body
-#if OCAML_VERSION = (4, 02, 2)
-      ; c_cont=None (* ?? *)
-#endif
-  } in
-  let func     =
-    let cases = [case] in
-    let partial = Partial in
-#if OCAML_VERSION > (4, 02, 2)
-    let arg_label = Nolabel in
-    Texp_function {arg_label; param; cases; partial}
-#else
-    let arg_label = "" in
-    Texp_function ("", cases, partial)
-#endif
-  in
-  expr_desc_to_expr func
-
-let create_constructor name args =
-
-  let arity = List.length args in
-
-  let c_desc = { Types.cstr_name  = name;  cstr_res       = type_expr; cstr_existentials = [];
-                 cstr_args        = [];    cstr_arity     = arity;     cstr_tag = Types.Cstr_constant 0;
-                 cstr_consts      = 0;     cstr_nonconsts = 0;         cstr_normal = 0;
-                 cstr_generalized = false; cstr_private   = Public;    cstr_loc = loc;
-                 cstr_attributes  = []
-#if OCAML_VERSION > (4, 02, 2)
-                  ;    cstr_inlined   = None
-#endif
-}
-  in
-
-  let ident     = create_fullname name in
-  let expr_desc = Texp_construct (ident, c_desc, args) in
-  expr_desc_to_expr expr_desc
-
-let create_apply e args =
-#if OCAML_VERSION > (4, 02, 2)
-  let make a = (Nolabel, Some a) in
-#else
-  let make a = ("", Some a , Required) in
-#endif
-  Texp_apply (e, List.map make args) |> expr_desc_to_expr
-
-let create_let rec_flag var_name body rest =
-  let var      = Ident.create var_name in
-  let pat_desc = Tpat_var (var, { txt = var_name; loc = loc }) in
-  let pat      = { pat_desc = pat_desc; pat_loc = loc; pat_extra = [];
-                   pat_type = type_expr; pat_env = Env.empty; pat_attributes = [] } in
-  let val_bind = { vb_pat = pat; vb_expr = body; vb_attributes = []; vb_loc = loc } in
-  let exp_let  = Texp_let (rec_flag, [val_bind], rest) in
-  expr_desc_to_expr exp_let
-
-let create_inj e =
-  let inj_ident = create_ident inj_name in
-  create_apply inj_ident [e]
-
-let create_unify e1 e2 =
-  let uniq_ident = create_ident uniq_name in
-  create_apply uniq_ident [e1; e2]
-
-let create_des_constr e1 e2 =
-  let des_constr_ident = create_ident des_constr_name in
-  create_apply des_constr_ident [e1; e2]
-
-let create_or e1 e2 =
-  let or_ident = create_ident or_name in
-  create_apply or_ident [e1; e2]
-
-let create_and e1 e2 =
-  let and_ident = create_ident and_name in
-  create_apply and_ident [e1; e2]
-
-  let create_fresh var_names body =
-    let abstr_body = List.fold_right create_fun var_names body in
-    let in_fresh   = create_ident_with_dot fresh_module_name in
-
-    let rec create_numeral = function
-      | 1 -> in_fresh fresh_one_name
-      | 2 -> in_fresh fresh_two_name
-      | 3 -> in_fresh fresh_three_name
-      | 4 -> in_fresh fresh_four_name
-      | 5 -> in_fresh fresh_five_name
-      | n -> create_apply (in_fresh fresh_succ_name) [create_numeral (n - 1)] in
-
-    let len = List.length var_names in
-    if len = 0 then body else create_apply (create_numeral len) [abstr_body]
-
-
-let create_conde xs =
-  let cnde = create_ident "conde" in
-  create_apply cnde [List.fold_right (fun x acc -> (create_constructor "::" [x;acc])) xs (create_constructor "[]" [])]
+let report_error fmt  = function
+| NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
 (*****************************************************************************************************************************)
 
@@ -221,70 +69,424 @@ let get_max_index tast =
 
   finder.structure finder tast |> ignore; !max_index
 
-let dummy_val_desc =
-  let open Types in
-  let val_kind = Val_reg in
-  let val_type = { desc = Tvar (Some "a"); level = 0; id = 0} in
-  let val_loc = Location.none in
-  {val_kind; val_type; val_loc; val_attributes = []}
+(*****************************************************************************************************************************)
+
+let untyper = Untypeast.default_mapper
+
+let create_id  s = Lident s |> mknoloc |> Exp.ident
+let create_pat s = mknoloc s |> Pat.var
+
+let rec lowercase_lident = function
+  | Lident s      -> Lident (Util.mangle_construct_name s)
+  | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident r)
+  | Ldot (t, s)   -> Ldot (lowercase_lident t, s)
+
+let rec is_primary_type (t : Types.type_expr) =
+  match t.desc with
+  | Tarrow _ -> false
+  | Tlink t' -> is_primary_type t'
+  | _        -> true
+
+
+let get_pat_name p =
+  match p.pat_desc with
+  | Tpat_var (name, _) -> name.name
+  | _                  -> failwith "Incorrect pattern"
+
+
+let create_apply f = function
+| []   -> f
+| args ->
+  let args = List.map (fun a -> Nolabel, a) args in
+  match f.pexp_desc with
+  | Pexp_apply (g, args') -> Exp.apply g (args' @ args)
+  | _                     -> Exp.apply f args
+
+
+let create_apply_to_list f arg_list =
+  let new_arg = List.fold_right (fun x acc -> [%expr [%e x] :: [%e acc]]) arg_list [%expr []] in
+  create_apply f [new_arg]
+
+
+let create_conj = function
+| []     -> failwith "Conjunction needs one or more arguments"
+| [x]    -> x
+| [x; y] -> [%expr [%e x] &&& [%e y]]
+| l      -> create_apply_to_list [%expr (?&)] l
+
+
+let create_disj = function
+| []     -> failwith "Conjunction needs one or more arguments"
+| [x]    -> x
+| [x; y] -> [%expr [%e x] ||| [%e y]]
+| l      -> create_apply_to_list [%expr conde] l
+
+
+let create_fun var body =
+  [%expr fun [%p create_pat var] -> [%e body]]
+
+
+let create_fresh var body =
+  create_apply [%expr call_fresh] [create_fun var body]
+
+
+let create_inj expr = [%expr !! [%e expr]]
 
 (*****************************************************************************************************************************)
 
-type error = NotYetSupported of string
-exception Error of error
+let translate tast start_index =
 
-let report_error fmt  = function
-| NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
+let curr_index = ref start_index in
 
+let create_fresh_var_name () =
+  let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
+  incr curr_index;
+  name in
+
+let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
+  match typ.desc with
+  | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
+  | Tlink typ                   -> create_fresh_argument_names_by_type typ
+  | _                           -> [create_fresh_var_name ()] in
+
+  (*************************************************)
+
+  let rec unnest_expr expr =
+    match expr.exp_desc with
+    | Texp_ident _ -> untyper.expr untyper expr, []
+    | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), []
+    | Texp_construct ({txt = Lident s}, _, []) when s = "true" || s = "false" -> create_inj (untyper.expr untyper expr), []
+
+    | Texp_construct (name, _, args) ->
+      let new_args, fv = List.map unnest_expr args |> List.split in
+      let fv           = List.concat fv in
+
+      let new_args     = match new_args with
+                         | [] -> [[%expr ()]]
+                         | l  -> l in
+
+      let new_name     = match name.txt with
+                         | Lident "[]" -> Lident "nil"
+                         | Lident "::" -> Lident "%"
+                         | txt         -> lowercase_lident txt in
+
+      create_apply (Exp.ident (mknoloc new_name)) new_args, fv
+
+    | _ when is_primary_type expr.exp_type ->
+      let fr_var = create_fresh_var_name () in
+      create_id fr_var, [(fr_var, expr)]
+    | _ -> translate_expression expr, []
+
+
+  and translate_construct expr =
+    let constr, binds = unnest_expr expr in
+    let out_var_name  = create_fresh_var_name () in
+    let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
+    let conjs         = unify_constr :: List.map (fun (v,e) -> create_apply (translate_expression e) [create_id v]) binds in
+    let conj          = create_conj conjs in
+    let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
+    create_fun out_var_name with_fresh
+
+
+  and translate_ident name typ =
+    if is_primary_type typ
+      then let var = create_fresh_var_name () in
+           [%expr fun [%p create_pat var] -> [%e create_id name] === [%e create_id var]]
+      else create_id name
+
+
+  and translate_abstraciton case =
+    Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
+
+
+  and normalize_apply expr =
+    match expr.exp_desc with
+    | Texp_apply (f, args_r) ->
+      let expr', args_l = normalize_apply f in
+      expr', args_l @ List.map (function | (_, Some x) -> x | _ -> failwith "Incorrect argument") args_r
+    | _ -> expr, []
+
+
+  and translate_apply expr =
+    let f, args = normalize_apply expr in
+    let new_args, binds = List.map unnest_expr args |> List.split in
+    let binds = List.concat binds in
+    if List.length binds = 0
+      then create_apply (translate_expression f) new_args
+      else let eta_vars   = create_fresh_argument_names_by_type expr.exp_type in
+           let eta_call   = create_apply (translate_expression f) (new_args @ List.map create_id eta_vars) in
+           let conjs      = List.map (fun (v,e) -> create_apply (translate_expression e) [create_id v]) binds @ [eta_call] in
+           let full_conj  = create_conj conjs in
+           let with_fresh = List.fold_right create_fresh (List.map fst binds) full_conj in
+           List.fold_right create_fun eta_vars with_fresh
+
+
+  and translate_let flag bind expr =
+    if flag = Recursive || not (is_primary_type bind.vb_expr.exp_type)
+      then Exp.let_ flag [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr)] (translate_expression expr)
+      else let name       = get_pat_name bind.vb_pat in
+           let conj1      = create_apply (translate_expression bind.vb_expr) [create_id name] in
+           let args       = create_fresh_argument_names_by_type expr.exp_type in
+           let conj2      = create_apply (translate_expression expr) (List.map create_id args) in
+           let both       = create_conj [conj1; conj2] in
+           let with_fresh = create_fresh name both in
+           List.fold_right create_fun args with_fresh
+
+
+  and translate_match expr cases typ =
+    let args = create_fresh_argument_names_by_type typ in
+
+    let scrutinee_is_var =
+      match expr.exp_desc with
+      | Texp_ident _ -> true
+      | _            -> false in
+
+    let scrutinee_var =
+      match expr.exp_desc with
+      | Texp_ident (_, { txt = Longident.Lident name }, _) -> name
+      | Texp_ident _                                       -> failwith "Incorrect variable"
+      | _                                                  -> create_fresh_var_name () in
+
+    let rec translate_pat pat =
+      match pat.pat_desc with
+      | Tpat_any                                       -> let var = create_fresh_var_name () in create_id var, [var]
+      | Tpat_var (v, _)                                -> create_id v.name, [v.name]
+      | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
+      | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
+      | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
+      | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr nil ()],  []
+      | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident] ()], []
+      | Tpat_construct ({txt = Lident "::"}, _, [a;b]) ->
+        let e1, v1 = translate_pat a in
+        let e2, v2 = translate_pat b in
+        [%expr [%e e1] % [%e e2]], v1 @ v2
+      | Tpat_construct (ident, _, args) ->
+        let args, vars = List.map translate_pat args |> List.split in
+        let vars = List.concat vars in
+        create_apply (lowercase_lident ident.txt |> mknoloc |> Exp.ident) args, vars
+      | _ -> failwith "Incorrect pattern in pattern matching" in
+
+    let translate_case case =
+      let pat, vars = translate_pat case.c_lhs in
+      let unify     = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+      let body      = create_apply (translate_expression case.c_rhs) (List.map create_id args) in
+      let conj      = create_conj [unify; body] in
+      List.fold_right create_fresh vars conj in
+
+    let new_cases  = List.map translate_case cases in
+    let disj       = create_disj new_cases in
+    let with_fresh = if scrutinee_is_var
+                     then disj
+                     else create_conj [create_apply (translate_expression expr) [create_id scrutinee_var]; disj]
+                       |> create_fresh scrutinee_var in
+
+    List.fold_right create_fun args with_fresh
+
+
+  and translate_bool_funs is_or =
+    let a1  = create_fresh_var_name () in
+    let a2  = create_fresh_var_name () in
+    let q   = create_fresh_var_name () in
+    let fst = if is_or then [%expr !!true]  else [%expr !!false] in
+    let snd = if is_or then [%expr !!false] else [%expr !!true]  in
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             conde [([%e create_id a1] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
+                    ([%e create_id a1] === [%e snd]) &&& ([%e create_id q] === [%e create_id a2])]]
+
+
+  and translate_eq_funs is_eq =
+    let a1  = create_fresh_var_name () in
+    let a2  = create_fresh_var_name () in
+    let q   = create_fresh_var_name () in
+    let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
+    let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             conde [([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst]);
+                    ([%e create_id a1] =/= [%e create_id a2]) &&& ([%e create_id q] === [%e snd])]]
+
+
+  and translate_not_fun () =
+    let a  = create_fresh_var_name () in
+    let q  = create_fresh_var_name () in
+    [%expr fun [%p create_pat a] [%p create_pat q] ->
+             conde [([%e create_id a] === !!true ) &&& ([%e create_id q] === !!false);
+                    ([%e create_id a] =/= !!false) &&& ([%e create_id q] === !!true )]]
+
+
+  and translaet_if cond th el typ =
+  let args = create_fresh_argument_names_by_type typ in
+
+  let cond_is_var =
+    match cond.exp_desc with
+    | Texp_ident _ -> true
+    | _            -> false in
+
+  let cond_var =
+    match cond.exp_desc with
+    | Texp_ident (_, { txt = Longident.Lident name }, _) -> name
+    | Texp_ident _                                       -> failwith "Incorrect variable"
+    | _                                                  -> create_fresh_var_name () in
+
+  let th = create_apply (translate_expression th) (List.map create_id args) in
+  let el = create_apply (translate_expression el) (List.map create_id args) in
+
+  let body = [%expr conde [([%e create_id cond_var] === !!true ) &&& [%e th];
+                           ([%e create_id cond_var] === !!false) &&& [%e el]]] in
+
+  let with_fresh =
+    if cond_is_var then body
+    else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression cond] [%e create_id cond_var]) &&& [%e body])] in
+
+    List.fold_right create_fun args with_fresh
+
+
+  and translate_expression expr =
+    match expr.exp_desc with
+    | Texp_constant _          -> translate_construct expr
+    | Texp_construct _         -> translate_construct expr
+
+    | Texp_apply _             -> translate_apply expr
+
+    | Texp_match (e, cs, _, _) -> translate_match e cs expr.exp_type
+
+    | Texp_ifthenelse (cond, th, Some el) -> translaet_if cond th el expr.exp_type
+
+    | Texp_function {cases = [case]} -> translate_abstraciton case
+
+    | Texp_ident (_, { txt = Lident "="  }, _)  -> translate_eq_funs true
+    | Texp_ident (_, { txt = Lident "<>" }, _)  -> translate_eq_funs false
+
+    | Texp_ident (_, { txt = Lident "||" }, _)  -> translate_bool_funs true
+    | Texp_ident (_, { txt = Lident "&&" }, _)  -> translate_bool_funs false
+
+    | Texp_ident (_, { txt = Lident "not" }, _) -> translate_not_fun ()
+
+    | Texp_ident (_, { txt = Lident name }, _) -> translate_ident name expr.exp_type
+
+    | Texp_let (flag, [bind], expr) -> translate_let flag bind expr
+
+    | Texp_let _ -> failwith "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
+    | _ -> failwith "Incorrect expression" in
+
+
+  let translate_external_value_binding vb =
+    if is_primary_type vb.vb_expr.exp_type
+      then failwith "Primary type of external let-binding"
+      else let pat  = untyper.pat untyper vb.vb_pat in
+           let expr = translate_expression vb.vb_expr in
+           Vb.mk pat expr in
+
+
+  let mark_type_declaration td =
+      match td.typ_kind with
+      | Ttype_variant cds -> { td with typ_attributes = [(mknoloc "put_distrib_here", Parsetree.PStr [])] }
+      | _                 -> failwith "Incrorrect type declaration" in
+
+
+  let translate_structure_item stri =
+    match stri.str_desc with
+    | Tstr_value (rec_flag, binds) ->
+      let new_binds = List.map translate_external_value_binding binds in
+        Str.value rec_flag new_binds
+    | Tstr_type (rec_flag, decls) ->
+      let new_decls = List.map mark_type_declaration decls in
+      untyper.structure_item untyper { stri with str_desc = Tstr_type (rec_flag, new_decls) }
+    | _ -> failwith "Incorrect structure item" in
+
+
+  let translate_structure str =
+      List.map translate_structure_item str.str_items in
+
+
+  translate_structure tast
+
+(*****************************************************************************************************************************)
+
+let add_packages ast =
+  List.map (fun n -> Lident n |> mknoloc |> Opn.mk |> Str.open_) packages @ ast
+
+(*****************************************************************************************************************************)
+
+let beta_reductor minimal_index =
+
+  let check_var_name name =
+    let prefix_length = String.length fresh_var_prefix in
+    let length = String.length name in
+    if length > prefix_length && (String.sub name 0 prefix_length) = fresh_var_prefix then
+    let index = try String.sub name prefix_length (length - prefix_length) |> int_of_string
+                with Failure _ -> -1 in
+    index >= minimal_index else false in
+
+  let name_from_pat pat =
+    match pat.ppat_desc with
+    | Ppat_var loc -> loc.txt
+    | _            -> failwith "Incorrect pattern in beta reduction" in
+
+  let rec substitute expr var subst =
+    match expr.pexp_desc with
+    | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
+    | Pexp_fun (_, _, pat, body) ->
+      let name = name_from_pat pat in
+      if name = var then expr else substitute body var subst |> create_fun name
+    | Pexp_apply (func, args) ->
+      List.map snd args |>
+      List.map (fun a -> substitute a var subst) |>
+      create_apply (substitute func var subst)
+    | Pexp_let (flag, vbs, expr) ->
+      let is_rec       = flag = Recursive in
+      let var_in_binds = List.map (fun vb -> name_from_pat vb.pvb_pat) vbs |> List.exists ((=) var) in
+
+      let subst_in_bind bind =
+        if is_rec && var_in_binds || not is_rec && var = (name_from_pat bind.pvb_pat)
+        then bind
+        else { bind with pvb_expr = substitute bind.pvb_expr var subst } in
+
+      let new_vbs = List.map subst_in_bind vbs in
+      Exp.let_ flag new_vbs (if var_in_binds then expr else substitute expr var subst)
+
+    | Pexp_construct (name, Some expr) -> Some (substitute expr var subst) |> Exp.construct name
+    | Pexp_tuple exprs -> List.map (fun e -> substitute e var subst) exprs |> Exp.tuple
+    | _ -> expr in
+
+
+  let rec beta_reduction expr args =
+    match expr.pexp_desc with
+    | Pexp_apply (func, args') ->
+      let old_args = List.map snd args' in
+      let new_args = List.map (fun a -> beta_reduction a []) old_args in
+      List.append new_args args |> beta_reduction func
+
+    | Pexp_fun (_, _, pat, body) ->
+      let var = match pat.ppat_desc with
+                | Ppat_var v -> v.txt
+                | _          -> failwith "Incorrect arg name in beta reduction" in
+      begin match args with
+        | arg::args' when check_var_name var -> beta_reduction (substitute body var arg) args'
+        | _                                  -> beta_reduction body [] |> create_fun var
+      end
+
+    | Pexp_let (flag, vbs, expr) ->
+      let new_vbs  = List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs in
+      let new_expr = beta_reduction expr args in
+      Exp.let_ flag  new_vbs new_expr
+
+    | Pexp_construct (name, Some expr) -> Some (beta_reduction expr []) |> Exp.construct name
+    | Pexp_tuple args -> List.map (fun a -> beta_reduction a []) args |> Exp.tuple
+    | _ -> create_apply expr args in
+
+  let expr _ x = beta_reduction x [] in
+  { Ast_mapper.default_mapper with expr }
+
+
+
+
+(*****************************************************************************************************************************)
+
+(*
 let get_translator start_index need_sort_goals need_unlazy =
 
   (****)
 
-  let curr_index     = ref start_index in
-  let curr_rec_names = ref [] in
-
-  (****)
-
-  let logic t =
-        match t.ctyp_desc with
-        | Ttyp_var _ -> t
-        | _          ->
-          let path       = create_path logic_type_name in
-          let fullname   = create_fullname logic_type_name in
-      let type_desc  = Ttyp_constr (path, fullname, [t]) in
-          { ctyp_desc = type_desc; ctyp_type = type_expr; ctyp_env = Env.empty; ctyp_loc = loc; ctyp_attributes = [] } in
-
-  let rec type_to_logic_type x =
-    let adder =
-      let typ sub x = type_to_logic_type x in
-      {Tast_mapper.default with typ} in
-
-    x |> Tast_mapper.default.typ adder |> logic in
-
-  let args_to_logic_args cd =
-    let cd_args =
-      let wrap f cd =
-#if OCAML_VERSION > (4, 02, 2)
-        match cd.cd_args with
-        | Cstr_tuple l -> Cstr_tuple (List.map type_to_logic_type l)
-#else
-        f cd.cd_args
-#endif
-      in
-      wrap (List.map type_to_logic_type) cd
-    in
-    {cd with cd_args}
-  in
-
-  (* let type_kind sub x =
-    match x with
-    | Ttype_variant l -> Ttype_variant (List.map args_to_logic_args l)
-    | Ttype_record _  -> raise (Error (NotYetSupported "record types"))
-    | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
-    | Ttype_open      -> raise (Error (NotYetSupported "open types"))
-  in *)
-
-  (****)
 
   let add_rec_names l = curr_rec_names := List.append !curr_rec_names l in
 
@@ -305,10 +507,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
   (****)
 
-  let create_fresh_var_name () =
-    let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
-    curr_index := !curr_index + 1;
-    name in
+
 
   (****)
 
@@ -356,7 +555,7 @@ let get_translator start_index need_sort_goals need_unlazy =
 
   let rec unnest_constuct expr =
     match expr.exp_desc with
-    | Texp_constant _  -> create_inj expr, []
+    | Texp_constant _  -> unnest_expr expr, []
     | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" -> create_inj expr, []
     | Texp_construct (name, _, args) ->
       let new_args, fv = List.map unnest_constuct args |> List.split in
@@ -871,165 +1070,26 @@ let get_translator start_index need_sort_goals need_unlazy =
       | Ttype_open      -> raise (Error (NotYetSupported "open types"))
 }
 
-(*****************************************************************************************************************************)
-
-let add_packages tast =
-  let pos        = { pos_fname = ""; pos_lnum = -1; pos_bol = -1; pos_cnum = -1 } in
-  let loc        = { loc_start = pos; loc_end = pos; loc_ghost = true } in
-  let longidents = List.map (fun n -> Longident.Lident n) packages in
-  let locs       = List.map (fun l -> { txt = l; loc = loc }) longidents in
-  let pathes     = List.map (fun n -> Path.Pident { stamp = -1; name = n; flags = 0 }) packages in
-  let open_desc  = List.map2 (fun i p -> { open_path = p; open_txt = i; open_override = Asttypes.Fresh;
-                                           open_loc = loc; open_attributes = [] }) locs pathes in
-  let item_descs = List.map (fun od -> Tstr_open od) open_desc in
-  let str_items' = List.map (fun id -> { str_desc = id; str_loc = loc; str_env = Env.empty }) item_descs in
-  let str_items  = List.append str_items' tast.str_items in
-  { tast with str_items }
-
-
-(*****************************************************************************************************************************)
-
-let beta_reductor =
-
-  let rec substitutor expr var subst =
-
-    let name_from_pat pat =
-      let Tpat_var (name, _) = pat.pat_desc in
-      name.name in
-
-    match expr.exp_desc with
-    | Texp_ident (_, ident, _) ->
-      let name = last ident.txt in
-      if name = var then subst else expr
-#if OCAML_VERSION > (4, 02, 2)
-    | Texp_function {arg_label; param; cases=[case]; partial} ->
-        if name_from_pat case.c_lhs = var then expr else
-        let c_rhs    = substitutor case.c_rhs var subst in
-        let new_case = { case with c_rhs } in
-        let exp_desc = Texp_function {arg_label; param; cases=[new_case]; partial} in
-        { expr with exp_desc }
-#else
-    | Texp_function (label, [case], typ) ->
-      if name_from_pat case.c_lhs = var then expr else
-        let c_rhs    = substitutor case.c_rhs var subst in
-        let new_case = { case with c_rhs } in
-        let exp_desc = Texp_function (label, [new_case], typ) in
-        { expr with exp_desc }
-#endif
-    | Texp_apply (func, args) ->
-      let new_func = substitutor func var subst in
-      let new_args =
-#if OCAML_VERSION > (4, 02, 2)
-      let make (l, Some arg)      = (l, Some (substitutor arg var subst)     ) in
-#else
-      let make (l, Some arg, flg) = (l, Some (substitutor arg var subst), flg) in
-#endif
-        List.map make args
-      in
-      let exp_desc = Texp_apply (new_func, new_args) in
-      { expr with exp_desc }
-
-    | Texp_let (rec_flag, val_binds, rest) ->
-
-      let is_recursive = rec_flag == Recursive in
-
-      let var_in_binds =
-        let all_names = List.map (fun vb -> name_from_pat vb.vb_pat) val_binds in
-        List.exists ((=)var) all_names in
-
-      let subst_in_vb val_bind =
-        if (is_recursive && var_in_binds) || (not is_recursive && var = (name_from_pat val_bind.vb_pat)) then val_bind else
-          let vb_expr = substitutor val_bind.vb_expr var subst in
-          { val_bind with vb_expr } in
-
-      let new_vbs  = List.map subst_in_vb val_binds in
-      let new_rest = if var_in_binds then rest else substitutor rest var subst in
-      let exp_desc = Texp_let (rec_flag, new_vbs, new_rest) in
-      { expr with exp_desc }
-    | Texp_construct (name, desc, exprs) ->
-      let new_exprs = List.map (fun x -> substitutor x var subst) exprs in
-      let exp_desc = Texp_construct (name, desc, new_exprs) in
-      {  expr with exp_desc }
-    | _ -> expr in
-
-  let rec beta_reduction expr args =
-    match expr.exp_desc with
-    | Texp_apply (func, args') ->
-#if OCAML_VERSION > (4, 02, 2)
-      let old_args = List.map (fun (_, Some a   ) -> a) args' in
-#else
-      let old_args = List.map (fun (_, Some a, _) -> a) args' in
-#endif
-      let new_args = List.map (fun a -> beta_reduction a []) old_args in
-      List.append new_args args |> beta_reduction func
-
-#if OCAML_VERSION > (4, 02, 2)
-      | Texp_function {arg_label; param; cases=[case]; partial} ->
-#else
-      | Texp_function (_, [case], _) ->
-#endif
-      let Tpat_var (var, _) = case.c_lhs.pat_desc in
-      begin
-        match args with
-        | arg::args' ->
-          let new_body = substitutor case.c_rhs var.name arg in
-          beta_reduction new_body args'
-
-        | _          ->
-          let new_body = beta_reduction case.c_rhs [] in
-          create_fun var.name new_body
-      end
-
-    | Texp_let (rec_flag, val_binds, rest) ->
-      let new_vbs  = List.map (fun v -> let vb_expr = beta_reduction v.vb_expr [] in { v with vb_expr } ) val_binds in
-      let new_rest = beta_reduction rest args in
-      let exp_desc = Texp_let (rec_flag, new_vbs, new_rest) in
-      { expr with exp_desc }
-
-    | Texp_construct (name, desc, exprs) ->
-      let new_exprs = List.map (fun x -> beta_reduction x []) exprs in
-      let exp_desc = Texp_construct (name, desc, new_exprs) in
-      { expr with exp_desc }
-
-    | _ ->
-      match args with
-      | [] -> expr
-      | _  -> create_apply expr args in
-
-
-  let expr _ x = beta_reduction x [] in
-
-
-    { Tast_mapper.default with expr }
-
-(*****************************************************************************************************************************)
-
+*)
 end
 
 let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;
   arg
 
+let eval_if_need flag f =
+  if flag then f else fun x -> x
 
 let only_generate ~oldstyle hook_info tast =
   if oldstyle
   then try
-    (*printf "Translating file %s\n%!" hook_info.Misc.sourcefile;
-    Format.printf ">>>>\n%!";
-    Pprintast.structure Format.std_formatter @@ Untypeast.untype_structure tast;
-    Format.printf "\n<<<<\n%!";*)
     let open Lozov  in
-    let need_sort_goals = true in
-    let need_unlazy     = true in
-    let current_index = get_max_index tast + 1 in
-    let translator    = get_translator current_index need_sort_goals need_unlazy in
-    let new_tast      = translator.structure translator tast |> add_packages in
-    let need_reduce   = true in
-    let reduced_tast  = if need_reduce
-                        then beta_reductor.structure beta_reductor new_tast
-                        else new_tast in
-
-    Untypeast.untype_structure reduced_tast |>
+    let need_reduce = true in
+    let start_index = get_max_index tast in
+    let reductor    = beta_reductor start_index in
+    translate tast start_index |>
+    add_packages |>
+    eval_if_need need_reduce (reductor.structure reductor) |>
     PutDistrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure

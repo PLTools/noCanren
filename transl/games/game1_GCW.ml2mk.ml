@@ -42,7 +42,7 @@ let checkAnswer a =
 
   checkAnswer a startState
 
-let t = true
+let t x = true
 
 (*
 (****************************************************************************)
