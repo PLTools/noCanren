@@ -132,33 +132,4 @@ let checkAnswer answer len cop =
 
 (****************************************************************************)
 
-let one = S O
-let two = S one
-let thr = S two
-let fou = S thr
-let fiv = S fou
-let six = S fiv
-let sev = S six
-let eig = S sev
-let nin = S eig
-
-let best = six |+| sev
-let total = S (sev |+| sev)
-
-let a4 = [Right one; Pour one; Left one; Fill; Right one; Fill; Right thr]
-
-let answer = [Right two; Pour one; Left two;
-              Fill; Right two; Pour one; Left two;
-              Fill; Right two; Fill;     Right fiv]
-
-
-
-let ans = [Right one; Pour two; Left one;
-           Fill; Right two; Pour one; Left two;
-           Fill; Right one; Fill; Right one; Fill; Right one; Pour one; Left thr;
-           Fill; Right two; Pour one; Left two;
-           Fill; Right one; Fill; Right one; Fill; Right one; Fill; Right fiv]
-
-
-
-let o = 1
+let o x = 1

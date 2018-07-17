@@ -31,6 +31,6 @@ let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
 let myshow x = show_list (show_step) x
 
 let () =
-(*run_exn myshow (1) q qh ("answers", (fun q -> (checkAnswer ((===)q) eig fiv (just @@ of_int 22))));*)
-  run_exn myshow (1) q qh ("answers", (fun q -> call_fresh (fun x -> (checkAnswer ((===)q) eig fiv (just x)))));
+(*run_exn myshow (1) q qh ("answers", (fun q -> (checkAnswer q (of_int 8) (of_int 5) (just @@ of_int 22))));*)
+  run_exn myshow (1) q qh ("answers", (fun q -> call_fresh (fun x -> (checkAnswer q (of_int 8) (of_int 5) (just x)))));
   ()

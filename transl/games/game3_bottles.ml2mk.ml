@@ -92,13 +92,6 @@ let checkAnswer answer capacities reqLvl =
 
 (****************************************************************************)
 
-let rec length l =
-  match l with
-  | []      -> O
-  | x :: xs -> S (length xs)
-
-let a8 = S(S(S(S(S(S(S(S O)))))))
-
 
 let capacities1 b =
   match b with
@@ -106,11 +99,4 @@ let capacities1 b =
   | Snd -> S (S (S (S (S (S (S (S (S O))))))))
 
 
-let reqLvl1 = S (S (S (S (S (S O)))))
-
-let answer = [ Step (Fill, Fst);   Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst);
-               Step (Fill, Fst);   Step (Pour, Fst);  Step (Empty, Snd);  Step (Pour, Fst);
-               Step (Fill, Fst);   Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst);
-               Step (Empty, Snd);  Step (Pour, Fst);  Step (Fill, Fst);   Step (Pour, Fst)]
-
-let badAns =  Step (Empty, Fst) :: answer
+let x y = 1

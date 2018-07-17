@@ -180,9 +180,14 @@ let check_state st =
   clue09 st && clue10 st && clue11 st && clue12 st && clue13 st && clue14 st && clue15 st &&
   all_present st
 
+
+(*
 let answer = State (
   Person (Yellow, Norwegian , Water       , Kools       , Fox   ),
   Person (Blue  , Ukrainian , Tea         , Chesterfield, Hourse),
   Person (Red   , Englishman, Milk        , Old_Gold    , Snails),
   Person (Ivory , Spaniard  , Orange_juice, Lacky_Strike, Dog   ),
   Person (Green , Japanese  , Coffee      , Parliament  , Zebra ))
+*)
+
+let f x = 1

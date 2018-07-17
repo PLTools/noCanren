@@ -28,5 +28,5 @@ let show_list f x =
 let myshow x = show_list (show_step) x
 
 let () =
- run_exn myshow (-1) q qh ("answers", (fun q -> checkAnswer ((===)q) capacities1 reqLvl1 (!!true)));
+ run_exn myshow (-1) q qh ("answers", (fun q -> checkAnswer q capacities1 (s (s (s (s (s (s (o ()))))))) (!!true)));
  ()
