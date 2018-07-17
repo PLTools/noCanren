@@ -79,16 +79,15 @@ let prepare_distribs ~loc tdecl fmap_decl =
 
   let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
   let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
-  [ [%stri let () = ()]
-  ; Str.module_ @@ Mb.mk gen_module_str @@
+  [ Str.module_ @@ Mb.mk gen_module_str @@
       Mod.(apply (ident (mknoloc @@ Lident (sprintf "Fmap%d" @@ List.length tdecl.ptype_params))) @@ structure
         [ fmap_decl
-        ; str_type_ Nonrecursive ~loc [ Type.mk ~params:tdecl.ptype_params
+        ; str_type_ Recursive ~loc [ Type.mk ~params:tdecl.ptype_params
             ~kind:Ptype_abstract
             ~manifest:(Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt) @@ List.map fst tdecl.ptype_params)
             (mknoloc "t") ]
         ])
-  ; Str.value Asttypes.Nonrecursive @@ List.map (fun {pcd_name; pcd_args} ->
+  ; Str.value Recursive @@ List.map (fun {pcd_name; pcd_args} ->
         let names =
           let Pcstr_tuple xs = pcd_args in
           List.mapi (fun n _ -> Printf.sprintf "x__%d" n) xs
@@ -222,7 +221,7 @@ let revisit_adt ~loc tdecl ctors =
             ; ptype_manifest = Some { ptyp_loc = Location.none; ptyp_attributes = []; ptyp_desc = alias_desc}
             } ]
       in*)
-    [ str_type_ ~loc Nonrecursive [functor_typ]
+    [ str_type_ ~loc Recursive [functor_typ]
     ] @ typ_to_add
 
 let has_to_gen_attr (xs: attributes) =
@@ -257,4 +256,3 @@ let main_mapper =
 
 let process x =
   main_mapper.structure main_mapper x
-
