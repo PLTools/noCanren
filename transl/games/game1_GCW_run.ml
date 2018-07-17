@@ -21,5 +21,5 @@ let show_list f x =
 let myshow x = show_list show_person x
 
 let () =
-  run_exn myshow (-1) q  qh  ("answers", (fun q -> checkAnswer ((===)q) (!!true)) );
+  run_exn myshow (-1) q  qh  ("answers", (fun q -> checkAnswer q (!!true)) );
   ()

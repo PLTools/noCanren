@@ -26,7 +26,7 @@ true: short_paths
 
 
 # Translator based on Lozov's works
-<transl/genmain.*>: package(compiler-libs.common), for-pack(Ml_to_mk), cppo_V_OCAML
+<transl/genmain.*>: package(compiler-libs.common,ppx_tools.metaquot), for-pack(Ml_to_mk), cppo_V_OCAML
 <transl/PutDistrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
 
 <transl/test4.*>: dsource, rectypes, use_ocanren_modules
