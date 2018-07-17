@@ -19,12 +19,6 @@ open Parsetree
 (*****************************************************************************************************************************)
 
 let fresh_var_prefix    = "q"
-
-let tabling_module_name = "Tabling"
-let tabling_one_name    = "one"
-let tabling_succ_name   = "succ"
-let tabling_rec_name    = "tabledrec"
-
 let tabling_attr_name   = "tabled"
 
 let fresh_module_name   = "Fresh"
@@ -221,16 +215,58 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
            List.fold_right create_fun eta_vars with_fresh
 
 
-  and translate_let flag bind expr =
-    if flag = Recursive || not (is_primary_type bind.vb_expr.exp_type)
-      then Exp.let_ flag [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr)] (translate_expression expr)
-      else let name       = get_pat_name bind.vb_pat in
+  and translate_nonrec_let bind expr =
+    if is_primary_type bind.vb_expr.exp_type
+      then let name       = get_pat_name bind.vb_pat in
            let conj1      = create_apply (translate_expression bind.vb_expr) [create_id name] in
            let args       = create_fresh_argument_names_by_type expr.exp_type in
            let conj2      = create_apply (translate_expression expr) (List.map create_id args) in
            let both       = create_conj [conj1; conj2] in
            let with_fresh = create_fresh name both in
            List.fold_right create_fun args with_fresh
+      else Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr)] (translate_expression expr)
+
+
+  and translate_rec_let bind expr =
+    let rec is_func_type (t : Types.type_expr) =
+      match t.desc with
+      | Tarrow _ -> true
+      | Tlink t' -> is_func_type t'
+      | _        -> false in
+
+    let rec has_func_arg (t : Types.type_expr) =
+      match t.desc with
+      | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
+      | Tlink t'         -> has_func_arg t'
+      | _                -> false in
+
+    let rec get_tabling_rank (typ : Types.type_expr) =
+      match typ.desc with
+      | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
+      | Tlink typ                   -> get_tabling_rank typ
+      | _                           -> [%expr Tabling.one] in
+
+    let body = translate_expression bind.vb_expr in
+    let expr = translate_expression expr in
+    let typ  = bind.vb_expr.exp_type in
+
+    let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
+
+    if not has_tabled_attr
+    then Exp.let_ Recursive [Vb.mk (untyper.pat untyper bind.vb_pat) body] expr
+    else if has_func_arg typ
+         then failwith "Tabled function has functional argument"
+         else let name = get_pat_name bind.vb_pat in
+              let abst = create_fun name body in
+              let rank = get_tabling_rank typ in
+              let appl = create_apply [%expr Tabling.tabledrec] [rank; abst] in
+              Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] expr
+
+
+  and translate_let flag bind expr =
+    match flag with
+    | Recursive    -> translate_rec_let    bind expr
+    | Nonrecursive -> translate_nonrec_let bind expr
 
 
   and translate_match expr cases typ =
@@ -498,600 +534,6 @@ let beta_reductor minimal_index =
   let expr _ x = beta_reduction x [] in
   { Ast_mapper.default_mapper with expr }
 
-
-
-
-(*****************************************************************************************************************************)
-
-(*
-let get_translator start_index need_sort_goals need_unlazy =
-
-  (****)
-
-
-  let add_rec_names l = curr_rec_names := List.append !curr_rec_names l in
-
-  let rem_rec_names l = curr_rec_names := List.filter (fun n -> List.for_all ((<>) n) l) !curr_rec_names in
-
-  let transl_without_rec_names f e l =
-    let old_names = !curr_rec_names in
-    rem_rec_names l;
-    let transl_e = f e in
-    curr_rec_names := old_names;
-    transl_e in
-
-  let rec expr_has_rec_vars expr = (* TODO: find in let-expressions *)
-    match expr.exp_desc with
-    | Texp_apply (func, args)                            -> expr_has_rec_vars func || List.exists (fun (_, Some e) -> expr_has_rec_vars e) args
-    | Texp_ident (_, { txt = Longident.Lident name }, _) -> List.exists ((=) name) !curr_rec_names
-    | _                                                  -> false in
-
-  (****)
-
-
-
-  (****)
-
-  let rec create_fresh_argument_names_by_type (typ : Types.type_expr) need_for_res =
-    match typ.desc with
-    | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ need_for_res
-    | Tlink typ                   -> create_fresh_argument_names_by_type typ need_for_res
-    | _                           -> if need_for_res then [create_fresh_var_name ()] else [] in
-
-  (****)
-
-  let rec path_of_longident ?(to_lower=false) = function
-  | Lident s ->
-      Path.Pident (Ident.create "wtf")
-      (*Path.Pident (Ident.create (if to_lower
-        then String.mapi (fun n -> if n=0 then Char.lowercase else fun c -> c) s
-        else s^"1"))*)
-  | Lapply (l,r) -> Path.Papply (path_of_longident ~to_lower l, path_of_longident ~to_lower r)
-  | Ldot (t, s)  -> Path.Pdot (path_of_longident ~to_lower t, s, 0)
-  in
-  let rec lowercase_lident ?(to_lower=false) = function
-  | Lident s -> Lident (Util.mangle_construct_name s)
-  | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident ~to_lower r)
-  | Ldot (t, s)  -> Ldot (lowercase_lident ~to_lower t, s)
-  in
-  let texp_unit =
-    let cd =
-      { Types.cstr_name = "()"; cstr_res = Obj.magic (); cstr_existentials = []
-      ; cstr_args = []
-      ; cstr_arity = 0
-      ; cstr_tag = Cstr_constant 0
-      ; cstr_consts = 1
-      ; cstr_nonconsts = 0
-      ; cstr_normal = 0
-      ; cstr_generalized = false
-      ; cstr_private = Public
-      ; cstr_loc = Location.none
-      ; cstr_attributes = []
-#if OCAML_VERSION > (4, 02, 2)
-      ; cstr_inlined = None
-#endif
-      } in
-    Texp_construct (mknoloc @@ Lident "()", cd, []) |> expr_desc_to_expr
-  in
-
-  let rec unnest_constuct expr =
-    match expr.exp_desc with
-    | Texp_constant _  -> unnest_expr expr, []
-    | Texp_construct ({txt=Lident s}, _, []) when s = "true" || s = "false" -> create_inj expr, []
-    | Texp_construct (name, _, args) ->
-      let new_args, fv = List.map unnest_constuct args |> List.split in
-      let fv           = List.concat fv in
-      let new_args     =
-        match new_args with
-        | [] -> [texp_unit]
-        | l  -> l in
-      let new_name     =
-        match name.txt with
-        | Lident "[]" -> Lident "nil"
-        | Lident "::" -> Lident "%"
-        | txt         -> lowercase_lident ~to_lower:true txt in
-      let inj_constr   = expr_desc_to_expr @@ Texp_ident (path_of_longident name.txt, {name with txt = new_name}, dummy_val_desc) in
-      let new_expr     = create_apply inj_constr new_args in
-      new_expr, fv
-    | _ ->
-      let fr_var = create_fresh_var_name () in
-      create_ident fr_var, [(fr_var, expr)] in
-
-
-  let translate_construct (sub : Tast_mapper.mapper) expr =
-    let output_var_name   = create_fresh_var_name () in
-    let output_var        = create_ident output_var_name in
-
-    let new_constr, fv    = unnest_constuct expr in
-    let var_names         = List.map fst fv in
-
-    let unify_cnstr       = create_unify output_var new_constr in
-
-    let unifies_list      = List.map (fun (v, e) -> create_apply (sub.expr sub e) [create_ident v]) fv in
-    let cnstr_and_unifies = List.fold_left create_and unify_cnstr unifies_list in
-    let translated_cnstr  = create_fresh var_names cnstr_and_unifies in
-    create_fun output_var_name translated_cnstr in
-
-  (****)
-
-  let translate_match (sub : Tast_mapper.mapper) expr cases (typ : Types.type_expr) =
-
-    let argument_names = create_fresh_argument_names_by_type typ true in
-    let arguments      = List.map create_ident argument_names in
-
-    let translated_expr = sub.expr sub expr in
-    let unify_var_name  = create_fresh_var_name() in
-    let unify_var       = create_ident unify_var_name in
-    let unify_expr      = create_apply translated_expr [unify_var] in
-
-    let translate_case case =
-      let pattern = case.c_lhs in
-      let body    = case.c_rhs in
-
-      let real_arg_pats =
-        match pattern.pat_desc with
-        | Tpat_constant _             -> []
-        | Tpat_construct (_, _, pats) -> pats
-        | _ -> raise (Error (NotYetSupported "anything other constants and constructores in the matching patterns"))
-      in
-
-      let get_var_name var =
-        let Tpat_var (ident, _) = var.pat_desc in
-        ident.name
-      in
-
-      let real_arg_names    = List.map get_var_name real_arg_pats in
-      let real_args         = List.map create_ident real_arg_names in
-
-      let fresh_arg_names   = List.map (fun _ -> create_fresh_var_name ()) real_args in
-      let fresh_args        = List.map create_ident fresh_arg_names in
-
-      let translated_body   = transl_without_rec_names (sub.expr sub) body real_arg_names in
-      let body_with_args    = create_apply translated_body arguments in
-      let body_with_lambda  = List.fold_right create_fun real_arg_names body_with_args in
-
-      let lambda_arg_names  = List.map (fun _ -> create_fresh_var_name ()) real_args in
-      let lambda_args       = List.map create_ident lambda_arg_names in
-
-      let unifies_for_subst = List.map2 create_unify lambda_args fresh_args in
-      let funs_for_subst    = List.map2 create_fun lambda_arg_names unifies_for_subst |> List.map (fun x -> [x]) in
-      let body_with_subst   = List.fold_left create_apply body_with_lambda funs_for_subst in
-
-      let cnstr             =
-        match pattern.pat_desc with
-        | Tpat_constant const          -> (Texp_constant const) |> expr_desc_to_expr |> create_inj
-        | Tpat_construct ({txt = Lident s}, _, _) when (s = "true" || s = "false") ->
-            let flid = Location.mknoloc (Lident s) in
-            Texp_ident (path_of_longident (Lident s), flid, dummy_val_desc) |> expr_desc_to_expr |> create_inj
-        | Tpat_construct ({txt = Lident "[]"}, _, _) -> create_apply (create_ident "nil") [texp_unit]
-        | Tpat_construct ({txt = Lident "::"}, _, _) -> create_apply (create_ident "%") fresh_args
-        | Tpat_construct (name, cd, [])  ->
-            let flid =
-              let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
-              (* TODO: We lose module path here *)
-              Location.mkloc (Lident str.txt) name.loc
-            in
-            create_apply
-                (Texp_ident (path_of_longident flid.txt, flid, dummy_val_desc) |> expr_desc_to_expr)
-                [texp_unit]
-        | Tpat_construct (name, cd, _)  ->
-          let flid =
-            let str = PutDistrib.lower_lid {name with txt = Longident.last name.txt } in
-            (* TODO: We lose module path here *)
-            Location.mkloc (Lident str.txt) name.loc
-          in
-          create_apply
-              (Texp_ident (path_of_longident flid.txt, flid, dummy_val_desc) |> expr_desc_to_expr)
-              fresh_args
-          in
-
-      let cnstr_unify       = create_unify unify_var cnstr in
-
-      let cnstr_and_body    = create_and cnstr_unify body_with_subst in
-
-      create_fresh fresh_arg_names cnstr_and_body
-    in
-
-    let translated_cases     = cases |> List.map translate_case |> create_conde in
-
-    let upper_exp_with_cases = if need_sort_goals && expr_has_rec_vars expr then create_and translated_cases unify_expr
-                                                                            else create_and unify_expr translated_cases in
-
-    let all_without_lambda   = create_fresh [unify_var_name] upper_exp_with_cases in
-
-    List.fold_right create_fun argument_names all_without_lambda
-  in
-
-  (****)
-
-  let rec is_primary_type (t : Types.type_expr) =
-    match t.desc with
-    | Tarrow _ -> false
-    | Tlink t' -> is_primary_type t'
-    | _        -> true in
-
-  let create_unify_with_one_argument a =
-    let arg = create_fresh_var_name () in
-    let uni = create_unify (create_ident arg) a in
-    create_fun arg uni in
-
-  let get_pattern_names bindings =
-    List.map (fun v -> v.vb_pat.pat_desc) bindings |> List.map (fun (Tpat_var (n, _)) -> n.name) in
-
-  (****)
-
-  let normalize_abstraction expr =
-    let rec normalize_abstraction expr acc =
-      match expr.exp_desc with
-      | Texp_function {arg_label; param; cases=[case]; _} ->
-        let Tpat_var (name, _) = case.c_lhs.pat_desc in
-        let typ = case.c_lhs.pat_type in
-        normalize_abstraction case.c_rhs ((name.name, typ) :: acc)
-      | _ -> expr, List.rev acc in
-    normalize_abstraction expr [] in
-
-
-  let eta_extension expr =
-    let rec get_arg_types (typ : Types.type_expr) =
-      match typ.desc with
-      | Tarrow (_, l, r, _) -> l :: get_arg_types r
-      | Tlink typ           -> get_arg_types typ
-      | _                   -> [] in
-
-    let arg_types = get_arg_types expr.exp_type in
-    List.map (fun t -> create_fresh_var_name (), t) arg_types in
-
-
-  let get_pat_name p =
-    match p.pat_desc with
-    | Tpat_var (name, _) -> name.name in
-
-
-  let two_or_more_mentions var_name expr =
-    let rec two_or_more_mentions expr count =
-      let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
-      let get_pat_args p = match p.pat_desc with | Tpat_construct (_, _, pats) -> pats in
-
-      match expr.exp_desc with
-      | Texp_constant _ -> count
-      | Texp_construct (_, _, args) ->
-        List.fold_left eval_if_need count args
-      | Texp_ident (_, { txt = Longident.Lident name }, _) ->
-        if var_name = name then count + 1 else count
-      | Texp_function {arg_label; param; cases=[case]; _} ->
-        if var_name = get_pat_name case.c_lhs then count else two_or_more_mentions case.c_rhs count
-      | Texp_apply (func, args) ->
-        let args = List.map (fun (_, Some a) -> a) args in
-        List.fold_left eval_if_need count @@ func :: args
-      | Texp_ifthenelse (cond, th, Some el) ->
-        List.fold_left eval_if_need count [cond; th; el]
-      | Texp_let (_, bindings, expr) ->
-        let bindings = List.filter (fun b -> var_name <> get_pat_name b.vb_pat) bindings in
-        let exprs = expr :: List.map (fun b -> b.vb_expr) bindings in
-        List.fold_left eval_if_need count exprs
-      | Texp_match (e, cs, _, _) ->
-        let cases = List.filter (fun c -> List.for_all (fun p -> var_name <> get_pat_name p) @@ get_pat_args c.c_lhs) cs in
-        let exprs = e :: List.map (fun c -> c.c_rhs) cases in
-        List.fold_left eval_if_need count exprs in
-
-    two_or_more_mentions expr 0 >= 2 in
-
-
-  let translate_function_body (sub : Tast_mapper.mapper) body real_vars =
-    let eta_vars                = eta_extension body in
-    let translated_body         = sub.expr sub body in
-
-    let result_var              = create_fresh_var_name () in
-    let body_with_eta_args      = create_apply translated_body @@ List.map (fun (n, _) -> create_ident n) eta_vars @ [create_ident result_var] in
-
-    let primary_vars_with_types = List.filter (fun (_, t) -> is_primary_type t) @@ real_vars @ eta_vars in
-    let primary_vars            = List.map fst primary_vars_with_types in
-    let bad_vars                = List.filter (fun v -> two_or_more_mentions v body) primary_vars in
-
-    let fresh_vars              = List.map (fun _ -> create_fresh_var_name ()) bad_vars in
-    let absr_body               = List.fold_right create_fun bad_vars body_with_eta_args in
-    let body_with_ags           = create_apply absr_body @@ List.map (fun x -> create_unify_with_one_argument @@ create_ident x) fresh_vars in
-
-    let conjs                   = List.map2 (fun a b -> create_apply (create_ident a) @@ [create_ident b]) bad_vars fresh_vars in
-    let full_conj               = List.fold_right create_and conjs body_with_ags in
-    let with_fresh              = create_fresh fresh_vars full_conj in
-    let first_fun               = create_fun result_var with_fresh in
-
-    List.fold_right create_fun (List.map fst eta_vars) first_fun in
-
-
-  let translate_abstraction (sub : Tast_mapper.mapper) expression =
-    let body, real_vars = normalize_abstraction expression in
-    let new_body        = translate_function_body sub body real_vars in
-    List.fold_right create_fun (List.map fst real_vars) new_body in
-
-  (****)
-
-  let translate_nonrec_let (sub : Tast_mapper.mapper) bindings expr typ =
-    let real_vars = List.map (fun b -> get_pat_name b.vb_pat, b.vb_pat.pat_type) bindings in
-    let new_expr  = translate_function_body sub expr real_vars in
-    let new_binds = List.map (fun b -> { b with vb_expr = sub.expr sub b.vb_expr }) bindings in
-    expr_desc_to_expr (Texp_let (Nonrecursive, new_binds, new_expr)) in
-
-  (****)
-
-  let translate_if (sub : Tast_mapper.mapper) cond th el typ =
-    let argument_names = create_fresh_argument_names_by_type typ true in
-    let arguments      = List.map create_ident argument_names in
-
-    let cond_var_name = create_fresh_var_name () in
-    let cond_var      = create_ident cond_var_name in
-
-    let create_branch case branch =
-      let tanslated_branch = sub.expr sub branch in
-      let branch_with_args = create_apply tanslated_branch arguments in
-      let case_checker     = create_unify cond_var case in
-      create_and case_checker branch_with_args in
-
-
-   let const_true  = create_constructor true_name [] |> create_inj in
-   let const_false = create_constructor false_name [] |> create_inj in
-   let both_cases = create_conde [create_branch const_true th; create_branch const_false el] in
-
-   let translated_cond = create_apply (sub.expr sub cond) [cond_var] in
-   let cond_with_cases = if need_sort_goals && expr_has_rec_vars cond
-                         then create_and both_cases translated_cond
-                         else create_and translated_cond both_cases in
-   let body_with_fresh = create_fresh [cond_var_name] cond_with_cases in
-   List.fold_right create_fun argument_names body_with_fresh in
-
-  (****)
-
-  let translate_eq is_equality =
-
-    let name_arg_l  = create_fresh_var_name () in
-    let name_arg_r  = create_fresh_var_name () in
-    let name_out    = create_fresh_var_name () in
-    let name_l      = create_fresh_var_name () in
-    let name_r      = create_fresh_var_name () in
-
-    let ident_arg_l = create_ident name_arg_l in
-    let ident_arg_r = create_ident name_arg_r in
-    let ident_out   = create_ident name_out in
-    let ident_l     = create_ident name_l in
-    let ident_r     = create_ident name_r in
-
-    let const_true  = create_constructor true_name [] |> create_inj in
-    let const_false = create_constructor false_name [] |> create_inj in
-
-    let out_unify_eq    = create_unify ident_out (if is_equality then const_true else const_false) in
-    let out_unify_neq   = create_unify ident_out (if is_equality then const_false else const_true) in
-    let l_unify_r       = create_unify ident_l ident_r in
-    let l_des_constr_r  = create_des_constr ident_l ident_r in
-    let first_and       = create_and l_unify_r out_unify_eq in
-    let second_and      = create_and l_des_constr_r out_unify_neq in
-    let full_or         = create_or first_and second_and in
-
-    let apply_l = create_apply ident_arg_l [ident_l] in
-    let apply_r = create_apply ident_arg_r [ident_r] in
-
-    let party_and = create_and apply_r full_or in
-    let full_and  = create_and apply_l party_and in
-
-    let fresh  = create_fresh [name_l; name_r] full_and in
-
-    let fun1 = create_fun name_out fresh in
-    let fun2 = create_fun name_arg_r fun1 in
-
-    create_fun name_arg_l fun2 in
-
-  (****)
-
-  let translate_bool_funs is_or =
-
-    let name_arg_l  = create_fresh_var_name () in
-    let name_arg_r  = create_fresh_var_name () in
-    let name_out    = create_fresh_var_name () in
-    let name_l      = create_fresh_var_name () in
-
-    let ident_arg_l = create_ident name_arg_l in
-    let ident_arg_r = create_ident name_arg_r in
-    let ident_out   = create_ident name_out in
-    let ident_l     = create_ident name_l in
-
-    let const_true  = create_constructor true_name [] |> create_inj in
-    let const_false = create_constructor false_name [] |> create_inj in
-
-    let l_true    = create_unify ident_l (if is_or then const_true else const_false) in
-    let l_false   = create_unify ident_l (if is_or then const_false else const_true) in
-    let q_true    = create_unify ident_out (if is_or then const_true else const_false) in
-    let calc_r    = create_apply ident_arg_r [ident_out] in
-
-    let first_and       = create_and l_true q_true in
-    let second_and      = create_and l_false calc_r in
-    let full_or         = create_or first_and second_and in
-
-    let apply_l = create_apply ident_arg_l [ident_l] in
-
-    let full_and  = create_and apply_l full_or in
-
-    let with_fresh = create_fresh [name_l] full_and in
-
-    let fun1 = create_fun name_out with_fresh in
-    let fun2 = create_fun name_arg_r fun1 in
-
-    create_fun name_arg_l fun2 in
-
-  let translate_not =
-    let name_arg    = create_fresh_var_name () in
-    let name_out    = create_fresh_var_name () in
-    let fr_arg      = create_fresh_var_name () in
-
-    let ident_arg   = create_ident name_arg in
-    let ident_out   = create_ident name_out in
-    let fr_ident    = create_ident fr_arg in
-
-    let const_true  = create_constructor true_name [] |> create_inj in
-    let const_false = create_constructor false_name [] |> create_inj in
-
-    let arg_true    = create_unify fr_ident const_true in
-    let arg_false   = create_unify fr_ident const_false in
-    let out_true    = create_unify ident_out const_true in
-    let out_false   = create_unify ident_out const_false in
-
-    let fst_and     = create_and arg_true out_false in
-    let snd_and     = create_and arg_false out_true in
-    let full_or     = create_or fst_and snd_and in
-
-    let apply       = create_apply ident_arg [fr_ident] in
-    let full_and    = create_and apply full_or in
-
-    let with_fresh  = create_fresh [fr_arg] full_and in
-    let fun1        = create_fun name_out with_fresh in
-    create_fun name_arg fun1 in
-
-  (****)
-
-  let translate_letrec_bindings_with_tibling sub binds =
-    let rec is_func_type (t : Types.type_expr) =
-      match t.desc with
-      | Tarrow _ -> true
-      | Tlink t' -> is_func_type t'
-      | _        -> false in
-
-    let rec has_func_arg (t : Types.type_expr) =
-      match t.desc with
-      | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
-      | Tlink t'         -> has_func_arg t'
-      | _                -> false in
-
-    add_rec_names (get_pattern_names binds);
-
-    let translate_binding bind =
-      let body            = bind.vb_expr in
-      let transtated_body = sub.expr sub body in
-      let typ             = body.exp_type in
-
-      let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
-
-
-      if not has_tabled_attr || has_func_arg typ then let vb_expr = transtated_body in { bind with vb_expr } else
-        let Tpat_var (name, _)    = bind.vb_pat.pat_desc in
-        let unrec_body            = create_fun name.name transtated_body in
-
-        let recfunc_argument_name = create_fresh_var_name () in
-        let recfunc_argument      = create_ident recfunc_argument_name in
-
-        let argument_names1       = create_fresh_argument_names_by_type typ false in
-        let arguments1            = List.map create_ident argument_names1 in
-        let res_arg_name_1        = create_fresh_var_name () in
-        let rec_arg_1             = create_ident res_arg_name_1 in
-
-        let argument_names2       = create_fresh_argument_names_by_type typ false in
-        let arguments2            = List.map create_ident argument_names2 in
-
-        let recfunc_with_args     = create_apply recfunc_argument (List.append arguments2 [rec_arg_1]) in
-        let conjuncts1            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments1 arguments2 in
-        let conjs_and_recfunc     = List.fold_right create_and conjuncts1 recfunc_with_args in
-        let freshing_and_recfunc  = create_fresh argument_names2 conjs_and_recfunc in
-        let lambdas_and_recfunc   = List.fold_right create_fun (List.append argument_names1 [res_arg_name_1]) freshing_and_recfunc in
-
-        let argument_names3       = create_fresh_argument_names_by_type typ false in
-        let arguments3            = List.map create_ident argument_names3 in
-
-        let argument_names4       = create_fresh_argument_names_by_type typ false in
-        let arguments4            = List.map create_ident argument_names4 in
-        let unified_vars1         = List.map2 create_unify arguments3 arguments4 in
-        let lambda_vars1          = List.map2 create_fun argument_names3 unified_vars1 in
-
-        let new_nody              = create_apply unrec_body (lambdas_and_recfunc :: lambda_vars1) in
-        let lambda_new_body       = List.fold_right create_fun (recfunc_argument_name :: argument_names4) new_nody in
-
-        let succ                  = create_ident_with_dot tabling_module_name tabling_succ_name in
-        let one                   = create_ident_with_dot tabling_module_name tabling_one_name in
-        let tabledrec             = create_ident_with_dot tabling_module_name tabling_rec_name in
-
-        let rec get_tabling_rank (typ : Types.type_expr) =
-          match typ.desc with
-          | Tarrow (_, _, right_typ, _) -> create_apply succ [get_tabling_rank right_typ]
-          | Tlink typ                   -> get_tabling_rank typ
-          | _                           -> one in
-
-        let tabling_rank          = get_tabling_rank typ in
-        let tabled_body           = create_apply tabledrec [tabling_rank; lambda_new_body] in
-
-        let argument_names5       = create_fresh_argument_names_by_type typ false in
-        let arguments5            = List.map create_ident argument_names5 in
-        let res_arg_name_5        = create_fresh_var_name () in
-        let rec_arg_5             = create_ident res_arg_name_5 in
-
-        let argument_names6       = create_fresh_argument_names_by_type typ false in
-        let arguments6            = List.map create_ident argument_names6 in
-
-        let tabled_body_with_args = create_apply tabled_body (List.append arguments6 [rec_arg_5]) in
-
-        let conjuncts2            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments5 arguments6 in
-        let conjs_and_tabled      = List.fold_right create_and conjuncts2 tabled_body_with_args in
-        let freshing_and_tabled   = create_fresh argument_names6 conjs_and_tabled in
-        let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
-
-        let vb_expr = lambdas_and_tabled in
-        { bind with vb_expr } in
-
-    List.map translate_binding binds in
-
-  (****)
-
-  let structure_item sub x =
-    match x.str_desc with
-    | Tstr_value (Recursive, bingings) ->
-      let new_bindings = translate_letrec_bindings_with_tibling sub bingings in
-      let str_desc = Tstr_value (Recursive, new_bindings) in
-      { x with str_desc }
-    | _ -> Tast_mapper.default.structure_item sub x in
-
-  let expr sub x = (*TODO: Update rec names for abstraction*)
-    match x.exp_desc with
-    | Texp_constant _           -> translate_construct sub x
-    | Texp_construct (_, _, _)  -> translate_construct sub x
-#if OCAML_VERSION > (4, 02, 2)
-    | Texp_match (e, cs, _, _)  -> translate_match sub e cs x.exp_type
-#else
-    | Texp_match (e, cs, _, _, _)  -> translate_match sub e cs x.exp_type
-#endif
-    | Texp_ifthenelse (cond, th, Some el) -> translate_if sub cond th el x.exp_type
-
-    | Texp_function _ when need_unlazy -> translate_abstraction sub x
-
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = eq_name -> translate_eq true
-
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = neq_name -> translate_eq false
-
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_or_name  -> translate_bool_funs true
-
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_and_name -> translate_bool_funs false
-
-    | Texp_ident (_, { txt = Longident.Lident name }, _) when name = bool_not_name -> translate_not
-
-    | Texp_let (Recursive, bindings, expr) ->
-      let new_bindings = translate_letrec_bindings_with_tibling sub bindings in
-      let transl_expr  = sub.expr sub expr in
-      rem_rec_names (get_pattern_names bindings);
-      expr_desc_to_expr (Texp_let (Recursive, new_bindings, transl_expr))
-
-    | Texp_let (Nonrecursive, bindings, expr) -> translate_nonrec_let sub bindings expr x.exp_type
-
-    | _ -> Tast_mapper.default.expr sub x in
-
-  let check_cd_is_ok (_cd: constructor_declaration list) = true in
-
-  { Tast_mapper.default with expr; structure_item
-  (* ; type_kind = fun _ ->  *)
-  ; type_declaration = fun _ decl ->
-      match decl.typ_kind with
-      | Ttype_variant cds when check_cd_is_ok cds ->
-          { decl with typ_attributes = [(Location.mknoloc "put_distrib_here", Parsetree.PStr [])] }
-      | Ttype_record _  -> raise (Error (NotYetSupported "record types"))
-      | Ttype_abstract  -> raise (Error (NotYetSupported "abstract types"))
-      | Ttype_open      -> raise (Error (NotYetSupported "open types"))
-}
-
-*)
 end
 
 let print_if ppf flag printer arg =
@@ -1105,7 +547,7 @@ let only_generate ~oldstyle hook_info tast =
   if oldstyle
   then try
     let open Lozov  in
-    let need_reduce = false in
+    let need_reduce = true in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
     translate tast start_index |>
