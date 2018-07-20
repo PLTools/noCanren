@@ -210,7 +210,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
             pamk_e ~need_st:true mapper body
         | body ->
             let xs = List.map (pamk_e ~need_st:false mapper) body in
-            [%expr ?& [%e Ast_convenience.list xs ] st ]
+            [%expr ?& [%e Ast_convenience.list xs ] ]
       in
       match reconstruct_args args with
       | Some (xs: string list) ->
@@ -220,33 +220,24 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
           let ans =
             List.fold_right xs
               ~f:(fun ident acc ->
-                  let msg = sprintf "create new variable %s as" ident in
-                  let msg = msg ^ " _.%d" in
                   [%expr
-                    let [%p pvar ident ], idx = State.new_var st in
-                    mylog (fun () -> printfn [%e  Exp.const_string msg] idx);
-                    [%e acc]
+                    call_fresh (fun [%p pvar ident] ->  [%e acc])
                   ]
                  )
               ~init:[%expr
-                mylog (fun () -> printfn [%e Exp.const_string msg2]);
-                MKStream.inc (fun () ->
-                  mylog (fun () -> printfn [%e Exp.const_string msg3]);
                   [%e new_body ]
-                )]
+                ]
           in
 
-          if need_st then ans
-          else [%expr fun st -> [%e ans]]
+          ans
+
       | None ->
          eprintf "Can't reconstruct args of 'fresh'";
          {e with pexp_desc=Pexp_apply (e1,[Nolabel, new_body]) }
     end
   | Pexp_apply (d, [(_,body)]) when is_defer d ->
       let ans = [%expr MKStream.inc (fun () -> [%e pamk_e ~need_st:false mapper body])] in
-      if need_st
-      then [%expr [%e ans] st]
-      else ans
+      ans
   | Pexp_apply (d, body) when is_unif d ->
 
       let loc_str =
@@ -257,16 +248,14 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         Buffer.contents b
       in
       (* let ans = e in *)
-      let body = (Labelled "loc", Exp.const_string loc_str) :: body in
+      let body = body in
       let ans = Exp.apply ~loc:e.pexp_loc d body in
-      if need_st then [%expr [%e ans ] st]
-      else ans
+      ans
   | Pexp_apply (e, xs) ->
       let ans = Pexp_apply (mapper.expr mapper e,
                                    List.map ~f:(fun (lbl,e) -> (lbl, mapper.expr mapper e)) xs ) in
       let ans = {e with pexp_desc = ans} in
-      if need_st then [%expr [%e ans] st]
-      else ans
+      ans
   | Pexp_fun (l,opt,pat,e) ->
      { e with pexp_desc=Pexp_fun(l,opt,pat, mapper.expr mapper e) }
 
