@@ -93,7 +93,7 @@ let rec is_primary_type (t : Types.type_expr) =
 let get_pat_name p =
   match p.pat_desc with
   | Tpat_var (name, _) -> name.name
-  | _                  -> failwith "Incorrect pattern"
+  | _                  -> fail_loc p.pat_loc "Incorrect pattern"
 
 
 let create_apply f = function
@@ -209,7 +209,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     match expr.exp_desc with
     | Texp_apply (f, args_r) ->
       let expr', args_l = normalize_apply f in
-      expr', args_l @ List.map (function | (_, Some x) -> x | _ -> failwith "Incorrect argument") args_r
+      expr', args_l @ List.map (function | (_, Some x) -> x | _ -> fail_loc expr.exp_loc "Incorrect argument") args_r
     | _ -> expr, []
 
 
@@ -267,7 +267,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     if not has_tabled_attr
     then Exp.let_ Recursive [Vb.mk (untyper.pat untyper bind.vb_pat) body] expr
     else if has_func_arg typ
-         then failwith "Tabled function has functional argument"
+         then fail_loc bind.vb_loc "Tabled function has functional argument"
          else let name = get_pat_name bind.vb_pat in
               let abst = create_fun name body in
               let rank = get_tabling_rank typ in
@@ -292,7 +292,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     let scrutinee_var =
       match expr.exp_desc with
       | Texp_ident (_, { txt = Longident.Lident name }, _) -> name
-      | Texp_ident _                                       -> failwith "Incorrect variable"
+      | Texp_ident _                                       -> fail_loc expr.exp_loc "Incorrect variable"
       | _                                                  -> create_fresh_var_name () in
 
     let rec translate_pat pat =
@@ -316,7 +316,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
         let args, vars = List.map translate_pat [l; r] |> List.split in
         let vars = List.concat vars in
         create_apply [%expr pair] args, vars
-      | _ -> failwith "Incorrect pattern in pattern matching" in
+      | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching" in
 
     let rec rename var1 var2 pat =
       match pat.pexp_desc with
@@ -389,7 +389,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
   let cond_var =
     match cond.exp_desc with
     | Texp_ident (_, { txt = Longident.Lident name }, _) -> name
-    | Texp_ident _                                       -> failwith "Incorrect variable"
+    | Texp_ident _                                       -> fail_loc cond.exp_loc "Incorrect variable"
     | _                                                  -> create_fresh_var_name () in
 
   let th = create_apply (translate_expression th) (List.map create_id args) in
@@ -432,21 +432,14 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_let (flag, [bind], expr) -> translate_let flag bind expr
 
-    | Texp_let _ -> failwith "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
-    | _ -> failwith "Incorrect expression"
+    | Texp_let _ -> fail_loc expr.exp_loc "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
+    | _ -> fail_loc expr.exp_loc "Incorrect expression"
   in
 
   let translate_external_value_binding vb =
     if is_primary_type vb.vb_expr.exp_type
     then
       fail_loc vb.vb_loc "Primary type of external let-binding at "
-      (* let b = Buffer.create 100 in
-       * let fmt = Format.formatter_of_buffer b in
-       * let () = Format.fprintf fmt "Primary type of external let-binding at "
-       * in
-       * let () = Location.print fmt vb.vb_loc in
-       * Format.pp_print_flush fmt ();
-       * failwith (Buffer.contents b) *)
     else
       let pat  = untyper.pat untyper vb.vb_pat in
       let expr = translate_expression vb.vb_expr in
@@ -456,7 +449,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
   let mark_type_declaration td =
       match td.typ_kind with
       | Ttype_variant cds -> { td with typ_attributes = [(mknoloc "put_distrib_here", Parsetree.PStr [])] }
-      | _                 -> failwith "Incrorrect type declaration" in
+      | _                 -> fail_loc td.typ_loc "Incrorrect type declaration" in
 
 
   let translate_structure_item stri =
@@ -467,7 +460,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       untyper.structure_item untyper { stri with str_desc = Tstr_type (rec_flag, new_decls) }
-    | _ -> failwith "Incorrect structure item" in
+    | _ -> fail_loc stri.str_loc "Incorrect structure item" in
 
 
   let translate_structure str =
@@ -504,7 +497,7 @@ let beta_reductor minimal_index =
   let name_from_pat pat =
     match pat.ppat_desc with
     | Ppat_var loc -> loc.txt
-    | _            -> failwith "Incorrect pattern in beta reduction" in
+    | _            -> fail_loc pat.ppat_loc "Incorrect pattern in beta reduction" in
 
   let rec substitute expr var subst =
     match expr.pexp_desc with
@@ -546,7 +539,7 @@ let beta_reductor minimal_index =
     | Pexp_fun (_, _, pat, body) ->
       let var = match pat.ppat_desc with
                 | Ppat_var v -> v.txt
-                | _          -> failwith "Incorrect arg name in beta reduction" in
+                | _          -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction" in
       begin match args with
         | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
         | _                                  -> create_apply (beta_reduction body [] |> create_fun var) args
