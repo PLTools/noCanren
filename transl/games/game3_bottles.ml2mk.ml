@@ -1,8 +1,6 @@
 type bottle = Fst | Snd
 type stepType = Fill | Empty | Pour
 type nat = O | S of nat
-type step = Step of stepType * bottle
-type state = State of nat * nat
 
 
 let rec add a b =
@@ -37,15 +35,15 @@ let anotherBottle b =
 
 let createState bottle lvl1 lvl2 =
    match bottle with
-   | Fst -> State (lvl1, lvl2)
-   | Snd -> State (lvl2, lvl1)
+   | Fst -> (lvl1, lvl2)
+   | Snd -> (lvl2, lvl1)
 
 
 let checkStep state0 step0 capacities =
   match state0 with
-  | State (f, s) ->
+  | (f, s) ->
     match step0 with
-    | Step (t, b) ->
+    | (t, b) ->
       let lvl1 = match b with | Fst -> f | Snd -> s in
       let lvl2 = match b with | Fst -> s | Snd -> f in
         match t with
@@ -58,9 +56,9 @@ let checkStep state0 step0 capacities =
 
 let doStep state0 step0 capacities =
   match state0 with
-  | State (f, s) ->
+  | (f, s) ->
     match step0 with
-    | Step (t, b) ->
+    | (t, b) ->
       let lvl2 = match b with | Fst -> s | Snd -> f in
         match t with
        | Fill  -> createState b (capacities b) lvl2
@@ -74,7 +72,7 @@ let doStep state0 step0 capacities =
 
 let isFinishState state0 reqLvl =
   match state0 with
-  | State (f, s) -> f = reqLvl || s = reqLvl
+  | (f, s) -> f = reqLvl || s = reqLvl
 
 
 let checkAnswer answer capacities reqLvl =
@@ -86,7 +84,7 @@ let checkAnswer answer capacities reqLvl =
         checkAnswer (doStep state0 x capacities) xs
       else false in
 
-   let startState = State (O, O) in
+   let startState = (O, O) in
    checkAnswer startState answer
 
 
