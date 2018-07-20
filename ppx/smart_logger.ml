@@ -253,7 +253,7 @@ let rec pamk_e ?(need_st=false) mapper e : expression =
         let b = Buffer.create 10 in
         let fmt = Format.formatter_of_buffer b in
         Location.print_compact fmt e.pexp_loc;
-        Format.pp_flush_formatter fmt;
+        Format.pp_print_flush fmt ();
         Buffer.contents b
       in
       (* let ans = e in *)

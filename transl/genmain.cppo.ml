@@ -41,6 +41,14 @@ exception Error of error
 let report_error fmt  = function
 | NotYetSupported s -> Format.fprintf fmt "Not supported during relational conversion: %s\n%!" s
 
+let fail_loc loc fmt =
+  let b = Buffer.create 100 in
+  let f = Format.formatter_of_buffer b in
+  let () = Format.fprintf f fmt in
+  let () = Location.print f loc in
+  Format.pp_print_flush f ();
+  failwith (Buffer.contents b)
+
 (*****************************************************************************************************************************)
 
 let get_max_index tast =
@@ -300,7 +308,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
         let args, vars = List.map translate_pat args |> List.split in
         let vars = List.concat vars in
         create_apply (lowercase_lident ident.txt |> mknoloc |> Exp.ident) args, vars
-      | _ -> failwith "Incorrect pattern in pattern matching" in
+      | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching "
+    in
 
     let rec rename var1 var2 pat =
       match pat.pexp_desc with
@@ -380,14 +389,14 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
   let el = create_apply (translate_expression el) (List.map create_id args) in
 
   let body = [%expr conde [([%e create_id cond_var] === !!true ) &&& [%e th];
-                           ([%e create_id cond_var] === !!false) &&& [%e el]]] in
+                           ([%e create_id cond_var] === !!false) &&& [%e el]]]
+  in
 
   let with_fresh =
     if cond_is_var then body
     else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression cond] [%e create_id cond_var]) &&& [%e body])] in
 
     List.fold_right create_fun args with_fresh
-
 
   and translate_expression expr =
     match expr.exp_desc with
@@ -415,15 +424,24 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Texp_let (flag, [bind], expr) -> translate_let flag bind expr
 
     | Texp_let _ -> failwith "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
-    | _ -> failwith "Incorrect expression" in
-
+    | _ -> failwith "Incorrect expression"
+  in
 
   let translate_external_value_binding vb =
     if is_primary_type vb.vb_expr.exp_type
-      then failwith "Primary type of external let-binding"
-      else let pat  = untyper.pat untyper vb.vb_pat in
-           let expr = translate_expression vb.vb_expr in
-           Vb.mk pat expr in
+    then
+      fail_loc vb.vb_loc "Primary type of external let-binding at "
+      (* let b = Buffer.create 100 in
+       * let fmt = Format.formatter_of_buffer b in
+       * let () = Format.fprintf fmt "Primary type of external let-binding at "
+       * in
+       * let () = Location.print fmt vb.vb_loc in
+       * Format.pp_print_flush fmt ();
+       * failwith (Buffer.contents b) *)
+    else
+      let pat  = untyper.pat untyper vb.vb_pat in
+      let expr = translate_expression vb.vb_expr in
+      Vb.mk pat expr in
 
 
   let mark_type_declaration td =
@@ -482,6 +500,9 @@ let beta_reductor minimal_index =
   let rec substitute expr var subst =
     match expr.pexp_desc with
     | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
+    (* | Pexp_function cases ->
+     *   Ast_helper.Exp.function_ ~loc:expr.pexp_loc
+     *     (List.map (fun c -> {c with pc_rhs = substitute c.pc_rhs var subst}) cases) *)
     | Pexp_fun (_, _, pat, body) ->
       let name = name_from_pat pat in
       if name = var then expr else substitute body var subst |> create_fun name
@@ -521,7 +542,9 @@ let beta_reductor minimal_index =
         | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
         | _                                  -> create_apply (beta_reduction body [] |> create_fun var) args
       end
-
+    (* | Pexp_function cases ->
+     *   Ast_helper.Exp.function_ ~loc:expr.pexp_loc
+     *     (List.map (fun c -> {c with pc_rhs = beta_reduction c.pc_rhs []}) cases) *)
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs  = List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs in
       let new_expr = beta_reduction expr args in

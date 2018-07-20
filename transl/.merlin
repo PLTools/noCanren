@@ -1,4 +1,10 @@
 PKG ppx_tools.metaquot
+PKG GT
 SRC .
+SRC ../src
+SRC ../tester
 B ../_build/transl
+B ../_build/src
+B ../_build/tester
+
 FLG -rectypes
