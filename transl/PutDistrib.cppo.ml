@@ -80,7 +80,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
   let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
   let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
   [ Str.module_ @@ Mb.mk gen_module_str @@
-      Mod.(apply (ident (mknoloc @@ Lident (sprintf "Fmap%d" @@ List.length tdecl.ptype_params))) @@ structure
+      Mod.(apply (ident (mknoloc @@ Lident (let n = List.length tdecl.ptype_params in if n = 1 then "Fmap" else sprintf "Fmap%d" n))) @@ structure
         [ fmap_decl
         ; str_type_ Recursive ~loc [ Type.mk ~params:tdecl.ptype_params
             ~kind:Ptype_abstract
