@@ -40,22 +40,22 @@ true: short_paths
 <transl/tabling_test.*>: dsource, rectypes, use_ocanren_modules
 <transl/tabling_test_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/game1_GCW.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game1_GCW.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/game1_GCW_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/game2_bridge.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game2_bridge.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/game2_bridge_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/game3_bottles.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game3_bottles.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/game3_bottles_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/game4_desert.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game4_desert.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/game4_desert_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/game5_einstein.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/game5_einstein.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/game5_einstein_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/logic_interpreter.*>: dsource, rectypes, use_ocanren_modules
+<transl/games/logic_interpreter.*>: dsource, rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
 <transl/games/logic_interpreter_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
 <transl/logic.*>: rectypes, use_ocanren_modules

@@ -559,7 +559,54 @@ let beta_reductor minimal_index =
 
 (*****************************************************************************************************************************)
 
+let fresh_var_upper =
+
+  let rec get_conds_and_vars expr =
+    match expr.pexp_desc with
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "call_fresh"}},
+                  [_, {pexp_desc = Pexp_fun (_, _, {ppat_desc = Ppat_var {txt}}, body)}]) ->
+      let conds, vars = get_conds_and_vars body in
+      conds, txt :: vars
+
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "&&&"}}, [_, a; _, b]) ->
+      let conds, vars = List.map get_conds_and_vars [a; b] |> List.split in
+      List.concat conds, List.concat vars
+
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "?&"}}, [_, args]) ->
+      let rec get_args_from_list args =
+        match args.pexp_desc with
+        | Pexp_construct ({txt = Lident "[]"}, _)                                     -> []
+        | Pexp_construct ({txt = Lident "::"}, Some {pexp_desc = Pexp_tuple [hd;tl]}) -> hd :: get_args_from_list tl
+        | _                                                                           -> fail_loc args.pexp_loc "Bad args in fresh var upper" in
+
+      let args = get_args_from_list args in
+      let conds, vars = List.map get_conds_and_vars args |> List.split in
+      List.concat conds, List.concat vars
+
+    | _ -> [expr], [] in
+
+    let upper sub expr =
+      let conds, vars = get_conds_and_vars expr in
+      let new_conds   = List.map (Ast_mapper.default_mapper.expr sub) conds in
+
+      let vars_as_apply = function
+        | x::xs -> create_apply (create_id x) (List.map create_id xs)
+        | _     -> failwith "Incorrect variable count" in
+
+      let vars_arg = function
+        | [v] -> Exp.tuple [create_id v]
+        | _   -> vars_as_apply vars in
+
+      if List.length vars > 0
+      then create_apply [%expr fresh] (vars_arg vars :: new_conds)
+      else create_conj new_conds in
+
+    { Ast_mapper.default_mapper with expr = upper }
+
+(*****************************************************************************************************************************)
+
 end
+
 
 let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;
@@ -572,13 +619,15 @@ let only_generate ~oldstyle hook_info tast =
   if oldstyle
   then try
     let open Lozov  in
-    let need_reduce = true in
+    let need_reduce     = true in
     let need_lower_case = true in
+    let need_normalize  = true in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
     translate tast start_index need_lower_case |>
     add_packages |>
-    eval_if_need need_reduce (reductor.structure reductor) |>
+    eval_if_need need_reduce    (reductor.structure reductor) |>
+    eval_if_need need_normalize (fresh_var_upper.structure fresh_var_upper) |>
     PutDistrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
