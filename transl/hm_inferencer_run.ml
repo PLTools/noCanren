@@ -28,7 +28,7 @@ type ilam = (lam, llam) injected
 
 
 (* let (_:int) = the_true *)
-let myshow x = show_maybe (show_lambda_type show_gnum) x
+let myshow x = (show_lambda_type show_gnum) x
 let show_glambda f1 f2 f3: (_,_,_) glambda -> string = function
   | Var s -> f1 s
   | Lit l -> f2 l
@@ -80,7 +80,9 @@ let term4: ilam =  (lit (lInt !!6))
 let term5: ilam =  (lit (lBool !!true))
 
 let () =
+  run_exn myshow (-1) q  qh  ("typeof term0", (fun q -> nat_type_inference term0 q  ) );
   run_exn myshow (-1) q  qh  ("typeof term1", (fun q -> nat_type_inference term1 q  ) );
+  run_exn myshow (-1) q  qh  ("typeof term2", (fun q -> nat_type_inference term2 q  ) );
   run_exn myshow (-1) q  qh  ("typeof term5", (fun q -> nat_type_inference term5 q  ) );
   run_exn myshow (-1) q  qh  ("typeof term4", (fun q -> nat_type_inference term4 q  ) );
   run_exn myshow (-1) q  qh  ("typeof term3", (fun q -> nat_type_inference term3 q  ) );
@@ -94,7 +96,7 @@ let peano n =
     [ n === !!1
     ; n === !!2
     ]
-
+(*
 let rec lookupo x env t =
   fresh (rest y v)
     (env === ((Pair.pair y v) % rest))
@@ -127,15 +129,15 @@ let rec evalo term typ env env_types rez =
           (typ === tFun tv tbody)
           (evalo body tbody env env_types body2)
           (rez === (abst v body2))
-    ]
+    ] *)
 
 let () =
-  (* runR lambda_reifier show_lambda show_llambda (-1) q  qh ("int ids", (fun t ->
-   *     nat_type_inference t (just (tFun (tInt()) (tInt()))  ) )); *)
+  runR lambda_reifier show_lambda show_llambda (-1) q  qh ("int ids", (fun t ->
+        fresh (q) (nat_type_inference t (tFun (tVar q) (tVar q))  ) ));
   (* runR lambda_reifier show_lambda show_llambda (-1) q  qh ("ints", (fun t ->
    *     evalo t (tFun (tInt()) (tInt()) )   (nil ())   (nil ()) t
    *   )); *)
-  runR lambda_reifier show_lambda show_llambda (-1) q  qh ("ints", (fun t ->
+  (* runR lambda_reifier show_lambda show_llambda (-1) q  qh ("ints", (fun t ->
       evalo t (tFun (tInt()) (tInt()) )   (nil ())   (nil ()) t
-    ));
+    )); *)
   ()

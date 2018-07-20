@@ -123,13 +123,22 @@ let env_free_vars env =
 
 let rec lookup v s =
   match s with
-  | Nil          -> Nothing
+  | Cons (p, xs) ->
+    match p with
+    | Pair (v', t) ->
+      match v = v' with
+      | true  -> t
+      | false -> lookup v xs
+
+let rec lookup_total v s =
+  match s with
+  | Nil -> Nothing
   | Cons (p, xs) ->
     match p with
     | Pair (v', t) ->
       match v = v' with
       | true  -> Just t
-      | false -> lookup v xs
+      | false -> lookup_total v xs
 
 (*********************************************************************************)
 
@@ -159,10 +168,7 @@ let rec map f l =
 
 (*********************************************************************************)
 
-let mb_bind a f =
-  match a with
-  | Nothing -> Nothing
-  | Just x  -> f x
+let mb_bind a f = f a
 
 (*********************************************************************************)
 (* Substitute all type variables if their instantiation is already known *)
@@ -173,9 +179,9 @@ let rec apply s typ =
   | TPair(a, b) -> TPair(apply s a, apply s b)
   | TFun (a, b) -> TFun (apply s a, apply s b)
   | TVar v      ->
-    match lookup v s with
-    | Nothing   -> typ
+    match lookup_total v s with
     | Just typ' -> typ'
+    | Nothing   -> typ
 
 (*********************************************************************************)
 
@@ -255,24 +261,22 @@ let rec has_var t v =
 let var_bind v t =
   let has = has_var t v in
   match t with
-  | TInt    -> Just (Cons (Pair (v, t), Nil))
-  | TBool   -> Just (Cons (Pair (v, t), Nil))
+  | TInt    -> Cons (Pair (v, t), Nil)
+  | TBool   -> Cons (Pair (v, t), Nil)
   | TVar v' ->
   begin
     match has with
-    | true  -> Just Nil
-    | false -> Just (Cons (Pair (v, t), Nil))
+    | true  -> Nil
+    | false -> Cons (Pair (v, t), Nil)
   end
   | TPair(a, b) ->
   begin
     match has with
-    | true  -> Nothing
-    | false -> Just (Cons (Pair (v, t), Nil))
+    | false -> Cons (Pair (v, t), Nil)
   end
   | TFun (a, b) ->
     match has with
-    | true  -> Nothing
-    | false -> Just (Cons (Pair (v, t), Nil))
+    | false -> Cons (Pair (v, t), Nil)
 
 (*********************************************************************************)
 
@@ -281,44 +285,32 @@ let rec mgu t1 t2 =
   | TInt ->
   begin
     match t2 with
-    | TInt        -> Just Nil
-    | TBool       -> Nothing
+    | TInt        -> Nil
     | TVar v      -> var_bind v t1
-    | TFun (a, b) -> Nothing
-    | TPair (_,_) -> Nothing
   end
   | TBool ->
   begin
     match t2 with
-    | TInt        -> Nothing
-    | TBool       -> Just Nil
+    | TBool       -> Nil
     | TVar v      -> var_bind v t1
-    | TFun (a, b) -> Nothing
-    | TPair (_,_) -> Nothing
   end
   | TVar v      -> var_bind v t2
   | TFun (a, b) ->
   begin
     match t2 with
-    | TInt          -> Nothing
-    | TBool         -> Nothing
     | TVar v        -> var_bind v t1
-    | TPair (_,_)   -> Nothing
     | TFun (a', b') ->
       let s1 = mgu a a' in
       let s2 = mb_bind s1 (fun s -> mgu (apply s b) (apply s b')) in
-      mb_bind s1 (fun x -> mb_bind s2 (fun y -> Just (compose_subst x y)))
+      compose_subst s1 s2
   end
   | TPair (a, b) ->
     match t2 with
-    | TInt          -> Nothing
-    | TBool         -> Nothing
-    | TFun (_,_)    -> Nothing
     | TVar v        -> var_bind v t1
     | TPair (a', b') ->
       let s1 = mgu a a' in
       let s2 = mb_bind s1 (fun s -> mgu (apply s b) (apply s b')) in
-      mb_bind s1 (fun x -> mb_bind s2 (fun y -> Just (compose_subst x y)))
+      mb_bind s1 (fun x -> mb_bind s2 (fun y -> compose_subst x y))
 
 (*********************************************************************************)
 
@@ -337,14 +329,13 @@ let ti_literal l =
      env is a mapping from type variables to types
  **)
 let rec ti fv fresher env term =
-  let ret s t fv = Just (Tuple (s, t, fv)) in
+  let ret s t fv = Tuple (s, t, fv) in
 
   match term with
   | Var v ->
   begin
     match lookup v env with
-    | Nothing -> Nothing
-    | Just gt ->
+    | gt ->
       let pair0 = instantiate fv fresher gt in
       match pair0 with
       | Pair (t, fv') -> ret Nil t fv'
@@ -421,7 +412,7 @@ let type_inference first_var fresher term =
   mb_bind tuple0
   (fun tpl ->
     match tpl with
-    | Tuple (s, t, fv) -> Just (apply s t)
+    | Tuple (s, t, fv) -> apply s t
   )
 
 (*********************************************************************************)

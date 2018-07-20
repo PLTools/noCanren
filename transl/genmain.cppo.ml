@@ -300,16 +300,19 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
       | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr nil ()],  []
       | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident] ()], []
-      | Tpat_construct ({txt = Lident "::"}, _, [a;b]) ->
-        let e1, v1 = translate_pat a in
-        let e2, v2 = translate_pat b in
-        [%expr [%e e1] % [%e e2]], v1 @ v2
-      | Tpat_construct (ident, _, args) ->
+      | Tpat_construct ({txt}, _, args)                ->
         let args, vars = List.map translate_pat args |> List.split in
         let vars = List.concat vars in
-        create_apply (lowercase_lident ident.txt |> mknoloc |> Exp.ident) args, vars
-      | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching "
-    in
+        let constr =
+          match txt with
+          | Lident "::" -> [%expr (%)]
+          | _           -> lowercase_lident txt |> mknoloc |> Exp.ident in
+        create_apply constr args, vars
+      | Tpat_tuple [l; r] ->
+        let args, vars = List.map translate_pat [l; r] |> List.split in
+        let vars = List.concat vars in
+        create_apply [%expr pair] args, vars
+      | _ -> failwith "Incorrect pattern in pattern matching" in
 
     let rec rename var1 var2 pat =
       match pat.pexp_desc with
@@ -402,6 +405,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     match expr.exp_desc with
     | Texp_constant _          -> translate_construct expr
     | Texp_construct _         -> translate_construct expr
+
+    | Texp_tuple [l; r] -> create_apply [%expr pair] (List.map translate_expression [l; r])
 
     | Texp_apply _             -> translate_apply expr
 
@@ -556,6 +561,8 @@ let beta_reductor minimal_index =
 
   let expr _ x = beta_reduction x [] in
   { Ast_mapper.default_mapper with expr }
+
+(*****************************************************************************************************************************)
 
 end
 
