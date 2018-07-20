@@ -1,7 +1,6 @@
 type peano  = O | S of peano
 type person = A | B | C | D
 type step   = One of person | Two of person * person
-type 'a opt = Nothing | Just of 'a
 type state = St of bool * bool * bool * bool * bool
 
 
@@ -81,10 +80,10 @@ let getAnswer answer times =
       | x :: xs ->
         if checkStep state x then
           match getAnswer xs (step state x) with
-          | Nothing -> Nothing
-          | Just t1 -> Just (add (getTime x times) t1)
-        else Nothing
-      | [] -> if state = finish then Just O else Nothing in
+          | None    -> None
+          | Some t1 -> Some (add (getTime x times) t1)
+        else None
+      | [] -> if state = finish then Some O else None in
 
   getAnswer answer start
 
@@ -121,8 +120,8 @@ let bestAnswer = list2mylist [Two(A, B); One A; Two(C, D); One B; Two(A, B)]
 
 let print a =
   match getAnswer a standartTimes with
-  | Nothing -> print_string "Baaaaad!\n"
-  | Just n  -> print_int (numToInt n);
+  | None -> print_string "Baaaaad!\n"
+  | Some n  -> print_int (numToInt n);
                print_string "\n"
 
 

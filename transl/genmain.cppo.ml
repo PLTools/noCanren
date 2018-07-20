@@ -158,6 +158,10 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Texp_ident _ -> untyper.expr untyper expr, []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), []
     | Texp_construct ({txt = Lident s}, _, []) when s = "true" || s = "false" -> create_inj (untyper.expr untyper expr), []
+    | Texp_tuple [a; b] ->
+      let new_args, fv = List.map unnest_expr [a; b] |> List.split in
+      let fv           = List.concat fv in
+      create_apply [%expr pair] new_args, fv
 
     | Texp_construct (name, _, args) ->
       let new_args, fv = List.map unnest_expr args |> List.split in
@@ -406,7 +410,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Texp_constant _          -> translate_construct expr
     | Texp_construct _         -> translate_construct expr
 
-    | Texp_tuple [l; r] -> create_apply [%expr pair] (List.map translate_expression [l; r])
+    | Texp_tuple [l; r]        -> translate_construct expr
 
     | Texp_apply _             -> translate_apply expr
 

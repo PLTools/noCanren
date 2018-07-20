@@ -15,7 +15,7 @@ let show_stepType = function
 
 
 let show_step = function
- | Step (s, b) -> Printf.sprintf "%s%s" (show_bottle b) (show_stepType s)
+ | (s, b) -> Printf.sprintf "%s%s" (show_bottle b) (show_stepType s)
 
 let show_list f x =
  let rec show_l = function

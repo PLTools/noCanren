@@ -5,9 +5,6 @@ type step = Left  of nat
           | Fill
           | Pour  of nat
 
-type 'a maybe = Just of 'a
-              | Nothing
-
 type state = St of nat * nat * nat list
 
 let rec (|+|) a b =
@@ -111,14 +108,14 @@ let isMove step =
 let checkAnswer answer len cop =
   let[@tabled] rec calcFuel state ans prevIsMove =
     match ans with
-    | []    -> if isFinishState state len then Just cop else Nothing
+    | []    -> if isFinishState state len then Some cop else None
     | x::xs -> let currIsMove = isMove x in
-               if prevIsMove = currIsMove then Nothing
+               if prevIsMove = currIsMove then None
                else if checkStep x state len cop then
                  match calcFuel (step x state len cop) xs currIsMove with
-                 | Nothing  -> Nothing
-                 | Just res -> Just (getFuel x state cop |+| res)
-               else Nothing in
+                 | None     -> None
+                 | Some res -> Some (getFuel x state cop |+| res)
+               else None in
 
   let startState =
     let rec stations n =
