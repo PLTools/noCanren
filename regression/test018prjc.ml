@@ -8,7 +8,7 @@ module X = struct
     let fmap f x = gmap(t) f x
   end
   include X
-  include Fmap1(X)
+  include Fmap(X)
   let a x     = inj @@ distrib (A x)
 end
 module Y = struct
@@ -18,7 +18,7 @@ module Y = struct
   end
 
   include Y
-  include Fmap1(Y)
+  include Fmap(Y)
 
   let b x     = inj @@ distrib (B x)
 end
