@@ -43,7 +43,7 @@ let any_of_neighbors_pair f st =
 let clue02 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (n = Englishman) && (c = Red) in
+    | Person (c, n, _, _, _) -> (n = Englishman) && (c = Red) in
   any_of_person for_person st
 
 
@@ -51,7 +51,7 @@ let clue02 st =
 let clue03 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (n = Spaniard) && (p = Dog) in
+    | Person (_, n, _, _, p) -> (n = Spaniard) && (p = Dog) in
   any_of_person for_person st
 
 
@@ -59,7 +59,7 @@ let clue03 st =
 let clue04 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (c = Green) && (d = Coffee) in
+    | Person (c, _, d, _, _) -> (c = Green) && (d = Coffee) in
   any_of_person for_person st
 
 
@@ -67,7 +67,7 @@ let clue04 st =
 let clue05 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (n = Ukrainian) && (d = Tea) in
+    | Person (_, n, d, _, _) -> (n = Ukrainian) && (d = Tea) in
   any_of_person for_person st
 
 
@@ -75,9 +75,9 @@ let clue05 st =
 let clue06 st =
   let for_neighbors_pair p1 p2 =
     match p1 with
-    | Person (c1, n1, d1, s1, p1) ->
+    | Person (c1, _, _, _, _) ->
       match p2 with
-      | Person (c2, n2, d2, s2, p2) -> (c1 = Ivory) && (c2 = Green) in
+      | Person (c2, _, _, _, _) -> (c1 = Ivory) && (c2 = Green) in
   any_of_neighbors_pair for_neighbors_pair st
 
 
@@ -85,7 +85,7 @@ let clue06 st =
 let clue07 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (s = Old_Gold) && (p = Snails) in
+    | Person (_, _, _, s, p) -> (s = Old_Gold) && (p = Snails) in
   any_of_person for_person st
 
 
@@ -93,32 +93,28 @@ let clue07 st =
 let clue08 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (c = Yellow) && (s = Kools) in
+    | Person (c, _, _, s, _) -> (c = Yellow) && (s = Kools) in
   any_of_person for_person st
 
 
 (* В центральном доме пьют молоко *)
 let clue09 st =
    match st with
-   | State (p1, p2, p3, p4, p5) ->
-     match p3 with
-     | Person (c, n, d, s, p) -> d = Milk
+   | State (_, _, Person (_, _, d, _, _), _, _) -> d = Milk
 
 (* Норвежец живёт в первом доме *)
 let clue10 st =
    match st with
-   | State (p1, p2, p3, p4, p5) ->
-     match p1 with
-     | Person (c, n, d, s, p) -> n = Norwegian
+   | State (Person (_, n, _, _, _), _, _, _, _) -> n = Norwegian
 
 
 (* Сосед того, кто курит Chesterfield, держит лису *)
 let clue11 st =
   let for_neighbors_pair p1 p2 =
     match p1 with
-    | Person (c1, n1, d1, s1, p1) ->
+    | Person (_, _, _, s1, p1) ->
       match p2 with
-      | Person (c2, n2, d2, s2, p2) -> ((s1 = Chesterfield) && (p2 = Fox)) || ((p1 = Fox) && (s2 = Chesterfield)) in
+      | Person (_, _, _, s2, p2) -> ((s1 = Chesterfield) && (p2 = Fox)) || ((p1 = Fox) && (s2 = Chesterfield)) in
   any_of_neighbors_pair for_neighbors_pair st
 
 
@@ -126,9 +122,9 @@ let clue11 st =
 let clue12 st =
   let for_neighbors_pair p1 p2 =
     match p1 with
-    | Person (c1, n1, d1, s1, p1) ->
+    | Person (_, _, _, s1, p1) ->
       match p2 with
-      | Person (c2, n2, d2, s2, p2) -> ((s1 = Kools) && (p2 = Hourse)) || ((p1 = Hourse) && (s2 = Kools)) in
+      | Person (_, _, _, s2, p2) -> ((s1 = Kools) && (p2 = Hourse)) || ((p1 = Hourse) && (s2 = Kools)) in
   any_of_neighbors_pair for_neighbors_pair st
 
 
@@ -136,7 +132,7 @@ let clue12 st =
 let clue13 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (s = Lacky_Strike) && (d = Orange_juice) in
+    | Person (_, _, d, s, _) -> (s = Lacky_Strike) && (d = Orange_juice) in
   any_of_person for_person st
 
 
@@ -144,7 +140,7 @@ let clue13 st =
 let clue14 st =
   let for_person p =
     match p with
-    | Person (c, n, d, s, p) -> (n = Japanese) && (s = Parliament) in
+    | Person (_, n, _, s, _) -> (n = Japanese) && (s = Parliament) in
   any_of_person for_person st
 
 
@@ -152,9 +148,9 @@ let clue14 st =
 let clue15 st =
   let for_neighbors_pair p1 p2 =
     match p1 with
-    | Person (c1, n1, d1, s1, p1) ->
+    | Person (c1, n1, _, _, _) ->
       match p2 with
-      | Person (c2, n2, d2, s2, p2) -> ((n1 = Norwegian) && (c2 = Blue)) || ((c1 = Blue) && (n2 = Norwegian)) in
+      | Person (c2, n2, _, _, _) -> ((n1 = Norwegian) && (c2 = Blue)) || ((c1 = Blue) && (n2 = Norwegian)) in
   any_of_neighbors_pair for_neighbors_pair st
 
 
