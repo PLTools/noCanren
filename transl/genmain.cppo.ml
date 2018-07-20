@@ -136,7 +136,12 @@ let create_inj expr = [%expr !! [%e expr]]
 
 (*****************************************************************************************************************************)
 
-let translate tast start_index =
+let translate tast start_index need_lowercase =
+
+let lowercase_lident x =
+  if need_lowercase
+  then lowercase_lident x
+  else x in
 
 let curr_index = ref start_index in
 
@@ -273,7 +278,6 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
               let rank = get_tabling_rank typ in
               let appl = create_apply [%expr Tabling.tabledrec] [rank; abst] in
               Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] expr
-
 
   and translate_let flag bind expr =
     match flag with
@@ -502,9 +506,6 @@ let beta_reductor minimal_index =
   let rec substitute expr var subst =
     match expr.pexp_desc with
     | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
-    (* | Pexp_function cases ->
-     *   Ast_helper.Exp.function_ ~loc:expr.pexp_loc
-     *     (List.map (fun c -> {c with pc_rhs = substitute c.pc_rhs var subst}) cases) *)
     | Pexp_fun (_, _, pat, body) ->
       let name = name_from_pat pat in
       if name = var then expr else substitute body var subst |> create_fun name
@@ -544,9 +545,6 @@ let beta_reductor minimal_index =
         | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
         | _                                  -> create_apply (beta_reduction body [] |> create_fun var) args
       end
-    (* | Pexp_function cases ->
-     *   Ast_helper.Exp.function_ ~loc:expr.pexp_loc
-     *     (List.map (fun c -> {c with pc_rhs = beta_reduction c.pc_rhs []}) cases) *)
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs  = List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs in
       let new_expr = beta_reduction expr args in
@@ -575,9 +573,10 @@ let only_generate ~oldstyle hook_info tast =
   then try
     let open Lozov  in
     let need_reduce = true in
+    let need_lower_case = true in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
-    translate tast start_index |>
+    translate tast start_index need_lower_case |>
     add_packages |>
     eval_if_need need_reduce (reductor.structure reductor) |>
     PutDistrib.process |>
