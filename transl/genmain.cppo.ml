@@ -134,6 +134,10 @@ let create_fresh var body =
 
 let create_inj expr = [%expr !! [%e expr]]
 
+
+let filter_vars vars1 vars2 =
+  List.filter (fun v -> List.for_all ((<>) v) vars2) vars1
+
 (*****************************************************************************************************************************)
 
 let translate tast start_index need_lowercase =
@@ -158,18 +162,18 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
   (*************************************************)
 
-  let rec unnest_expr expr =
+  let rec unnest_expr let_vars expr =
     match expr.exp_desc with
-    | Texp_ident _ -> untyper.expr untyper expr, []
+    | Texp_ident (_, { txt = Longident.Lident name }, _) when List.for_all ((<>) name) let_vars -> untyper.expr untyper expr, []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), []
     | Texp_construct ({txt = Lident s}, _, []) when s = "true" || s = "false" -> create_inj (untyper.expr untyper expr), []
     | Texp_tuple [a; b] ->
-      let new_args, fv = List.map unnest_expr [a; b] |> List.split in
+      let new_args, fv = List.map (unnest_expr let_vars) [a; b] |> List.split in
       let fv           = List.concat fv in
       create_apply [%expr pair] new_args, fv
 
     | Texp_construct (name, _, args) ->
-      let new_args, fv = List.map unnest_expr args |> List.split in
+      let new_args, fv = List.map (unnest_expr let_vars) args |> List.split in
       let fv           = List.concat fv in
 
       let new_args     = match new_args with
@@ -186,28 +190,29 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | _ when is_primary_type expr.exp_type ->
       let fr_var = create_fresh_var_name () in
       create_id fr_var, [(fr_var, expr)]
-    | _ -> translate_expression expr, []
+    | _ -> translate_expression let_vars expr, []
 
 
-  and translate_construct expr =
-    let constr, binds = unnest_expr expr in
+  and translate_construct let_vars expr =
+    let constr, binds = unnest_expr let_vars expr in
     let out_var_name  = create_fresh_var_name () in
     let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
-    let conjs         = unify_constr :: List.map (fun (v,e) -> create_apply (translate_expression e) [create_id v]) binds in
+    let conjs         = unify_constr :: List.map (fun (v,e) -> create_apply (translate_expression let_vars e) [create_id v]) binds in
     let conj          = create_conj conjs in
     let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
     create_fun out_var_name with_fresh
 
 
-  and translate_ident name typ =
-    if is_primary_type typ
+  and translate_ident let_vars name typ =
+    if is_primary_type typ && List.for_all ((<>) name) let_vars
       then let var = create_fresh_var_name () in
            [%expr fun [%p create_pat var] -> [%e create_id name] === [%e create_id var]]
       else create_id name
 
 
-  and translate_abstraciton case =
-    Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
+  and translate_abstraciton let_vars case =
+    let let_vars = filter_vars let_vars [get_pat_name case.c_lhs] in
+    Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression let_vars case.c_rhs)
 
 
   and normalize_apply expr =
@@ -218,33 +223,30 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | _ -> expr, []
 
 
-  and translate_apply expr =
+  and translate_apply let_vars expr =
     let f, args = normalize_apply expr in
-    let new_args, binds = List.map unnest_expr args |> List.split in
+    let new_args, binds = List.map (unnest_expr let_vars) args |> List.split in
     let binds = List.concat binds in
     if List.length binds = 0
-      then create_apply (translate_expression f) new_args
+      then create_apply (translate_expression let_vars f) new_args
       else let eta_vars   = create_fresh_argument_names_by_type expr.exp_type in
-           let eta_call   = create_apply (translate_expression f) (new_args @ List.map create_id eta_vars) in
-           let conjs      = List.map (fun (v,e) -> create_apply (translate_expression e) [create_id v]) binds @ [eta_call] in
+           let eta_call   = create_apply (translate_expression let_vars f) (new_args @ List.map create_id eta_vars) in
+           let conjs      = List.map (fun (v,e) -> create_apply (translate_expression let_vars e) [create_id v]) binds @ [eta_call] in
            let full_conj  = create_conj conjs in
            let with_fresh = List.fold_right create_fresh (List.map fst binds) full_conj in
            List.fold_right create_fun eta_vars with_fresh
 
 
-  and translate_nonrec_let bind expr =
-    if is_primary_type bind.vb_expr.exp_type
-      then let name       = get_pat_name bind.vb_pat in
-           let conj1      = create_apply (translate_expression bind.vb_expr) [create_id name] in
-           let args       = create_fresh_argument_names_by_type expr.exp_type in
-           let conj2      = create_apply (translate_expression expr) (List.map create_id args) in
-           let both       = create_conj [conj1; conj2] in
-           let with_fresh = create_fresh name both in
-           List.fold_right create_fun args with_fresh
-      else Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr)] (translate_expression expr)
+  and translate_nonrec_let let_vars bind expr =
+    let new_let_vars =
+      if is_primary_type bind.vb_expr.exp_type
+      then get_pat_name bind.vb_pat :: let_vars
+      else let_vars in
+
+     Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression let_vars bind.vb_expr)] (translate_expression new_let_vars expr)
 
 
-  and translate_rec_let bind expr =
+  and translate_rec_let let_vars bind expr =
     let rec is_func_type (t : Types.type_expr) =
       match t.desc with
       | Tarrow _ -> true
@@ -263,8 +265,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | Tlink typ                   -> get_tabling_rank typ
       | _                           -> [%expr Tabling.one] in
 
-    let body = translate_expression bind.vb_expr in
-    let expr = translate_expression expr in
+    let body = translate_expression let_vars bind.vb_expr in
+    let expr = translate_expression let_vars expr in
     let typ  = bind.vb_expr.exp_type in
 
     let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
@@ -279,13 +281,13 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
               let appl = create_apply [%expr Tabling.tabledrec] [rank; abst] in
               Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] expr
 
-  and translate_let flag bind expr =
+  and translate_let let_vars flag bind expr =
     match flag with
-    | Recursive    -> translate_rec_let    bind expr
-    | Nonrecursive -> translate_nonrec_let bind expr
+    | Recursive    -> translate_rec_let    let_vars bind expr
+    | Nonrecursive -> translate_nonrec_let let_vars bind expr
 
 
-  and translate_match expr cases typ =
+  and translate_match let_vars expr cases typ =
     let args = create_fresh_argument_names_by_type typ in
 
     let scrutinee_is_var =
@@ -336,8 +338,9 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       let pat        = if is_overlap then rename scrutinee_var new_var pat else pat in
       let vars       = if is_overlap then List.map (fun n -> if n = scrutinee_var then new_var else n) vars else vars in
 
+
       let unify      = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-      let body       = create_apply (translate_expression case.c_rhs) (List.map create_id args) in
+      let body       = create_apply (translate_expression (filter_vars let_vars vars) case.c_rhs) (List.map create_id args) in
       let body       = if is_overlap then create_apply (create_fun scrutinee_var body) [create_id new_var] else body in
       let conj       = create_conj [unify; body] in
       List.fold_right create_fresh vars conj in
@@ -346,7 +349,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     let disj       = create_disj new_cases in
     let with_fresh = if scrutinee_is_var
                      then disj
-                     else create_conj [create_apply (translate_expression expr) [create_id scrutinee_var]; disj]
+                     else create_conj [create_apply (translate_expression let_vars expr) [create_id scrutinee_var]; disj]
                        |> create_fresh scrutinee_var in
 
     List.fold_right create_fun args with_fresh
@@ -382,7 +385,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
                     ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
 
 
-  and translaet_if cond th el typ =
+  and translaet_if let_vars cond th el typ =
   let args = create_fresh_argument_names_by_type typ in
 
   let cond_is_var =
@@ -396,8 +399,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Texp_ident _                                       -> fail_loc cond.exp_loc "Incorrect variable"
     | _                                                  -> create_fresh_var_name () in
 
-  let th = create_apply (translate_expression th) (List.map create_id args) in
-  let el = create_apply (translate_expression el) (List.map create_id args) in
+  let th = create_apply (translate_expression let_vars th) (List.map create_id args) in
+  let el = create_apply (translate_expression let_vars el) (List.map create_id args) in
 
   let body = [%expr conde [([%e create_id cond_var] === !!true ) &&& [%e th];
                            ([%e create_id cond_var] === !!false) &&& [%e el]]]
@@ -405,24 +408,24 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
   let with_fresh =
     if cond_is_var then body
-    else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression cond] [%e create_id cond_var]) &&& [%e body])] in
+    else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression let_vars cond] [%e create_id cond_var]) &&& [%e body])] in
 
     List.fold_right create_fun args with_fresh
 
-  and translate_expression expr =
+  and translate_expression let_vars expr =
     match expr.exp_desc with
-    | Texp_constant _          -> translate_construct expr
-    | Texp_construct _         -> translate_construct expr
+    | Texp_constant _          -> translate_construct let_vars expr
+    | Texp_construct _         -> translate_construct let_vars expr
 
-    | Texp_tuple [l; r]        -> translate_construct expr
+    | Texp_tuple [l; r]        -> translate_construct let_vars expr
 
-    | Texp_apply _             -> translate_apply expr
+    | Texp_apply _             -> translate_apply let_vars expr
 
-    | Texp_match (e, cs, _, _) -> translate_match e cs expr.exp_type
+    | Texp_match (e, cs, _, _) -> translate_match let_vars e cs expr.exp_type
 
-    | Texp_ifthenelse (cond, th, Some el) -> translaet_if cond th el expr.exp_type
+    | Texp_ifthenelse (cond, th, Some el) -> translaet_if let_vars cond th el expr.exp_type
 
-    | Texp_function {cases = [case]} -> translate_abstraciton case
+    | Texp_function {cases = [case]} -> translate_abstraciton let_vars case
 
     | Texp_ident (_, { txt = Lident "="  }, _)  -> translate_eq_funs true
     | Texp_ident (_, { txt = Lident "<>" }, _)  -> translate_eq_funs false
@@ -432,22 +435,18 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_ident (_, { txt = Lident "not" }, _) -> translate_not_fun ()
 
-    | Texp_ident (_, { txt = Lident name }, _) -> translate_ident name expr.exp_type
+    | Texp_ident (_, { txt = Lident name }, _) -> translate_ident let_vars name expr.exp_type
 
-    | Texp_let (flag, [bind], expr) -> translate_let flag bind expr
+    | Texp_let (flag, [bind], expr) -> translate_let let_vars flag bind expr
 
     | Texp_let _ -> fail_loc expr.exp_loc "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
     | _ -> fail_loc expr.exp_loc "Incorrect expression"
   in
 
-  let translate_external_value_binding vb =
-    if is_primary_type vb.vb_expr.exp_type
-    then
-      fail_loc vb.vb_loc "Primary type of external let-binding at "
-    else
-      let pat  = untyper.pat untyper vb.vb_pat in
-      let expr = translate_expression vb.vb_expr in
-      Vb.mk pat expr in
+  let translate_external_value_binding let_vars vb =
+    let pat  = untyper.pat untyper vb.vb_pat in
+    let expr = translate_expression let_vars vb.vb_expr in
+    Vb.mk pat expr in
 
 
   let mark_type_declaration td =
@@ -456,11 +455,10 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | _                 -> fail_loc td.typ_loc "Incrorrect type declaration" in
 
 
-  let translate_structure_item stri =
+  let translate_structure_item let_vars stri =
     match stri.str_desc with
-    | Tstr_value (rec_flag, binds) ->
-      let new_binds = List.map translate_external_value_binding binds in
-        Str.value rec_flag new_binds
+    | Tstr_value (rec_flag, [bind]) ->
+        Str.value rec_flag [translate_external_value_binding let_vars bind]
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       untyper.structure_item untyper { stri with str_desc = Tstr_type (rec_flag, new_decls) }
@@ -468,7 +466,16 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
 
   let translate_structure str =
-      List.map translate_structure_item str.str_items in
+    let rec translate_items let_vars = function
+    | []    -> []
+    | x::xs ->
+      let new_let_vars =
+        match x.str_desc with
+        | Tstr_value (Nonrecursive, [{vb_expr; vb_pat = {pat_desc = Tpat_var (var, _)}}]) when is_primary_type vb_expr.exp_type -> var.name :: let_vars
+        | _                                                                                                                     -> let_vars in
+      translate_structure_item let_vars x :: translate_items new_let_vars xs in
+
+    translate_items [] str.str_items in
 
 
   translate_structure tast
