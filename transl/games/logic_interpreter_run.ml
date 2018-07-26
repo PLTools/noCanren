@@ -12,7 +12,7 @@ let show_list f x =
  Printf.sprintf "[%s]" (show_l x)
 
 let show_pair f g = function
- | Pair (a, b) -> Printf.sprintf "%s = %s" (f a) @@ g b
+ | (a, b) -> Printf.sprintf "%s = %s" (f a) @@ g b
 
 let show_bool b = if b then "true" else "false"
 
@@ -20,8 +20,8 @@ let myshow x = show_list (show_pair (fun x -> x) show_bool) x
 
 
 let () =
-  run_exn myshow (-1) q qh ("answers", (fun q -> check_and_eval ((===)q) expr1 (just (!!true))));
-  run_exn myshow (-1) q qh ("answers", (fun q -> check_and_eval ((===)q) expr2 (just (!!true))));
-  run_exn myshow (-1) q qh ("answers", (fun q -> check_and_eval ((===)q) expr3 (just (!!true))));
-  run_exn myshow (-1) q qh ("answers", (fun q -> check_and_eval ((===)q) expr4 (just (!!true))));
+  run_exn myshow (-1) q qh ("answers", (fun q -> fresh (e) (expr1 e) (check_and_eval q e (some (!!true)))));
+  run_exn myshow (-1) q qh ("answers", (fun q -> fresh (e) (expr2 e) (check_and_eval q e (some (!!true)))));
+  run_exn myshow (-1) q qh ("answers", (fun q -> fresh (e) (expr3 e) (check_and_eval q e (some (!!true)))));
+  run_exn myshow (-1) q qh ("answers", (fun q -> fresh (e) (expr4 e) (check_and_eval q e (some (!!true)))));
   ()
