@@ -45,6 +45,7 @@ let fail_loc loc fmt =
   let b = Buffer.create 100 in
   let f = Format.formatter_of_buffer b in
   let () = Format.fprintf f fmt in
+  let () = Format.fprintf f ". " in
   let () = Location.print f loc in
   Format.pp_print_flush f ();
   failwith (Buffer.contents b)
@@ -287,8 +288,23 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Nonrecursive -> translate_nonrec_let let_vars bind expr
 
 
-  and translate_match let_vars expr cases typ =
+  and translate_match let_vars loc expr cases typ =
     let args = create_fresh_argument_names_by_type typ in
+
+    let rec have_unifier p1 p2 =
+      match p1.pat_desc, p2.pat_desc with
+      | Tpat_any  , _ | _, Tpat_any
+      | Tpat_var _, _ | _, Tpat_var _ -> true
+      | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
+      | Tpat_tuple t1, Tpat_tuple t2 ->
+        List.length t1 = List.length t2 && List.for_all2 have_unifier t1 t2
+      | Tpat_construct (_, cd1, a1), Tpat_construct (_, cd2, a2) ->
+        cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 have_unifier a1 a2
+      | _ -> false in
+
+    let rec is_disj_pats = function
+      | []      -> true
+      | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs in
 
     let scrutinee_is_var =
       match expr.exp_desc with
@@ -332,8 +348,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     let translate_case case =
       let pat, vars  = translate_pat case.c_lhs in
-
-      let is_overlap = List.exists ((=) scrutinee_var) vars in
+      let is_overlap = List.mem scrutinee_var vars in
       let new_var    = if is_overlap then create_fresh_var_name () else "" in
       let pat        = if is_overlap then rename scrutinee_var new_var pat else pat in
       let vars       = if is_overlap then List.map (fun n -> if n = scrutinee_var then new_var else n) vars else vars in
@@ -345,15 +360,17 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       let conj       = create_conj [unify; body] in
       List.fold_right create_fresh vars conj in
 
-    let new_cases  = List.map translate_case cases in
-    let disj       = create_disj new_cases in
-    let with_fresh = if scrutinee_is_var
-                     then disj
-                     else create_conj [create_apply (translate_expression let_vars expr) [create_id scrutinee_var]; disj]
-                       |> create_fresh scrutinee_var in
+    if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then
 
-    List.fold_right create_fun args with_fresh
+      let new_cases  = List.map translate_case cases in
+      let disj       = create_disj new_cases in
+      let with_fresh =
+        if scrutinee_is_var then disj
+        else create_conj [create_apply (translate_expression let_vars expr) [create_id scrutinee_var]; disj] |> create_fresh scrutinee_var in
 
+      List.fold_right create_fun args with_fresh
+
+    else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bool_funs is_or =
     let a1  = create_fresh_var_name () in
@@ -421,7 +438,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_apply _             -> translate_apply let_vars expr
 
-    | Texp_match (e, cs, _, _) -> translate_match let_vars e cs expr.exp_type
+    | Texp_match (e, cs, _, _) -> translate_match let_vars expr.exp_loc e cs expr.exp_type
 
     | Texp_ifthenelse (cond, th, Some el) -> translaet_if let_vars cond th el expr.exp_type
 
