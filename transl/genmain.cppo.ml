@@ -583,7 +583,12 @@ let beta_reductor minimal_index =
 
 (*****************************************************************************************************************************)
 
-let fresh_var_upper =
+let fresh_var_normalizer =
+
+  let is_call_fresh expr =
+    match expr.pexp_desc with
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "call_fresh"}}, _) -> true
+    | _                                                                    -> false in
 
   let rec get_conds_and_vars expr =
     match expr.pexp_desc with
@@ -593,8 +598,7 @@ let fresh_var_upper =
       conds, txt :: vars
 
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "&&&"}}, [_, a; _, b]) ->
-      let conds, vars = List.map get_conds_and_vars [a; b] |> List.split in
-      List.concat conds, List.concat vars
+      [a; b], []
 
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "?&"}}, [_, args]) ->
       let rec get_args_from_list args =
@@ -602,30 +606,31 @@ let fresh_var_upper =
         | Pexp_construct ({txt = Lident "[]"}, _)                                     -> []
         | Pexp_construct ({txt = Lident "::"}, Some {pexp_desc = Pexp_tuple [hd;tl]}) -> hd :: get_args_from_list tl
         | _                                                                           -> fail_loc args.pexp_loc "Bad args in fresh var upper" in
-
-      let args = get_args_from_list args in
-      let conds, vars = List.map get_conds_and_vars args |> List.split in
-      List.concat conds, List.concat vars
+      get_args_from_list args, []
 
     | _ -> [expr], [] in
 
-    let upper sub expr =
-      let conds, vars = get_conds_and_vars expr in
-      let new_conds   = List.map (Ast_mapper.default_mapper.expr sub) conds in
+    let rec normalizer sub expr =
+      if is_call_fresh expr
+      then
+        let conds, vars = get_conds_and_vars expr in
+        let new_conds = List.map (normalizer sub) conds in
 
-      let vars_as_apply = function
-        | x::xs -> create_apply (create_id x) (List.map create_id xs)
-        | _     -> failwith "Incorrect variable count" in
+        let vars_as_apply = function
+          | x::xs -> create_apply (create_id x) (List.map create_id xs)
+          | _     -> failwith "Incorrect variable count" in
 
-      let vars_arg = function
-        | [v] -> Exp.tuple [create_id v]
-        | _   -> vars_as_apply vars in
+        let vars_arg = function
+          | [v] -> Exp.tuple [create_id v]
+          | _   -> vars_as_apply vars in
 
-      if List.length vars > 0
-      then create_apply [%expr fresh] (vars_arg vars :: new_conds)
-      else create_conj new_conds in
+        if List.length vars > 0
+        then create_apply [%expr fresh] (vars_arg vars :: new_conds)
+        else create_conj new_conds
 
-    { Ast_mapper.default_mapper with expr = upper }
+      else Ast_mapper.default_mapper.expr sub expr in
+
+    { Ast_mapper.default_mapper with expr = normalizer }
 
 (*****************************************************************************************************************************)
 
@@ -651,7 +656,7 @@ let only_generate ~oldstyle hook_info tast =
     translate tast start_index need_lower_case |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
-    eval_if_need need_normalize (fresh_var_upper.structure fresh_var_upper) |>
+    eval_if_need need_normalize (fresh_var_normalizer.structure fresh_var_normalizer) |>
     PutDistrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
