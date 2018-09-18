@@ -238,13 +238,21 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
            List.fold_right create_fun eta_vars with_fresh
 
 
+   and eta_form_for_let let_part let_vars expr =
+     let transl_expr = translate_expression let_vars expr in
+     if is_primary_type expr.exp_type
+     then let new_var = create_fresh_var_name () in
+      [%expr fun [%p create_pat new_var] -> [%e create_apply transl_expr [create_id new_var] |> let_part]]
+     else let_part transl_expr
+
+
   and translate_nonrec_let let_vars bind expr =
     let new_let_vars =
       if is_primary_type bind.vb_expr.exp_type
       then get_pat_name bind.vb_pat :: let_vars
       else let_vars in
-
-     Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression let_vars bind.vb_expr)] (translate_expression new_let_vars expr)
+    let let_part = Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression let_vars bind.vb_expr)] in
+    eta_form_for_let let_part new_let_vars expr
 
 
   and translate_rec_let let_vars bind expr =
@@ -267,20 +275,21 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | _                           -> [%expr Tabling.one] in
 
     let body = translate_expression let_vars bind.vb_expr in
-    let expr = translate_expression let_vars expr in
     let typ  = bind.vb_expr.exp_type in
 
     let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
 
     if not has_tabled_attr
-    then Exp.let_ Recursive [Vb.mk (untyper.pat untyper bind.vb_pat) body] expr
+    then let let_part = Exp.let_ Recursive [Vb.mk (untyper.pat untyper bind.vb_pat) body] in
+         eta_form_for_let let_part let_vars expr
     else if has_func_arg typ
          then fail_loc bind.vb_loc "Tabled function has functional argument"
          else let name = get_pat_name bind.vb_pat in
               let abst = create_fun name body in
               let rank = get_tabling_rank typ in
               let appl = create_apply [%expr Tabling.tabledrec] [rank; abst] in
-              Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] expr
+              let let_part = Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] in
+              eta_form_for_let let_part let_vars expr
 
   and translate_let let_vars flag bind expr =
     match flag with
