@@ -161,6 +161,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
   | Tlink typ                   -> create_fresh_argument_names_by_type typ
   | _                           -> [create_fresh_var_name ()] in
 
+let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", Parsetree.PStr [])]} in
+
   (*************************************************)
 
   let rec unnest_expr let_vars expr =
@@ -171,7 +173,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Texp_tuple [a; b] ->
       let new_args, fv = List.map (unnest_expr let_vars) [a; b] |> List.split in
       let fv           = List.concat fv in
-      create_apply [%expr pair] new_args, fv
+      create_apply (mark_constr [%expr pair]) new_args, fv
 
     | Texp_construct (name, _, args) ->
       let new_args, fv = List.map (unnest_expr let_vars) args |> List.split in
@@ -186,7 +188,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
                          | Lident "::" -> Lident "%"
                          | txt         -> lowercase_lident txt in
 
-      create_apply (Exp.ident (mknoloc new_name)) new_args, fv
+      create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args, fv
 
     | _ when is_primary_type expr.exp_type ->
       let fr_var = create_fresh_var_name () in
@@ -333,20 +335,20 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
       | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
       | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
-      | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr nil ()],  []
-      | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident] ()], []
+      | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], []
+      | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], []
       | Tpat_construct ({txt}, _, args)                ->
         let args, vars = List.map translate_pat args |> List.split in
         let vars = List.concat vars in
         let constr =
           match txt with
           | Lident "::" -> [%expr (%)]
-          | _           -> lowercase_lident txt |> mknoloc |> Exp.ident in
-        create_apply constr args, vars
+          | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
+        create_apply (mark_constr constr) args, vars
       | Tpat_tuple [l; r] ->
         let args, vars = List.map translate_pat [l; r] |> List.split in
         let vars = List.concat vars in
-        create_apply [%expr pair] args, vars
+        create_apply (mark_constr [%expr pair]) args, vars
       | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching" in
 
     let rec rename var1 var2 pat =
@@ -411,7 +413,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
                     ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
 
 
-  and translaet_if let_vars cond th el typ =
+  and translate_if let_vars cond th el typ =
   let args = create_fresh_argument_names_by_type typ in
 
   let cond_is_var =
@@ -449,7 +451,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_match (e, cs, _, _) -> translate_match let_vars expr.exp_loc e cs expr.exp_type
 
-    | Texp_ifthenelse (cond, th, Some el) -> translaet_if let_vars cond th el expr.exp_type
+    | Texp_ifthenelse (cond, th, Some el) -> translate_if let_vars cond th el expr.exp_type
 
     | Texp_function {cases = [case]} -> translate_abstraciton let_vars case
 
@@ -645,6 +647,10 @@ let fresh_var_normalizer =
 
 end
 
+let attrs_remover =
+  let expr          sub expr = Ast_mapper.default_mapper.expr          sub { expr with pexp_attributes = [] } in
+  let value_binding sub vb   = Ast_mapper.default_mapper.value_binding sub { vb   with pvb_attributes  = [] } in
+  { Ast_mapper.default_mapper with expr; value_binding }
 
 let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;

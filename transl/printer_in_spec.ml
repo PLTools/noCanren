@@ -1,0 +1,122 @@
+open Parsetree
+open Format
+open Ast_iterator
+
+let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
+
+  let name_from_pat pat =
+    match pat.ppat_desc with
+    | Ppat_var loc -> loc.txt
+    | _            -> failwith "Incorrect pattern in tree printer" in
+
+
+  let rec has_attr attr = function
+  | (x, _) :: xs -> x.Location.txt = attr || has_attr attr xs
+  | []           -> false in
+
+
+  let rec get_args_and_body expr =
+    match expr.pexp_desc with
+    | Pexp_fun (_, _, pat, body) -> let vars, body' = get_args_and_body body in
+                                    name_from_pat pat :: vars, body'
+    | _                          -> [], expr in
+
+
+  let rec print_list sep f fmt = function
+  | [x]     -> f fmt x
+  | x :: xs -> fprintf fmt "%a%s%a" f x sep (print_list sep f) xs
+  | []      -> () in
+
+
+  let rec expr_as_ident expr =
+    match expr.pexp_desc with
+   | Pexp_ident {txt = Lident name} -> name
+   | _  -> failwith "Expression isn't ident" in
+
+
+  let rec print_fresh fmt args =
+
+    let vars, conjs =
+      match args with
+      | { pexp_desc = Pexp_apply (f, a) } :: xs -> f :: List.map snd a, xs
+      | { pexp_desc = Pexp_tuple [a]    } :: xs -> [a], xs
+      | [] -> failwith "Fresh must have arguments"
+      | _  -> failwith "Incorrect tree for fresh-operation" in
+
+    fprintf fmt "fresh [%a] (%a)"
+      (print_list ", " (fun fmt e -> expr_as_ident e |> fprintf fmt "\"%s\"")) vars
+      (print_list " &&& " print_expr_in_brackets) conjs
+
+
+  and print_apply fmt expr =
+    let rec normalize_apply expr =
+      match expr.pexp_desc with
+      | Pexp_apply (f, args) -> let f', args' = normalize_apply f in
+                                f', args' @ List.map snd args
+      | _                    -> expr, [] in
+
+    let rec get_args_from_list args =
+      match args.pexp_desc with
+      | Pexp_construct ({txt = Lident "[]"}, _)                                     -> []
+      | Pexp_construct ({txt = Lident "::"}, Some {pexp_desc = Pexp_tuple [hd;tl]}) -> hd :: get_args_from_list tl
+      | _ -> failwith "Bad args for fresh-operation in tree printer" in
+
+    let f, args = normalize_apply expr in
+    let name    = expr_as_ident f in
+
+    if has_attr "it_was_constr" f.pexp_attributes then
+      match args with
+      | [{ pexp_desc = Pexp_construct ({txt = Lident "()"}, None) }] -> fprintf fmt "C \"%s\" []" name
+      | _ -> fprintf fmt "C \"%s\" [%a]" name (print_list ", " print_expr) args
+
+    else
+      match name, args with
+      | "!!",    [a]      -> print_expr fmt a
+      | "fresh", _        -> print_fresh fmt args
+
+      | name, [a1; a2] when
+          name = "===" ||
+          name = "&&&" ||
+          name = "|||"    -> fprintf fmt "(%a) %s (%a)" print_expr a1 name print_expr a2
+
+      | "conde", [a]      -> get_args_from_list a |> print_list " ||| " print_expr_in_brackets fmt
+      | "?&",    [a]      -> get_args_from_list a |> print_list " &&& " print_expr_in_brackets fmt
+
+      | "=/=", _          -> failwith "Disequality constaint isn't supported in specializator"
+
+      | _ ->  fprintf fmt "call \"%s\" [%a]" name (print_list ", " print_expr) args
+
+  and print_expr_in_brackets fmt = fprintf fmt "(%a)" print_expr
+
+  and print_expr fmt expr =
+    match expr.pexp_desc with
+    | Pexp_construct ({ txt = Lident "true"  }, None)
+    | Pexp_construct ({ txt = Lident "false" }, None)
+    | Pexp_constant _         -> fprintf fmt "C \"%a\" []" Pprintast.expression expr
+    | Pexp_ident _            -> fprintf fmt "V \"%a\"" Pprintast.expression expr
+    | Pexp_apply _            -> print_apply fmt expr
+    | Pexp_let (_, vbs, expr) -> print_vbs (fun fmt () -> print_expr fmt expr) fmt vbs
+    | _                       -> failwith "Incorrect exprission in tree printing"
+
+
+  and print_vb fmt vb =
+    let vars, body = get_args_and_body vb.pvb_expr in
+    fprintf fmt "Let (def \"%s\" [%a] (%a))"
+      (name_from_pat vb.pvb_pat)
+      (print_list ", " (fun fmt -> fprintf fmt "\"%s\"")) vars
+      print_expr body
+
+
+  and print_vbs cont fmt = function
+  | vb :: vbs -> fprintf fmt "%a (%a)" print_vb vb (print_vbs cont) vbs
+  | []        -> cont fmt ()
+
+
+  and print_structure_items fmt = function
+  | { pstr_desc = Pstr_value (_, vbs) } :: xs when has_attr "service_function" (List.hd vbs).pvb_attributes |> not
+            -> print_vbs (fun fmt _ -> print_structure_items fmt xs) fmt vbs
+  | _ :: xs -> print_structure_items fmt xs
+  | []      -> fprintf fmt "%s" last_goal in
+
+
+  fprintf fmt "%s %s = %a%!" tree_name last_goal print_structure_items

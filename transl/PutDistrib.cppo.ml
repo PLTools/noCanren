@@ -103,7 +103,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
             constr_itself (Some (tuple @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
       in
       let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [nolabel, body] ] ] in
-      Vb.mk (Pat.var @@ lower_lid pcd_name)
+      Vb.mk ~attrs:[(mknoloc "service_function", Parsetree.PStr [])] (Pat.var @@ lower_lid pcd_name)
         (match names with
         | [] -> Exp.fun_ nolabel None (Pat.construct (mknoloc (Lident "()")) None) body
         | names -> List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body)
@@ -148,7 +148,7 @@ let prepare_fmap ~loc tdecl =
   )
   in
 
-  [%stri let rec fmap = [%e
+  [%stri let[@service_function] rec fmap = [%e
     List.fold_right (function
       | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
       ) param_names (Exp.function_ cases) ] ]
