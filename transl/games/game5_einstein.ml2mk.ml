@@ -185,5 +185,3 @@ let answer = State (
   Person (Ivory , Spaniard  , Orange_juice, Lacky_Strike, Dog   ),
   Person (Green , Japanese  , Coffee      , Parliament  , Zebra ))
 *)
-
-let f x = 1

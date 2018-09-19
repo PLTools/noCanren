@@ -95,6 +95,3 @@ let capacities1 b =
   match b with
   | Fst -> S (S (S (S O)))
   | Snd -> S (S (S (S (S (S (S (S (S O))))))))
-
-
-let x y = 1

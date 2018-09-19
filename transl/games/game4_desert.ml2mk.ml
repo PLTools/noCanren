@@ -125,8 +125,3 @@ let checkAnswer answer len cop =
     St (O, cop, stations len) in
 
   calcFuel startState answer false
-
-
-(****************************************************************************)
-
-let o x = 1

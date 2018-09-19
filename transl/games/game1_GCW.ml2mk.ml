@@ -41,16 +41,3 @@ let checkAnswer a =
       else false in
 
   checkAnswer a startState
-
-let t x = true
-
-(*
-(****************************************************************************)
-
-
-let print a =
-  print_string (if checkAnswer a then "OK\n" else "Baaaad!\n")
-
-
-let main = print [G; N; C; G; W; N; G];
-           print [G; N; W; G; C; N; G]*)

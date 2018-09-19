@@ -78,5 +78,3 @@ let expr3 = Conj (Var "ok", I)
 
 let expr4 =
   Disj (Conj (Var "X", Var "Y"), Conj (Var "Z", Not (Var "Last")))
-
-let a = false
