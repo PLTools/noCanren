@@ -28,6 +28,7 @@ open Compenv
 (* Keep in sync with the copy in optcompile.ml *)
 
 let old_style_ml2mk = ref true
+let output_for_spec_tree = ref None
 
 let tool_name = "ocamlc"
 
@@ -69,7 +70,7 @@ let implementation ppf sourcefile outputprefix =
   let modulename = module_of_filename ppf sourcefile outputprefix in
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
-  let where_to_print = match !output_name with Some s -> s | None -> failwith "output filenot specified" in
+  let where_to_print = match !output_name with Some s -> s | None -> failwith "output file not specified" in
   try
 (*    Format.printf "output prefix = %s, output_name = %s\n%!" !output_name outputprefix;*)
     let (typedtree, coercion) =
@@ -81,14 +82,24 @@ let implementation ppf sourcefile outputprefix =
         Printtyped.implementation_with_coercion
     in
     let untyped = Genmain.only_generate ~oldstyle:(!old_style_ml2mk) { Misc.sourcefile = sourcefile } typedtree in
+    let tree_without_attrs = Genmain.(attrs_remover.structure attrs_remover) untyped in
     let () = Pprintast.structure Format.std_formatter untyped in
 
     let () =
       let ch = open_out where_to_print in
       let fmt = Format.formatter_of_out_channel ch in
       Format.pp_set_margin fmt 180;
-      Pprintast.structure fmt untyped
-    in
+      Pprintast.structure fmt tree_without_attrs;
+      fprintf fmt "%!" in
+
+    let () =
+      match !output_for_spec_tree with
+      | None      -> ()
+      | Some path ->
+        let ch = open_out path in
+        let fmt = Format.formatter_of_out_channel ch in
+        Printer_in_spec.print_tree fmt untyped in
+
     ()
 (*
     if !Clflags.print_types then begin
@@ -293,10 +304,12 @@ end)
 let all_options =
   ("-newstyle", Arg.Unit (fun () -> print_endline "PIZDA"; Compile.old_style_ml2mk := false),
                "switch from old Lozov-style to new style of generation")
+  ::
+  ("-spec-tree", Arg.String (fun output_path -> Compile.output_for_spec_tree := Some output_path),
+                        "<file> Print the generated program as a Kate's specialization tree to <file>")
   :: Options.list
 
 let () =
     readenv ppf Before_args;
     Arg.parse all_options anonymous usage;
     ()
-
