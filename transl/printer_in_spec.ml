@@ -22,10 +22,11 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
     | _                          -> [], expr in
 
 
-  let rec print_list sep f fmt = function
-  | [x]     -> f fmt x
-  | x :: xs -> fprintf fmt "%a%s%a" f x sep (print_list sep f) xs
-  | []      -> () in
+  let rec print_list need_nl sep f fmt = function
+  | [x]                  -> f fmt x
+  | x :: xs when need_nl -> fprintf fmt "%a%s@\n%a" f x sep (print_list need_nl sep f) xs
+  | x :: xs              -> fprintf fmt "%a%s%a" f x sep (print_list need_nl sep f) xs
+  | []                   -> () in
 
 
   let rec expr_as_ident expr =
@@ -43,9 +44,9 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
       | [] -> failwith "Fresh must have arguments"
       | _  -> failwith "Incorrect tree for fresh-operation" in
 
-    fprintf fmt "fresh [%a] (%a)"
-      (print_list ", " (fun fmt e -> expr_as_ident e |> fprintf fmt "\"%s\"")) vars
-      (print_list " &&& " print_expr_in_brackets) conjs
+    fprintf fmt "@[<h2>fresh [%a] (@\n%a@])"
+      (print_list false ", " (fun fmt e -> expr_as_ident e |> fprintf fmt "\"%s\"")) vars
+      (print_list true " &&& " print_expr_in_brackets) conjs
 
 
   and print_apply fmt expr =
@@ -67,7 +68,7 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
     if has_attr "it_was_constr" f.pexp_attributes then
       match args with
       | [{ pexp_desc = Pexp_construct ({txt = Lident "()"}, None) }] -> fprintf fmt "C \"%s\" []" name
-      | _ -> fprintf fmt "C \"%s\" [%a]" name (print_list ", " print_expr) args
+      | _ -> fprintf fmt "C \"%s\" [%a]" name (print_list false ", " print_expr) args
 
     else
       match name, args with
@@ -75,16 +76,15 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
       | "fresh", _        -> print_fresh fmt args
 
       | name, [a1; a2] when
-          name = "===" ||
           name = "&&&" ||
-          name = "|||"    -> fprintf fmt "(%a) %s (%a)" print_expr a1 name print_expr a2
+          name = "|||"    -> fprintf fmt "(%a) %s @\n(%a)" print_expr a1 name print_expr a2
+      | "===",   [a1; a2] -> fprintf fmt "%a === %a" print_expr a1 print_expr a2
+      | "conde", [a]      -> get_args_from_list a |> print_list true " ||| "  print_expr_in_brackets fmt
+      | "?&",    [a]      -> get_args_from_list a |> print_list true " &&& " print_expr_in_brackets fmt
 
-      | "conde", [a]      -> get_args_from_list a |> print_list " ||| " print_expr_in_brackets fmt
-      | "?&",    [a]      -> get_args_from_list a |> print_list " &&& " print_expr_in_brackets fmt
+    (*  | "=/=", _          -> failwith "Disequality constaint isn't supported in specializator" *)
 
-      | "=/=", _          -> failwith "Disequality constaint isn't supported in specializator"
-
-      | _ ->  fprintf fmt "call \"%s\" [%a]" name (print_list ", " print_expr) args
+      | _ ->  fprintf fmt "call \"%s\" [%a]" name (print_list false ", " print_expr) args
 
   and print_expr_in_brackets fmt = fprintf fmt "(%a)" print_expr
 
@@ -101,14 +101,14 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
 
   and print_vb fmt vb =
     let vars, body = get_args_and_body vb.pvb_expr in
-    fprintf fmt "Let (def \"%s\" [%a] (%a))"
+    fprintf fmt "@[<h2>Let (def \"%s\" [%a] (@\n%a@]@\n))"
       (name_from_pat vb.pvb_pat)
-      (print_list ", " (fun fmt -> fprintf fmt "\"%s\"")) vars
+      (print_list false ", " (fun fmt -> fprintf fmt "\"%s\"")) vars
       print_expr body
 
 
   and print_vbs cont fmt = function
-  | vb :: vbs -> fprintf fmt "%a (%a)" print_vb vb (print_vbs cont) vbs
+  | vb :: vbs -> fprintf fmt "%a (@\n%a)" print_vb vb (print_vbs cont) vbs
   | []        -> cont fmt ()
 
 
@@ -119,4 +119,4 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
   | []      -> fprintf fmt "%s" last_goal in
 
 
-  fprintf fmt "%s %s = %a%!" tree_name last_goal print_structure_items
+  fprintf fmt "@[<h2>%s %s =@\n%a@]%!" tree_name last_goal print_structure_items
