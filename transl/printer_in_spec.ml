@@ -2,7 +2,7 @@ open Parsetree
 open Format
 open Ast_iterator
 
-let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
+let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt tree =
 
   let name_from_pat pat =
     match pat.ppat_desc with
@@ -113,10 +113,23 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt =
 
 
   and print_structure_items fmt = function
-  | { pstr_desc = Pstr_value (_, vbs) } :: xs when has_attr "service_function" (List.hd vbs).pvb_attributes |> not
-            -> print_vbs (fun fmt _ -> print_structure_items fmt xs) fmt vbs
-  | _ :: xs -> print_structure_items fmt xs
-  | []      -> fprintf fmt "%s" last_goal in
+  | { pstr_desc = Pstr_value (_, vbs) } :: xs -> print_vbs (fun fmt _ -> print_structure_items fmt xs) fmt vbs
+  | []                                        -> fprintf fmt "%s" last_goal
+  | _                                         -> failwith "Error in print_structure_items" in
 
 
-  fprintf fmt "@[<h2>%s %s =@\n%a@]%!" tree_name last_goal print_structure_items
+  let tree_without_types, types =
+    let one_step si (tr, ty) =
+      match si.pstr_desc with
+      | Pstr_value (_, vbs) when has_attr "service_function" (List.hd vbs).pvb_attributes |> not -> si :: tr, ty
+      | _                                                                                        -> tr, si :: ty in
+    List.fold_right one_step tree ([],[]) in
+
+  let types   = Genmain.(attrs_remover.structure attrs_remover) types in
+  let buf     = Buffer.create 100 in
+  let buf_fmt = Format.formatter_of_buffer buf in
+  Pprintast.structure buf_fmt types;
+  Format.pp_print_flush buf_fmt ();
+  let text = Buffer.contents buf |> String.escaped in
+
+  fprintf fmt "@[<h2>%s = \n (\\%s -> @\n%a@\n@\n,@\n@\n\"%s\")%!@]" tree_name last_goal print_structure_items tree_without_types text
