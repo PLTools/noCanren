@@ -71,8 +71,7 @@ type rec_flg_t = Nonrecursive | Recursive
 
 let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
 
-
-let prepare_distribs ~loc tdecl fmap_decl =
+let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
   let Ptype_variant constructors = tdecl.ptype_kind in
@@ -105,10 +104,25 @@ let prepare_distribs ~loc tdecl fmap_decl =
       let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [nolabel, body] ] ] in
       Vb.mk ~attrs:[(mknoloc "service_function", Parsetree.PStr [])] (Pat.var @@ lower_lid pcd_name)
         (match names with
-        | [] -> Exp.fun_ nolabel None (Pat.construct (mknoloc (Lident "()")) None) body
+        | [] -> [%expr fun () -> [%e body]]
         | names -> List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body)
     ) constructors
   ]
+
+let prepare_distribs ~loc tdecl fmap_decl =
+  let open Location in
+  let open Longident in
+  let open Exp in
+  if List.length tdecl.ptype_params > 0
+  then prepare_distribs_for_FAT loc tdecl fmap_decl
+  else let Ptype_variant constructors = tdecl.ptype_kind in
+       constructors |>
+       List.map (fun {pcd_name} ->
+         Vb.mk ~attrs:[(mknoloc "service_function", Parsetree.PStr [])]
+               (Pat.var @@ lower_lid pcd_name)
+               ([%expr fun () -> !! [%e construct (mknoloc (Lident pcd_name.txt)) None]])) |>
+       List.map (fun vb -> Str.value Nonrecursive [vb])
+
 
 let prepare_fmap ~loc tdecl =
   let open Location in
