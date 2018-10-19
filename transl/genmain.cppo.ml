@@ -319,12 +319,12 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
 
     let scrutinee_is_var =
       match expr.exp_desc with
-      | Texp_ident _ -> true
-      | _            -> false in
+      | Texp_ident (_, { txt = Longident.Lident name }, _) -> not @@ List.mem name let_vars
+      | _                                                  -> false in
 
     let scrutinee_var =
       match expr.exp_desc with
-      | Texp_ident (_, { txt = Longident.Lident name }, _) -> name
+      | Texp_ident (_, { txt = Longident.Lident name }, _) -> if scrutinee_is_var then name else create_fresh_var_name ()
       | Texp_ident _                                       -> fail_loc expr.exp_loc "Incorrect variable"
       | _                                                  -> create_fresh_var_name () in
 
