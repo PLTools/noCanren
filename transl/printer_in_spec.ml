@@ -2,7 +2,7 @@ open Parsetree
 open Format
 open Ast_iterator
 
-let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt tree =
+let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "last_goal") fmt tree =
 
   let name_from_pat pat =
     match pat.ppat_desc with
@@ -132,4 +132,6 @@ let print_tree ?(tree_name = "tree") ?(last_goal = "last_goal") fmt tree =
   Format.pp_print_flush buf_fmt ();
   let text = Buffer.contents buf |> String.escaped in
 
+  fprintf fmt "@[module %s where @\n@\n@]" (String.capitalize module_name);
+  fprintf fmt "@[import Syntax@\n@\n@]";
   fprintf fmt "@[<h2>%s = \n (\\%s -> @\n%a@\n@\n,@\n@\n\"%s\")%!@]" tree_name last_goal print_structure_items tree_without_types text
