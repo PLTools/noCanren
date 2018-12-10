@@ -141,7 +141,7 @@ let filter_vars vars1 vars2 =
 
 (*****************************************************************************************************************************)
 
-let translate tast start_index need_lowercase =
+let translate tast start_index need_lowercase need_poly =
 
 let lowercase_lident x =
   if need_lowercase
@@ -249,6 +249,15 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
 
 
   and translate_nonrec_let let_vars bind expr =
+    if not need_poly && is_primary_type bind.vb_expr.exp_type then
+      let name       = get_pat_name bind.vb_pat in
+      let conj1      = create_apply (translate_expression let_vars bind.vb_expr) [create_id name] in
+      let args       = create_fresh_argument_names_by_type expr.exp_type in
+      let conj2      = create_apply (translate_expression let_vars expr) (List.map create_id args) in
+      let both       = create_conj [conj1; conj2] in
+      let with_fresh = create_fresh name both in
+      List.fold_right create_fun args with_fresh
+    else
     let new_let_vars =
       if is_primary_type bind.vb_expr.exp_type
       then get_pat_name bind.vb_pat :: let_vars
@@ -666,9 +675,10 @@ let only_generate ~oldstyle hook_info tast =
     let need_reduce     = true in
     let need_lower_case = true in
     let need_normalize  = true in
+    let need_poly       = false in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
-    translate tast start_index need_lower_case |>
+    translate tast start_index need_lower_case need_poly |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
     eval_if_need need_normalize (fresh_var_normalizer.structure fresh_var_normalizer) |>
