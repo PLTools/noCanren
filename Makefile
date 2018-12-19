@@ -47,9 +47,10 @@ transl: lib
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game3_bottles_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game4_desert_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game5_einstein_run.native
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game6_sudoku4x4_run.native
+	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game6_sudoku4x4_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/logic_interpreter_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/tabling_test_run.native
+	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/unify_run.native
 
 	@# peano.native is not compilable at the moment because a plugin linking
 	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
@@ -59,7 +60,7 @@ transl: lib
 celan: clean
 
 clean: clean_tests
-	$(RM) -r _build *.log  *.native *.byte *.docdir
+	$(RM) -r _build *.log  *.native *.byte *.docdir transl/games/*.cmi
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto 017tabling 018prjc 019tablingCache 020
