@@ -64,6 +64,9 @@ true: short_paths
 <transl/games/logic_interpreter.*>: dsource
 <transl/games/logic_interpreter_run.*>:  package(GT)
 
+<transl/games/unify.*>: dsource
+<transl/games/unify_run.*>:  package(GT)
+
 <transl/logic.*>: rectypes, use_ocanren_modules
 <transl/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
 <transl/games/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
