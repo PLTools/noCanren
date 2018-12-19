@@ -141,7 +141,7 @@ let filter_vars vars1 vars2 =
 
 (*****************************************************************************************************************************)
 
-let translate tast start_index need_lowercase need_poly =
+let translate tast start_index need_lowercase need_poly need_false =
 
 let lowercase_lident x =
   if need_lowercase
@@ -398,10 +398,16 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
     let q   = create_fresh_var_name () in
     let fst = if is_or then [%expr !!true]  else [%expr !!false] in
     let snd = if is_or then [%expr !!false] else [%expr !!true]  in
+    if need_false then
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              conde [([%e create_id a1] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
                     ([%e create_id a1] === [%e snd]) &&& ([%e create_id q] === [%e create_id a2])]]
-
+    else if is_or then
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
+    else
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) &&& ([%e create_id a2] === !!true))]
 
   and translate_eq_funs is_eq =
     let a1  = create_fresh_var_name () in
@@ -409,9 +415,13 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
     let q   = create_fresh_var_name () in
     let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
+    if need_false then
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              conde [([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst]);
                     ([%e create_id a1] =/= [%e create_id a2]) &&& ([%e create_id q] === [%e snd])]]
+    else
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
 
 
   and translate_not_fun () =
@@ -460,17 +470,23 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
 
     | Texp_match (e, cs, _, _) -> translate_match let_vars expr.exp_loc e cs expr.exp_type
 
-    | Texp_ifthenelse (cond, th, Some el) -> translate_if let_vars cond th el expr.exp_type
+    | Texp_ifthenelse (cond, th, Some el) -> if need_false
+                                             then translate_if let_vars cond th el expr.exp_type
+                                             else fail_loc expr.exp_loc "if-then-else expression in not-false mode"
 
     | Texp_function {cases = [case]} -> translate_abstraciton let_vars case
 
     | Texp_ident (_, { txt = Lident "="  }, _)  -> translate_eq_funs true
-    | Texp_ident (_, { txt = Lident "<>" }, _)  -> translate_eq_funs false
+    | Texp_ident (_, { txt = Lident "<>" }, _)  -> if need_false
+                                                   then translate_eq_funs false
+                                                   else fail_loc expr.exp_loc "Operator '<>' in not-false mode"
 
     | Texp_ident (_, { txt = Lident "||" }, _)  -> translate_bool_funs true
     | Texp_ident (_, { txt = Lident "&&" }, _)  -> translate_bool_funs false
 
-    | Texp_ident (_, { txt = Lident "not" }, _) -> translate_not_fun ()
+    | Texp_ident (_, { txt = Lident "not" }, _) -> if need_false
+                                                   then translate_not_fun ()
+                                                   else fail_loc expr.exp_loc "Operator 'not' in not-false mode"
 
     | Texp_ident (_, { txt = Lident name }, _) -> translate_ident let_vars name expr.exp_type
 
@@ -676,9 +692,10 @@ let only_generate ~oldstyle hook_info tast =
     let need_lower_case = true in
     let need_normalize  = true in
     let need_poly       = false in
+    let need_false      = true in
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
-    translate tast start_index need_lower_case need_poly |>
+    translate tast start_index need_lower_case need_poly need_false |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
     eval_if_need need_normalize (fresh_var_normalizer.structure fresh_var_normalizer) |>
