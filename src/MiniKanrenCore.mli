@@ -149,6 +149,8 @@ val conj : goal -> goal -> goal
 (** [&&&] is a left-associative infix synonym for [conj] *)
 val (&&&) : goal -> goal -> goal
 
+val (<&>) : goal -> goal -> goal
+
 (** [disj s1 s2] creates a goal, which is a disjunction of its arguments *)
 val disj : goal -> goal -> goal
 
@@ -227,6 +229,8 @@ val run : (unit ->
     See also syntax extension [defer].
 *)
 val delay : (unit -> goal) -> goal
+
+val cont_delay : goal -> goal
 
 (** The exception is raised when we try to extract a regular term from the answer with some free variables *)
 exception Not_a_value

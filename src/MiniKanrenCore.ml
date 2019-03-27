@@ -88,6 +88,7 @@ module Stream =
       | Nil
       | Cons of 'a * ('a t)
       | Thunk  of 'a thunk
+      | Cont of 'a * ('a -> 'a t)
       | Waiting of 'a suspended list
     and 'a thunk =
       unit -> 'a t
@@ -98,6 +99,8 @@ module Stream =
     let single x    = Cons (x, Nil)
     let cons x s    = Cons (x, s)
     let from_fun zz = Thunk zz
+
+    let from_cont g t = Cont (t, g)
 
     let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
 
@@ -114,6 +117,7 @@ module Stream =
       | Nil           -> force ys
       | Cons (x, xs)  -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
       | Thunk   _     -> from_fun (fun () -> mplus (force ys) xs)
+      | Cont (t, k)   -> Cont (t, fun t -> mplus (force ys) (from_fun @@ fun () -> k t))
       | Waiting ss    ->
         let ys = force ys in
         (* handling waiting streams is tricky *)
@@ -144,6 +148,22 @@ module Stream =
       | Nil           -> Nil
       | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
       | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
+      | Cont (t, k)   -> bind (k t) f
+      | Waiting ss    ->
+        match unwrap_suspended ss with
+        | Waiting ss ->
+          let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
+          Waiting (List.map helper ss)
+        | s          -> bind s f
+
+
+    let rec sym_bind s f =
+      let bind = sym_bind in
+      match s with
+      | Nil           -> Nil
+      | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
+      | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
+      | Cont (t, k)   -> Cont (t, fun t -> bind (f t) k)
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
@@ -155,6 +175,7 @@ module Stream =
     | Nil           -> None
     | Cons (x, xs)  -> Some (x, xs)
     | Thunk zz      -> msplit @@ zz ()
+    | Cont (t, k)   -> msplit @@ k t
     | Waiting ss    ->
       match unwrap_suspended ss with
       | Waiting _ -> None
@@ -1503,9 +1524,15 @@ let (=/=) x y st =
 
 let delay g st = Stream.from_fun (fun () -> g () st)
 
+let cont_delay = Stream.from_cont
+
 let conj f g st = Stream.bind (f st) g
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
+
+
+let (<&>) f g st = Stream.sym_bind (f st) g
+
 
 let disj_base f g st = Stream.mplus (f st) (Stream.from_fun (fun () -> g st))
 
