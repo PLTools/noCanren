@@ -1,3 +1,7 @@
 example, all answers {
 q=[];
 }
+tree, all answers {
+q=Leaf ();
+q=Node (Leaf (), Leaf ());
+}
