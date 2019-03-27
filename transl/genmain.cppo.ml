@@ -114,8 +114,8 @@ let create_apply_to_list f arg_list =
 let create_conj = function
 | []     -> failwith "Conjunction needs one or more arguments"
 | [x]    -> x
-| [x; y] -> [%expr [%e x] &&& [%e y]]
-| l      -> create_apply_to_list [%expr (?&)] l
+| [x; y] -> [%expr [%e x] <&> [%e y]]
+| x::xs  -> List.fold_left (fun x y -> [%expr (<&>) [%e x] [%e y]]) x xs
 
 
 let create_disj = function
@@ -130,7 +130,7 @@ let create_fun var body =
 
 
 let create_fresh var body =
-  create_apply [%expr call_fresh] [create_fun var body]
+  create_apply [%expr cont_delay] [create_apply [%expr call_fresh] [create_fun var body]]
 
 
 let create_inj expr = [%expr !! [%e expr]]
@@ -400,14 +400,14 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
     let snd = if is_or then [%expr !!false] else [%expr !!true]  in
     if need_false then
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             conde [([%e create_id a1] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
-                    ([%e create_id a1] === [%e snd]) &&& ([%e create_id q] === [%e create_id a2])]]
+             conde [([%e create_id a1] === [%e fst]) <&> ([%e create_id q] === [%e fst]);
+                    ([%e create_id a1] === [%e snd]) <&> ([%e create_id q] === [%e create_id a2])]]
     else if is_or then
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
+             ([%e create_id q] === !!true) <&> (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
     else
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) &&& ([%e create_id a2] === !!true))]
+             ([%e create_id q] === !!true) <&> (([%e create_id a1] === !!true) <&> ([%e create_id a2] === !!true))]
 
   and translate_eq_funs is_eq =
     let a1  = create_fresh_var_name () in
@@ -417,19 +417,19 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
     if need_false then
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             conde [([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst]);
-                    ([%e create_id a1] =/= [%e create_id a2]) &&& ([%e create_id q] === [%e snd])]]
+             conde [([%e create_id a1] === [%e create_id a2]) <&> ([%e create_id q] === [%e fst]);
+                    ([%e create_id a1] =/= [%e create_id a2]) <&> ([%e create_id q] === [%e snd])]]
     else
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
+             ([%e create_id a1] === [%e create_id a2]) <&> ([%e create_id q] === [%e fst])]
 
 
   and translate_not_fun () =
     let a  = create_fresh_var_name () in
     let q  = create_fresh_var_name () in
     [%expr fun [%p create_pat a] [%p create_pat q] ->
-             conde [([%e create_id a] === !!true ) &&& ([%e create_id q] === !!false);
-                    ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
+             conde [([%e create_id a] === !!true ) <&> ([%e create_id q] === !!false);
+                    ([%e create_id a] === !!false) <&> ([%e create_id q] === !!true )]]
 
 
   and translate_if let_vars cond th el typ =
@@ -449,13 +449,13 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
   let th = create_apply (translate_expression let_vars th) (List.map create_id args) in
   let el = create_apply (translate_expression let_vars el) (List.map create_id args) in
 
-  let body = [%expr conde [([%e create_id cond_var] === !!true ) &&& [%e th];
-                           ([%e create_id cond_var] === !!false) &&& [%e el]]]
+  let body = [%expr conde [([%e create_id cond_var] === !!true ) <&> [%e th];
+                           ([%e create_id cond_var] === !!false) <&> [%e el]]]
   in
 
   let with_fresh =
     if cond_is_var then body
-    else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression let_vars cond] [%e create_id cond_var]) &&& [%e body])] in
+    else [%expr call_fresh (fun [%p create_pat cond_var] -> ([%e translate_expression let_vars cond] [%e create_id cond_var]) <&> [%e body])] in
 
     List.fold_right create_fun args with_fresh
 
@@ -633,7 +633,7 @@ let fresh_var_normalizer =
       let conds, vars = get_conds_and_vars body in
       conds, txt :: vars
 
-    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "&&&"}}, [_, a; _, b]) ->
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "<&>"}}, [_, a; _, b]) ->
       [a; b], []
 
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "?&"}}, [_, args]) ->
@@ -690,9 +690,13 @@ let only_generate ~oldstyle hook_info tast =
     let open Lozov  in
     let need_reduce     = true in
     let need_lower_case = true in
+<<<<<<< HEAD
     let need_normalize  = true in
     let need_poly       = false in
     let need_false      = true in
+=======
+    let need_normalize  = false in
+>>>>>>> Supported symmectric conj.
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index in
     translate tast start_index need_lower_case need_poly need_false |>
