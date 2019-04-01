@@ -89,6 +89,7 @@ module Stream =
       | Cons of 'a * ('a t)
       | Thunk  of 'a thunk
       | Cont of 'a * ('a -> 'a t)
+      | Disj of 'a t * 'a t
       | Waiting of 'a suspended list
     and 'a thunk =
       unit -> 'a t
@@ -100,6 +101,8 @@ module Stream =
     let cons x s    = Cons (x, s)
     let from_fun zz = Thunk zz
 
+    let n = ref 0
+    let pp () = n := !n + 1; Printf.printf "lol%d\n%!" !n
     let from_cont g t = Cont (t, g)
 
     let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
@@ -115,9 +118,10 @@ module Stream =
     let rec mplus xs ys =
       match xs with
       | Nil           -> force ys
-      | Cons (x, xs)  -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
-      | Thunk   _     -> from_fun (fun () -> mplus (force ys) xs)
-      | Cont (t, k)   -> Cont (t, fun t -> mplus (force ys) (from_fun @@ fun () -> k t))
+      | Cons (x, xs)  -> cons x @@ from_fun @@ fun () -> Disj (force ys, xs)
+      | Thunk   _     -> from_fun @@ fun () -> Disj (force ys, xs)
+      | Cont (t, k)   -> Disj (force ys, Cont (t, k))
+      | Disj (a, b)   -> Disj (force ys, from_fun @@ fun () -> mplus a b)
       | Waiting ss    ->
         let ys = force ys in
         (* handling waiting streams is tricky *)
@@ -149,6 +153,10 @@ module Stream =
       | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
       | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
       | Cont (t, k)   -> bind (k t) f
+
+      | Disj (Cont (t, k), b)   -> bind (mplus (from_fun @@ fun () -> k t) b) f
+
+      | Disj (a, b)   -> bind (mplus a b) f
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
@@ -164,6 +172,7 @@ module Stream =
       | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
       | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
       | Cont (t, k)   -> Cont (t, fun t -> bind (f t) k)
+      | Disj (a, b)   -> Disj (from_fun (fun () -> bind a f), from_fun @@ fun () -> bind b f)
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
@@ -190,6 +199,7 @@ module Stream =
     | Nil          -> Nil
     | Cons (x, xs) -> Cons (f x, map f xs)
     | Thunk zzz    -> from_fun (fun () -> map f @@ zzz ())
+    | Disj (a, b)  -> map f @@ mplus a b
     | Waiting ss   ->
       let helper {zz} as s = {s with zz = fun () -> map f (zz ())} in
       Waiting (List.map helper ss)
@@ -1534,7 +1544,7 @@ let (?&) gs = List.fold_right (&&&) gs success
 let (<&>) f g st = Stream.sym_bind (f st) g
 
 
-let disj_base f g st = Stream.mplus (f st) (Stream.from_fun (fun () -> g st))
+let disj_base f g st = Stream.Disj (f st, Stream.from_fun (fun () -> g st))
 
 let disj f g st = let st = State.new_scope st in disj_base f g |> (fun g -> Stream.from_fun (fun () -> g st))
 
