@@ -113,15 +113,16 @@ module Stream =
 
     let force = function
     | Thunk zz  -> zz ()
+    | Cont (t, k) -> k t
     | xs        -> xs
 
     let rec mplus xs ys =
       match xs with
       | Nil           -> force ys
-      | Cons (x, xs)  -> cons x @@ from_fun @@ fun () -> Disj (force ys, xs)
-      | Thunk   _     -> from_fun @@ fun () -> Disj (force ys, xs)
-      | Cont (t, k)   -> Disj (force ys, Cont (t, k))
-      | Disj (a, b)   -> Disj (force ys, from_fun @@ fun () -> mplus a b)
+      | Cons (x, xs)  -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
+      | Thunk   _     -> from_fun (fun () -> mplus (force ys) xs)
+      | Cont (t, k)   -> Disj (force ys, xs)
+      | Disj (a, b)   -> Disj (force ys, from_fun (fun () -> mplus a b))
       | Waiting ss    ->
         let ys = force ys in
         (* handling waiting streams is tricky *)
@@ -153,10 +154,7 @@ module Stream =
       | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
       | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
       | Cont (t, k)   -> bind (k t) f
-
-      | Disj (Cont (t, k), b)   -> bind (mplus (from_fun @@ fun () -> k t) b) f
-
-      | Disj (a, b)   -> bind (mplus a b) f
+      | Disj (a, b)   -> from_fun @@ fun () -> bind (mplus a b) f
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
@@ -184,7 +182,6 @@ module Stream =
     | Nil           -> None
     | Cons (x, xs)  -> Some (x, xs)
     | Thunk zz      -> msplit @@ zz ()
-    | Cont (t, k)   -> msplit @@ k t
     | Waiting ss    ->
       match unwrap_suspended ss with
       | Waiting _ -> None
@@ -1544,7 +1541,7 @@ let (?&) gs = List.fold_right (&&&) gs success
 let (<&>) f g st = Stream.sym_bind (f st) g
 
 
-let disj_base f g st = Stream.Disj (f st, Stream.from_fun (fun () -> g st))
+let disj_base f g st = Stream.mplus (f st) @@ Stream.from_fun (fun () -> g st)
 
 let disj f g st = let st = State.new_scope st in disj_base f g |> (fun g -> Stream.from_fun (fun () -> g st))
 
