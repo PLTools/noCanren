@@ -82,9 +82,17 @@ let run x = runR (List.reify MiniKanren.reify)
                  (show List.ground @@ show string)
                  (show List.logic (show logic @@ show string)) x
 
+let list_init n f =
+  let rec helper i =
+    if i >= n then
+      []
+    else
+      f i :: helper (i+1)
+  in
+  helper 0
 
 let () =
-  run (-1) q qh ("rev", fun q -> reverso q (l @@ List.init 10 (Printf.sprintf "%d")));;
+  run (-1) q qh ("rev", fun q -> reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
 
 (*******************************************************************)
 
@@ -94,7 +102,7 @@ let () =
 (*******************************************************************)
 
 
-(* let (&&&) = (<&>) *)
+let (&&&) = (<&>)
 (* let cont_delay x = x *)
 
 let rec a_star a l = cont_delay @@
@@ -129,7 +137,4 @@ let aMbNcN l = cont_delay @@
 let aNbNcN l = aNbNcM l &&& aMbNcN l
 
 let () =
-  run (10) q qh ("aNbNcN", fun q -> fresh (p)
-                                      (appendo p (l ["B"; "C"]) q)
-                                      (p === l ["A"])
-                                      (aNbNcN q))
+  run (5) q qh ("aNbNcN", fun q -> fresh (p) (aNbNcN q))
