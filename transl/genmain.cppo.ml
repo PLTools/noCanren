@@ -139,6 +139,246 @@ let create_inj expr = [%expr !! [%e expr]]
 let filter_vars vars1 vars2 =
   List.filter (fun v -> List.for_all ((<>) v) vars2) vars1
 
+let mark_type_declaration td =
+    match td.typ_kind with
+    | Ttype_variant cds -> { td with typ_attributes = [(mknoloc "put_distrib_here", Parsetree.PStr [])] }
+    | _                 -> fail_loc td.typ_loc "Incrorrect type declaration"
+
+let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", Parsetree.PStr [])]}
+
+let rec have_unifier p1 p2 =
+  match p1.pat_desc, p2.pat_desc with
+  | Tpat_any  , _ | _, Tpat_any
+  | Tpat_var _, _ | _, Tpat_var _ -> true
+  | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
+  | Tpat_tuple t1, Tpat_tuple t2 ->
+    List.length t1 = List.length t2 && List.for_all2 have_unifier t1 t2
+  | Tpat_construct (_, cd1, a1), Tpat_construct (_, cd2, a2) ->
+    cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 have_unifier a1 a2
+  | _ -> false
+
+let rec translate_pat pat fresher =
+  match pat.pat_desc with
+  | Tpat_any                                       -> let var = fresher () in create_id var, [var]
+  | Tpat_var (v, _)                                -> create_id v.name, [v.name]
+  | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
+  | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
+  | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
+  | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], []
+  | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], []
+  | Tpat_construct ({txt}, _, args)                ->
+    let args, vars = List.map (fun q -> translate_pat q fresher) args |> List.split in
+    let vars = List.concat vars in
+    let constr =
+      match txt with
+      | Lident "::" -> [%expr (%)]
+      | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
+    create_apply (mark_constr constr) args, vars
+  | Tpat_tuple [l; r] ->
+    let args, vars = List.map (fun q -> translate_pat q fresher) [l; r] |> List.split in
+    let vars = List.concat vars in
+    create_apply (mark_constr [%expr pair]) args, vars
+  | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
+
+let rec is_disj_pats = function
+  | []      -> true
+  | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs
+
+(*****************************************************************************************************************************)
+
+
+(*HERE*)
+
+let translate_high tast start_index need_lowercase =
+
+let lowercase_lident x =
+  if need_lowercase
+  then lowercase_lident x
+  else x in
+
+let curr_index = ref start_index in
+
+let create_fresh_var_name () =
+  let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
+  incr curr_index;
+  name in
+
+let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
+  match typ.desc with
+  | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
+  | Tlink typ                   -> create_fresh_argument_names_by_type typ
+  | _                           -> [create_fresh_var_name ()] in
+
+let rec unnest_constuct e =
+  match e.exp_desc with
+  | Texp_constant c ->
+    create_inj (Exp.constant (Untypeast.constant c)), []
+  | Texp_construct ({txt = Lident s}, _, []) when s = "true" || s = "false" ->
+    create_inj (untyper.expr untyper e), []
+  | Texp_tuple [a; b] ->
+      let arg1, fv1 = unnest_constuct a in
+      let arg2, fv2 = unnest_constuct b in
+      create_apply (mark_constr [%expr pair]) [arg1; arg2], fv1 @ fv2
+  | Texp_construct (name, _, args) ->
+    let new_args, fv = List.map unnest_constuct args |> List.split in
+    let fv           = List.concat fv in
+    let new_args     = match new_args with [] -> [[%expr ()]] | l  -> l in
+    let new_name     = match name.txt with
+                       | Lident "[]" -> Lident "nil"
+                       | Lident "::" -> Lident "%"
+                       | txt         -> lowercase_lident txt in
+    create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args, fv
+  | _ ->
+    let fr_var = create_fresh_var_name () in
+    create_id fr_var, [(fr_var, e)]
+
+
+
+and translate_construct expr =
+  let constr, binds = unnest_constuct expr in
+  let out_var_name  = create_fresh_var_name () in
+  let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
+  let conjs         = unify_constr :: List.map (fun (v,e) -> create_apply (translate_expression e) [create_id v]) binds in
+  let conj          = create_conj conjs in
+  let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
+  create_fun out_var_name with_fresh
+
+
+and translate_bool_funs is_or =
+  let a1  = create_fresh_var_name () in
+  let a2  = create_fresh_var_name () in
+  let b   = create_fresh_var_name () in
+  let q   = create_fresh_var_name () in
+  let fst = if is_or then [%expr !!true]  else [%expr !!false] in
+  let snd = if is_or then [%expr !!false] else [%expr !!true]  in
+  [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+      call_fresh (fun [%p create_pat b] ->
+        ([%e create_id a1] [%e create_id b]) &&&
+        (conde [
+          ([%e create_id b] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
+          ([%e create_id b] === [%e snd]) &&& ([%e create_id a2] [%e create_id q])]))]
+
+ and translate_eq_funs is_eq =
+   let a1  = create_fresh_var_name () in
+   let a2  = create_fresh_var_name () in
+   let b1  = create_fresh_var_name () in
+   let b2  = create_fresh_var_name () in
+   let q   = create_fresh_var_name () in
+   let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
+   let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
+   [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+     call_fresh (fun [%p create_pat b1] ->
+     call_fresh (fun [%p create_pat b2] ->
+            ([%e create_id a1] [%e create_id b1]) &&&
+            ([%e create_id a2] [%e create_id b2]) &&&
+            (conde [
+              ([%e create_id b1] === [%e create_id b2]) &&& ([%e create_id q] === [%e fst]);
+              ([%e create_id b1] =/= [%e create_id b2]) &&& ([%e create_id q] === [%e snd])])))]
+
+ and translate_not_fun () =
+   let a  = create_fresh_var_name () in
+   let b  = create_fresh_var_name () in
+   let q  = create_fresh_var_name () in
+   [%expr fun [%p create_pat a] [%p create_pat q] ->
+     call_fresh (fun [%p create_pat b] ->
+            ([%e create_id a] [%e create_id b]) &&&
+            (conde [
+              ([%e create_id b] === !!true ) &&& ([%e create_id q] === !!false);
+              ([%e create_id b] === !!false) &&& ([%e create_id q] === !!true )]))]
+
+
+and translate_if cond th el =
+  let b   = create_fresh_var_name () in
+  let q   = create_fresh_var_name () in
+  [%expr fun [%p create_pat q] -> call_fresh (fun [%p create_pat b] ->
+      ([%e translate_expression cond] [%e create_id b]) &&& (
+        conde [
+          ([%e create_id b] === !!true ) &&& ([%e translate_expression th] [%e create_id q]);
+          ([%e create_id b] === !!false) &&& ([%e translate_expression el] [%e create_id q])
+        ]))]
+
+and translate_ident i = Printf.printf "%s\n%!" i;
+  match i with
+  | "&&"  -> translate_bool_funs false
+  | "||"  -> translate_bool_funs true
+  | "not" -> translate_not_fun ()
+  | "="   -> translate_eq_funs true
+  | "<>"  -> translate_eq_funs false
+  |  _    -> create_id i
+
+
+and translate_abstraciton case =
+  Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
+
+and translate_apply f a l =
+  create_apply
+    (translate_expression f)
+    (List.map (function (_, Some e) -> translate_expression e
+                       | _ -> fail_loc l "Incorrect argument") a)
+
+and translate_match loc s cases typ =
+  if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then
+    let extra_args = create_fresh_argument_names_by_type typ in
+    let scrutinee_var = create_fresh_var_name () in
+
+    let create_subst v =
+      let abs_v = create_fresh_var_name () in
+      let unify = [%expr [%e create_id v] === [%e create_id abs_v]] in
+      create_fun abs_v unify in
+
+    let translate_case case =
+      let pat, vars  = translate_pat case.c_lhs create_fresh_var_name in
+      let unify      = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+      let body       = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
+      let abst_body  = List.fold_right create_fun vars body in
+      let subst      = List.map create_subst vars in
+      let total_body = create_apply abst_body subst in
+      let conj       = create_conj [unify; total_body] in
+      List.fold_right create_fresh vars conj in
+
+    let new_cases = List.map translate_case cases in
+    let disj      = create_disj new_cases in
+    let scrutinee = create_apply (translate_expression s) [create_id scrutinee_var] in
+    let conj      = create_conj [scrutinee; disj] in
+    let fresh     = create_fresh scrutinee_var conj in
+    List.fold_right create_fun extra_args fresh
+
+  else fail_loc loc "Pattern matching contains unified patterns"
+
+
+
+and translate_expression e =
+  match e.exp_desc with
+  | Texp_constant _                          -> translate_construct e
+  | Texp_construct _                         -> translate_construct e
+  | Texp_tuple [l; r]                        -> translate_construct e
+  | Texp_ident (_, { txt = Lident name }, _) -> translate_ident name
+  | Texp_function {cases = [case]}           -> translate_abstraciton case
+  | Texp_apply (f, a)                        -> translate_apply f a e.exp_loc
+  | Texp_match (s, cs, _, _)                 -> translate_match e.exp_loc s cs e.exp_type
+  | Texp_ifthenelse (cond, th, Some el)      -> translate_if cond th el
+  | _                                        -> fail_loc e.exp_loc "Incorrect expression" in
+let translate_external_value_binding vb =
+  let pat  = untyper.pat untyper vb.vb_pat in
+  let expr = translate_expression vb.vb_expr in
+  Vb.mk pat expr in
+
+let translate_structure_item i =
+  match i.str_desc with
+  | Tstr_value (rec_flag, [bind]) ->
+      Str.value rec_flag [translate_external_value_binding bind]
+  | Tstr_type (rec_flag, decls) ->
+    let new_decls = List.map mark_type_declaration decls in
+    untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }
+  | _ -> fail_loc i.str_loc "Incorrect structure item" in
+
+
+let translate_structure t = List.map translate_structure_item t.str_items in
+
+translate_structure tast
+
+
+
 (*****************************************************************************************************************************)
 
 let translate tast start_index need_lowercase need_poly need_false =
@@ -160,8 +400,6 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
   | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
   | Tlink typ                   -> create_fresh_argument_names_by_type typ
   | _                           -> [create_fresh_var_name ()] in
-
-let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", Parsetree.PStr [])]} in
 
   (*************************************************)
 
@@ -311,21 +549,6 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
   and translate_match let_vars loc expr cases typ =
     let args = create_fresh_argument_names_by_type typ in
 
-    let rec have_unifier p1 p2 =
-      match p1.pat_desc, p2.pat_desc with
-      | Tpat_any  , _ | _, Tpat_any
-      | Tpat_var _, _ | _, Tpat_var _ -> true
-      | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
-      | Tpat_tuple t1, Tpat_tuple t2 ->
-        List.length t1 = List.length t2 && List.for_all2 have_unifier t1 t2
-      | Tpat_construct (_, cd1, a1), Tpat_construct (_, cd2, a2) ->
-        cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 have_unifier a1 a2
-      | _ -> false in
-
-    let rec is_disj_pats = function
-      | []      -> true
-      | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs in
-
     let scrutinee_is_var =
       match expr.exp_desc with
       | Texp_ident (_, { txt = Longident.Lident name }, _) -> not @@ List.mem name let_vars
@@ -337,29 +560,6 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
       | Texp_ident _                                       -> fail_loc expr.exp_loc "Incorrect variable"
       | _                                                  -> create_fresh_var_name () in
 
-    let rec translate_pat pat =
-      match pat.pat_desc with
-      | Tpat_any                                       -> let var = create_fresh_var_name () in create_id var, [var]
-      | Tpat_var (v, _)                                -> create_id v.name, [v.name]
-      | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
-      | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
-      | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
-      | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], []
-      | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], []
-      | Tpat_construct ({txt}, _, args)                ->
-        let args, vars = List.map translate_pat args |> List.split in
-        let vars = List.concat vars in
-        let constr =
-          match txt with
-          | Lident "::" -> [%expr (%)]
-          | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
-        create_apply (mark_constr constr) args, vars
-      | Tpat_tuple [l; r] ->
-        let args, vars = List.map translate_pat [l; r] |> List.split in
-        let vars = List.concat vars in
-        create_apply (mark_constr [%expr pair]) args, vars
-      | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching" in
-
     let rec rename var1 var2 pat =
       match pat.pexp_desc with
       | Pexp_ident { txt = Lident name } -> if name = var1 then create_id var2 else pat
@@ -367,7 +567,7 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
       | _ -> pat in
 
     let translate_case case =
-      let pat, vars  = translate_pat case.c_lhs in
+      let pat, vars  = translate_pat case.c_lhs create_fresh_var_name in
       let is_overlap = List.mem scrutinee_var vars in
       let new_var    = if is_overlap then create_fresh_var_name () else "" in
       let pat        = if is_overlap then rename scrutinee_var new_var pat else pat in
@@ -502,12 +702,6 @@ let mark_constr expr = { expr with pexp_attributes = [(mknoloc "it_was_constr", 
     Vb.mk pat expr in
 
 
-  let mark_type_declaration td =
-      match td.typ_kind with
-      | Ttype_variant cds -> { td with typ_attributes = [(mknoloc "put_distrib_here", Parsetree.PStr [])] }
-      | _                 -> fail_loc td.typ_loc "Incrorrect type declaration" in
-
-
   let translate_structure_item let_vars stri =
     match stri.str_desc with
     | Tstr_value (rec_flag, [bind]) ->
@@ -540,9 +734,9 @@ let add_packages ast =
 
 (*****************************************************************************************************************************)
 
-let beta_reductor minimal_index =
+let beta_reductor minimal_index only_q =
 
-  let need_subst name arg =
+  let need_subst name arg = not only_q ||
     let arg_is_var =
       match arg.pexp_desc with
       | Pexp_ident _ -> true
@@ -693,9 +887,14 @@ let only_generate ~oldstyle hook_info tast =
     let need_normalize  = true in
     let need_poly       = false in
     let need_false      = true in
+    let need_high       = true in
+    let need_CbN        = true in
+    let subst_only_q    = false in
     let start_index = get_max_index tast in
-    let reductor    = beta_reductor start_index in
-    translate tast start_index need_lower_case need_poly need_false |>
+    let reductor    = beta_reductor start_index subst_only_q in
+    (if need_high
+      then translate_high tast start_index need_lower_case
+      else translate tast start_index need_lower_case need_poly need_false) |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
     eval_if_need need_normalize (fresh_var_normalizer.structure fresh_var_normalizer) |>
