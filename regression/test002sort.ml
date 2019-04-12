@@ -29,34 +29,34 @@ let show_nat      = GT.(show Nat.ground)
 let minmaxo a b min max =
   let open Nat in
   conde
-    [ (min === a) &&& (max === b) &&& (a <= b)
-    ; (max === a) &&& (min === b) &&& (a >  b)
+    [ (min === a) <&> (max === b) <&> (a <= b)
+    ; (max === a) <&> (min === b) <&> (a >  b)
     ]
 
 (* [l] is a (non-empty) list, [s] is its smallest element,
    [l'] --- all other elements
 *)
-let rec smallesto l s l' = conde
-  [ (l === !< s) &&& (l' === nil())
-  ; fresh (h t s' t' max)
-      (l' === max % t')
-      (l === h % t)
-      (minmaxo h s' s max)
-      (smallesto t s' t')
+let rec smallesto l s l' = cont_delay @@ conde
+  [ (l === !< s) <&> (l' === nil())
+  ; fresh (h t s' t' max) (
+      (l' === max % t')    <&>
+      (l === h % t)        <&>
+      (minmaxo h s' s max) <&>
+      (smallesto t s' t'))
   ]
 
 (* Relational sort *)
-let rec sorto x y =
+let rec sorto x y = cont_delay @@
   conde
     [ (* either both lists are empty *)
-      (x === nil()) &&& (y === nil())
-    ; fresh (s xs xs')
+      (x === nil()) <&> (y === nil())
+    ; fresh (s xs xs') (
       (* or the sorted one is a concatenation of the
         smallest element (s) and sorted list of all other elements (xs')
       *)
-        (y === s % xs')
-        (sorto xs xs')       (* 1 *)
-        (smallesto x s xs)   (* 2 *)
+        (y === s % xs')     <&>
+        (sorto xs xs')      <&>  (* 1 *)
+        (smallesto x s xs))  (* 2 *)
     ]
 
 let _ = Stream.take ~n:10 @@
@@ -114,7 +114,7 @@ let _ =
 
      The following (somewhat shameful) implementation, however, works for both cases:
      let rec sorto x y = conde [
-       (x === !!Nil) &&& (y === !!Nil);
+       (x === !!Nil) <&> (y === !!Nil);
        fresh (s xs xs')
          (y === s % xs')
          (smallesto x s xs)
@@ -133,8 +133,8 @@ let _ =
   Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2]);
   Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3]);
   Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3; 4]);
-  Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3; 4; 5]);
-  Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]);
+  (* Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3; 4; 5]); *)
+  (* Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm [1; 2; 3; 4; 5; 6]); *)
 
   Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm' []);
   Printf.printf "%s\n\n%!" (show(GT.list) (show(GT.list) (show(int))) @@ perm' [1]);

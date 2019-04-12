@@ -13,13 +13,13 @@ let occurs x =
 let two_vars x y = x===y
 let a_and_b a =
   call_fresh (fun b ->
-      (a === !!7) &&&
+      (a === !!7) <&>
       conde [ (b === !!6); (b === !!5) ]
   )
 
 let a_and_b' b =
   call_fresh (fun a ->
-      (a === !!7) &&&
+      (a === !!7) <&>
       conde [ (b === !!6); (b === !!5) ]
   )
 
@@ -35,23 +35,25 @@ let rec fives x =
 
   (* let (===) = unitrace (fun h t -> show_intl_list @@ List.reify MiniKanren.reify h t) *)
 
-let rec appendo a b ab =
+let rec appendo a b ab = cont_delay @@
   conde
-    [ ((a === nil ()) &&& (b === ab))
-    ; fresh (h t ab')
-        (a === h%t)
-        (h%ab' === ab)
+    [ ((a === nil ()) <&> (b === ab))
+    ; fresh (h t ab') (
+        (a === h%t) <&>
+        (h%ab' === ab) <&>
         (appendo t b ab')
+      )
     ]
 
 
-let rec reverso a b =
+let rec reverso a b = cont_delay @@
   conde
-    [ ((a === nil ()) &&& (b === nil ()))
-    ; fresh (h t a')
-        (a === h%t)
-        (appendo a' !<h b)
+    [ ((a === nil ()) <&> (b === nil ()))
+    ; fresh (h t a') (
+        (a === h%t) <&>
+        (appendo a' !<h b) <&>
         (defer (reverso t a'))
+      )
     ]
 
 
@@ -81,3 +83,8 @@ let _withFree =
   runL         10  q  qh (REPR (fun q   -> reverso q q                                  ));
   runL          1 qr qrh (REPR (fun q r -> two_vars q r                                 ));
   ()
+
+
+(* let _ =
+  runL (-1) q qh ("test ->", fun q -> reverso q (ilist [1;2;3;4]));
+  runL (-1) q qh ("test <-", fun q -> reverso (ilist [1;2;3;4]) q) *)

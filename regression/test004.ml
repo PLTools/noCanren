@@ -3,11 +3,11 @@ open Tester
 open Printf
 open GT
 
-module Peano = 
+module Peano =
   struct
 
-    module T = 
-      struct    
+    module T =
+      struct
         @type 'a t = O | S of 'a with show, gmap
 
         let fmap f x = gmap(t) f x
@@ -38,22 +38,22 @@ let runN n = runR peano_reifier Peano.show_rn Peano.show_ln n
 let o      = Peano.o ()
 let s prev = Peano.s prev
 
-let rec addo x y z =
+let rec addo x y z = cont_delay @@
   conde [
-    (x === o) &&& (z === y);
+    (x === o) <&> (z === y);
     Fresh.two (fun x' z' ->
-      (x === s x') &&&
-      (z === s z') &&&
+      (x === s x') <&>
+      (z === s z') <&>
       (addo x' y z')
     )
   ]
 
-let rec mulo x y z =
+let rec mulo x y z = cont_delay @@
   conde [
-    (x === o) &&& (z === o);
+    (x === o) <&> (z === o);
     Fresh.two (fun x' z' ->
-      (x === s x') &&&
-      (addo y z' z) &&&
+      (x === s x') <&>
+      (addo y z' z) <&>
       (mulo x' y z')
     )
   ]
@@ -88,7 +88,7 @@ let () =
   runN  1   qr  qrh (REPR (fun q r -> mulo (s o) q r                  ));
   runN 10   qr  qrh (REPR (fun q r -> mulo (s o) q r                  ));
 
-  runN  1   (succ q) (*qr*)  qrh (REPR (fun q r -> mulo q r (s o)                  ));
+  runN  2   (succ q) (*qr*)  qrh (REPR (fun q r -> mulo q r (s o)                  ));
 
   runN  1    q   qh (REPR (fun q   -> mulo (s o) (s o) q              ));
   runN  1   qr  qrh (REPR (fun q r -> mulo q r (s (s (s (s o))))      ));

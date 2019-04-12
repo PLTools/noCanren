@@ -43,9 +43,9 @@ let runResult n = runR (Result.reify MiniKanren.reify int_opt_reifier) show1 sho
 
 let _ =
   run_exn show1 1  q qh (REPR(fun q -> q === Result.ok !!5 ));
-  runResult   (-1) q qh (REPR(fun q -> call_fresh (fun r -> (q === Result.ok r) &&& conde [r === !!5; success])));
+  runResult   (-1) q qh (REPR(fun q -> call_fresh (fun r -> (q === Result.ok r) <&> conde [r === !!5; success])));
   runResult   (-1) q qh (REPR(fun q -> Fresh.two (fun r s -> conde
-                                                                [ (q === Result.ok    s) &&& (s =/= !!4)
+                                                                [ (q === Result.ok    s) <&> (s =/= !!4)
                                                                 ; (q === Result.error r)
                                                                 ])
                         ))
