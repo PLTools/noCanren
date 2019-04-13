@@ -232,8 +232,6 @@ let rec unnest_constuct e =
     let fr_var = create_fresh_var_name () in
     create_id fr_var, [(fr_var, e)]
 
-
-
 and translate_construct expr =
   let constr, binds = unnest_constuct expr in
   let out_var_name  = create_fresh_var_name () in
@@ -242,7 +240,6 @@ and translate_construct expr =
   let conj          = create_conj conjs in
   let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
   create_fun out_var_name with_fresh
-
 
 and translate_bool_funs is_or =
   let a1  = create_fresh_var_name () in
@@ -258,34 +255,33 @@ and translate_bool_funs is_or =
           ([%e create_id b] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
           ([%e create_id b] === [%e snd]) &&& ([%e create_id a2] [%e create_id q])]))]
 
- and translate_eq_funs is_eq =
-   let a1  = create_fresh_var_name () in
-   let a2  = create_fresh_var_name () in
-   let b1  = create_fresh_var_name () in
-   let b2  = create_fresh_var_name () in
-   let q   = create_fresh_var_name () in
-   let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
-   let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
-   [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-     call_fresh (fun [%p create_pat b1] ->
-     call_fresh (fun [%p create_pat b2] ->
+and translate_eq_funs is_eq =
+  let a1  = create_fresh_var_name () in
+  let a2  = create_fresh_var_name () in
+  let b1  = create_fresh_var_name () in
+  let b2  = create_fresh_var_name () in
+  let q   = create_fresh_var_name () in
+  let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
+  let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
+  [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+    call_fresh (fun [%p create_pat b1] ->
+    call_fresh (fun [%p create_pat b2] ->
             ([%e create_id a1] [%e create_id b1]) &&&
             ([%e create_id a2] [%e create_id b2]) &&&
             (conde [
               ([%e create_id b1] === [%e create_id b2]) &&& ([%e create_id q] === [%e fst]);
               ([%e create_id b1] =/= [%e create_id b2]) &&& ([%e create_id q] === [%e snd])])))]
 
- and translate_not_fun () =
-   let a  = create_fresh_var_name () in
-   let b  = create_fresh_var_name () in
-   let q  = create_fresh_var_name () in
-   [%expr fun [%p create_pat a] [%p create_pat q] ->
-     call_fresh (fun [%p create_pat b] ->
-            ([%e create_id a] [%e create_id b]) &&&
-            (conde [
-              ([%e create_id b] === !!true ) &&& ([%e create_id q] === !!false);
-              ([%e create_id b] === !!false) &&& ([%e create_id q] === !!true )]))]
-
+and translate_not_fun () =
+  let a  = create_fresh_var_name () in
+  let b  = create_fresh_var_name () in
+  let q  = create_fresh_var_name () in
+  [%expr fun [%p create_pat a] [%p create_pat q] ->
+   call_fresh (fun [%p create_pat b] ->
+          ([%e create_id a] [%e create_id b]) &&&
+          (conde [
+            ([%e create_id b] === !!true ) &&& ([%e create_id q] === !!false);
+            ([%e create_id b] === !!false) &&& ([%e create_id q] === !!true )]))]
 
 and translate_if cond th el =
   let b   = create_fresh_var_name () in
@@ -305,7 +301,6 @@ and translate_ident i = Printf.printf "%s\n%!" i;
   | "="   -> translate_eq_funs true
   | "<>"  -> translate_eq_funs false
   |  _    -> create_id i
-
 
 and translate_abstraciton case =
   Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
@@ -345,7 +340,10 @@ and translate_match loc s cases typ =
 
   else fail_loc loc "Pattern matching contains unified patterns"
 
-
+and translate_let flag bind expr =
+  Exp.let_ flag
+           [Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr)]
+           (translate_expression expr)
 
 and translate_expression e =
   match e.exp_desc with
@@ -357,6 +355,7 @@ and translate_expression e =
   | Texp_apply (f, a)                        -> translate_apply f a e.exp_loc
   | Texp_match (s, cs, _, _)                 -> translate_match e.exp_loc s cs e.exp_type
   | Texp_ifthenelse (cond, th, Some el)      -> translate_if cond th el
+  | Texp_let (flag, [bind], expr)            -> translate_let flag bind expr
   | _                                        -> fail_loc e.exp_loc "Incorrect expression" in
 let translate_external_value_binding vb =
   let pat  = untyper.pat untyper vb.vb_pat in
