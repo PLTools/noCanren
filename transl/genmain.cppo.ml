@@ -189,7 +189,7 @@ let rec is_disj_pats = function
 
 (*HERE*)
 
-let translate_high tast start_index need_lowercase =
+let translate_high tast start_index need_lowercase need_unlazy =
 
 let lowercase_lident x =
   if need_lowercase
@@ -293,7 +293,7 @@ and translate_if cond th el =
           ([%e create_id b] === !!false) &&& ([%e translate_expression el] [%e create_id q])
         ]))]
 
-and translate_ident i = Printf.printf "%s\n%!" i;
+and translate_ident i =
   match i with
   | "&&"  -> translate_bool_funs false
   | "||"  -> translate_bool_funs true
@@ -303,7 +303,88 @@ and translate_ident i = Printf.printf "%s\n%!" i;
   |  _    -> create_id i
 
 and translate_abstraciton case =
-  Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
+
+  let rec normalize_abstraction expr acc =
+    match expr.exp_desc with
+    | Texp_function {arg_label; param; cases=[case]; _} ->
+      let Tpat_var (name, _) = case.c_lhs.pat_desc in
+      let typ = case.c_lhs.pat_type in
+      normalize_abstraction case.c_rhs ((name.name, typ) :: acc)
+    | _ -> expr, List.rev acc in
+
+  let eta_extension expr =
+    let rec get_arg_types (typ : Types.type_expr) =
+      match typ.desc with
+      | Tarrow (_, l, r, _) -> l :: get_arg_types r
+      | Tlink typ           -> get_arg_types typ
+      | _                   -> [] in
+    let arg_types = get_arg_types expr.exp_type in
+    List.map (fun t -> create_fresh_var_name (), t) arg_types in
+
+  let two_or_more_mentions var_name expr =
+    let rec two_or_more_mentions expr count =
+      let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
+      let rec get_pat_vars p =
+        match p.pat_desc with
+        | Tpat_any
+        | Tpat_constant _             -> []
+        | Tpat_var (name, _)          -> [name.name]
+        | Tpat_tuple pats
+        | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats in
+
+      match expr.exp_desc with
+      | Texp_constant _ -> count
+      | Texp_tuple args
+      | Texp_construct (_, _, args) ->
+        List.fold_left eval_if_need count args
+      | Texp_ident (_, { txt = Longident.Lident name }, _) ->
+        if var_name = name then count + 1 else count
+      | Texp_function {arg_label; param; cases=[case]; _} ->
+        if var_name = get_pat_name case.c_lhs then count else two_or_more_mentions case.c_rhs count
+      | Texp_apply (func, args) ->
+        let args = List.map (fun (_, Some a) -> a) args in
+        List.fold_left eval_if_need count @@ func :: args
+      | Texp_ifthenelse (cond, th, Some el) ->
+        List.fold_left eval_if_need count [cond; th; el]
+      | Texp_let (_, bindings, expr) ->
+        let bindings = List.filter (fun b -> var_name <> get_pat_name b.vb_pat) bindings in
+        let exprs = expr :: List.map (fun b -> b.vb_expr) bindings in
+        List.fold_left eval_if_need count exprs
+      | Texp_match (e, cs, _, _) ->
+        let cases = List.filter (fun c -> List.for_all ((<>) var_name) @@ get_pat_vars c.c_lhs) cs in
+        let exprs = e :: List.map (fun c -> c.c_rhs) cases in
+        List.fold_left eval_if_need count exprs in
+
+    two_or_more_mentions expr 0 >= 2 in
+
+  let create_simple_arg var =
+    let fresh_n = create_fresh_var_name () in
+    create_fun fresh_n [%expr [%e create_id fresh_n] === [%e create_id var]] in
+
+  if need_unlazy then
+    let Tpat_var (name0, _) = case.c_lhs.pat_desc in
+    let body, real_vars     = normalize_abstraction case.c_rhs [name0.name, case.c_lhs.pat_type] in
+    let eta_vars            = eta_extension body in
+    let translated_body     = translate_expression body in
+    let result_var          = create_fresh_var_name () in
+    let body_with_eta_args  = create_apply translated_body @@
+                              List.map create_id @@
+                              List.map fst eta_vars @ [result_var] in
+    let bad_vars            = List.filter (fun v -> two_or_more_mentions v body) @@
+                              List.map fst @@
+                              List.filter (fun (_, t) -> is_primary_type t) @@
+                              real_vars @ eta_vars in
+    let fresh_vars          = List.map (fun _ -> create_fresh_var_name ()) bad_vars in
+    let abstr_body          = List.fold_right create_fun bad_vars body_with_eta_args in
+    let body_with_args      = create_apply abstr_body @@
+                              List.map create_simple_arg fresh_vars in
+    let conjs               = List.map2 (fun a b -> create_apply (create_id a) @@ [create_id b]) bad_vars fresh_vars in
+    let full_conj           = create_conj (conjs @ [body_with_args]) in
+    let with_fresh          = List.fold_right create_fresh fresh_vars full_conj in
+    let first_fun           = create_fun result_var with_fresh in
+    let with_eta            = List.fold_right create_fun (List.map fst eta_vars) first_fun in
+    List.fold_right create_fun (List.map fst real_vars) with_eta
+  else Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
 
 and translate_apply f a l =
   create_apply
@@ -334,6 +415,7 @@ and translate_match loc s cases typ =
     let new_cases = List.map translate_case cases in
     let disj      = create_disj new_cases in
     let scrutinee = create_apply (translate_expression s) [create_id scrutinee_var] in
+    let scrutinee = { scrutinee with pexp_attributes = s.exp_attributes } in
     let conj      = create_conj [scrutinee; disj] in
     let fresh     = create_fresh scrutinee_var conj in
     List.fold_right create_fun extra_args fresh
@@ -357,6 +439,7 @@ and translate_expression e =
   | Texp_ifthenelse (cond, th, Some el)      -> translate_if cond th el
   | Texp_let (flag, [bind], expr)            -> translate_let flag bind expr
   | _                                        -> fail_loc e.exp_loc "Incorrect expression" in
+
 let translate_external_value_binding vb =
   let pat  = untyper.pat untyper vb.vb_pat in
   let expr = translate_expression vb.vb_expr in
@@ -370,7 +453,6 @@ let translate_structure_item i =
     let new_decls = List.map mark_type_declaration decls in
     untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }
   | _ -> fail_loc i.str_loc "Incorrect structure item" in
-
 
 let translate_structure t = List.map translate_structure_item t.str_items in
 
@@ -622,7 +704,6 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
 
-
   and translate_not_fun () =
     let a  = create_fresh_var_name () in
     let q  = create_fresh_var_name () in
@@ -630,9 +711,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
              conde [([%e create_id a] === !!true ) &&& ([%e create_id q] === !!false);
                     ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
 
-
   and translate_if let_vars cond th el typ =
-  let args = create_fresh_argument_names_by_type typ in
+    let args = create_fresh_argument_names_by_type typ in
 
   let cond_is_var =
     match cond.exp_desc with
@@ -756,7 +836,7 @@ let beta_reductor minimal_index only_q =
     | Ppat_var loc -> loc.txt
     | _            -> fail_loc pat.ppat_loc "Incorrect pattern in beta reduction" in
 
-  let rec substitute expr var subst =
+  let rec substitute' expr var subst =
     match expr.pexp_desc with
     | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
     | Pexp_fun (_, _, pat, body) ->
@@ -780,10 +860,13 @@ let beta_reductor minimal_index only_q =
 
     | Pexp_construct (name, Some expr) -> Some (substitute expr var subst) |> Exp.construct name
     | Pexp_tuple exprs -> List.map (fun e -> substitute e var subst) exprs |> Exp.tuple
-    | _ -> expr in
+    | _ -> expr
 
+  and substitute expr var subst =
+    let res = substitute' expr var subst in
+    { res with pexp_attributes = expr.pexp_attributes } in
 
-  let rec beta_reduction expr args =
+  let rec beta_reduction' expr args =
     match expr.pexp_desc with
     | Pexp_apply (func, args') ->
       let old_args = List.map snd args' in
@@ -805,59 +888,78 @@ let beta_reductor minimal_index only_q =
 
     | Pexp_construct (name, Some expr) -> Some (beta_reduction expr []) |> Exp.construct name
     | Pexp_tuple args -> List.map (fun a -> beta_reduction a []) args |> Exp.tuple
-    | _ -> create_apply expr args in
+    | _ -> create_apply expr args
+
+  and beta_reduction expr args =
+    let res = beta_reduction' expr args in
+    { res with pexp_attributes = expr.pexp_attributes } in
 
   let expr _ x = beta_reduction x [] in
   { Ast_mapper.default_mapper with expr }
 
 (*****************************************************************************************************************************)
 
-let fresh_var_normalizer =
+let fresh_and_conjs_normalizer need_move_unifies_up =
 
-  let is_call_fresh expr =
-    match expr.pexp_desc with
-    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "call_fresh"}}, _) -> true
-    | _                                                                    -> false in
+  let has_heavy_attr e = List.exists (fun a -> (fst a).txt = "heavy") e.pexp_attributes in
 
-  let rec get_conds_and_vars expr =
+  let rec split_conjs = function
+  | []      -> [], [], []
+  | c :: cs ->
+    let unifies, conjs, heavies = split_conjs cs in
+    match c.pexp_desc with
+    | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "==="}}, _) ->
+      c :: unifies, conjs, heavies
+    | _ when has_heavy_attr c -> unifies, conjs, c :: heavies
+    | _ -> unifies, c :: conjs, heavies in
+
+
+  let rec get_conjs_and_vars expr =
     match expr.pexp_desc with
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "call_fresh"}},
                   [_, {pexp_desc = Pexp_fun (_, _, {ppat_desc = Ppat_var {txt}}, body)}]) ->
-      let conds, vars = get_conds_and_vars body in
-      conds, txt :: vars
+      let conjs, vars = get_conjs_and_vars body in
+      conjs, txt :: vars
 
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "&&&"}}, [_, a; _, b]) ->
-      [a; b], []
+      let conjs1, vars1 = get_conjs_and_vars a in
+      let conjs2, vars2 = get_conjs_and_vars b in
+      conjs1 @ conjs2, vars1 @ vars2
 
     | Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "?&"}}, [_, args]) ->
-      let rec get_args_from_list args =
+      let rec get_conjs_and_vars_from_list args =
         match args.pexp_desc with
-        | Pexp_construct ({txt = Lident "[]"}, _)                                     -> []
-        | Pexp_construct ({txt = Lident "::"}, Some {pexp_desc = Pexp_tuple [hd;tl]}) -> hd :: get_args_from_list tl
-        | _                                                                           -> fail_loc args.pexp_loc "Bad args in fresh var upper" in
-      get_args_from_list args, []
+        | Pexp_construct ({txt = Lident "[]"}, _) -> [], []
+        | Pexp_construct ({txt = Lident "::"}, Some {pexp_desc = Pexp_tuple [hd;tl]}) ->
+          let conjs1, vars1 = get_conjs_and_vars hd in
+          let conjs2, vars2 = get_conjs_and_vars_from_list tl in
+          conjs1 @ conjs2, vars1 @ vars2
+        | _ -> fail_loc args.pexp_loc "Bad args in fresh var upper" in
+      get_conjs_and_vars_from_list args
 
     | _ -> [expr], [] in
 
-    let rec normalizer sub expr =
-      if is_call_fresh expr
-      then
-        let conds, vars = get_conds_and_vars expr in
-        let new_conds = List.map (normalizer sub) conds in
+  let rec normalizer sub expr =
+    let conjs, vars = get_conjs_and_vars expr in
+    let conjs = List.map (Ast_mapper.default_mapper.expr sub) conjs in
 
-        let vars_as_apply = function
-          | x::xs -> create_apply (create_id x) (List.map create_id xs)
-          | _     -> failwith "Incorrect variable count" in
+    let conjs =
+      if need_move_unifies_up then
+        let unifies, conjs, heavies = split_conjs conjs in
+        unifies @ conjs @ heavies
+      else conjs in
 
-        let vars_arg = function
-          | [v] -> Exp.tuple [create_id v]
-          | _   -> vars_as_apply vars in
+    let vars_as_apply = function
+      | x::xs -> create_apply (create_id x) (List.map create_id xs)
+      | _     -> failwith "Incorrect variable count" in
 
-        if List.length vars > 0
-        then create_apply [%expr fresh] (vars_arg vars :: new_conds)
-        else create_conj new_conds
+    let vars_arg = function
+      | [v] -> Exp.tuple [create_id v]
+      | _   -> vars_as_apply vars in
 
-      else Ast_mapper.default_mapper.expr sub expr in
+    if List.length vars > 0
+    then create_apply [%expr fresh] (vars_arg vars :: conjs)
+    else create_conj conjs in
 
     { Ast_mapper.default_mapper with expr = normalizer }
 
@@ -881,22 +983,27 @@ let only_generate ~oldstyle hook_info tast =
   if oldstyle
   then try
     let open Lozov  in
-    let need_reduce     = true in
-    let need_lower_case = true in
-    let need_normalize  = true in
-    let need_poly       = false in
-    let need_false      = true in
-    let need_high       = true in
-    let need_CbN        = true in
-    let subst_only_q    = false in
+    let need_reduce          = true in
+    let need_lower_case      = true in
+    let need_normalize       = true in
+
+    let need_poly            = false in
+    let need_false           = true in
+
+    let need_high            = true in
+    let need_move_unifies_up = true in
+    let need_unlazy          = true in
+    let subst_only_q         = false in
+
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index subst_only_q in
     (if need_high
-      then translate_high tast start_index need_lower_case
+      then translate_high tast start_index need_lower_case need_unlazy
       else translate tast start_index need_lower_case need_poly need_false) |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
-    eval_if_need need_normalize (fresh_var_normalizer.structure fresh_var_normalizer) |>
+    eval_if_need need_normalize (let mapper = fresh_and_conjs_normalizer need_move_unifies_up in
+                                 mapper.structure mapper) |>
     PutDistrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
