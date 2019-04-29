@@ -64,6 +64,9 @@ true: short_paths
 <transl/games/logic_interpreter.*>: dsource
 <transl/games/logic_interpreter_run.*>:  package(GT)
 
+<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
+<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax), use_pa_minikanren
+
 <transl/games/unify.*>: dsource
 <transl/games/unify_run.*>:  package(GT)
 
