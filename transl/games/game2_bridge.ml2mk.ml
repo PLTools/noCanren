@@ -75,11 +75,11 @@ let getAnswer answer times =
   let start  = St (true, true, true, true, true) in
   let finish = St (false, false, false, false, false) in
 
-  let[@tabled] rec getAnswer answer state =
+  let rec getAnswer answer state =
       match answer with
       | x :: xs ->
         if checkStep state x then
-          match getAnswer xs (step state x) with
+          match (getAnswer xs (step state x))[@heavy] with
           | None    -> None
           | Some t1 -> Some (add (getTime x times) t1)
         else None
