@@ -3,15 +3,21 @@ open MiniKanren
 open Std
 open Tester
 
+(* let conj = (<&>)
+let (&&&) = (<&>)
+let (?&) gs = List.fold_right (<&>) gs success *)
+
+let cont_delay x = x
+
 let rec build_num =
   function
   | 0                   -> nil()
   | n when n mod 2 == 0 -> (inj@@lift 0) % build_num (n / 2)
   | n                   -> (inj@@lift 1) % build_num (n / 2)
 
-let rec appendo l s out =
+let rec appendo l s out = cont_delay @@
   conde [
-    (List.nullo l) &&& (s === out);
+    (List.nullo l) <&> (s === out);
     fresh (a d res)
       ((a % d) === l)
       (appendo d s res)
@@ -27,7 +33,7 @@ let gt1o q =
     (q === h % (t % tt))
 
 let (!) = (!!)
-let full_addero b x y r c =
+let full_addero b x y r c = cont_delay @@
   conde [
     (!0 === b) &&& (!0 === x) &&& (!0 === y) &&& (!0 === r) &&& (!0 === c);
     (!1 === b) &&& (!0 === x) &&& (!0 === y) &&& (!1 === r) &&& (!0 === c);
@@ -39,7 +45,7 @@ let full_addero b x y r c =
     (!1 === b) &&& (!1 === x) &&& (!1 === y) &&& (!1 === r) &&& (!1 === c)
   ]
 
-let rec addero d n m r =
+let rec addero d n m r = cont_delay @@
   conde [
     (!0 === d) &&& (nil() === m) &&& (n === r);
     (!0 === d) &&& (nil() === n) &&& (m === r) &&& (poso m);
@@ -56,7 +62,7 @@ let rec addero d n m r =
     ((!< !1) === m) &&& (gt1o n) &&& (gt1o r) &&& (defer (addero d (!< !1) n r));
     (gt1o n) &&& (gen_addero d n m r)
   ]
-and gen_addero d n m r =
+and gen_addero d n m r = cont_delay @@
   fresh (a b c e x y z)
     ((a % x) === n)
     ((b % y) === m)
@@ -70,7 +76,7 @@ let pluso n m k = addero !0 n m k
 
 let minuso n m k = pluso m k n
 
-let rec bound_multo q p n m =
+let rec bound_multo q p n m = cont_delay @@
   conde [
     (List.nullo q) &&& (poso p);
     fresh (x y z)
@@ -82,7 +88,7 @@ let rec bound_multo q p n m =
       ])
   ]
 
-let rec multo n m p =
+let rec multo n m p = cont_delay @@
   conde [
     (nil() === n) &&& (nil() === p);
     (poso n) &&& (nil() === m) &&& (nil() === p);
@@ -108,14 +114,14 @@ let rec multo n m p =
       (poso y)
       (odd_multo x n m p)
   ]
-and odd_multo x n m p =
+and odd_multo x n m p = cont_delay @@
   Fresh.one (fun q ->
     (bound_multo q p n m) &&&
     (multo x m q) &&&
     (pluso (!0 % q) m p)
   )
 
-let rec eqlo n m =
+let rec eqlo n m = cont_delay @@
   conde [
     (nil() === n) &&& (nil() === m);
     ((!< !1) === n) &&& ((!< !1) === m);
@@ -127,7 +133,7 @@ let rec eqlo n m =
       (eqlo x y)
   ]
 
-let rec ltlo n m =
+let rec ltlo n m = cont_delay @@
   conde [
     (nil() === n) &&& (poso m);
     ((!< !1) === n) &&& (gt1o m);
@@ -139,13 +145,13 @@ let rec ltlo n m =
       (ltlo x y)
   ]
 
-let lelo n m =
+let lelo n m = cont_delay @@
   conde [
     (eqlo n m);
     (ltlo n m)
   ]
 
-let rec lto n m =
+let rec lto n m = cont_delay @@
   conde [
     (ltlo n m);
     ?& [
@@ -156,13 +162,13 @@ let rec lto n m =
     ]
   ]
 
-let leo n m =
+let leo n m = cont_delay @@
   conde [
     (n === m);
     (lto n m)
   ]
 
-let rec splito n r l h =
+let rec splito n r l h = cont_delay @@
   conde [
     (nil() === n) &&& (nil() === h) &&& (nil() === l);
     fresh (b n')
@@ -193,7 +199,7 @@ let rec splito n r l h =
       (splito n' r' l' h)
   ]
 
-let rec divo n m q r =
+let rec divo n m q r = cont_delay @@
   conde [
     (r === n) &&& (nil() === q) &&& (lto n m);
     ((!< !1) === q) &&& (eqlo n m) &&& (pluso r m n) &&& (lto r m);
@@ -218,7 +224,7 @@ let rec divo n m q r =
     ]
   ]
 
-let rec repeated_mul n q nq =
+let rec repeated_mul n q nq = cont_delay @@
   conde [
     (poso n) &&& (nil() === q) &&& ((!< !1) === nq);
     ((!< !1) === q) &&& (n === nq);
@@ -231,7 +237,7 @@ let rec repeated_mul n q nq =
     ]
   ]
 
-let rec exp2 n b q =
+let rec exp2 n b q = cont_delay @@
   conde [
     ((!< !1) === n) &&& (nil() === q);
     ?& [
@@ -255,7 +261,7 @@ let rec exp2 n b q =
       (exp2 nh b2 q1)
   ]
 
-let rec logo n b q r =
+let rec logo n b q r = cont_delay @@
   conde [
     ((!< !1) === n) &&& (poso b) &&& (nil() === q) &&& (nil() === r);
     (nil() === q) &&& (lto n b) &&& (pluso r (!< !1) n);
@@ -316,6 +322,9 @@ let expo b q n =
 let test17 n m =
   (lelo n m) &&& (multo n (build_num 2) m)
 
+let test17' n m =
+  (lelo m n) &&& (multo n (build_num 2) m)
+
 let test27 b q r =
   (logo (build_num 68) b q r) &&& (gt1o q)
 
@@ -327,11 +336,12 @@ let _ffoo _ =
   run_exn show_int_list (-1)   q  qh (REPR (fun q       -> multo (build_num 7) (build_num 63) q             ));
   run_exn show_int_list (-1)  qr qrh (REPR (fun q r     -> divo (build_num 3) (build_num 2) q r             ));
   run_exn show_int_list (-1)   q  qh (REPR (fun q       -> logo (build_num 14) (build_num 2) (build_num 3) q));
-  run_exn show_int_list (-1)   q  qh (REPR (fun q       -> expo (build_num 3) (build_num 5) q               ))
+  run_exn show_int_list (-1)   q  qh (REPR (fun q       -> expo (build_num 3) (build_num 3) q               ))
 
 let runL n = runR (List.reify MiniKanren.reify) show_int_list show_intl_llist n
 
 let _freeVars =
+
   runL   22  qrs  qrsh (REPR (fun q r s   -> pluso q r s                                      ));
   runL   34  qrs  qrsh (REPR (fun q r s   -> multo q r s                                      ));
   runL   10   qr   qrh (REPR (fun q r     -> test17 q r                                       ));
@@ -339,4 +349,6 @@ let _freeVars =
   runL  (-1)   q    qh (REPR (fun q       -> lto (build_num 5) q                              ));
   runL  (-1)   q    qh (REPR (fun q       -> lto q (build_num 5)                              ));
   runL    6 (succ qrs) qrsth (REPR (fun q r s t -> divo q r s t                                     ));
-  runL    5  qrs  qrsh (REPR (fun q r s   -> test27 q r s                                     ))
+  runL    5  qrs  qrsh (REPR (fun q r s   -> test27 q r s                                     ));
+
+  (* runL   10   qr   qrh (REPR (fun q r     -> test17' q r                                       )); *)
