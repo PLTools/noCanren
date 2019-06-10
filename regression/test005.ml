@@ -38,28 +38,28 @@ let rec gtyp_reifier c x = GTyp.reify MiniKanren.reify gtyp_reifier c x
 open GLam
 open GTyp
 
-let rec lookupo a g t =
+let rec lookupo a g t = cont_delay @@
   Fresh.three (fun a' t' tl ->
-    (g === (pair a' t')%tl) &&&
+    (g === (pair a' t')%tl) <&>
     (conde [
-      (a' === a) &&& (t' === t);
+      (a' === a) <&> (t' === t);
       lookupo a tl t
      ])
   )
 
-let infero expr typ =
+let infero expr typ = cont_delay @@
   let rec infero gamma expr typ =
     conde [
       Fresh.one (fun x ->
-        (expr === v x) &&&
+        (expr === v x) <&>
         (lookupo x gamma typ));
       Fresh.three (fun m n t ->
-        (expr === app m n) &&&
-        (infero gamma m (arr t typ)) &&&
+        (expr === app m n) <&>
+        (infero gamma m (arr t typ)) <&>
         (infero gamma n t));
       Fresh.four (fun x l t t' ->
-        (expr === abs x l) &&&
-        (typ  === arr t t') &&&
+        (expr === abs x l) <&>
+        (typ  === arr t t') <&>
         (infero ((pair x t)%gamma) l t'))
     ]
   in
@@ -72,14 +72,14 @@ let inj_list_p xs = List.list @@ List.map (fun (x,y) -> pair x y) xs
 
 (* Without free variables *)
 let () =
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [])  q                                   ));
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varX, v varX)]) q                    ));
-  run_exn GLam.show_rlam    1 q qh (REPR (fun q -> lookupo varX (inj_list_p [(varY, v varY); (varX, v varX)]) q    ));
+  run_exn GLam.show_rlam    (-1) q qh (REPR (fun q -> lookupo varX (inj_list_p [])  q                                   ));
+  run_exn GLam.show_rlam    (-1) q qh (REPR (fun q -> lookupo varX (inj_list_p [(varX, v varX)]) q                    ));
+  run_exn GLam.show_rlam    (-1) q qh (REPR (fun q -> lookupo varX (inj_list_p [(varY, v varY); (varX, v varX)]) q    ));
 
-  run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varX)  ));
-  run_exn (show string)  1 q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varY)  ));
+  run_exn (show string)  (-1) q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varX)  ));
+  run_exn (show string)  (-1) q qh (REPR (fun q -> lookupo    q (inj_list_p [(varY, v varY); (varX, v varX)]) (v varY)  ));
 
-  run_exn GTyp.show_rtyp    1 q qh (REPR (fun q -> infero (abs varX (app (v varX) (v varX)))                q))
+  run_exn GTyp.show_rtyp    (-1) q qh (REPR (fun q -> infero (abs varX (app (v varX) (v varX)))                q))
 
 let show_env_logic = show(List.logic) @@ show(logic) (show(GT.pair) (show(logic) (fun s -> s)) show_llam)
 
@@ -97,7 +97,10 @@ let runL n = runR glam_reifier GLam.show_rlam GLam.show_llam n
 
 let () =
   runEnv   1   q   qh (REPR (fun q -> lookupo varX q (v varY)                                       ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varX (v varX)) q                                  ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varF (abs varX (app (v varF) (v varX)))) q        ));
-  runT     1   q   qh (REPR (fun q -> infero (abs varX (abs varF (app (v varF) (v varX)))) q        ));
+  runT     (-1)   q   qh (REPR (fun q -> infero (abs varX (v varX)) q                                  ));
+  runT     (-1)   q   qh (REPR (fun q -> infero (abs varF (abs varX (app (v varF) (v varX)))) q        ));
+  runT     (-1)   q   qh (REPR (fun q -> infero (abs varX (abs varF (app (v varF) (v varX)))) q        ));
   runL     1   q   qh (REPR (fun q -> infero q (arr (p varX) (p varX))                              ))
+
+(* let () =
+  runL (-1) q qh (REPR (fun q -> infero q (p varX))) *)

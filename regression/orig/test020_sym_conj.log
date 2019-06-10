@@ -5,3 +5,16 @@ tree, all answers {
 q=Leaf ();
 q=Node (Leaf (), Leaf ());
 }
+rev, all answers {
+q=["9"; "8"; "7"; "6"; "5"; "4"; "3"; "2"; "1"; "0"];
+}
+bad_case, all answers {
+q=[];
+}
+aNbNcN, 5 answers {
+q=[];
+q=["A"; "B"; "C"];
+q=["A"; "A"; "B"; "B"; "C"; "C"];
+q=["A"; "A"; "A"; "B"; "B"; "B"; "C"; "C"; "C"];
+q=["A"; "A"; "A"; "A"; "B"; "B"; "B"; "B"; "C"; "C"; "C"; "C"];
+}

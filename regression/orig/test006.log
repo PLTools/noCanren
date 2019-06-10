@@ -1,13 +1,10 @@
-fun q -> substo (v varX) varX (v varY) q, 1 answer {
+fun q -> substo (v varX) varX (v varY) q, all answers {
 q=V ("y");
 }
-fun q -> evalo (abs varX (v varX)) q, 1 answer {
+fun q -> evalo (abs varX (v varX)) q, all answers {
 q=Abs ("x", V ("x"));
 }
-fun q -> evalo (abs varX (v varX)) q, 2 answers {
-q=Abs ("x", V ("x"));
-}
-fun q -> evalo (app (abs varX (v varX)) (v varY)) q, 1 answer {
+fun q -> evalo (app (abs varX (v varX)) (v varY)) q, all answers {
 q=V ("y");
 }
 fun q -> evalo (app (abs varX (v varX)) q) (v varY), 1 answer {
@@ -16,19 +13,19 @@ q=V ("y");
 fun q -> evalo (app (abs varX q) (v varY)) (v varY), 1 answer {
 q=V ("x");
 }
-fun q -> evalo (app (v varX) (v varX)) q, 1 answer {
+fun q -> evalo (app (v varX) (v varX)) q, all answers {
 q=App (V ("x"), V ("x"));
 }
-fun q -> evalo (v varX) q, 1 answer {
+fun q -> evalo (v varX) q, all answers {
 q=V ("x");
 }
 fun q -> evalo (app q (v varX)) (v varX), 1 answer {
-q=Abs (_.44, V (_.44));
+q=Abs (_.25, V (_.25));
 }
 fun q r -> evalo (app r q) (v varX), 1 answer {
-q=V ("x"); r=Abs (_.54, V (_.54));
+q=V ("x"); r=Abs (_.26, V (_.26));
 }
 fun q r s -> a_la_quine q r s, 2 answers {
-q=Abs (_.859, V (_.859)); r=Abs (_.859, V (_.859)); s=Abs (_.859, V (_.859));
-q=Abs (_.1192, V (_.1192)); r=Abs (_.1192, Abs (_.1192, V (_.1192))); s=Abs (_.1192, Abs (_.1192, V (_.1192)));
+q=Abs (_.22776, V (_.22776)); r=Abs (_.22776, V (_.22776)); s=Abs (_.22776, V (_.22776));
+q=Abs (_.33328, Abs (_.33328, V (_.33328))); r=Abs (_.33328, Abs (_.33328, V (_.33328))); s=Abs (_.33328, V (_.33328));
 }
