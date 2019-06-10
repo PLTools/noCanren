@@ -79,28 +79,28 @@ let _ =
 
 
 let () =
-  let rec distincto l =
+  let rec distincto l = cont_delay @@
     conde [
       l === nil ();
-      (fresh (a) (l === !< a));
-      (fresh (a ad dd) (
-         (l === a % (ad % dd)) &&&
-         (a =/= ad) &&&
-         (distincto (a % dd)) &&&
+      Fresh.one (fun a -> l === !< a);
+      Fresh.three (fun a ad dd ->
+         (l === a % (ad % dd)) <&>
+         (a =/= ad) <&>
+         (distincto (a % dd)) <&>
          (distincto (ad % dd))
-      ))
+      )
     ]
   in
   runInt (-1) q qh (REPR (fun q -> distincto (!2 % (!3 %< q)) ));
 
-  let rec remembero x ls out =
+  let rec remembero x ls out = cont_delay @@
      conde [
-       (ls === nil ()) &&& (out === nil ());
-       fresh (a d res) (
-         (ls === a % d) &&&
-         (remembero x d res) &&&
+       (ls === nil ()) <&> (out === nil ());
+       Fresh.three (fun a d res ->
+         (ls === a % d) <&>
+         (remembero x d res) <&>
          (conde [
-             (a === x) &&& (out === res);
+             (a === x) <&> (out === res);
              (out === a % res)
           ])
        )
@@ -109,15 +109,15 @@ let () =
   run_exn show_int_list (-1) q qh (REPR (fun q -> remembero !1 (!1 % (!2 % (!1 %< !3))) q          ));
   runInt                (-1) q qh (REPR (fun q -> remembero !1 (!1 % (!2 %< !3)) (!1 % (!2 %< !3)) ));
 
-   let rec rembero x ls out =
+   let rec rembero x ls out = cont_delay @@
      conde [
-       (ls === nil ()) &&& (out === nil ());
-       fresh (a d res) (
-         (ls === a % d) &&&
-         (rembero x d res) &&&
+       (ls === nil ()) <&> (out === nil ());
+       Fresh.three (fun a d res -> 
+         (ls === a % d) <&>
+         (rembero x d res) <&>
          (conde [
-             (a === x) &&& (out === res);
-             (a =/= x) &&& (out === a % res)
+             (a === x) <&> (out === res);
+             (a =/= x) <&> (out === a % res)
           ])
        )
      ]

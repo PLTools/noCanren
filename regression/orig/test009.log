@@ -1,21 +1,21 @@
-fun q -> pExpr (list (!!) [Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id]) q, all answers {
 q=I ();
 }
-fun q -> pExpr (list (!!) [Id; Mul; Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id; Mul; Id]) q, all answers {
 q=M (I (), I ());
 }
-fun q -> pExpr (list (!!) [Id; Mul; Id; Mul; Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id; Mul; Id; Mul; Id]) q, all answers {
 q=M (I (), M (I (), I ()));
 }
-fun q -> pExpr (list (!!) [Id; Mul; Id; Add; Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id; Mul; Id; Add; Id]) q, all answers {
 q=A (M (I (), I ()), I ());
 }
-fun q -> pExpr (list (!!) [Id; Add; Id; Mul; Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id; Add; Id; Mul; Id]) q, all answers {
 q=A (I (), M (I (), I ()));
 }
-fun q -> pExpr (list (!!) [Id; Add; Id; Add; Id]) q, 1 answer {
+fun q -> pExpr (list (!!) [Id; Add; Id; Add; Id]) q, all answers {
 q=A (I (), A (I (), I ()));
 }
-fun q -> pExpr q (m (i ()) (i ())), 1 answer {
+fun q -> pExpr q (m (i ()) (i ())), all answers {
 q=[Id (); Mul (); Id ()];
 }
