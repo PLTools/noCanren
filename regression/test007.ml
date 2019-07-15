@@ -57,7 +57,7 @@ let rec evalo m n = cont_delay @@
 let _ =
   run_exn show_rlam (-1)    q   qh (REPR (fun q   -> substo (v varX) varX (v varY) q                   ));
   run_exn show_rlam (-1)    q   qh (REPR (fun q   -> evalo (abs varX (v varX)) q                       ));
-  run_exn show_rlam (-1)    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) (v varY)) q        ));
+  run_exn show_rlam (1)    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) (v varY)) q        ));
 
   run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX (v varX)) q)        (v varY) ));
   run_exn show_rlam 1    q   qh (REPR (fun q   -> evalo (app (abs varX q)        (v varY)) (v varY) ));

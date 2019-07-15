@@ -87,7 +87,7 @@ module Stream =
     type 'a t =
       | Nil
       | Cons of 'a * ('a t)
-      | Cont of 'a * ('a -> 'a t) * ('a t)
+      | Cont of bool * 'a * ('a -> 'a t) * ('a t)
       | Thunk  of 'a thunk
       | Waiting of 'a suspended list
     and 'a thunk =
@@ -102,7 +102,7 @@ module Stream =
 
     let n = ref 0
     let pp () = n := !n + 1; Printf.printf "lol%d\n%!" !n
-    let from_cont g t = Cont (t, g, Nil)
+    let from_cont g t = Cont (false, t, g, Nil)
 
     let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
 
@@ -115,11 +115,13 @@ module Stream =
     (* | Cont (t, k) -> k t *)
     | xs        -> xs
 
+    let depth = 7
+
     let rec mplus xs ys =
       match xs with
       | Nil             -> force ys
       | Cons (x, xs)    -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
-      | Cont (t, k, xs) -> Cont (t, k, from_fun @@ fun () -> mplus (force ys) xs)
+      | Cont (b, t, k, xs) -> Cont (b, t, k, from_fun @@ fun () -> mplus (force ys) xs)
       | Thunk   _       -> from_fun (fun () -> mplus (force ys) xs)
       (* | Disj (a, b)   -> Disj (force ys, from_fun (fun () -> mplus a b)) *)
       | Waiting ss    ->
@@ -151,7 +153,7 @@ module Stream =
       match s with
       | Nil             -> Nil
       | Cons (x, xs)    -> mplus (f x)          (from_fun (fun () -> bind (force xs) f))
-      | Cont (t, k, xs) -> mplus (bind (k t) f) (from_fun (fun () -> bind (force xs) f))
+      | Cont (_, t, k, xs) -> mplus (bind (k t) f) (from_fun (fun () -> bind (force xs) f))
       | Thunk zz        -> from_fun (fun () -> bind (zz ()) f)
       (* | Disj (a, b)   -> from_fun @@ fun () -> bind (mplus a b) f *)
       | Waiting ss    ->
@@ -161,20 +163,34 @@ module Stream =
           Waiting (List.map helper ss)
         | s          -> bind s f
 
-    let rec sym_bind s f =
-      let bind = sym_bind in
+    (* let foo = ref 0 *)
+
+    let rec sym_bind : int -> 'a t -> ('a -> 'a t) -> 'a t = fun d s f ->
+      (* let bind = sym_bind 1 in *)
       match s with
       | Nil             -> Nil
-      | Cons (x, xs)    -> mplus (f x) (from_fun (fun () -> bind (force xs) f))
-      | Cont (t, k, xs) -> Cont (t, (fun t -> bind (f t) k), from_fun (fun () -> bind (force xs) f))
-      | Thunk zz        -> from_fun (fun () -> bind (zz ()) f)
+      | Cons (x, xs)    -> mplus (f x) (from_fun (fun () -> sym_bind d (force xs) f))
+      | Cont (_, t, k, xs) ->
+        (* let _ = Printf.printf "ololo %d\n%!" d in *)
+        if d = 0 then
+          Cont (true, t, (fun t -> sym_bind depth (f t) k), from_fun (fun () -> sym_bind depth (force xs) f))
+        else
+          Cont (true, t, (fun t -> sym_bind (d-1) (k t) f), from_fun (fun () -> sym_bind (d-1) (force xs) f))
+          (* mplus (sym_bind (d-1) (k t) f) (from_fun (fun () -> sym_bind (d-1) (force xs) f)) *)
+      (* | Cont (true, t, k, xs) ->
+          Cont (true, t, (fun t -> sym_bind d (f t) k), from_fun (fun () -> sym_bind d (force xs) f)) *)
+      | Thunk zz           -> from_fun (fun () -> sym_bind d (zz ()) f)
       (* | Disj (a, b)   -> Disj (from_fun (fun () -> bind a f), from_fun @@ fun () -> bind b f) *)
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
-          let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
+          let helper {zz} as s = {s with zz = fun () -> sym_bind d (zz ()) f} in
           Waiting (List.map helper ss)
-        | s          -> bind s f
+        | s          -> sym_bind d s f
+
+    let sym_bind' : 'a t -> ('a -> 'a t) -> 'a t = fun s f -> sym_bind depth s f
+
+    (* let _ : unit = sym_bind *)
 
     let rec msplit = function
     | Nil           -> None
@@ -193,7 +209,7 @@ module Stream =
     let rec map f = function
     | Nil             -> Nil
     | Cons (x, xs)    -> Cons (f x, map f xs)
-    | Cont (t, k, xs) -> mplus (map f (k t)) (from_fun (fun () -> map f xs))
+    | Cont (_, t, k, xs) -> mplus (map f (k t)) (from_fun (fun () -> map f xs))
     | Thunk zz        -> from_fun (fun () -> map f @@ zz ())
     (* | Disj (a, b)     -> map f @@ mplus a b *)
     | Waiting ss   ->
@@ -1536,9 +1552,7 @@ let conj f g st = Stream.bind (f st) g
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
 
-
-let (<&>) f g st = Stream.sym_bind (f st) g
-
+let (<&>) (f : goal) (g : goal) (st : State.t) = Stream.sym_bind' (f st) g
 
 let disj_base f g st = Stream.mplus (f st) @@ Stream.from_fun (fun () -> g st)
 

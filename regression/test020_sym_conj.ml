@@ -5,7 +5,7 @@ open MiniKanrenStd
 
 open Tester
 
-let rec foo e l =
+(* let rec foo e l =
    (l === nil ()) ||| (fresh (ls) ((l === e % ls) &&& (cont_delay @@ foo e ls)))
 
 let main_goal q = foo !!"A" q <&> foo !!"B" q
@@ -15,8 +15,8 @@ let run x = runR (List.reify MiniKanren.reify)
                  (show List.logic (show logic @@ show string)) x
 
 
-let () = run (-1) q qh ("example", fun q -> main_goal q);;
-
+(* let () = run (-1) q qh ("example", fun q -> main_goal q);; *)
+;;
 (*******************************************************************)
 
 @type 'tree tree = Leaf | Node of 'tree * 'tree with show
@@ -53,10 +53,12 @@ let rec show_ltree x = show logic (show tree show_ltree) x
 
 let run x = runR tree_reify show_tree show_ltree x
 
-let () =
-  run (-1) q qh ("tree", fun q -> main_goal q);;
-
+(* let () =
+  run (-1) q qh ("tree", fun q -> main_goal q);; *)
+;;
 (*******************************************************************)
+
+(* let (<&>) = (&&&) *)
 
 let rec appendo x y xy =
    conde [
@@ -70,6 +72,7 @@ let rec reverso x y =
     (x === nil ()) <&> (y === nil ());
     fresh (e x' y')
        ((x === e % x') <&> (cont_delay @@ reverso x' y') <&> (cont_delay @@ appendo y' (e % nil ()) y))
+       (* ((x === e % x') <&> (cont_delay @@ appendo y' (e % nil ()) y) <&> (cont_delay @@ reverso x' y')) *)
   ]
 
 
@@ -91,13 +94,17 @@ let list_init n f =
   in
   helper 0
 
-let () =
-  run (-1) q qh ("rev", fun q -> reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
+  let () =
+    run (-1) q qh ("appendo", fun q -> fresh (p) (appendo q (p % nil ()) (l @@ list_init 10 (Printf.sprintf "%d"))));;
+
+
+(* let () =
+  run (-1) q qh ("rev", fun q -> reverso q (l @@ list_init 10 (Printf.sprintf "%d")));; *)
 
 (*******************************************************************)
 
-let () =
-  run (-1) q qh ("bad_case", fun q -> (cont_delay success ||| cont_delay failure) <&> (q === nil ()));;
+(* let () =
+  run (-1) q qh ("bad_case", fun q -> (cont_delay success ||| cont_delay failure) <&> (q === nil ()));; *)
 
 (*******************************************************************)
 
@@ -134,7 +141,25 @@ let aMbNcN l = cont_delay @@
   fresh (l1 l2)
     (appendo l1 l2 l &&& a_star !!"A" l1 &&& aNbN !!"B" !!"C" l2)
 
-let aNbNcN l = aNbNcM l &&& aMbNcN l
+let aNbNcN l = aNbNcM l &&& aMbNcN l *)
+
+(* let () =
+  run (5) q qh ("aNbNcN", fun q -> fresh (p) (aNbNcN q)) *)
+
+
+(*******************************************************************)
+
+let run x = runR (List.reify MiniKanren.reify)
+                 (show List.ground @@ show string)
+                 (show List.logic (show logic @@ show string)) x
+
+let rec inc name var =
+  var := 1 + !var;
+  if !var mod 1000 = 0 then
+    Printf.printf "%s = %d\n%!" name !var;
+  success <&> (delay @@ fun () -> cont_delay @@ inc name var)
 
 let () =
-  run (5) q qh ("aNbNcN", fun q -> fresh (p) (aNbNcN q))
+  let lst = List.init 10 (fun i -> (Printf.sprintf "n%d" i, ref 0)) in
+  let goal = List.fold_right (fun (n, v) g -> inc n v <&> g) lst success in
+  run (1) q qh ("hh", fun q -> goal)
