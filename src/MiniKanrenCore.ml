@@ -84,45 +84,55 @@ module Log =
 
 module Stream =
   struct
-    type 'a t =
+    type 'a h =
       | Nil
-      | Cons of 'a * ('a t)
-      | Cont of 'a * ('a -> 'a t) * ('a t)
-      | Thunk  of 'a thunk
-      | Waiting of 'a suspended list
-    and 'a thunk =
-      unit -> 'a t
-    and 'a suspended =
-      {is_ready: unit -> bool; zz: 'a thunk}
+      | Cons of 'a * ('a h)
+      | Cont of 'a * ('a -> 'a t) * ('a h)
+    and 'a t = int -> 'a h
+      (* | Thunk  of 'a thunk *)
+      (* | Waiting of 'a suspended list *)
+    (* and 'a thunk =
+      unit -> 'a helper *)
+    (* and 'a suspended =
+      {is_ready: unit -> bool; zz: 'a thunk} *)
 
-    let nil         = Nil
-    let single x    = Cons (x, Nil)
-    let cons x s    = Cons (x, s)
-    let from_fun zz = Thunk zz
+    let nil         = fun _ -> Nil
+    let single x    = fun _ -> Cons (x, Nil)
+    let cons x s    = fun i -> Cons (x, s i)
+    (* let from_fun zz = fun i -> Thunk (zz i) *)
 
-    let n = ref 0
-    let pp () = n := !n + 1; Printf.printf "lol%d\n%!" !n
-    let from_cont g t = Cont (t, g, Nil)
+    let rec deepen s i =
+      match s with
+      | Nil             -> Nil
+      | Cons (x, xs)    -> Cons (x, xs)
+      | Cont (t, k, xs) ->
+        if i == 0 then
+          Cont (t, k, xs)
+        else
+          deepen (mplus (k t (i-1)) xs) (i-1)
+      (* | Thunk zz        -> from_fun (fun () -> deepen (zz ()) i) *)
 
-    let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
+    let from_cont g t = fun i -> depeen (Cont (t, g, Nil)) i
+
+    (* let suspend ~is_ready f = Waiting [{is_ready; zz=f}] *)
 
     let rec of_list = function
-    | []    -> Nil
-    | x::xs -> Cons (x, of_list xs)
+    | []    -> nil
+    | x::xs -> cons x (of_list xs)
 
-    let force = function
+    (* let force = function
     | Thunk zz  -> zz ()
     (* | Cont (t, k) -> k t *)
-    | xs        -> xs
+    | xs        -> xs *)
 
-    let rec mplus xs ys =
-      match xs with
-      | Nil             -> force ys
-      | Cons (x, xs)    -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
-      | Cont (t, k, xs) -> Cont (t, k, from_fun @@ fun () -> mplus (force ys) xs)
-      | Thunk   _       -> from_fun (fun () -> mplus (force ys) xs)
-      (* | Disj (a, b)   -> Disj (force ys, from_fun (fun () -> mplus a b)) *)
-      | Waiting ss    ->
+    let rec mplus xs ys i =
+      match xs i with
+      | Nil             -> ys i
+      | Cons (x, xs)    -> Cons (x, mplus ys (deepen xs) i)
+      | Cont (t, k, xs) -> Cont (t, k, mplus ys (deepen xs) i)
+      (* | Thunk   _       -> from_fun (fun () -> mplus (force ys) xs) *)
+
+      (* | Waiting ss    ->
         let ys = force ys in
         (* handling waiting streams is tricky *)
         match unwrap_suspended ss, ys with
@@ -132,9 +142,9 @@ module Stream =
            pushing waiting stream to the back of the new stream *)
         | Waiting ss, _           -> mplus ys @@ from_fun (fun () -> xs)
         (* if [xs] has ready streams then [xs'] contains some lazy stream that is ready to produce new answers *)
-        | xs', _ -> mplus xs' ys
+        | xs', _ -> mplus xs' ys *)
 
-    and unwrap_suspended ss =
+    (* and unwrap_suspended ss =
       let rec find_ready prefix = function
         | ({is_ready; zz} as s)::ss ->
           if is_ready ()
@@ -145,45 +155,43 @@ module Stream =
       match find_ready [] ss with
         | Some s, [] -> s
         | Some s, ss -> mplus (force s) @@ Waiting ss
-        | None , ss  -> Waiting ss
+        | None , ss  -> Waiting ss *)
 
-    let rec bind s f =
-      match s with
+    let rec bind s f i =
+      match s i with
       | Nil             -> Nil
-      | Cons (x, xs)    -> mplus (f x)          (from_fun (fun () -> bind (force xs) f))
-      | Cont (t, k, xs) -> mplus (bind (k t) f) (from_fun (fun () -> bind (force xs) f))
-      | Thunk zz        -> from_fun (fun () -> bind (zz ()) f)
-      (* | Disj (a, b)   -> from_fun @@ fun () -> bind (mplus a b) f *)
-      | Waiting ss    ->
+      | Cons (x, xs)    -> mplus (f x)          (bind (deepen xs) f) i
+      | Cont (t, k, xs) -> mplus (bind (k t) f) (bind (deepen xs) f) i
+      (* | Thunk zz        -> from_fun (fun () -> bind (zz ()) f) *)
+      (* | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
           let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
           Waiting (List.map helper ss)
-        | s          -> bind s f
+        | s          -> bind s f *)
 
-    let rec sym_bind s f =
-      let bind = sym_bind in
-      match s with
+    let rec sbind s f i =
+      match s i with
       | Nil             -> Nil
-      | Cons (x, xs)    -> mplus (f x) (from_fun (fun () -> bind (force xs) f))
-      | Cont (t, k, xs) -> Cont (t, (fun t -> bind (f t) k), from_fun (fun () -> bind (force xs) f))
-      | Thunk zz        -> from_fun (fun () -> bind (zz ()) f)
+      | Cons (x, xs)    -> mplus (f x)          (bind (deepen xs) f) i
+      | Cont (t, k, xs) -> mplus (bind (f t) k) (bind (deepen xs) f) i
+      (* | Thunk zz        -> from_fun (fun () -> bind (zz ()) f)
       (* | Disj (a, b)   -> Disj (from_fun (fun () -> bind a f), from_fun @@ fun () -> bind b f) *)
       | Waiting ss    ->
         match unwrap_suspended ss with
         | Waiting ss ->
           let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
           Waiting (List.map helper ss)
-        | s          -> bind s f
+        | s          -> bind s f *)
 
     let rec msplit = function
     | Nil           -> None
     | Cons (x, xs)  -> Some (x, xs)
-    | Thunk zz      -> msplit @@ zz ()
+    (* | Thunk zz      -> msplit @@ zz ()
     | Waiting ss    ->
       match unwrap_suspended ss with
       | Waiting _ -> None
-      | xs        -> msplit xs
+      | xs        -> msplit xs *)
 
     let is_empty s =
       match msplit s with
@@ -1420,6 +1428,10 @@ module Answer :
 
   end
 
+  type 'a t = int -> 'a Stream.t
+
+  val mplus :
+
 module State :
   sig
     type t =
@@ -1536,9 +1548,7 @@ let conj f g st = Stream.bind (f st) g
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
 
-
 let (<&>) f g st = Stream.sym_bind (f st) g
-
 
 let disj_base f g st = Stream.mplus (f st) @@ Stream.from_fun (fun () -> g st)
 
@@ -1833,7 +1843,7 @@ module Table :
 
         val add       : t -> Answer.t -> unit
         val contains  : t -> Answer.t -> bool
-        val consume   : t -> 'a -> goal
+        val consume   : t -> 'a -> <
       end =
       struct
         (* Cache is a pair of queue-like list of answers plus hashtbl of answers;
