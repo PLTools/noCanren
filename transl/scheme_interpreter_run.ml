@@ -41,4 +41,7 @@ let run x = runR term_reify show_term' show_lterm x
 
 let () =
   run (1) q qh ("test", fun q ->
-   eval ((===) q) (((===) (nil ()))) (val_ q))
+   snd eval ([Obj.magic q], (===) q) ([], ((===) (nil ()))) (val_ q))
+ (*
+ run (1) qr qrh ("test", fun q r ->
+  eval ((===) q) (((===) (nil ()))) (val_ r) &&& eval ((===) r) (((===) (nil ()))) (val_ q)) *)
