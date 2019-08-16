@@ -1,6 +1,6 @@
 open GT
 open MiniKanren
-open MiniKanrenStd
+open MiniKanren.Std
 open Tester
 
 open Hanoi
@@ -12,9 +12,9 @@ let show_stick = function
 
 let show_lstick = show logic show_stick
 
-let show_answer  = show List.ground @@ show Pair.ground show_stick  show_stick
-let lshow_answer = show List.logic  @@ show Pair.logic  show_lstick show_lstick
-let reify_answer x = List.reify (Pair.reify MiniKanren.reify MiniKanren.reify) x
+let show_answer  = show LList.ground @@ show LPair.ground show_stick  show_stick
+let lshow_answer = show LList.logic  @@ show LPair.logic  show_lstick show_lstick
+let reify_answer x = LList.reify (LPair.reify MiniKanren.reify MiniKanren.reify) x
 
 let run x = runR reify_answer show_answer lshow_answer x
 

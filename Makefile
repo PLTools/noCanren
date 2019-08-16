@@ -37,6 +37,9 @@ ppx:
 plugin:
 	$(OB) camlp5/pa_ocanren.cmo
 
+compile_transl: lib
+	$(OB) -Is $(SRC),transl transl/ml2mk_pp.native
+
 transl: lib
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/peano_run.native
 	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/test4_run.native

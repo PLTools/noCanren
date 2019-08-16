@@ -31,7 +31,7 @@ let fresh_succ_name     = "succ"
 
 (*****************************************************************************************************************************)
 
-let packages = ["GT"; "MiniKanren"; "MiniKanrenStd"]
+let packages = ["GT"; "MiniKanren"; "MiniKanren.Std"]
 
 (*****************************************************************************************************************************)
 
@@ -698,7 +698,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bool_funs is_or =
-    if is_or then  [%expr Bool.oro] else  [%expr Bool.ando]
+    if is_or then  [%expr LBool.oro] else  [%expr LBool.ando]
     (* let a1  = create_fresh_var_name () in
     let a2  = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
@@ -729,7 +729,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
 
-  and translate_not_fun () = [%expr Bool.noto]
+  and translate_not_fun () = [%expr LBool.noto]
     (* let a  = create_fresh_var_name () in
     let q  = create_fresh_var_name () in
     [%expr fun [%p create_pat a] [%p create_pat q] ->

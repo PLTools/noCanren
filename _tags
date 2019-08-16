@@ -36,12 +36,12 @@ true: short_paths
 <transl/peano_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
 <transl/hm_inferencer.*>: dsource, rectypes, use_ocanren_modules
-<transl/hm_inferencer_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
+<transl/hm_inferencer_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
 
 <transl/tabling_test.*>: dsource, rectypes, use_ocanren_modules
 <transl/tabling_test_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
 
-<transl/games/*>: rectypes, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
+<transl/games/*>: rectypes, link_ocanren_modules, use_pa_minikanren, syntax(camlp5o), package(GT.syntax.all)
 
 <transl/games/game1_GCW.*>: dsource
 <transl/games/game1_GCW_run.*>: package(GT), link_ocanren_modules
@@ -62,13 +62,13 @@ true: short_paths
 <transl/games/game6_sudoku4x4_run.*>:  package(GT)
 
 <transl/games/hanoi.*>: dsource
-<transl/games/hanoi_run.*>:  package(GT)
+<transl/games/hanoi_run.*>: package(GT)
 
 <transl/games/logic_interpreter.*>: dsource
 <transl/games/logic_interpreter_run.*>:  package(GT)
 
-<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax), use_pa_minikanren
-<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax), use_pa_minikanren
+<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
+<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
 
 <transl/games/unify.*>: dsource
 <transl/games/unify_run.*>:  package(GT)
