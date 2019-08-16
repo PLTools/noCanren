@@ -61,6 +61,9 @@ true: short_paths
 <transl/games/game6_sudoku4x4.*>: dsource
 <transl/games/game6_sudoku4x4_run.*>:  package(GT)
 
+<transl/games/hanoi.*>: dsource
+<transl/games/hanoi_run.*>:  package(GT)
+
 <transl/games/logic_interpreter.*>: dsource
 <transl/games/logic_interpreter_run.*>:  package(GT)
 
