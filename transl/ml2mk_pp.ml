@@ -297,6 +297,9 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _args0 = Arg.read_arg0
   let _no_keep_docs = unset keep_docs
   let _no_keep_locs = unset keep_locs
+  let _dunique_ids = ignore
+  let _dno_unique_ids = ignore
+
 
   let anonymous = anonymous
 end)

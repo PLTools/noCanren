@@ -51,22 +51,11 @@ let str_type_ = Ast_helper.Str.type_
  * #endif *)
 
 let nolabel =
-#if OCAML_VERSION > (4, 02, 2)
       Asttypes.Nolabel
-#else
-      ""
-#endif
 
 let get_param_names pcd_args =
-#if OCAML_VERSION > (4, 02, 2)
   let Pcstr_tuple pcd_args  = pcd_args in
-#endif
   extract_names pcd_args
-
-#if OCAML_VERSION <= (4, 02, 2)
-type rec_flg_t = Nonrecursive | Recursive
-#endif
-
 
 
 let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
@@ -189,16 +178,10 @@ let revisit_adt ~loc tdecl ctors =
                           let new_name = sprintf "a%d" n in
                           (n+1, FoldInfo.extend new_name arg arg map, (Typ.var new_name)::args)
             )
-#if OCAML_VERSION > (4, 02, 2)
             (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
-#else
-            cd.pcd_args
-#endif
             (n, acc_map,[])
           in
-#if OCAML_VERSION > (4, 02, 2)
           let new_args = Pcstr_tuple new_args in
-#endif
           (n, map2, { cd with pcd_args = new_args } :: cs)
       )
       ctors
@@ -257,11 +240,7 @@ let main_mapper =
   { Ast_mapper.default_mapper with
     structure = fun self ss ->
       let f si = match si.pstr_desc with
-#if OCAML_VERSION > (4, 02, 2)
       | Pstr_type (_,tydecls) ->
-#else
-      | Pstr_type tydecls ->
-#endif
         wrap_tydecls si.pstr_loc tydecls
       | x -> [si]
       in

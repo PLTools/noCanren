@@ -93,8 +93,8 @@ let rec is_primary_type (t : Types.type_expr) =
 
 let get_pat_name p =
   match p.pat_desc with
-  | Tpat_var (name, _) -> name.name
-  | _                  -> fail_loc p.pat_loc "Incorrect pattern"
+  | Tpat_var (n, _) -> name n
+  | _               -> fail_loc p.pat_loc "Incorrect pattern"
 
 
 let create_apply f = function
@@ -167,7 +167,7 @@ let rec have_unifier p1 p2 =
 let rec translate_pat pat fresher =
   match pat.pat_desc with
   | Tpat_any                                       -> let var = fresher () in create_id var, [var]
-  | Tpat_var (v, _)                                -> create_id v.name, [v.name]
+  | Tpat_var (v, _)                                -> create_id (name v), [name v]
   | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
   | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
   | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
@@ -320,9 +320,9 @@ and translate_abstraciton case =
   let rec normalize_abstraction expr acc =
     match expr.exp_desc with
     | Texp_function {arg_label; param; cases=[case]; _} ->
-      let Tpat_var (name, _) = case.c_lhs.pat_desc in
+      let Tpat_var (n, _) = case.c_lhs.pat_desc in
       let typ = case.c_lhs.pat_type in
-      normalize_abstraction case.c_rhs ((name.name, typ) :: acc)
+      normalize_abstraction case.c_rhs ((name n, typ) :: acc)
     | _ -> expr, List.rev acc in
 
   let eta_extension expr =
@@ -341,7 +341,7 @@ and translate_abstraciton case =
         match p.pat_desc with
         | Tpat_any
         | Tpat_constant _             -> []
-        | Tpat_var (name, _)          -> [name.name]
+        | Tpat_var (n, _)             -> [name n]
         | Tpat_tuple pats
         | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats in
 
@@ -376,7 +376,7 @@ and translate_abstraciton case =
 
   if need_unlazy then
     let Tpat_var (name0, _) = case.c_lhs.pat_desc in
-    let body, real_vars     = normalize_abstraction case.c_rhs [name0.name, case.c_lhs.pat_type] in
+    let body, real_vars     = normalize_abstraction case.c_rhs [name name0, case.c_lhs.pat_type] in
     let eta_vars            = eta_extension body in
     let translated_body     = translate_expression body in
     let result_var          = create_fresh_var_name () in
@@ -822,7 +822,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | x::xs ->
       let new_let_vars =
         match x.str_desc with
-        | Tstr_value (Nonrecursive, [{vb_expr; vb_pat = {pat_desc = Tpat_var (var, _)}}]) when is_primary_type vb_expr.exp_type -> var.name :: let_vars
+        | Tstr_value (Nonrecursive, [{vb_expr; vb_pat = {pat_desc = Tpat_var (var, _)}}]) when is_primary_type vb_expr.exp_type -> name var :: let_vars
         | _                                                                                                                     -> let_vars in
       translate_structure_item let_vars x :: translate_items new_let_vars xs in
 
