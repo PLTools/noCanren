@@ -67,6 +67,7 @@ let (++) x f = f x
 
 let implementation ppf sourcefile outputprefix =
   Compmisc.init_path false;
+  Clflags.dont_write_files := true;
   let modulename = module_of_filename ppf sourcefile outputprefix in
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
