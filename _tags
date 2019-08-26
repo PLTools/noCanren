@@ -30,23 +30,19 @@ true: short_paths
 <transl/PutDistrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
 <transl/printer_in_spec.*>: package(compiler-libs.common)
 
-<transl/*_run.*>: rectypes, package(GT,unix), use_pa_ocanren
-<transl/games/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
+<transl/samples/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
 
-<transl/hm_inferencer.*>: rectypes, dsource
-
-<transl/games/game1_GCW.*>: dsource
-<transl/games/game2_bridge.*>: dsource
-<transl/games/game3_bottles.*>: dsource
-<transl/games/game4_desert.*>: dsource
-<transl/games/game5_einstein.*>: dsource
-<transl/games/game6_sudoku4x4.*>: dsource
-<transl/games/hanoi.*>: dsource
-<transl/games/logic_interpreter.*>: dsource
-<transl/games/unify.*>: dsource
-
-<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_ocanren
-<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax.all), use_pa_ocanren
+<transl/samples/hm_inferencer.*>: rectypes, dsource
+<transl/samples/GCW.*>: dsource
+<transl/samples/bridge.*>: dsource
+<transl/samples/bottles.*>: dsource
+<transl/samples/lorry.*>: dsource
+<transl/samples/einstein.*>: dsource
+<transl/samples/sudoku4x4.*>: dsource
+<transl/samples/hanoi.*>: dsource
+<transl/samples/logic_interpreter.*>: dsource
+<transl/samples/unify.*>: dsource
+<transl/samples/scheme_interpreter.*>: dsource
 
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
 

@@ -42,21 +42,17 @@ compile_transl: lib
 	$(OB) -Is $(SRC),transl transl/ml2mk_pp.native
 
 transl:
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/peano_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/test4_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/hm_inferencer_run.native
-
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game1_GCW_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game2_bridge_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/scheme_interpreter_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game3_bottles_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game4_desert_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game5_einstein_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game6_sudoku4x4_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/logic_interpreter_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/tabling_test_run.native
-	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/unify_run.native
-	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/games/hanoi_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/hm_inferencer_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/GCW_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bridge_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/scheme_interpreter_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bottles_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/lorry_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/einstein_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/sudoku4x4_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/logic_interpreter_run.native
+	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/unify_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/hanoi_run.native
 
 celan: clean
 
