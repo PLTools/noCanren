@@ -26,8 +26,8 @@ true: short_paths
 
 
 # Translator based on Lozov's works
-<transl/genmain.*>: package(compiler-libs.common,ppx_tools.metaquot), for-pack(Ml_to_mk), cppo_V_OCAML
-<transl/PutDistrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
+<transl/translator.*>: package(compiler-libs.common,ppx_tools.metaquot), for-pack(Ml_to_mk), cppo_V_OCAML
+<transl/put_distrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
 <transl/printer_in_spec.*>: package(compiler-libs.common)
 
 <transl/samples/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren

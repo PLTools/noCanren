@@ -1229,7 +1229,7 @@ let only_generate ~oldstyle hook_info tast =
     eval_if_need need_normalize (let mapper = fresh_and_conjs_normalizer need_move_unifies_up in
                                  mapper.structure mapper) |>
     eval_if_need need_CbN call_by_need_creator |>
-    PutDistrib.process |>
+    Put_distrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
   with

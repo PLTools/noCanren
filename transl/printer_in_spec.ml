@@ -125,7 +125,7 @@ let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "l
       | _                                                                                        -> tr, si :: ty in
     List.fold_right one_step tree ([],[]) in
 
-  let types   = Genmain.(attrs_remover.structure attrs_remover) types in
+  let types   = Translator.(attrs_remover.structure attrs_remover) types in
   let buf     = Buffer.create 100 in
   let buf_fmt = Format.formatter_of_buffer buf in
   Pprintast.structure buf_fmt types;

@@ -82,8 +82,8 @@ let implementation ppf sourcefile outputprefix =
       ++ print_if ppf Clflags.dump_typedtree
         Printtyped.implementation_with_coercion
     in
-    let untyped = Genmain.only_generate ~oldstyle:(!old_style_ml2mk) { Misc.sourcefile = sourcefile } typedtree in
-    let tree_without_attrs = Genmain.(attrs_remover.structure attrs_remover) untyped in
+    let untyped = Translator.only_generate ~oldstyle:(!old_style_ml2mk) { Misc.sourcefile = sourcefile } typedtree in
+    let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
     let () = Pprintast.structure Format.std_formatter untyped in
 
     let () =
