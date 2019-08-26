@@ -8,7 +8,7 @@ open Tast_mapper
 
 let () = Printexc.record_backtrace true
 
-module Lozov = struct
+module Transl = struct
 open Typedtree
 open Ident
 open Asttypes
@@ -1202,10 +1202,9 @@ let print_if ppf flag printer arg =
 let eval_if_need flag f =
   if flag then f else fun x -> x
 
-let only_generate ~oldstyle hook_info tast =
-  if oldstyle
-  then try
-    let open Lozov  in
+let only_generate hook_info tast =
+  try
+    let open Transl in
     let need_reduce          = true in
     let need_lower_case      = true in
     let need_normalize       = true in
@@ -1233,69 +1232,6 @@ let only_generate ~oldstyle hook_info tast =
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
   with
-    | Lozov.Error e as exc ->
-      Lozov.report_error Format.std_formatter e;
+    | Transl.Error e as exc ->
+      Transl.report_error Format.std_formatter e;
       raise exc
-  else
-  try
-    print_endline "new style";
-    let reduced_ast = Smart_mapper.process tast in
-    reduced_ast |>
-    (*PutDistrib.process |>*)
-    print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
-    print_if Format.std_formatter Clflags.dump_source Pprintast.structure
-  with exc ->
-    Printexc.print_backtrace stdout;
-    raise exc
-
-
-let main = fun (hook_info : Misc.hook_info) ((tast, coercion) : Typedtree.structure * Typedtree.module_coercion) ->
-  let new_ast       = only_generate ~oldstyle:false hook_info tast in
-
-  try
-  (*        let new_ast = [] in*)
-    let old = ref (!Clflags.print_types) in
-    Clflags.print_types := true;
-    let (retyped_ast, new_sig, _env) =
-      let () = print_endline "retyping generated code" in
-      Printexc.print
-      (Typemod.type_structure (Compmisc.initial_env()) new_ast)
-      Location.none
-    in
-    Clflags.print_types := !old;
-  (*        Printtyped.implementation_with_coercion Format.std_formatter (retyped_ast, coercion);*)
-    Printtyp.wrap_printing_env (Compmisc.initial_env()) (fun () ->
-      let open Format in
-      fprintf std_formatter "%a@."
-        Printtyp.signature (Typemod.simplify_signature new_sig));
-    (retyped_ast, Tcoerce_none)
-  with
-    | Lozov.Error e as exc ->
-      Lozov.report_error Format.std_formatter e;
-      raise exc
-(*    | Error e as exc ->
-      report_error Format.std_formatter e;
-      raise exc*)
-    | Env.Error e as exc ->
-      Env.report_error Format.std_formatter e;
-      Format.printf "\n%!";
-      raise exc
-    | Typecore.Error (_loc,_env,e) as exc ->
-      Typecore.report_error _env Format.std_formatter e;
-      Format.printf "\n%!";
-      raise exc
-    | Typemod.Error (_loc,_env,e) as exc ->
-      Typemod.report_error _env Format.std_formatter e;
-      Format.printf "\n%!";
-      raise exc
-    | Typetexp.Error (_loc,_env,e) as exc ->
-      Typetexp.report_error _env Format.std_formatter e;
-      Format.printf "\n%!";
-      raise exc
-    | Typemod.Error_forward e as exc ->
-      raise exc
-
-(*
-(* registering actual translator *)
-let () = Typemod.ImplementationHooks.add_hook "ml_to_mk" main
-*)

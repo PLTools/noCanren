@@ -27,7 +27,6 @@ open Compenv
 
 (* Keep in sync with the copy in optcompile.ml *)
 
-let old_style_ml2mk = ref true
 let output_for_spec_tree = ref None
 
 let tool_name = "ocamlc"
@@ -82,7 +81,7 @@ let implementation ppf sourcefile outputprefix =
       ++ print_if ppf Clflags.dump_typedtree
         Printtyped.implementation_with_coercion
     in
-    let untyped = Translator.only_generate ~oldstyle:(!old_style_ml2mk) { Misc.sourcefile = sourcefile } typedtree in
+    let untyped = Translator.only_generate { Misc.sourcefile = sourcefile } typedtree in
     let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
     let () = Pprintast.structure Format.std_formatter untyped in
 
@@ -306,9 +305,6 @@ module Options = Main_args.Make_bytecomp_options (struct
 end)
 
 let all_options =
-  ("-newstyle", Arg.Unit (fun () -> print_endline "PIZDA"; Compile.old_style_ml2mk := false),
-               "switch from old Lozov-style to new style of generation")
-  ::
   ("-spec-tree", Arg.String (fun output_path -> Compile.output_for_spec_tree := Some output_path),
                         "<file> Print the generated program as a Kate's specialization tree to <file>")
   :: Options.list
