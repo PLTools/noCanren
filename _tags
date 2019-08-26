@@ -30,52 +30,23 @@ true: short_paths
 <transl/PutDistrib.*>: for-pack(Ml_to_mk), package(compiler-libs.common,ppx_tools.metaquot), cppo_V_OCAML
 <transl/printer_in_spec.*>: package(compiler-libs.common)
 
-<transl/test4.*>: dsource, rectypes, use_ocanren_modules
+<transl/*_run.*>: rectypes, package(GT,unix), use_pa_ocanren
+<transl/games/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
 
-<transl/peano.*>: dsource, rectypes, use_ocanren_modules
-<transl/peano_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
-
-<transl/hm_inferencer.*>: dsource, rectypes, use_ocanren_modules
-<transl/hm_inferencer_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
-
-<transl/tabling_test.*>: dsource, rectypes, use_ocanren_modules
-<transl/tabling_test_run.*>: rectypes, use_ocanren_modules, package(GT), use_ocanren_modules, link_ocanren_modules
-
-<transl/games/*>: rectypes, link_ocanren_modules, use_pa_minikanren, syntax(camlp5o), package(GT.syntax.all)
+<transl/hm_inferencer.*>: rectypes, dsource
 
 <transl/games/game1_GCW.*>: dsource
-<transl/games/game1_GCW_run.*>: package(GT), link_ocanren_modules
-
 <transl/games/game2_bridge.*>: dsource
-<transl/games/game2_bridge_run.*>:  package(GT), link_ocanren_modules
-
 <transl/games/game3_bottles.*>: dsource
-<transl/games/game3_bottles_run.*>:  package(GT)
-
 <transl/games/game4_desert.*>: dsource
-<transl/games/game4_desert_run.*>:  package(GT)
-
 <transl/games/game5_einstein.*>: dsource
-<transl/games/game5_einstein_run.*>:  package(GT)
-
 <transl/games/game6_sudoku4x4.*>: dsource
-<transl/games/game6_sudoku4x4_run.*>:  package(GT)
-
 <transl/games/hanoi.*>: dsource
-<transl/games/hanoi_run.*>: package(GT)
-
 <transl/games/logic_interpreter.*>: dsource
-<transl/games/logic_interpreter_run.*>:  package(GT)
-
-<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
-<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax.all), use_pa_minikanren
-
 <transl/games/unify.*>: dsource
-<transl/games/unify_run.*>:  package(GT)
 
-<transl/logic.*>: rectypes, use_ocanren_modules
-<transl/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
-<transl/games/*_run.*>: rectypes, use_ocanren_modules, package(GT,unix), use_ocanren_modules, link_ocanren_modules
+<transl/scheme_interpreter.*>: dsource, use_ocanren_modules, syntax(camlp5o), package(GT.syntax.all), use_pa_ocanren
+<transl/scheme_interpreter_run.*>:  package(GT), syntax(camlp5o), package(GT.syntax.all), use_pa_ocanren
 
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
 

@@ -9,6 +9,7 @@ OB += -verbose 6
 endif
 
 SRC=src,src/core,src/std
+SRC_TRANSL=src,src/core,src/std,regression,transl
 
 CMA_TARGETS=src/OCanren.cma
 CMO_TARGETS=regression/tester.cmo
@@ -20,7 +21,7 @@ JSOO_LIB=jsoo_runner/jsoo_runner.cma
 
 .PHONY: all celan clean clean_tests install uninstall tests test regression promote_all \
 	ppx doc \
-	only-toplevel toplevel lib tester bundle plugin samples
+	only-toplevel toplevel lib tester bundle plugin samples transl
 
 .DEFAULT_GOAL: all
 
@@ -40,27 +41,22 @@ plugin:
 compile_transl: lib
 	$(OB) -Is $(SRC),transl transl/ml2mk_pp.native
 
-transl: lib
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/peano_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/test4_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/hm_inferencer_run.native
+transl:
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/peano_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/test4_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/hm_inferencer_run.native
 
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game1_GCW_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game2_bridge_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/scheme_interpreter_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game3_bottles_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game4_desert_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game5_einstein_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/game6_sudoku4x4_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/logic_interpreter_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/tabling_test_run.native
-	#$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/unify_run.native
-	$(OB) -Is transl transl/ml_to_mk.cma transl/ml2mk_pp.native transl/games/hanoi_run.native
-
-	@# peano.native is not compilable at the moment because a plugin linking
-	@# error loading shared library: /home/kakadu/asp/ocanren-eff/_build/transl/ml_to_mk.cmxs:
-	@# undefined symbol: caml_int_of_string while loading argument of -plugin
-	#$(OB) -Is transl,src peano_run.native peano_run.byte
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game1_GCW_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game2_bridge_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/scheme_interpreter_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game3_bottles_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game4_desert_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game5_einstein_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/game6_sudoku4x4_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/logic_interpreter_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/tabling_test_run.native
+	#$(OB) -Is $(SRC_TRANSL)  transl/ml2mk_pp.native transl/games/unify_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/games/hanoi_run.native
 
 celan: clean
 

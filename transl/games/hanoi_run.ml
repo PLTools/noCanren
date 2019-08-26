@@ -1,6 +1,6 @@
 open GT
-open MiniKanren
-open MiniKanren.Std
+open OCanren
+open OCanren.Std
 open Tester
 
 open Hanoi
@@ -14,7 +14,7 @@ let show_lstick = show logic show_stick
 
 let show_answer  = show LList.ground @@ show LPair.ground show_stick  show_stick
 let lshow_answer = show LList.logic  @@ show LPair.logic  show_lstick show_lstick
-let reify_answer x = LList.reify (LPair.reify MiniKanren.reify MiniKanren.reify) x
+let reify_answer x = LList.reify (LPair.reify OCanren.reify OCanren.reify) x
 
 let run x = runR reify_answer show_answer lshow_answer x
 
@@ -24,7 +24,7 @@ let rec length l n =
 
 
 
-  let rec less a b =
+  (* let rec less a b =
     fresh (b')
      (b === s b')
      (conde [
@@ -85,7 +85,7 @@ let rec length l n =
       (steps === x % xs)
       (one_step x state q16)
       (check q16 xs)
-    ]
+    ] *)
 
 
 let rec toN n = if n = 0 then z () else s (toN (n - 1))
@@ -100,4 +100,4 @@ let gen n = triple (gen_pin n) (nil ()) (nil ())
 
 
 let _ =
-  run 1 q qh ("first", fun q -> check (gen 5) q &&& length q 31)
+  run 1 q qh ("first", fun q -> check (gen 3) q !!true)
