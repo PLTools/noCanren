@@ -1081,6 +1081,19 @@ let call_by_need_creator tree =
 
   let expr_is_logic e = has_attr "need_CbN" e.pexp_attributes in
 
+  let is_unify_expr e =
+    match e.pexp_desc with
+    | Pexp_fun (_, _, _, body) ->
+      begin match body.pexp_desc with
+      | Pexp_apply (f, [_; _]) ->
+        begin match f.pexp_desc with
+        | Pexp_ident { txt = Lident n } -> n = "==="
+        | _ -> false
+        end
+      | _ -> false
+      end
+    | _ -> false in
+
   let var_is_logic pat = has_attr "logic" pat.ppat_attributes in
 
   let rec update_expr env e =
@@ -1102,7 +1115,7 @@ let call_by_need_creator tree =
         let new_conjs = List.map (update_expr new_env) conjs in
         create_apply f (v::new_conjs)
       else
-        let need_tabling = List.map expr_is_logic args in
+        let need_tabling = List.map (fun a -> expr_is_logic a && not @@ is_unify_expr a) args in
         let new_args = List.map2 (update_arg env) args need_tabling in
         create_apply [%expr snd [%e f]] new_args
     | Pexp_fun (_, _, pat, body) ->
