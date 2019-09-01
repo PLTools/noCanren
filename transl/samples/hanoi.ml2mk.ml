@@ -4,29 +4,6 @@ type stick = One | Two | Thr
 
 type 'a triple = Triple of 'a * 'a * 'a
 
-(**********************************************)
-
-(* let rec nat2int = function
-  | Z   -> 0
-  | S x -> 1 + nat2int x
-
-let rec int2nat n =
-  if n = 0 then Z else S (int2nat @@ n - 1)
-
-let print_state state =
-  let l1 = List.map nat2int @@ state One in
-  let l2 = List.map nat2int @@ state Two in
-  let l3 = List.map nat2int @@ state Thr in
-  Printf.printf "--------------\n";
-  List.iter (Printf.printf "%d ") @@ List.rev l1;
-  Printf.printf "\n--------------\n";
-  List.iter (Printf.printf "%d ") @@ List.rev l2;
-  Printf.printf "\n--------------\n";
-  List.iter (Printf.printf "%d ") @@ List.rev l3;
-  Printf.printf "\n--------------\n" *)
-
-(**********************************************)
-
 let rec less a b =
   match b with
   | S b' -> match a with

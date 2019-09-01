@@ -106,7 +106,7 @@ let isMove step =
 
 
 let checkAnswer answer len cop =
-  let[@tabled] rec calcFuel state ans prevIsMove =
+  let rec calcFuel state ans prevIsMove =
     match ans with
     | []    -> if isFinishState state len then Some cop else None
     | x::xs -> let currIsMove = isMove x in

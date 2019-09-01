@@ -42,22 +42,25 @@ compile_transl: lib
 	$(OB) -Is $(SRC),transl transl/ml2mk_pp.native
 
 transl:
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/hm_inferencer_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/GCW_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bridge_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/scheme_interpreter_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bottles_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/lorry_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/einstein_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/sudoku4x4_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/logic_interpreter_run.native
-	#$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/unify_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bottles_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/bridge_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/einstein_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/GCW_run.native
 	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/hanoi_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/hm_inferencer_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/logic_interpreter_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/lorry_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/scheme_interpreter_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/sudoku4x4_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/unify_run.native
 
 celan: clean
 
 clean: clean_tests
-	$(RM) -r _build *.log  *.native *.byte *.docdir transl/games/*.cmi
+	$(RM) -r _build *.log  *.native *.byte *.docdir
+
+clean_transl:
+	$(RM) -r _build/transl  *.log  *.native *.byte *.docdir
 
 ######################## Tests related stuff  ##########################
 REGRES_CASES := 000 002sort 001 004 005 006 007 009 010 011 013 014 015runaway 016sorto 017tabling 018prjc 019tablingCache 020

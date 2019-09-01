@@ -6,18 +6,6 @@ type term = Ident of identifier | Seq of term list
 
 type result = Val of term | Closure of identifier * term * (identifier * result) list
 
-let rec eq_var a b =
-  match a with
-  | First  -> ( match b with First -> true  | Next _ -> false      )
-  | Next x -> ( match b with First -> false | Next y -> eq_var x y )
-
-let eq_id a b =
-  match a with
-  | Lambda -> ( match b with Lambda -> true  | Quote -> false | List -> false | Var _ -> false      )
-  | Quote  -> ( match b with Lambda -> false | Quote -> true  | List -> false | Var _ -> false      )
-  | List   -> ( match b with Lambda -> false | Quote -> false | List -> true  | Var _ -> false      )
-  | Var x  -> ( match b with Lambda -> false | Quote -> false | List -> false | Var y -> eq_var x y )
-
 let rec map f l =
   match l with
   | x :: xs -> f x :: map f xs
@@ -26,13 +14,13 @@ let rec map f l =
 let rec lookup x env =
   match env with
   | (y, res) :: env' ->
-    if eq_id x y then res else lookup x env'
+    if x = y then res else lookup x env'
 
 let rec not_in_env x env =
   match env with
   | [] -> true
   | (y, res) :: env' ->
-     if eq_id x y then false else not_in_env x env'
+     if x = y then false else not_in_env x env'
 
 let rec eval term env =
 
@@ -71,16 +59,3 @@ let rec eval term env =
         match eval t env with
         | Closure (x, body, env') ->
           eval body ((x, eval arg env) :: env')
-
-
-
-(* let x      = Ident (Var First)
-let quotE  = Ident Quote
-let lambdA = Ident Lambda
-let lisT   = Ident List
-let s x    = Seq x
-
-let quine_func = s [lambdA; s [x]; s [lisT; x; s [lisT; s [quotE; quotE]; x]]]
-let quine_arg  = s [quotE; quine_func]
-
-let quine =      s [quine_func; quine_arg] *)

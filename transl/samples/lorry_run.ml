@@ -1,8 +1,12 @@
-open MiniKanren
-open MiniKanrenStd
-open Game4_desert
+open GT
+
+open OCanren
+open OCanren.Std
 open Tester
 
+open Lorry
+
+(*************************************************)
 
 let show_number num =
   let rec helper = function
@@ -17,20 +21,16 @@ let show_step = function
   | Fill    -> "F"
   | Pour x  -> Printf.sprintf "P%s" @@ show_number x
 
+let myshow x = show List.ground show_step x
 
-let show_list f x =
- let rec show_l = function
- | Nil           -> ""
- | Cons (x, Nil) -> f x
- | Cons (x, xs)  -> Printf.sprintf "%s; %s" (f x) (show_l xs)
- in
- Printf.sprintf "[%s]" (show_l x)
+(*************************************************)
 
 let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
 
-let myshow x = show_list (show_step) x
+(** For high order conversion **)
+(* let checkAnswer a q p r = checkAnswer ((===) a) ((===) q) ((===) p) r *)
 
 let () =
-(*run_exn myshow (1) q qh ("answers", (fun q -> (checkAnswer q (of_int 8) (of_int 5) (just @@ of_int 22))));*)
-  run_exn myshow (1) q qh ("answers", (fun q -> call_fresh (fun x -> (checkAnswer q (of_int 8) (of_int 5) (some x)))));
-  ()
+  run_exn myshow (1) q qh ("answers", fun q ->
+    checkAnswer q (of_int 8) (of_int 5) (some @@ of_int 22)
+  )

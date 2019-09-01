@@ -1,14 +1,12 @@
 open GT
-open MiniKanren
-open MiniKanrenStd
-open Scheme_interpreter
+
+open OCanren
+open OCanren.Std
 open Tester
 
-let m = Obj.magic
-let rec ll = function
-  | []      -> nil ()
-  | x :: xs -> x % ll xs
+open Scheme_interpreter
 
+(*************************************************)
 
 let rec var_reify   x = For_gvariable.reify   var_reify x
 let     ident_reify x = For_gidentifier.reify var_reify x
@@ -39,9 +37,11 @@ let rec show_lterm   x = show logic (show_term show_lindent (show List.logic sho
 
 let run x = runR term_reify show_term' show_lterm x
 
-let () =
+(*************************************************)
+(** For high order conversion **)
+(* let eval q l r = eval ((===) q) ((===) l) r *)
+
+let _ =
   run (1) q qh ("test", fun q ->
-   snd eval ([Obj.magic q], (===) q) ([], ((===) (nil ()))) (val_ q))
- (*
- run (1) qr qrh ("test", fun q r ->
-  eval ((===) q) (((===) (nil ()))) (val_ r) &&& eval ((===) r) (((===) (nil ()))) (val_ q)) *)
+    eval q (nil ()) (val_ q)
+  )

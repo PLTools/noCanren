@@ -1,7 +1,10 @@
-open MiniKanren
-open MiniKanrenStd
-open Game6_sudoku4x4
+open OCanren
+open OCanren.Std
 open Tester
+
+open Sudoku4x4
+
+(*************************************************)
 
 let show_num = function
 | N1 -> "1"
@@ -21,6 +24,11 @@ let show_sudoku4x4 = function
 
 let myshow = show_sudoku4x4
 
-let () =
-  run_exn myshow (1) q qh ("sudoku", (fun q -> (check_sudoku q (!!true))));
-  ()
+(*************************************************)
+(** For high order conversion **)
+(* let check_sudoku q r = check_sudoku ((===) q) r *)
+
+let _ =
+  run_exn myshow (1) q qh ("sudoku", fun q ->
+    check_sudoku q !!true
+    )

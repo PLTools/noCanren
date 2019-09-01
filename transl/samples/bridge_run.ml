@@ -1,7 +1,10 @@
-open MiniKanren
-open MiniKanrenStd
-open Game2_bridge
+open GT
+
+open OCanren
+open OCanren.Std
 open Tester
+
+open Bridge
 
 (*************************************************)
 
@@ -15,20 +18,16 @@ let show_step f = function
  | One x     -> f x
  | Two (x,y) -> Printf.sprintf "(%s, %s)" (f x) (f y)
 
-let show_list f x =
- let rec show_l = function
- | Nil           -> ""
- | Cons (x, Nil) -> f x
- | Cons (x, xs)  -> Printf.sprintf "%s, %s" (f x) (show_l xs)
- in
- Printf.sprintf "[%s]" (show_l x)
+let myshow x = show List.ground (show_step show_person) x
 
-let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
+(*************************************************)
 
-let myshow x = show_list (show_step show_person) x
+let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
 
-(*********************************************************)
+(** For high order conversion **)
+(* let getAnswer q t r = getAnswer ((===) q) t r *)
 
-let () =
- run_exn myshow (-1) q qh ("answers", (fun q -> getAnswer ((===)q) standartTimes (of_int 17 |> some)));
- ()
+let _ =
+  run_exn myshow (1) q qh ("answers", fun q ->
+    getAnswer q standartTimes (int2nat 17 |> some)
+  )

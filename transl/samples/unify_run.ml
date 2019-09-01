@@ -1,8 +1,12 @@
-open MiniKanren
-open MiniKanrenStd
-open Unify
-open Tester
 open GT
+
+open OCanren
+open OCanren.Std
+open Tester
+
+open Unify
+
+(*************************************************)
 
 let show_number x =
   let rec nat2int =
@@ -25,6 +29,7 @@ let show_lnumber x =
 let show_llist f x =
   let rec show_list x = Printf.sprintf "[%s]" (String.concat "; " x) in
   let rec show_llist x =
+    let open List in
     match x with
     | Var _               -> [], Some (show(logic) (fun _ -> "") x)
     | Value Nil           -> [], None
@@ -40,12 +45,22 @@ let rec show_gterm f g = function
 | Var_ v        -> Printf.sprintf "V %s" (f v)
 | Constr (n, a) -> Printf.sprintf "C %s %s" (f n) (g a)
 
-let rec show_term f x = show_gterm f (show(List.ground) (show_term f)) x
-let rec show_lterm f x = show(logic) (show_gterm f (show (List.logic) (show_lterm f))) x
+let rec show_term  f x = show_gterm f (show List.ground (show_term f)) x
+let rec show_lterm f x = show logic (show_gterm f (show (List.logic) (show_lterm f))) x
 
-let rec int2nat n = if n <= 0 then O else S (int2nat (n - 1))
-let v n   = Var_ (int2nat n)
-let c n a = Constr (int2nat n, a)
+let my_show x = show(List.ground) (show_term show_number) x
+let my_lshow x = show_llist (show_lterm show_lnumber) x
+let rec nat_reifier x = For_gnat.reify nat_reifier x
+let rec term_reifier r x = For_gterm.reify r (List.reify (term_reifier r)) x
+let my_reifier = List.reify ( (term_reifier nat_reifier))
+
+let full_run = runR my_reifier my_show my_lshow
+
+(*************************************************)
+
+let rec int2nat n = if n <= 0 then o () else s (int2nat (n - 1))
+let v n   = var_ (int2nat n)
+let c n a = constr (int2nat n) @@ List.list a
 
 let t1 = c 0 []
 let t2 = v 0
@@ -82,56 +97,21 @@ let w1, w2 =
   appendo (list2 cA cB) (list2 cC cD) (vLs),        (* append([a, b]  , [c, d], Ls      ) *)
   appendo (cons vX vXs) (vYs)         (cons vX vZs) (* append([X | Xs], Ys    , [X | Zs]) *)
 
-let rec (!!!) =
-  let rec n2l = function
-  | O   -> o ()
-  | S x -> s (n2l x) in
-  let rec l2l e2l = function
-  | []    -> nil ()
-  | x::xs -> e2l x % l2l e2l xs in
-function
-| Var_ v         -> var_ (n2l v)
-| Constr (n, a) -> constr (n2l n) (l2l (!!!) a)
+(** For high order conversion **)
+(* let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r *)
 
-let check_uni t1 t2 s = check_uni s !!!t1 !!!t2
+let _ =
+  full_run (-1) q qh ("answers1", fun q -> check_uni q t1  t1  !!true);
+  full_run (-1) q qh ("answers2", fun q -> check_uni q t2  t2  !!true);
+  full_run (-1) q qh ("answers3", fun q -> check_uni q t1  t2  !!true);
+  full_run (-1) q qh ("answers4", fun q -> check_uni q t3  t4  !!true);
+  full_run (-1) q qh ("answers5", fun q -> check_uni q t3  t5  !!true);
+  full_run (-1) q qh ("answers6", fun q -> check_uni q t4  t5  !!true);
+  full_run (-1) q qh ("answers7", fun q -> check_uni q x1  x2  !!true);
+  full_run (-1) q qh ("answers8", fun q -> check_uni q x1' x2' !!true);
+  full_run (-1) q qh ("answers9", fun q -> check_uni q y1  y2  !!true);
 
-let rec init_subst subst n =
-  if n = 0
-    then subst === nil ()
-    else fresh (x xs)
-           (subst === x % xs)
-           (init_subst xs (n-1))
+  full_run (-1) q qh ("answers_bad", fun q -> check_uni q t2 t2' !!true);
 
-let my_show x = show(List.ground) (show_term show_number) x
-let my_lshow x = show_llist (show_lterm show_lnumber) x
-let rec nat_reifier x = For_gnat.reify nat_reifier x
-let rec term_reifier r x = For_gterm.reify r (List.reify (term_reifier r)) x
-let my_reifier = List.reify ( (term_reifier nat_reifier))
-
-let rec l2ll = function
-| []    -> nil ()
-| x::xs -> x % l2ll xs
-
-let res1 = l2ll [some (!!! (v 1)); some (!!! (c 1 [v 2; v 3])); some (!!!(c 2 [])); some (!!!(c 3 []))]
-
-let full_run = runR my_reifier my_show my_lshow
-
-let () =
-  (* full_run (-1) q qh ("answers1", (fun q ->fresh (x) (q === none ()% x) ));
-  full_run (-1) q qh ("answers1", (fun q ->fresh (x) (q === none ()% (x % nil ()))));
-  full_run (-1) q qh ("answers1", (fun q -> fresh (x) (q === some (var_ (s (s x))) % nil ()))); *)
-  full_run (-1) q qh ("answers1", (fun q -> check_uni t1 t1 q !!true));
-  full_run (-1) q qh ("answers2", (fun q -> check_uni t2 t2 q !!true));
-  full_run (-1) q qh ("answers3", (fun q -> check_uni t1 t2 q !!true));
-  full_run (-1) q qh ("answers4", (fun q -> check_uni t3 t4 q !!true));
-  full_run (-1) q qh ("answers5", (fun q -> check_uni t3 t5 q !!true));
-  full_run (-1) q qh ("answers6", (fun q -> check_uni t4 t5 q !!true));
-  full_run (-1) q qh ("answers7", (fun q -> check_uni x1 x2 q !!true));
-  full_run (-1) q qh ("answers8", (fun q -> check_uni x1' x2' q !!true));
-  full_run (-1) q qh ("answers9", (fun q -> check_uni y1 y2 q !!true));
-
-
-  full_run (-1) q qh ("answers_bad", (fun q -> check_uni t2 t2' q !!true));
-
-  full_run (-1) q qh ("answers", (fun q -> check_uni w1 w2 q !!true));
+  full_run (-1) q qh ("answers", fun q -> check_uni q w1 w2 !!true);
   ()
