@@ -44,6 +44,8 @@ true: short_paths
 <transl/samples/unify.*>: dsource
 <transl/samples/scheme_interpreter.*>: dsource
 
+<transl/micro/*>: rectypes, syntax(camlp5o), package(GT.syntax.all,GT,unix), use_pa_ocanren
+
 <transl/ml2mk_pp.*>: package(compiler-libs.common)
 
 <transl/smart_mapper.*>: package(compiler-libs.common,ppx_tools.metaquot)

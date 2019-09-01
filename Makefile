@@ -54,6 +54,15 @@ transl:
 	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/sudoku4x4_run.native
 	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/samples/unify_run.native
 
+transl_micro:
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/bottles_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/bridge_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/GCW_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/hanoi_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/lorry_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/scheme_interpreter_run.native
+	$(OB) -Is $(SRC_TRANSL) transl/ml2mk_pp.native transl/micro/unify_run.native
+
 celan: clean
 
 clean: clean_tests
