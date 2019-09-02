@@ -27,12 +27,12 @@ let myshow x = show List.ground show_step x
 let rec int2nat n = if n = 0 then o () else s @@ int2nat @@ n - 1
 
 (** For high order conversion **)
-(* let checkAnswer q c n r = checkAnswer ((===) q) c ((===) n) r *)
+(* let checkAnswer q n r = checkAnswer ((===) q) ((===) n) r *)
 
 (** For call-by-need conversion **)
-(* let checkAnswer q c n r = (snd checkAnswer) ([Obj.magic q], (===) q) c ([], (===) n) r *)
+(* let checkAnswer q n r = (snd checkAnswer) ([Obj.magic q], (===) q) ([], (===) n) r *)
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
-    checkAnswer q capacities1 (int2nat 7) !!true
+    checkAnswer q (int2nat 7) !!true
   )

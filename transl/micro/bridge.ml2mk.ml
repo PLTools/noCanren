@@ -77,13 +77,19 @@ let step state step =
   | One p      -> moveLight (movePerson state p)
   | Two (p, q) -> moveLight (movePerson (movePerson state p) q)
 
-let getTime state times =
+let times p =
+  match p with
+  | A -> S O
+  | B -> S (S O)
+  | C -> S (S (S (S (S O))))
+  | D -> S (S (S (S (S (S (S (S (S (S O)))))))))
+
+let getTime state =
   match state with
   | One p      -> times p
   | Two (p, q) -> max (times p) (times q)
 
-
-let getAnswer answer times =
+let getAnswer answer =
   let start  = St (true, true, true, true, true) in
   let finish = St (false, false, false, false, false) in
 
@@ -93,16 +99,8 @@ let getAnswer answer times =
         if checkStep state x then
           match (getAnswer xs (step state x))[@heavy] with
           | None    -> None
-          | Some t1 -> Some (add (getTime x times) t1)
+          | Some t1 -> Some (add (getTime x) t1)
         else None
       | [] -> if eqState state finish then Some O else None in
 
   getAnswer answer start
-
-
-let standartTimes p =
-  match p with
-  | A -> S O
-  | B -> S (S O)
-  | C -> S (S (S (S (S O))))
-  | D -> S (S (S (S (S (S (S (S (S (S O)))))))))

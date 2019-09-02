@@ -44,7 +44,12 @@ let createState bottle lvl1 lvl2 =
    | Snd -> (lvl2, lvl1)
 
 
-let checkStep state0 step0 capacities =
+ let capacities b =
+   match b with
+   | Fst -> S (S (S (S O)))
+   | Snd -> S (S (S (S (S (S (S (S (S O))))))))
+
+let checkStep state0 step0 =
   match state0 with
   | (f, s) ->
     match step0 with
@@ -59,7 +64,7 @@ let checkStep state0 step0 capacities =
           not (eqNat lvl1 O || eqNat lvl2 (capacities b'))
 
 
-let doStep state0 step0 capacities =
+let doStep state0 step0 =
   match state0 with
   | (f, s) ->
     match step0 with
@@ -79,22 +84,14 @@ let isFinishState state0 reqLvl =
   match state0 with
   | (f, s) -> eqNat f reqLvl || eqNat s reqLvl
 
-
-let checkAnswer answer capacities reqLvl =
+let checkAnswer answer reqLvl =
   let rec checkAnswer state0 answer =
     match answer with
     | []      -> isFinishState state0 reqLvl
     | x :: xs ->
-      if checkStep state0 x capacities then
-        checkAnswer (doStep state0 x capacities) xs
+      if checkStep state0 x then
+        checkAnswer (doStep state0 x) xs
       else false in
 
    let startState = (O, O) in
    checkAnswer startState answer
-
-(****************************************************************************)
-
-let capacities1 b =
-  match b with
-  | Fst -> S (S (S (S O)))
-  | Snd -> S (S (S (S (S (S (S (S (S O))))))))

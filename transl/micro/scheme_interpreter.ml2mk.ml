@@ -18,11 +18,6 @@ let eq_id a b =
   | List   -> ( match b with Lambda -> false | Quote -> false | List -> true  | Var _ -> false      )
   | Var x  -> ( match b with Lambda -> false | Quote -> false | List -> false | Var y -> eq_var x y )
 
-let rec map f l =
-  match l with
-  | x :: xs -> f x :: map f xs
-  | []      -> []
-
 let rec lookup x env =
   match env with
   | (y, res) :: env' ->
@@ -53,7 +48,11 @@ let rec eval term env =
     match not_in_env List env with
     | true ->
       let eval_val t = match eval t env with Val v -> v in
-      Val (Seq (map eval_val ts)) in
+      let rec map_eval_val l =
+        match l with
+        | x :: xs -> eval_val x :: map_eval_val xs
+        | []      -> [] in
+      Val (Seq (map_eval_val ts)) in
 
   match term with
   | Ident x -> lookup x env
