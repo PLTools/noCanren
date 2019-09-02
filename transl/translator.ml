@@ -486,7 +486,7 @@ translate_structure tast
 
 (*****************************************************************************************************************************)
 
-let translate tast start_index need_lowercase need_poly need_false =
+let translate tast start_index need_lowercase need_poly need_false need_standart_bool =
 
 let lowercase_lident x =
   if need_lowercase
@@ -698,7 +698,24 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bool_funs is_or =
-    if is_or then [%expr Bool.oro] else [%expr Bool.ando]
+    if need_standart_bool then
+      if is_or then [%expr Bool.oro] else [%expr Bool.ando]
+      else
+        let a1  = create_fresh_var_name () in
+        let a2  = create_fresh_var_name () in
+        let q   = create_fresh_var_name () in
+        let fst = if is_or then [%expr !!true]  else [%expr !!false] in
+        let snd = if is_or then [%expr !!false] else [%expr !!true]  in
+        if need_false then
+        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+                 conde [([%e create_id a1] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
+                        ([%e create_id a1] === [%e snd]) &&& ([%e create_id q] === [%e create_id a2])]]
+        else if is_or then
+        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+                 ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
+        else
+        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+                 ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) &&& ([%e create_id a2] === !!true))]
 
   and translate_eq_funs is_eq =
     let a1  = create_fresh_var_name () in
@@ -714,7 +731,14 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
 
-  and translate_not_fun () = [%expr Bool.noto]
+  and translate_not_fun () =
+    if need_standart_bool then [%expr Bool.noto]
+    else
+      let a  = create_fresh_var_name () in
+      let q  = create_fresh_var_name () in
+      [%expr fun [%p create_pat a] [%p create_pat q] ->
+               conde [([%e create_id a] === !!true ) &&& ([%e create_id q] === !!false);
+                      ([%e create_id a] === !!false) &&& ([%e create_id q] === !!true )]]
 
   and translate_if let_vars cond th el typ =
     let args = create_fresh_argument_names_by_type typ in
@@ -1198,6 +1222,8 @@ let eval_if_need flag f =
 let only_generate hook_info tast =
   try
     let open Transl in
+    let need_standart_bool   = false in
+
     let need_reduce          = true in
     let need_lower_case      = true in
     let need_normalize       = true in
@@ -1215,7 +1241,7 @@ let only_generate hook_info tast =
     let reductor    = beta_reductor start_index subst_only_q in
     (if need_high
       then translate_high tast start_index need_lower_case need_unlazy
-      else translate tast start_index need_lower_case need_poly need_false) |>
+      else translate tast start_index need_lower_case need_poly need_false need_standart_bool) |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
     eval_if_need need_normalize (let mapper = fresh_and_conjs_normalizer need_move_unifies_up in
