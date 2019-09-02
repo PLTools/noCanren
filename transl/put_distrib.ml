@@ -205,7 +205,7 @@ let revisit_adt ~loc tdecl ctors =
                      ptype_name = { full_t.ptype_name with txt = "g" ^ full_t.ptype_name.txt }}
       in
       let fmap_for_typ = prepare_fmap ~loc functor_typ in
-      functor_typ, ([fmap_for_typ] @ (prepare_distribs ~loc functor_typ fmap_for_typ))
+      functor_typ, prepare_distribs ~loc functor_typ fmap_for_typ
   in
 (*      let non_logic_typ =
         let alias_desc =
