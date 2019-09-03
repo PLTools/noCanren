@@ -150,6 +150,9 @@ let mark_constr expr = { expr with
 let mark_fo_arg expr = { expr with
   pexp_attributes = (mknoloc "need_CbN", Parsetree.PStr []) :: expr.pexp_attributes }
 
+let is_active_arg pat =
+  List.exists (fun a -> (fst a).txt = "active") pat.pat_attributes
+
 let create_logic_var name =
   { (create_pat name) with ppat_attributes = [mknoloc "logic", Parsetree.PStr []] }
 
@@ -193,10 +196,7 @@ let rec is_disj_pats = function
 
 (*****************************************************************************************************************************)
 
-
-(*HERE*)
-
-let translate_high tast start_index need_lowercase need_unlazy =
+let translate_high tast start_index need_lowercase need_activate =
 
 let lowercase_lident x =
   if need_lowercase
@@ -319,10 +319,8 @@ and translate_abstraciton case =
 
   let rec normalize_abstraction expr acc =
     match expr.exp_desc with
-    | Texp_function {arg_label; param; cases=[case]; _} ->
-      let Tpat_var (n, _) = case.c_lhs.pat_desc in
-      let typ = case.c_lhs.pat_type in
-      normalize_abstraction case.c_rhs ((name n, typ) :: acc)
+    | Texp_function { cases=[case] } ->
+      normalize_abstraction case.c_rhs (case.c_lhs :: acc)
     | _ -> expr, List.rev acc in
 
   let eta_extension expr =
@@ -352,7 +350,7 @@ and translate_abstraciton case =
         List.fold_left eval_if_need count args
       | Texp_ident (_, { txt = Longident.Lident name }, _) ->
         if var_name = name then count + 1 else count
-      | Texp_function {arg_label; param; cases=[case]; _} ->
+      | Texp_function { cases=[case] } ->
         if var_name = get_pat_name case.c_lhs then count else two_or_more_mentions case.c_rhs count
       | Texp_apply (func, args) ->
         let args = List.map (fun (_, Some a) -> a) args in
@@ -370,34 +368,33 @@ and translate_abstraciton case =
 
     two_or_more_mentions expr 0 >= 2 in
 
+  let need_to_activate p e =
+    is_primary_type p.pat_type && (
+      is_active_arg p || need_activate && two_or_more_mentions (get_pat_name p) e) in
+
   let create_simple_arg var =
     let fresh_n = create_fresh_var_name () in
     create_fun fresh_n [%expr [%e create_id fresh_n] === [%e create_id var]] in
 
-  if need_unlazy then
-    let Tpat_var (name0, _) = case.c_lhs.pat_desc in
-    let body, real_vars     = normalize_abstraction case.c_rhs [name name0, case.c_lhs.pat_type] in
-    let eta_vars            = eta_extension body in
-    let translated_body     = translate_expression body in
-    let result_var          = create_fresh_var_name () in
-    let body_with_eta_args  = create_apply translated_body @@
-                              List.map create_id @@
-                              List.map fst eta_vars @ [result_var] in
-    let bad_vars            = List.filter (fun v -> two_or_more_mentions v body) @@
-                              List.map fst @@
-                              List.filter (fun (_, t) -> is_primary_type t) @@
-                              real_vars @ eta_vars in
-    let fresh_vars          = List.map (fun _ -> create_fresh_var_name ()) bad_vars in
-    let abstr_body          = List.fold_right create_fun bad_vars body_with_eta_args in
-    let body_with_args      = create_apply abstr_body @@
-                              List.map create_simple_arg fresh_vars in
-    let conjs               = List.map2 (fun a b -> create_apply (create_id a) @@ [create_id b]) bad_vars fresh_vars in
-    let full_conj           = create_conj (conjs @ [body_with_args]) in
-    let with_fresh          = List.fold_right create_fresh fresh_vars full_conj in
-    let first_fun           = create_fun result_var with_fresh in
-    let with_eta            = List.fold_right create_fun (List.map fst eta_vars) first_fun in
-    List.fold_right create_fun (List.map fst real_vars) with_eta
-  else Exp.fun_ Nolabel None (untyper.pat untyper case.c_lhs) (translate_expression case.c_rhs)
+  let body, real_vars     = normalize_abstraction case.c_rhs [case.c_lhs] in
+  let eta_vars            = eta_extension body in
+  let translated_body     = translate_expression body in
+  let result_var          = create_fresh_var_name () in
+  let body_with_eta_args  = create_apply translated_body @@
+                            List.map create_id @@
+                            List.map fst eta_vars @ [result_var] in
+  let active_vars         = List.map get_pat_name @@
+                            List.filter (fun p -> need_to_activate p body) real_vars in
+  let fresh_vars          = List.map (fun _ -> create_fresh_var_name ()) active_vars in
+  let abstr_body          = List.fold_right create_fun active_vars body_with_eta_args in
+  let body_with_args      = create_apply abstr_body @@
+                            List.map create_simple_arg fresh_vars in
+  let conjs               = List.map2 (fun a b -> create_apply (create_id a) @@ [create_id b]) active_vars fresh_vars in
+  let full_conj           = create_conj (conjs @ [body_with_args]) in
+  let with_fresh          = List.fold_right create_fresh fresh_vars full_conj in
+  let first_fun           = create_fun result_var with_fresh in
+  let with_eta            = List.fold_right create_fun (List.map fst eta_vars) first_fun in
+  List.fold_right create_fun (List.map get_pat_name real_vars) with_eta
 
 and translate_apply f a l =
   create_apply
@@ -1233,14 +1230,14 @@ let only_generate hook_info tast =
 
     let need_high            = false in
     let need_move_unifies_up = true in
-    let need_unlazy          = false in
+    let need_activate        = false in
     let need_CbN             = false in
     let subst_only_q         = false in
 
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index subst_only_q in
     (if need_high
-      then translate_high tast start_index need_lower_case need_unlazy
+      then translate_high tast start_index need_lower_case need_activate
       else translate tast start_index need_lower_case need_poly need_false need_standart_bool) |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
