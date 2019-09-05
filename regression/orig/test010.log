@@ -10,21 +10,21 @@ q=2;
 fun q r -> gxy q r, 10 answers {
 q=1; r=1;
 q=1; r=2;
-q=2; r=1;
 q=1; r=3;
-q=3; r=1;
+q=2; r=1;
 q=2; r=2;
-q=3; r=2;
 q=2; r=3;
+q=3; r=1;
+q=3; r=2;
 q=3; r=3;
 }
 fun q r -> gxy' q r, 10 answers {
 q=1; r=2;
-q=2; r=1;
 q=1; r=3;
+q=2; r=1;
+q=2; r=3;
 q=3; r=1;
 q=3; r=2;
-q=2; r=3;
 }
 fun q ->
   OCanren.Fresh.two

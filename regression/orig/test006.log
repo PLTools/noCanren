@@ -23,12 +23,12 @@ fun q -> evalo (v varX) q, 1 answer {
 q=V ("x");
 }
 fun q -> evalo (app q (v varX)) (v varX), 1 answer {
-q=Abs (_.44, V (_.44));
+q=Abs (_.42, V (_.42));
 }
 fun q r -> evalo (app r q) (v varX), 1 answer {
-q=V ("x"); r=Abs (_.54, V (_.54));
+q=V ("x"); r=Abs (_.52, V (_.52));
 }
 fun q r s -> a_la_quine q r s, 2 answers {
-q=Abs (_.859, V (_.859)); r=Abs (_.859, V (_.859)); s=Abs (_.859, V (_.859));
-q=Abs (_.1192, V (_.1192)); r=Abs (_.1192, Abs (_.1192, V (_.1192))); s=Abs (_.1192, Abs (_.1192, V (_.1192)));
+q=Abs (_.803, V (_.803)); r=Abs (_.803, V (_.803)); s=Abs (_.803, V (_.803));
+q=Abs (_.1111, V (_.1111)); r=Abs (_.1111, Abs (_.1111, V (_.1111))); s=Abs (_.1111, Abs (_.1111, V (_.1111)));
 }
