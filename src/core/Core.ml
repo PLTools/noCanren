@@ -194,14 +194,14 @@ let (===) x y st =
   | None    -> failure st
 
 let unify = (===)
-          
+
 let (=/=) x y st =
   match State.diseq x y st with
   | Some st -> success st
   | None    -> failure st
 
 let diseq = (=/=)
-          
+
 let delay g st = RStream.from_fun (fun () -> g () st)
 
 let conj f g st = RStream.bind (f st) g
@@ -321,6 +321,7 @@ let run n g h =
 (** ************************************************************************* *)
 (** Tabling primitives                                                        *)
 
+(*
 module Table :
   sig
     (* Type of table.
@@ -443,6 +444,7 @@ module Table :
         in
         ((g args) &&& hook) abs_st
   end
+*)
 
 module Tabling =
   struct
@@ -459,16 +461,17 @@ module Tabling =
     let five  () = succ four ()
 
     let tabled n g =
-      let tbl = Table.create () in
+      (* let tbl = Table.create () in *)
       let currier, uncurrier = n () in
-      currier (Table.call tbl @@ uncurrier g)
+      currier (uncurrier g)
+      (* currier (Table.call tbl @@ uncurrier g) *)
 
     let tabledrec n g_norec =
-      let tbl = Table.create () in
+      (* let tbl = Table.create () in *)
       let currier, uncurrier = n () in
       let g = ref (fun _ -> assert false) in
       let g_rec args = uncurrier (g_norec !g) args in
-      let g_tabled = Table.call tbl g_rec in
+      let g_tabled = (*Table.call tbl*) g_rec in
       g := currier g_tabled;
       !g
   end

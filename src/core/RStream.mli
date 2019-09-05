@@ -29,7 +29,7 @@ val cons : 'a -> 'a t -> 'a t
 
 val from_fun : (unit -> 'a t) -> 'a t
 
-val suspend : is_ready:(unit -> bool) -> (unit -> 'a t) -> 'a t
+(* val suspend : is_ready:(unit -> bool) -> (unit -> 'a t) -> 'a t *)
 
 val of_list : 'a list -> 'a t
 

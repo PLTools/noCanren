@@ -18,35 +18,37 @@
 
 type 'a t =
   | Nil
-  | Cons of 'a * ('a t)
-  | Thunk  of 'a thunk
-  | Waiting of 'a suspended list
+  | Cont  of 'a * ('a -> 'a t) list * 'a t
+  | Thunk of 'a thunk
+  (* | Waiting of 'a suspended list *)
 and 'a thunk =
   unit -> 'a t
-and 'a suspended =
-  {is_ready: unit -> bool; zz: 'a thunk}
+(* and 'a suspended =
+  {is_ready: unit -> bool; zz: 'a thunk} *)
 
 let nil         = Nil
-let single x    = Cons (x, Nil)
-let cons x s    = Cons (x, s)
+let single x    = Cont (x, [], Nil)
+let cons x s    = Cont (x, [], s)
+let cont x ks s = Cont (x, ks, s)
+
 let from_fun zz = Thunk zz
 
-let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
+(* let suspend ~is_ready f = Waiting [{is_ready; zz=f}] *)
 
 let rec of_list = function
-| []    -> Nil
-| x::xs -> Cons (x, of_list xs)
+  | []    -> nil
+  | x::xs -> cons x (of_list xs)
 
 let force = function
-| Thunk zz  -> zz ()
-| xs        -> xs
+  | Thunk zz  -> zz ()
+  | xs        -> xs
 
 let rec mplus xs ys =
   match xs with
-  | Nil           -> force ys
-  | Cons (x, xs)  -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
-  | Thunk   _     -> from_fun (fun () -> mplus (force ys) xs)
-  | Waiting ss    ->
+  | Nil               -> force ys
+  | Cont (x, ks, xs)  -> cont x ks (from_fun @@ fun () -> mplus (force ys) xs)
+  | Thunk   _         -> from_fun (fun () -> mplus (force ys) xs)
+  (* | Waiting ss    ->
     let ys = force ys in
     (* handling waiting streams is tricky *)
     match unwrap_suspended ss, ys with
@@ -56,9 +58,9 @@ let rec mplus xs ys =
        pushing waiting stream to the back of the new stream *)
     | Waiting ss, _           -> mplus ys @@ from_fun (fun () -> xs)
     (* if [xs] has ready streams then [xs'] contains some lazy stream that is ready to produce new answers *)
-    | xs', _ -> mplus xs' ys
+    | xs', _ -> mplus xs' ys *)
 
-and unwrap_suspended ss =
+(* and unwrap_suspended ss =
   let rec find_ready prefix = function
     | ({is_ready; zz} as s)::ss ->
       if is_ready ()
@@ -69,51 +71,81 @@ and unwrap_suspended ss =
   match find_ready [] ss with
     | Some s, [] -> s
     | Some s, ss -> mplus (force s) @@ Waiting ss
-    | None , ss  -> Waiting ss
+    | None , ss  -> Waiting ss *)
 
-let rec bind s f =
+(* TODO: better name *)
+let rec fbind : 'a t -> ('a -> 'a t) -> 'a t = fun s k ->
   match s with
-  | Nil           -> Nil
-  | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
-  | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
-  | Waiting ss    ->
+  | Nil                 -> Nil
+  | Cont (x, ks, s)     -> Cont (x, k::ks, fbind s k)
+  | Thunk zz            -> from_fun (fun () -> fbind (zz ()) k)
+
+(* TODO: better name *)
+let rec enforce s fs =
+  match s with
+  | Nil -> Nil
+  | Cont (x, ks, s) ->
+    let fx = match ks @ fs with
+      | []    -> single x
+      | k::ks -> enforce (k x) ks
+    in mplus fx (from_fun @@ fun () -> enforce s fs)
+  | Thunk zz -> from_fun @@ fun () -> enforce (zz ()) fs
+
+let bind s f =
+  let rec bind s f =
+    match s with
+    | Nil                 -> Nil
+    | Cont (x, [], s)     -> mplus (f x) (from_fun (fun () -> bind (force s) f))
+    | Thunk zz            -> from_fun (fun () -> bind (zz ()) f)
+  in bind (enforce s []) f
+
+  (* | Waiting ss    ->
     match unwrap_suspended ss with
     | Waiting ss ->
       let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
       Waiting (List.map helper ss)
-    | s          -> bind s f
+    | s          -> bind s f *)
 
-let rec msplit = function
-| Nil           -> None
-| Cons (x, xs)  -> Some (x, xs)
-| Thunk zz      -> msplit @@ zz ()
-| Waiting ss    ->
+let map f s =
+  let rec map f = function
+  | Nil             -> Nil
+  | Cont (x, [], s) -> cons (f x) @@ map f s
+  | Thunk zz        -> from_fun (fun () -> map f @@ zz ())
+  in map f @@ enforce s []
+
+let filter p s =
+  let rec filter p = function
+  | Nil             -> Nil
+  | Cont (x, [], s) ->
+    let s = filter p s in
+    if p x then cons x s else s
+  | Thunk zz        -> from_fun (fun () -> filter p @@ zz ())
+  in filter p @@ enforce s []
+
+  (* | Waiting ss   ->
+    let helper {zz} as s = {s with zz = fun () -> map f (zz ())} in
+    Waiting (List.map helper ss) *)
+
+let msplit s =
+  let rec msplit = function
+  | Nil               -> None
+  | Cont (x, [], xs)  -> Some (x, xs)
+  | Thunk zz          -> msplit @@ zz ()
+  in msplit @@ enforce s []
+(* | Waiting ss    ->
   match unwrap_suspended ss with
   | Waiting _ -> None
-  | xs        -> msplit xs
+  | xs        -> msplit xs *)
 
 let is_empty s =
   match msplit s with
   | Some _  -> false
   | None    -> true
 
-let rec map f = function
-| Nil          -> Nil
-| Cons (x, xs) -> Cons (f x, map f xs)
-| Thunk zzz    -> from_fun (fun () -> map f @@ zzz ())
-| Waiting ss   ->
-  let helper {zz} as s = {s with zz = fun () -> map f (zz ())} in
-  Waiting (List.map helper ss)
-
 let rec iter f s =
   match msplit s with
   | Some (x, s) -> f x; iter f s
   | None        -> ()
-
-let rec filter p s =
-  match msplit s with
-  | Some (x, s) -> let s = filter p s in if p x then Cons (x, s) else s
-  | None        -> Nil
 
 let rec fold f acc s =
   match msplit s with
@@ -123,7 +155,7 @@ let rec fold f acc s =
 let rec zip xs ys =
   match msplit xs, msplit ys with
   | None,         None          -> Nil
-  | Some (x, xs), Some (y, ys)  -> Cons ((x, y), zip xs ys)
+  | Some (x, xs), Some (y, ys)  -> cons (x, y) (zip xs ys)
   | _                           -> invalid_arg "OCanren fatal (Stream.zip): streams have different lengths"
 
 let hd s =
