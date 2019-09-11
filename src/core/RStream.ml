@@ -80,6 +80,9 @@ let rec fbind : 'a t -> ('a -> 'a t) -> 'a t = fun s k ->
   | Cont (x, ks, s)     -> Cont (x, k::ks, fbind s k)
   | Thunk zz            -> from_fun (fun () -> fbind (zz ()) k)
 
+let fbinds : 'a t -> ('a -> 'a t) list -> 'a t = fun s ks ->
+  List.fold_right (fun c s -> fbind s c) ks s
+
 (* TODO: better name *)
 let rec enforce s fs =
   match s with
@@ -98,6 +101,31 @@ let bind s f =
     | Cont (x, [], s)     -> mplus (f x) (from_fun (fun () -> bind (force s) f))
     | Thunk zz            -> from_fun (fun () -> bind (zz ()) f)
   in bind (enforce s []) f
+
+  let rec deepen s n =
+    match s with
+    | Nil                  -> Nil
+    | Cont (x, [], ss)     -> cons x (deepen ss n)
+    | Cont (x, c::cs, ss)  -> if n = 0 then s
+                              else mplus (deepen (fbinds (c x) cs) @@ n - 1) @@ deepen ss n
+    | Thunk zz             -> from_fun @@ fun () -> deepen (zz ()) n
+
+  (* TODO: better name *)
+  let fair_handler (x::xs) = xs @ [x]
+
+  (* TODO: better name *)
+  let rec deepens s f n =
+    let rec helper s =
+      match s with
+      | Nil              -> Nil
+      | Cont (x, [], ss) -> cons x @@ helper ss
+      | Cont (x, cs, ss) ->
+        from_fun @@ fun () -> mplus (deepens (cont x (f cs) nil) f n) @@ helper ss
+      | Thunk zz         -> from_fun @@ fun () -> helper @@ zz () in
+    helper @@ deepen s n
+
+  let fair_deepens s n = deepens s fair_handler n
+
 
   (* | Waiting ss    ->
     match unwrap_suspended ss with

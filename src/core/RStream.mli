@@ -62,6 +62,10 @@ val zip : 'a t -> 'b t -> ('a * 'b) t
   *)
 val mplus : 'a t -> 'a t -> 'a t
 
+val fbind : 'a t -> ('a -> 'a t) -> 'a t
+
+val fair_deepens : 'a t -> int -> 'a t
+
 (** [bind s f] monadic-bind for streams;
   *   maps function [f] over values of the stream [s],
   *    obtaining a stream of streams ['b t t], and then flattens this stream

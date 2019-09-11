@@ -51,6 +51,8 @@ val conj : goal -> goal -> goal
 (** [&&&] is a left-associative infix synonym for [conj] *)
 val (&&&) : goal -> goal -> goal
 
+val (<&>) : goal -> goal -> goal
+
 (** [disj s1 s2] creates a goal, which is a disjunction of its arguments *)
 val disj : goal -> goal -> goal
 
@@ -69,6 +71,8 @@ val conde : goal list -> goal
     (note the {i right} association)
 *)
 val (?&) : goal list -> goal
+
+val deepen : int -> goal -> goal
 
 (** {2 Some predefined goals} *)
 

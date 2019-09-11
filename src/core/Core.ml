@@ -208,6 +208,8 @@ let conj f g st = RStream.bind (f st) g
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
 
+let (<&>) f g st = RStream.fbind (f st) g
+
 let disj_base f g st = RStream.mplus (f st) (RStream.from_fun (fun () -> g st))
 
 let disj f g st = let st = State.new_scope st in disj_base f g |> (fun g -> RStream.from_fun (fun () -> g st))
@@ -224,6 +226,9 @@ let (?|) gs st =
   inner gs |> (fun g -> RStream.from_fun (fun () -> g st))
 
 let conde = (?|)
+
+let deepen : int -> goal -> goal = fun n g st ->
+  RStream.fair_deepens (g st) n
 
 let call_fresh f st =
   let x = State.fresh st in
