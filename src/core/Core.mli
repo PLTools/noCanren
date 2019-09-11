@@ -71,6 +71,8 @@ val conde : goal list -> goal
     (note the {i right} association)
 *)
 val (?&) : goal list -> goal
+val (?<&>) : goal list -> goal
+
 
 val deepen : int -> goal -> goal
 

@@ -27,6 +27,8 @@ val single : 'a -> 'a t
 
 val cons : 'a -> 'a t -> 'a t
 
+val cont : 'a -> ('a -> 'a t) list -> 'a t -> 'a t
+
 val from_fun : (unit -> 'a t) -> 'a t
 
 (* val suspend : is_ready:(unit -> bool) -> (unit -> 'a t) -> 'a t *)

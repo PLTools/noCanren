@@ -77,11 +77,14 @@ let rec mplus xs ys =
 let rec fbind : 'a t -> ('a -> 'a t) -> 'a t = fun s k ->
   match s with
   | Nil                 -> Nil
-  | Cont (x, ks, s)     -> Cont (x, k::ks, fbind s k)
+  | Cont (x, ks, s)     -> Cont (x, ks @ [k], fbind s k)
   | Thunk zz            -> from_fun (fun () -> fbind (zz ()) k)
 
-let fbinds : 'a t -> ('a -> 'a t) list -> 'a t = fun s ks ->
-  List.fold_right (fun c s -> fbind s c) ks s
+let rec fbinds : 'a t -> ('a -> 'a t) list -> 'a t = fun s ks ->
+  match s with
+  | Nil                 -> Nil
+  | Cont (x, ks', s)    -> Cont (x, ks @ ks', fbinds s ks)
+  | Thunk zz            -> from_fun (fun () -> fbinds (zz ()) ks)
 
 (* TODO: better name *)
 let rec enforce s fs =
@@ -102,29 +105,39 @@ let bind s f =
     | Thunk zz            -> from_fun (fun () -> bind (zz ()) f)
   in bind (enforce s []) f
 
-  let rec deepen s n =
+let rec deepen s n =
+  match s with
+  | Nil                  -> Nil
+  | Cont (x, [], ss)     -> cons x (deepen ss n)
+  | Cont (x, c::cs, ss)  -> if n = 0 then s
+                            else mplus (deepen (fbinds (c x) cs) @@ n - 1) @@ deepen ss n
+  | Thunk zz             -> from_fun @@ fun () -> deepen (zz ()) n
+
+(* let rand = Random.init 2 *)
+
+(* TODO: better name *)
+let fair_handler (*ks*) (x::xs) =
+  xs @ [x]
+  (* let rec remove_nth n = function
+  | []    -> []
+  | x::xs -> if n = 0 then xs else x :: remove_nth (n - 1) xs
+  in
+  let n = Random.int (List.length ks) in
+  let k, ks = List.nth ks n, remove_nth n ks in
+  k::ks *)
+
+(* TODO: better name *)
+let rec deepens s f n =
+  let rec helper s =
     match s with
-    | Nil                  -> Nil
-    | Cont (x, [], ss)     -> cons x (deepen ss n)
-    | Cont (x, c::cs, ss)  -> if n = 0 then s
-                              else mplus (deepen (fbinds (c x) cs) @@ n - 1) @@ deepen ss n
-    | Thunk zz             -> from_fun @@ fun () -> deepen (zz ()) n
+    | Nil              -> Nil
+    | Cont (x, [], ss) -> cons x @@ helper ss
+    | Cont (x, cs, ss) ->
+      from_fun @@ fun () -> mplus (deepens (cont x (f cs) nil) f n) @@ helper ss
+    | Thunk zz         -> from_fun @@ fun () -> helper @@ zz () in
+  helper @@ deepen s n
 
-  (* TODO: better name *)
-  let fair_handler (x::xs) = xs @ [x]
-
-  (* TODO: better name *)
-  let rec deepens s f n =
-    let rec helper s =
-      match s with
-      | Nil              -> Nil
-      | Cont (x, [], ss) -> cons x @@ helper ss
-      | Cont (x, cs, ss) ->
-        from_fun @@ fun () -> mplus (deepens (cont x (f cs) nil) f n) @@ helper ss
-      | Thunk zz         -> from_fun @@ fun () -> helper @@ zz () in
-    helper @@ deepen s n
-
-  let fair_deepens s n = deepens s fair_handler n
+let fair_deepens s n = deepens s fair_handler n
 
 
   (* | Waiting ss    ->

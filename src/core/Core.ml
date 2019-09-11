@@ -208,7 +208,9 @@ let conj f g st = RStream.bind (f st) g
 let (&&&) = conj
 let (?&) gs = List.fold_right (&&&) gs success
 
-let (<&>) f g st = RStream.fbind (f st) g
+let (<&>) f g st = RStream.cont st [f; g] RStream.nil
+
+let (?<&>) gs st = RStream.cont st gs RStream.nil
 
 let disj_base f g st = RStream.mplus (f st) (RStream.from_fun (fun () -> g st))
 
