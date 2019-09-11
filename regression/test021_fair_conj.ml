@@ -5,12 +5,8 @@ open OCanren.Std
 
 open Tester
 
-let cont_delay x = x
-let (<&>) = (&&&)
-
-
 let rec foo e l =
-   (l === nil ()) ||| (fresh (ls) ((l === e % ls) &&& (cont_delay @@ foo e ls)))
+   (l === nil ()) ||| (fresh (ls) ((l === e % ls) <&> (foo e ls)))
 
 let main_goal q = foo !!"A" q <&> foo !!"B" q
 
@@ -22,6 +18,7 @@ let run x = runR (List.reify OCanren.reify)
 let () = run (-1) q qh ("example", fun q -> main_goal q);;
 
 (*******************************************************************)
+
 
 @type 'tree tree = Leaf | Node of 'tree * 'tree with show
 
@@ -40,13 +37,13 @@ let rec ltree t =
   conde [
     t === leaf ();
     fresh (t')
-      (t === node t' (leaf ()) <&> cont_delay @@ ltree t')]
+      (t === node t' (leaf ()) <&> ltree t')]
 
 let rec rtree t =
   conde [
     t === leaf ();
     fresh (t')
-      (t === node (leaf ()) t' <&> cont_delay @@ rtree t')]
+      (t === node (leaf ()) t' <&> rtree t')]
 
 let main_goal q = ltree q <&> rtree q
 
@@ -60,20 +57,21 @@ let run x = runR tree_reify show_tree show_ltree x
 let () =
   run (-1) q qh ("tree", fun q -> main_goal q);;
 
+
 (*******************************************************************)
 
 let rec appendo x y xy =
    conde [
       (x === nil ()) <&> (y === xy);
       fresh (e x' xy')
-        ((x === e % x') <&> (xy === e % xy') <&> (cont_delay @@ appendo x' y xy'))
+        ((x === e % x') <&> (xy === e % xy') <&> (appendo x' y xy'))
    ]
 
 let rec reverso x y =
   conde [
     (x === nil ()) <&> (y === nil ());
     fresh (e x' y')
-       ((x === e % x') <&> (cont_delay @@ reverso x' y') <&> (cont_delay @@ appendo y' (e % nil ()) y))
+       ((x === e % x') <&> (reverso x' y') <&> (appendo y' (e % nil ()) y))
   ]
 
 
@@ -96,49 +94,45 @@ let list_init n f =
   helper 0
 
 let () =
-  run (-1) q qh ("rev", fun q -> reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
+  run (-1) q qh ("rev", fun q -> deepen (-1) @@ reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
 
 (*******************************************************************)
 
 let () =
-  run (-1) q qh ("bad_case", fun q -> (cont_delay success ||| cont_delay failure) <&> (q === nil ()));;
+  run (-1) q qh ("bad_case", fun q -> (success ||| failure) <&> (q === nil ()));;
 
 (*******************************************************************)
 
-
-let (&&&) = (<&>)
-(* let cont_delay x = x *)
-
-let rec a_star a l = cont_delay @@
+let rec a_star a l =
   conde [
     l === nil ();
     fresh (ls)
-      ((l === a % ls) &&& a_star a ls)
+      ((l === a % ls) <&> a_star a ls)
   ]
 
-let rec appendo x y xy = cont_delay @@
+let rec appendo x y xy =
    conde [
-      (x === nil ()) &&& (y === xy);
+      (x === nil ()) <&> (y === xy);
       fresh (e x' xy')
-        ((x === e % x') &&& (xy === e % xy') &&& (appendo x' y xy'))
+        ((x === e % x') <&> (xy === e % xy') <&> (appendo x' y xy'))
    ]
 
-let rec aNbN a b l = cont_delay @@
+let rec aNbN a b l =
   conde [
     l === nil ();
     fresh (ls ls')
-      ((l === a % ls) &&& appendo ls' (b % nil ()) ls &&& aNbN a b ls')
+      ((l === a % ls) <&> appendo ls' (b % nil ()) ls <&> aNbN a b ls')
   ]
 
-let aNbNcM l = cont_delay @@
+let aNbNcM l =
   fresh (l1 l2)
-    (appendo l1 l2 l &&& aNbN !!"A" !!"B" l1 &&& a_star !!"C" l2)
+    (appendo l1 l2 l <&> aNbN !!"A" !!"B" l1 <&> a_star !!"C" l2)
 
-let aMbNcN l = cont_delay @@
+let aMbNcN l =
   fresh (l1 l2)
-    (appendo l1 l2 l &&& a_star !!"A" l1 &&& aNbN !!"B" !!"C" l2)
+    (appendo l1 l2 l <&> a_star !!"A" l1 <&> aNbN !!"B" !!"C" l2)
 
-let aNbNcN l = aNbNcM l &&& aMbNcN l
+let aNbNcN l = aNbNcM l <&> aMbNcN l
 
 let () =
   run (5) q qh ("aNbNcN", fun q -> fresh (p) (aNbNcN q))
