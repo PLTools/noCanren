@@ -105,19 +105,23 @@ let bind s f =
     | Thunk zz            -> from_fun (fun () -> bind (zz ()) f)
   in bind (enforce s []) f
 
-let rec deepen s n =
+let rec deepen s n = if n = 0 then s, 0 else
   match s with
-  | Nil                  -> Nil
-  | Cont (x, [], ss)     -> cons x (deepen ss n)
-  | Cont (x, c::cs, ss)  -> if n = 0 then s
-                            else mplus (deepen (fbinds (c x) cs) @@ n - 1) @@ deepen ss n
-  | Thunk zz             -> from_fun @@ fun () -> deepen (zz ()) n
+  | Nil                  -> Nil, n
+  | Cont (x, [], ss)     -> let s', n' = deepen ss n in
+                            cons x s', n'
+                            (* This case distincts from classic miniKanren. We need to interleave evaluations  *)
+  | Cont (x, c::cs, ss)  -> let s1, n1 = deepen (c x) @@ n - 1 in
+                            let s2, n2 = deepen (fbinds s1 cs) n1 in
+                            let s3, n3 = deepen ss n2 in
+                            mplus s2 s3, n3
+  | Thunk zz             -> deepen (zz ()) @@ n - 1
 
 (* let rand = Random.init 2 *)
 
 (* TODO: better name *)
-let fair_handler (*ks*) (x::xs) =
-  xs @ [x]
+let fair_handler k = k
+
   (* let rec remove_nth n = function
   | []    -> []
   | x::xs -> if n = 0 then xs else x :: remove_nth (n - 1) xs
@@ -135,7 +139,7 @@ let rec deepens s f n =
     | Cont (x, cs, ss) ->
       from_fun @@ fun () -> mplus (deepens (cont x (f cs) nil) f n) @@ helper ss
     | Thunk zz         -> from_fun @@ fun () -> helper @@ zz () in
-  helper @@ deepen s n
+  helper @@ fst @@ deepen s n
 
 let fair_deepens s n = deepens s fair_handler n
 

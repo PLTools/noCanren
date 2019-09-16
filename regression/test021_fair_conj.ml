@@ -15,7 +15,8 @@ let run x = runR (List.reify OCanren.reify)
                  (show List.logic (show logic @@ show string)) x
 
 
-let () = run (-1) q qh ("example", fun q -> main_goal q);;
+(* let () = run (-1) q qh ("example", fun q -> deepen 1 @@ main_goal q) *)
+;;
 
 (*******************************************************************)
 
@@ -55,23 +56,23 @@ let rec show_ltree x = show logic (show tree show_ltree) x
 let run x = runR tree_reify show_tree show_ltree x
 
 let () =
-  run (-1) q qh ("tree", fun q -> main_goal q);;
+  run (-1) q qh ("tree", fun q -> deepen 1 @@ main_goal q);;
 
 
 (*******************************************************************)
 
 let rec appendo x y xy =
    conde [
-      (x === nil ()) <&> (y === xy);
+      ?<&> [(x === nil ()); (y === xy)];
       fresh (e x' xy')
-        ((x === e % x') <&> (xy === e % xy') <&> (appendo x' y xy'))
+        (?<&> [(x === e % x'); (xy === e % xy'); (appendo x' y xy')])
    ]
 
 let rec reverso x y =
   conde [
-    (x === nil ()) <&> (y === nil ());
+    ?<&> [(x === nil ()); (y === nil ())];
     fresh (e x' y')
-       ((x === e % x') <&> (reverso x' y') <&> (appendo y' (e % nil ()) y))
+       (?<&> [(reverso x' y'); (x === e % x'); (appendo y' (e % nil ()) y)])
   ]
 
 
@@ -94,7 +95,7 @@ let list_init n f =
   helper 0
 
 let () =
-  run (-1) q qh ("rev", fun q -> deepen (-1) @@ reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
+  run (-1) q qh ("rev", fun q -> deepen (20) @@ reverso q (l @@ list_init 10 (Printf.sprintf "%d")));;
 
 (*******************************************************************)
 
@@ -107,32 +108,32 @@ let rec a_star a l =
   conde [
     l === nil ();
     fresh (ls)
-      ((l === a % ls) <&> a_star a ls)
+      ?<&> [l === a % ls; a_star a ls]
   ]
 
 let rec appendo x y xy =
    conde [
-      (x === nil ()) <&> (y === xy);
+      ?<&> [x === nil (); (y === xy)];
       fresh (e x' xy')
-        ((x === e % x') <&> (xy === e % xy') <&> (appendo x' y xy'))
+        ?<&> [x === e % x'; xy === e % xy'; appendo x' y xy']
    ]
 
 let rec aNbN a b l =
   conde [
     l === nil ();
     fresh (ls ls')
-      ((l === a % ls) <&> appendo ls' (b % nil ()) ls <&> aNbN a b ls')
+      ?<&> [l === a % ls; appendo ls' (b % nil ()) ls; aNbN a b ls']
   ]
 
 let aNbNcM l =
   fresh (l1 l2)
-    (appendo l1 l2 l <&> aNbN !!"A" !!"B" l1 <&> a_star !!"C" l2)
+    ?<&> [appendo l1 l2 l; aNbN !!"A" !!"B" l1; a_star !!"C" l2]
 
 let aMbNcN l =
   fresh (l1 l2)
-    (appendo l1 l2 l <&> a_star !!"A" l1 <&> aNbN !!"B" !!"C" l2)
+    ?<&> [appendo l1 l2 l; a_star !!"A" l1; aNbN !!"B" !!"C" l2]
 
-let aNbNcN l = aNbNcM l <&> aMbNcN l
+let aNbNcN l = ?<&> [aNbNcM l; aMbNcN l]
 
 let () =
-  run (5) q qh ("aNbNcN", fun q -> fresh (p) (aNbNcN q))
+  run (7) q qh ("aNbNcN", fun q ->  fresh (p) ( aNbNcN q))
