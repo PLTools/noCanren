@@ -196,7 +196,9 @@ let rec is_disj_pats = function
 
 (*****************************************************************************************************************************)
 
-let translate_high tast start_index need_lowercase need_activate =
+type tactic = Off | Nondet | Det
+
+let translate_high tast start_index need_lowercase activate_tactic =
 
 let lowercase_lident x =
   if need_lowercase
@@ -332,7 +334,7 @@ and translate_abstraciton case =
     let arg_types = get_arg_types expr.exp_type in
     List.map (fun t -> create_fresh_var_name (), t) arg_types in
 
-  let two_or_more_mentions var_name expr =
+  let two_or_more_mentions tactic var_name expr =
     let rec two_or_more_mentions expr count =
       let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
       let rec get_pat_vars p =
@@ -356,21 +358,29 @@ and translate_abstraciton case =
         let args = List.map (fun (_, Some a) -> a) args in
         List.fold_left eval_if_need count @@ func :: args
       | Texp_ifthenelse (cond, th, Some el) ->
-        List.fold_left eval_if_need count [cond; th; el]
+        if tactic = Nondet
+          then List.fold_left eval_if_need count [cond; th; el]
+          else let c1 = eval_if_need count cond in
+               max (eval_if_need c1 th) (eval_if_need c1 el)
       | Texp_let (_, bindings, expr) ->
         let bindings = List.filter (fun b -> var_name <> get_pat_name b.vb_pat) bindings in
         let exprs = expr :: List.map (fun b -> b.vb_expr) bindings in
         List.fold_left eval_if_need count exprs
       | Texp_match (e, cs, _, _) ->
         let cases = List.filter (fun c -> List.for_all ((<>) var_name) @@ get_pat_vars c.c_lhs) cs in
-        let exprs = e :: List.map (fun c -> c.c_rhs) cases in
-        List.fold_left eval_if_need count exprs in
-
+        let exprs = List.map (fun c -> c.c_rhs) cases in
+        if tactic = Nondet
+          then List.fold_left eval_if_need count @@ e :: exprs
+          else let c1 = eval_if_need count e in
+               List.fold_left max c1 @@ List.map (eval_if_need c1) exprs in
     two_or_more_mentions expr 0 >= 2 in
 
   let need_to_activate p e =
     is_primary_type p.pat_type && (
-      is_active_arg p || need_activate && two_or_more_mentions (get_pat_name p) e) in
+      is_active_arg p ||
+        activate_tactic <> Off &&
+        two_or_more_mentions activate_tactic (get_pat_name p) e
+      ) in
 
   let create_simple_arg var =
     let fresh_n = create_fresh_var_name () in
@@ -1228,16 +1238,16 @@ let only_generate hook_info tast =
     let need_poly            = false in
     let need_false           = true in
 
-    let need_high            = false in
+    let need_high            = true in
     let need_move_unifies_up = true in
-    let need_activate        = false in
+    let activate_tactic      = Det in
     let need_CbN             = false in
     let subst_only_q         = false in
 
     let start_index = get_max_index tast in
     let reductor    = beta_reductor start_index subst_only_q in
     (if need_high
-      then translate_high tast start_index need_lower_case need_activate
+      then translate_high tast start_index need_lower_case activate_tactic
       else translate tast start_index need_lower_case need_poly need_false need_standart_bool) |>
     add_packages |>
     eval_if_need need_reduce    (reductor.structure reductor) |>
