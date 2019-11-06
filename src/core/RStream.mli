@@ -18,8 +18,19 @@
 
 (** Stream type *)
 type 'a t
+type 'a s
 
 (** Constructors *)
+
+val nope : 'a s
+
+val answ : 'a -> 'a s
+
+val cont : 'a -> ('a -> 'a s) -> 'a s
+
+val conj : 'a s -> ('a -> 'a s) -> 'a s
+
+val disj : 'a s -> 'a s -> 'a s
 
 val nil : 'a t
 
@@ -29,9 +40,9 @@ val cons : 'a -> 'a t -> 'a t
 
 val from_fun : (unit -> 'a t) -> 'a t
 
-val suspend : is_ready:(unit -> bool) -> (unit -> 'a t) -> 'a t
-
 val of_list : 'a list -> 'a t
+
+val transform : 'a s -> 'a t
 
 (** Emptiness test *)
 val is_empty : 'a t -> bool

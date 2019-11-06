@@ -16,22 +16,30 @@
  * (enclosed in the file COPYING).
  *)
 
+type 'a s =
+  | Nope
+  | Answ of 'a
+  | Cont of 'a   * ('a -> 'a s)
+  | Conj of 'a s * ('a -> 'a s)
+  | Disj of 'a s * 'a s
+
 type 'a t =
   | Nil
   | Cons of 'a * ('a t)
   | Thunk  of 'a thunk
-  | Waiting of 'a suspended list
 and 'a thunk =
   unit -> 'a t
-and 'a suspended =
-  {is_ready: unit -> bool; zz: 'a thunk}
+
+let nope     = Nope
+let answ s   = Answ s
+let cont a c = Cont (a, c)
+let conj s c = Conj (s, c)
+let disj s r = Disj (s, r)
 
 let nil         = Nil
 let single x    = Cons (x, Nil)
 let cons x s    = Cons (x, s)
 let from_fun zz = Thunk zz
-
-let suspend ~is_ready f = Waiting [{is_ready; zz=f}]
 
 let rec of_list = function
 | []    -> Nil
@@ -41,56 +49,46 @@ let force = function
 | Thunk zz  -> zz ()
 | xs        -> xs
 
+let rec step = function
+  | Nope        -> None  , None
+  | Answ a      -> Some a, None
+  | Cont (a, c) -> None  , Some (c a)
+  | Conj (s, c) ->
+    begin match step s with
+    | None,   None   -> None, None
+    | Some a, None   -> None, Some (cont a c)
+    | None,   Some s -> None, Some (conj s c)
+    | Some a, Some s -> None, Some (disj (cont a c) (conj s c))
+    end
+  | Disj (s1, s2) ->
+    match step s1 with
+    | a, None    -> a, Some s2
+    | a, Some s1 -> a, Some (disj s2 s1)
+
+
+let rec transform s =
+  match step s with
+  | None,   None   -> nil
+  | Some a, None   -> single a
+  | None  , Some s -> from_fun @@ fun () -> transform s
+  | Some a, Some s -> cons a (from_fun @@ fun () -> transform s)
+
 let rec mplus xs ys =
   match xs with
   | Nil           -> force ys
   | Cons (x, xs)  -> cons x (from_fun @@ fun () -> mplus (force ys) xs)
   | Thunk   _     -> from_fun (fun () -> mplus (force ys) xs)
-  | Waiting ss    ->
-    let ys = force ys in
-    (* handling waiting streams is tricky *)
-    match unwrap_suspended ss, ys with
-    (* if [xs] has no ready streams and [ys] is also a waiting stream then we merge them  *)
-    | Waiting ss, Waiting ss' -> Waiting (ss @ ss')
-    (* if [xs] has no ready streams but [ys] is not a waiting stream then we swap them,
-       pushing waiting stream to the back of the new stream *)
-    | Waiting ss, _           -> mplus ys @@ from_fun (fun () -> xs)
-    (* if [xs] has ready streams then [xs'] contains some lazy stream that is ready to produce new answers *)
-    | xs', _ -> mplus xs' ys
-
-and unwrap_suspended ss =
-  let rec find_ready prefix = function
-    | ({is_ready; zz} as s)::ss ->
-      if is_ready ()
-      then Some (from_fun zz), (List.rev prefix) @ ss
-      else find_ready (s::prefix) ss
-    | [] -> None, List.rev prefix
-  in
-  match find_ready [] ss with
-    | Some s, [] -> s
-    | Some s, ss -> mplus (force s) @@ Waiting ss
-    | None , ss  -> Waiting ss
 
 let rec bind s f =
   match s with
   | Nil           -> Nil
   | Cons (x, s)   -> mplus (f x) (from_fun (fun () -> bind (force s) f))
   | Thunk zz      -> from_fun (fun () -> bind (zz ()) f)
-  | Waiting ss    ->
-    match unwrap_suspended ss with
-    | Waiting ss ->
-      let helper {zz} as s = {s with zz = fun () -> bind (zz ()) f} in
-      Waiting (List.map helper ss)
-    | s          -> bind s f
 
 let rec msplit = function
 | Nil           -> None
 | Cons (x, xs)  -> Some (x, xs)
 | Thunk zz      -> msplit @@ zz ()
-| Waiting ss    ->
-  match unwrap_suspended ss with
-  | Waiting _ -> None
-  | xs        -> msplit xs
 
 let is_empty s =
   match msplit s with
@@ -101,9 +99,6 @@ let rec map f = function
 | Nil          -> Nil
 | Cons (x, xs) -> Cons (f x, map f xs)
 | Thunk zzz    -> from_fun (fun () -> map f @@ zzz ())
-| Waiting ss   ->
-  let helper {zz} as s = {s with zz = fun () -> map f (zz ())} in
-  Waiting (List.map helper ss)
 
 let rec iter f s =
   match msplit s with

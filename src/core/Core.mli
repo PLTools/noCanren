@@ -26,6 +26,7 @@ module State :
 (** Goal converts a state into a lazy stream of states *)
 type 'a goal'
 type goal = State.t RStream.t goal'
+type sgoal = State.t RStream.s goal'
 
 (** {3 miniKanren basic combinators} *)
 
@@ -77,6 +78,24 @@ val success : goal
 
 (** [failure] always fails *)
 val failure : goal
+
+val success' : sgoal
+val failure' : sgoal
+
+val (===!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
+val (=/=!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
+val delay' : sgoal -> sgoal
+val conj'  : sgoal -> sgoal -> sgoal
+val (&&&!) : sgoal -> sgoal -> sgoal
+val disj'  : sgoal -> sgoal -> sgoal
+val (|||!) : sgoal -> sgoal -> sgoal
+val conde' : sgoal list -> sgoal
+
+val call_fresh' : (('a, 'b) injected -> sgoal) -> sgoal
+
+val transform : sgoal -> goal
+
+
 
 (** {2 Combinators to produce fresh variables} *)
 module Fresh :

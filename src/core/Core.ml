@@ -184,6 +184,7 @@ let (!!!) = Obj.magic
 type 'a goal' = State.t -> 'a
 
 type goal = State.t RStream.t goal'
+type sgoal = State.t RStream.s goal'
 
 let success st = RStream.single st
 let failure _  = RStream.nil
@@ -228,6 +229,37 @@ let conde = (?|)
 let call_fresh f st =
   let x = State.fresh st in
   f x st
+
+let rec fold_right1 f = function
+| [g]     -> g
+| g :: gs -> f g @@ fold_right1 f gs
+
+let (===!) x y st =
+  match State.unify x y st with
+  | Some st -> RStream.answ st
+  | None    -> RStream.nope
+
+let (=/=!) x y st =
+  match State.diseq x y st with
+  | Some st -> RStream.answ st
+  | None    -> RStream.nope
+
+let delay' g st    = RStream.cont st g
+let conj' f g st   = RStream.conj (RStream.cont st f) g
+let (&&&!)         = conj'
+let disj' x y st   = let st = State.new_scope st in RStream.disj (RStream.cont st x) (RStream.cont st y)
+let (|||!)         = disj'
+let conde' gs st   = fold_right1 disj' gs st
+
+let call_fresh' f st =
+  let x = State.fresh st in
+  f x st
+
+let success' = RStream.answ
+let failure' _ = RStream.nope
+
+let transform g st = RStream.transform (g st)
+
 
 module Fresh =
   struct
@@ -380,7 +412,7 @@ module Table :
               (* delayed check that current head of cache is not equal to head of seen part *)
               let is_ready () = seen != !cache  in
               (* delayed thunk starts to consume unseen part of cache  *)
-              RStream.suspend ~is_ready @@ fun () -> helper !cache !cache seen
+              RStream.from_fun @@ fun () -> helper !cache !cache seen
             else
               (* consume one answer term from cache and `lift` it to the current environment *)
               let answ, tail = (Answer.lift env @@ List.hd curr), List.tl curr in
