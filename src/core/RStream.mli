@@ -28,7 +28,7 @@ val answ : 'a -> 'a s
 
 val cont : 'a -> ('a -> 'a s) -> 'a s
 
-val conj : 'a s -> ('a -> 'a s) -> 'a s
+val conj : 'a s -> int -> int -> ('a -> 'a s) -> 'a s
 
 val disj : 'a s -> 'a s -> 'a s
 
@@ -42,7 +42,9 @@ val from_fun : (unit -> 'a t) -> 'a t
 
 val of_list : 'a list -> 'a t
 
-val transform : 'a s -> 'a t
+val classic_transform : 'a s -> 'a t
+
+val fair_transform : 'a s -> 'a t
 
 (** Emptiness test *)
 val is_empty : 'a t -> bool

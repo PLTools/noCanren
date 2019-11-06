@@ -85,15 +85,16 @@ val failure' : sgoal
 val (===!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
 val (=/=!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
 val delay' : sgoal -> sgoal
-val conj'  : sgoal -> sgoal -> sgoal
-val (&&&!) : sgoal -> sgoal -> sgoal
+val conj'  : int -> sgoal -> sgoal -> sgoal
+val (&&&!) : int -> sgoal -> sgoal -> sgoal
 val disj'  : sgoal -> sgoal -> sgoal
 val (|||!) : sgoal -> sgoal -> sgoal
 val conde' : sgoal list -> sgoal
 
 val call_fresh' : (('a, 'b) injected -> sgoal) -> sgoal
 
-val transform : sgoal -> goal
+val classic_transform : sgoal -> goal
+val fair_transform    : sgoal -> goal
 
 
 

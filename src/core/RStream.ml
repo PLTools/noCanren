@@ -20,7 +20,7 @@ type 'a s =
   | Nope
   | Answ of 'a
   | Cont of 'a   * ('a -> 'a s)
-  | Conj of 'a s * ('a -> 'a s)
+  | Conj of 'a s * int * int * ('a -> 'a s)
   | Disj of 'a s * 'a s
 
 type 'a t =
@@ -30,11 +30,16 @@ type 'a t =
 and 'a thunk =
   unit -> 'a t
 
-let nope     = Nope
-let answ s   = Answ s
-let cont a c = Cont (a, c)
-let conj s c = Conj (s, c)
-let disj s r = Disj (s, r)
+let nope         = Nope
+let answ s       = Answ s
+let cont a c     = Cont (a, c)
+let conj s n m c = Conj (s, n, m, c)
+let disj s r     = Disj (s, r)
+
+let rec disjs = function
+| [x]     -> x
+| x :: xs -> disj x @@ disjs xs
+| []      -> nope
 
 let nil         = Nil
 let single x    = Cons (x, Nil)
@@ -49,29 +54,59 @@ let force = function
 | Thunk zz  -> zz ()
 | xs        -> xs
 
-let rec step = function
+let rec classic_step = function
   | Nope        -> None  , None
   | Answ a      -> Some a, None
   | Cont (a, c) -> None  , Some (c a)
-  | Conj (s, c) ->
-    begin match step s with
+  | Conj (s, n, m, c) ->
+    begin match classic_step s with
     | None,   None   -> None, None
     | Some a, None   -> None, Some (cont a c)
-    | None,   Some s -> None, Some (conj s c)
-    | Some a, Some s -> None, Some (disj (cont a c) (conj s c))
+    | None,   Some s -> None, Some (conj s n m c)
+    | Some a, Some s -> None, Some (disj (cont a c) (conj s n m c))
     end
   | Disj (s1, s2) ->
-    match step s1 with
+    match classic_step s1 with
     | a, None    -> a, Some s2
     | a, Some s1 -> a, Some (disj s2 s1)
 
 
-let rec transform s =
+let rec split acc = function
+  | Nope           -> []
+  | Answ a         -> [a, answ, acc]
+  | Cont (a, c)    -> [a, c, acc]
+  | Disj (s, t)    -> split acc s @ split acc t
+  | Conj (s, n, m, c) -> split (fun x -> acc @@ conj x n m c) s
+
+let split s = List.map (fun a, c, h -> a, fun a -> h @@ cont a c) @@ split (fun x -> x) s
+
+let rec fair_step = function
+  | Nope        -> None  , None
+  | Answ a      -> Some a, None
+  | Cont (a, c) -> None  , Some (c a)
+  | Conj (s, n, 0, c) -> None, Some (disjs @@ List.map (fun a, c' -> conj (c a) n n c') @@ split s)
+  | Conj (s, n, m, c) ->
+    begin match fair_step s with
+    | None,   None   -> None, None
+    | Some a, None   -> None, Some (cont a c)
+    | None,   Some s -> None, Some (conj s n (m - 1) c)
+    | Some a, Some s -> None, Some (disj (cont a c) (conj s n (m - 1) c))
+    end
+  | Disj (s1, s2) ->
+    match fair_step s1 with
+    | a, None    -> a, Some s2
+    | a, Some s1 -> a, Some (disj s2 s1)
+
+
+let rec transform step s =
   match step s with
   | None,   None   -> nil
   | Some a, None   -> single a
-  | None  , Some s -> from_fun @@ fun () -> transform s
-  | Some a, Some s -> cons a (from_fun @@ fun () -> transform s)
+  | None  , Some s -> from_fun @@ fun () -> transform step s
+  | Some a, Some s -> cons a (from_fun @@ fun () -> transform step s)
+
+let classic_transform s = transform classic_step s
+let fair_transform    s = transform fair_step    s
 
 let rec mplus xs ys =
   match xs with

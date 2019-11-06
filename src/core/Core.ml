@@ -245,7 +245,7 @@ let (=/=!) x y st =
   | None    -> RStream.nope
 
 let delay' g st    = RStream.cont st g
-let conj' f g st   = RStream.conj (RStream.cont st f) g
+let conj' n f g st = RStream.conj (RStream.cont st f) n n g
 let (&&&!)         = conj'
 let disj' x y st   = let st = State.new_scope st in RStream.disj (RStream.cont st x) (RStream.cont st y)
 let (|||!)         = disj'
@@ -258,7 +258,9 @@ let call_fresh' f st =
 let success' = RStream.answ
 let failure' _ = RStream.nope
 
-let transform g st = RStream.transform (g st)
+let classic_transform g st = RStream.classic_transform (g st)
+
+let fair_transform g st = RStream.fair_transform (g st)
 
 
 module Fresh =
