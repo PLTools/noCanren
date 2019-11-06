@@ -11,8 +11,50 @@ let delay = delay'
 
 let (===) = (===!)
 let (=/=) = (=/=!)
-let (&&&) = (&&&!)
+let (&&&) = (&&&!) 50
 let conde = conde'
+
+(******************************************)
+;;
+
+@type 'tree tree = Leaf | Node of 'tree * 'tree with show
+
+module For_tree = (Fmap)
+  (struct
+    let rec fmap fa = function
+      | Leaf       -> Leaf
+      | Node (a1, a2) -> Node (fa a1, fa a2)
+    type 'a t = 'a tree
+  end)
+
+let leaf ()    = inj @@ For_tree.distrib @@ Leaf
+let node a1 a2 = inj @@ For_tree.distrib @@ Node (a1, a2)
+
+let rec ltree t =
+  conde [
+    t === leaf ();
+    call_fresh @@ fun t' ->
+      (t === node t' (leaf ()) &&& ltree t')]
+
+let rec rtree t =
+  conde [
+    t === leaf ();
+    call_fresh @@ fun t' ->
+      (t === node (leaf ()) t' &&& rtree t')]
+
+let main_goal q = ltree q &&& rtree q
+
+
+let rec tree_reify x = For_tree.reify tree_reify x
+let rec show_tree  x = show tree show_tree x
+let rec show_ltree x = show logic (show tree show_ltree) x
+
+let run x = runR tree_reify show_tree show_ltree x
+
+let () =
+  run (-1) q qh ("tree", fun q -> fair_transform @@ main_goal q);;
+
+(******************************************)
 
 type 'a0 gnat =
   | Z 
@@ -123,8 +165,9 @@ let gen n = triple (gen_pin n) (nil ()) (nil ())
 (** For high order conversion **)
 (* let check p q r = check ((===) p) ((===) q) r *)
 
+
+
 let _ =
   run 1 q qh ("first", fun q ->
-   OCanren.transform @@ check (gen 3) q
+   OCanren.fair_transform @@ check (gen 3) q
   )
-
