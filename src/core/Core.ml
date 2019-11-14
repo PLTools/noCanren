@@ -195,14 +195,14 @@ let (===) x y st =
   | None    -> failure st
 
 let unify = (===)
-          
+
 let (=/=) x y st =
   match State.diseq x y st with
   | Some st -> success st
   | None    -> failure st
 
 let diseq = (=/=)
-          
+
 let delay g st = RStream.from_fun (fun () -> g () st)
 
 let conj f g st = RStream.bind (f st) g
@@ -244,7 +244,7 @@ let (=/=!) x y st =
   | Some st -> RStream.answ st
   | None    -> RStream.nope
 
-let delay' g st    = RStream.cont st g
+let delay' zz st   = RStream.cont st @@ zz ()
 let conj' n f g st = RStream.conj (RStream.cont st f) n n g
 let (&&&!)         = conj'
 let disj' x y st   = let st = State.new_scope st in RStream.disj (RStream.cont st x) (RStream.cont st y)

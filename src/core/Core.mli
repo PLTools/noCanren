@@ -84,7 +84,7 @@ val failure' : sgoal
 
 val (===!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
 val (=/=!) : ('a, 'b logic) injected -> ('a, 'b logic) injected -> sgoal
-val delay' : sgoal -> sgoal
+val delay' : (unit -> sgoal) -> sgoal
 val conj'  : int -> sgoal -> sgoal -> sgoal
 val (&&&!) : int -> sgoal -> sgoal -> sgoal
 val disj'  : sgoal -> sgoal -> sgoal
