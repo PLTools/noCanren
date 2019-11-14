@@ -54,9 +54,9 @@ let rec ctor e =
   | _                    -> None
 
 let list_of_list es =
-  let loc      = MLast.loc_of_expr (List.hd es) in 
+  let loc      = MLast.loc_of_expr (List.hd es) in
   let cons a b = <:expr< [ $a$ :: $b$ ]  >> in
-  List.fold_right (fun e lst -> cons e lst) es <:expr< [] >>  
+  List.fold_right (fun e lst -> cons e lst) es <:expr< [] >>
 
 let rec fix_term e =
   let loc = MLast.loc_of_expr e in
@@ -69,7 +69,7 @@ let rec fix_term e =
              List.fold_left (fun acc e -> <:expr< $acc$ $fix_term e$ >> ) e1' ts
           | _  -> <:expr< $e1'$ $fix_term e2$ >>
          )
-      | _ ->         
+      | _ ->
          (match e with
           | <:expr< OCanren.Std.nil () >> -> e
           | _ -> <:expr< $fix_term e1$ $fix_term e2$ >>
@@ -89,7 +89,7 @@ let rec fix_term e =
     )
 
 (* Borrowed from camlp5 OCaml parser *)
-let is_operator = 
+let is_operator =
   let ht = Hashtbl.create 73 in
   let ct = Hashtbl.create 73 in
   List.iter (fun x -> Hashtbl.add ht x true)
@@ -99,13 +99,13 @@ let is_operator =
      '?'; '%'; '.'; '$'];
   fun x ->
     try Hashtbl.find ht x with
-    Not_found -> try Hashtbl.find ct x.[0] with _ -> false 
+    Not_found -> try Hashtbl.find ct x.[0] with _ -> false
 
 let operator_rparen =
   Grammar.Entry.of_parser gram "operator_rparen"
     (fun strm ->
        match Stream.npeek 2 strm with
-       | [("", s); ("", ")")] when is_operator s -> 
+       | [("", s); ("", ")")] when is_operator s ->
            Stream.junk strm;
            Stream.junk strm;
            s
@@ -115,7 +115,7 @@ let operator =
   Grammar.Entry.of_parser gram "operator"
     (fun strm ->
        match Stream.npeek 1 strm with
-       | [("", s)] when is_operator s -> 
+       | [("", s)] when is_operator s ->
            Stream.junk strm;
            s
        | _ -> raise Stream.Failure)
@@ -130,7 +130,7 @@ let symbolchar =
     else if List.mem s.[i] list then loop s (i + 1)
     else false
   in
-  loop 
+  loop
 
 let prefix =
   let list = ['!'; '?'; '~'] in
@@ -142,27 +142,27 @@ let prefix =
                             List.mem s.[0] list && symbolchar s 1 -> Stream.junk strm; s
       | _ -> raise Stream.Failure
     )
-  
+
 let op_from_list l =
   let b = Buffer.create 64 in
   let add = Buffer.add_string b in
   List.iter add l;
   Buffer.contents b
-    
+
 (* Decorate type expressions *)
 let rec decorate_type ctyp =
   let loc = MLast.loc_of_ctyp ctyp in
   match ctyp with
   | <:ctyp< int >>           -> <:ctyp< OCanren.Std.Nat.logic >>
-  | <:ctyp< bool >>          -> <:ctyp< OCanren.Std.Bool.logic >>                                 
+  | <:ctyp< bool >>          -> <:ctyp< OCanren.Std.Bool.logic >>
   | <:ctyp< $lid:id$ >>      -> <:ctyp< OCanren.logic $ctyp$ >>
-  | <:ctyp< list $y$ >>      -> <:ctyp< OCanren.Std.List.logic $decorate_type y$ >>                               
-  | <:ctyp< option $y$ >>    -> <:ctyp< OCanren.Std.Option.logic $decorate_type y$ >>                               
+  | <:ctyp< list $y$ >>      -> <:ctyp< OCanren.Std.List.logic $decorate_type y$ >>
+  | <:ctyp< option $y$ >>    -> <:ctyp< OCanren.Std.Option.logic $decorate_type y$ >>
   | <:ctyp< $x$ $y$ >>       -> let t = <:ctyp< $x$ $decorate_type y$ >> in <:ctyp< OCanren.logic $t$ >>
   | <:ctyp< $p$ . $t$ >>     -> <:ctyp< $ctyp$ Ocanren.logic >>
   | <:ctyp< ( $list:ts$ ) >> -> fold_right1 (fun t1 t2 -> <:ctyp< OCanren.Std.Pair.logic $t1$ $t2$ >> ) @@ List.map decorate_type ts
   | _                        -> ctyp
-  
+
 EXTEND
   GLOBAL: expr ctyp;
 
@@ -179,7 +179,7 @@ EXTEND
           in
           loop <:expr< $uid:i$ >> j
     ]];
-  
+
   (* TODO: support conde expansion here *)
   expr: LEVEL "expr1" [
     [ "fresh"; "("; vars=LIST0 LIDENT; ")"; clauses=LIST1 expr LEVEL "." ->
@@ -192,19 +192,9 @@ EXTEND
       in
       let ans =
         let rec loop = function
-        | a::b::c::tl ->
+        | a::tl ->
             let pa = <:patt< $lid:a$ >> in
-            let pb = <:patt< $lid:b$ >> in
-            let pc = <:patt< $lid:c$ >> in
-            <:expr< OCanren.Fresh.three (fun $pa$ $pb$ $pc$ -> $loop tl$) >>
-        | a::b::tl ->
-            let rez = loop tl in
-            let pa = <:patt< $lid:a$ >> in
-            let pb = <:patt< $lid:b$ >> in
-            <:expr< OCanren.Fresh.two (fun $pa$ $pb$ -> $rez$) >>
-        | a::[] ->
-            let pa = <:patt< $lid:a$ >> in
-            <:expr< OCanren.Fresh.one (fun $pa$ -> $body$) >>
+            <:expr< call_fresh (fun $pa$ -> $loop tl$) >>
         | []    -> body
         in
         loop vars
@@ -232,7 +222,7 @@ EXTEND
             <:expr< OCanren.call_fresh ( fun $p$ -> $b$ ) >>
          )
          vars
-         b                                        
+         b
     ] |
     "primary" [
         p=prefix; t=ocanren_term                      -> let p = <:expr< $lid:p$ >> in <:expr< $p$ $t$ >>
@@ -242,20 +232,20 @@ EXTEND
                                                          let a = <:expr< $p$ $l$ >> in
                                                          <:expr< $a$ $r$ >>
       | l=ocanren_term                                -> l
-      | "("; op=operator_rparen                       -> <:expr< $lid:op$ >> 
+      | "("; op=operator_rparen                       -> <:expr< $lid:op$ >>
       | "("; e=ocanren_expr; ")"                      -> e
-      | "||"; "("; es=LIST1 ocanren_expr SEP ";"; ")" -> <:expr< OCanren.conde $list_of_list es$ >> 
+      | "||"; "("; es=LIST1 ocanren_expr SEP ";"; ")" -> <:expr< OCanren.conde $list_of_list es$ >>
       | "&&"; "("; es=LIST1 ocanren_expr SEP ";"; ")" ->
          let op = <:expr< $lid:"?&"$ >> in
          let id = <:expr< OCanren . $op$ >> in
-         <:expr< $id$ $list_of_list es$ >> 
+         <:expr< $id$ $list_of_list es$ >>
     ]
   ];
 
   ocanren_term: [[
     t=ocanren_term' -> fix_term t
   ]];
-  
+
   ocanren_term':  [
     "top" [ "!"; "("; e=expr; ")" -> e
     | c=INT ->
@@ -287,5 +277,5 @@ EXTEND
   ];
 
   ctyp: [[ "ocanren"; "("; t=ctyp; ")" -> decorate_type t ]];
-  
+
 END;
