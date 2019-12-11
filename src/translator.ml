@@ -5,6 +5,7 @@ open Longident
 open Typedtree
 open Ast_helper
 open Tast_mapper
+open Util
 
 let () = Printexc.record_backtrace true
 
@@ -80,7 +81,7 @@ let create_id  s = Lident s |> mknoloc |> Exp.ident
 let create_pat s = mknoloc s |> Pat.var
 
 let rec lowercase_lident = function
-  | Lident s      -> Lident (Util.mangle_construct_name s)
+  | Lident s      -> Lident (mangle_construct_name s)
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident r)
   | Ldot (t, s)   -> Ldot (lowercase_lident t, s)
 
@@ -196,14 +197,12 @@ let rec is_disj_pats = function
 
 (*****************************************************************************************************************************)
 
-type tactic = Off | Nondet | Det
-
-let translate_high tast start_index need_lowercase activate_tactic =
+let translate_high tast start_index params =
 
 let lowercase_lident x =
-  if need_lowercase
-  then lowercase_lident x
-  else x in
+  if params.leave_constuctors
+  then x
+  else lowercase_lident x in
 
 let curr_index = ref start_index in
 
@@ -378,8 +377,8 @@ and translate_abstraciton case =
   let need_to_activate p e =
     is_primary_type p.pat_type && (
       is_active_arg p ||
-        activate_tactic <> Off &&
-        two_or_more_mentions activate_tactic (get_pat_name p) e
+        params.high_order_paprams.activate_tactic <> Off &&
+        two_or_more_mentions params.high_order_paprams.activate_tactic (get_pat_name p) e
       ) in
 
   let create_simple_arg var =
@@ -492,13 +491,17 @@ let translate_structure t = List.map translate_structure_item t.str_items in
 translate_structure tast
 
 (*****************************************************************************************************************************)
+(*****************************************************************************************************************************)
+(*****************************************************************************************************************************)
+(*****************************************************************************************************************************)
+(*****************************************************************************************************************************)
 
-let translate tast start_index need_lowercase need_poly need_false need_standart_bool =
+let translate tast start_index params =
 
 let lowercase_lident x =
-  if need_lowercase
-  then lowercase_lident x
-  else x in
+  if params.leave_constuctors
+  then x
+  else lowercase_lident x in
 
 let curr_index = ref start_index in
 
@@ -599,7 +602,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
 
   and translate_nonrec_let let_vars bind expr =
-    if not need_poly && is_primary_type bind.vb_expr.exp_type then
+    if not params.unnesting_params.polymorphism_supported && is_primary_type bind.vb_expr.exp_type then
       let name       = get_pat_name bind.vb_pat in
       let conj1      = create_apply (translate_expression let_vars bind.vb_expr) [create_id name] in
       let args       = create_fresh_argument_names_by_type expr.exp_type in
@@ -705,7 +708,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bool_funs is_or =
-    if need_standart_bool then
+    if params.unnesting_params.use_standart_bool_relations then
       if is_or then [%expr Bool.oro] else [%expr Bool.ando]
       else
         let a1  = create_fresh_var_name () in
@@ -713,16 +716,16 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
         let q   = create_fresh_var_name () in
         let fst = if is_or then [%expr !!true]  else [%expr !!false] in
         let snd = if is_or then [%expr !!false] else [%expr !!true]  in
-        if need_false then
-        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+        if params.unnesting_params.remove_false then
+          if is_or then
+            [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+                      ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
+          else
+            [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+                      ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) &&& ([%e create_id a2] === !!true))]
+        else [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
                  conde [([%e create_id a1] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
                         ([%e create_id a1] === [%e snd]) &&& ([%e create_id q] === [%e create_id a2])]]
-        else if is_or then
-        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-                 ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) ||| ([%e create_id a2] === !!true))]
-        else
-        [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-                 ([%e create_id q] === !!true) &&& (([%e create_id a1] === !!true) &&& ([%e create_id a2] === !!true))]
 
   and translate_eq_funs is_eq =
     let a1  = create_fresh_var_name () in
@@ -730,16 +733,16 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     let q   = create_fresh_var_name () in
     let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
-    if need_false then
+    if params.unnesting_params.remove_false then
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
+             ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
+    else
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
              conde [([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst]);
                     ([%e create_id a1] =/= [%e create_id a2]) &&& ([%e create_id q] === [%e snd])]]
-    else
-    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_pat q] ->
-             ([%e create_id a1] === [%e create_id a2]) &&& ([%e create_id q] === [%e fst])]
 
   and translate_not_fun () =
-    if need_standart_bool then [%expr Bool.noto]
+    if params.unnesting_params.use_standart_bool_relations then [%expr Bool.noto]
     else
       let a  = create_fresh_var_name () in
       let q  = create_fresh_var_name () in
@@ -785,23 +788,23 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_match (e, cs, _, _) -> translate_match let_vars expr.exp_loc e cs expr.exp_type
 
-    | Texp_ifthenelse (cond, th, Some el) -> if need_false
-                                             then translate_if let_vars cond th el expr.exp_type
-                                             else fail_loc expr.exp_loc "if-then-else expression in not-false mode"
+    | Texp_ifthenelse (cond, th, Some el) -> if params.unnesting_params.remove_false
+                                             then fail_loc expr.exp_loc "if-then-else expression in not-false mode"
+                                             else translate_if let_vars cond th el expr.exp_type
 
     | Texp_function {cases = [case]} -> translate_abstraciton let_vars case
 
     | Texp_ident (_, { txt = Lident "="  }, _)  -> translate_eq_funs true
-    | Texp_ident (_, { txt = Lident "<>" }, _)  -> if need_false
-                                                   then translate_eq_funs false
-                                                   else fail_loc expr.exp_loc "Operator '<>' in not-false mode"
+    | Texp_ident (_, { txt = Lident "<>" }, _)  -> if params.unnesting_params.remove_false
+                                                   then fail_loc expr.exp_loc "Operator '<>' in not-false mode"
+                                                   else translate_eq_funs false
 
     | Texp_ident (_, { txt = Lident "||" }, _)  -> translate_bool_funs true
     | Texp_ident (_, { txt = Lident "&&" }, _)  -> translate_bool_funs false
 
-    | Texp_ident (_, { txt = Lident "not" }, _) -> if need_false
-                                                   then translate_not_fun ()
-                                                   else fail_loc expr.exp_loc "Operator 'not' in not-false mode"
+    | Texp_ident (_, { txt = Lident "not" }, _) -> if params.unnesting_params.remove_false
+                                                   then fail_loc expr.exp_loc "Operator 'not' in not-false mode"
+                                                   else translate_not_fun ()
 
     | Texp_ident (_, { txt = Lident name }, _) -> translate_ident let_vars name expr.exp_type
 
@@ -1226,34 +1229,18 @@ let print_if ppf flag printer arg =
 let eval_if_need flag f =
   if flag then f else fun x -> x
 
-let only_generate hook_info tast =
+let only_generate hook_info tast params =
   try
     let open Transl in
-    let need_standart_bool   = false in
-
-    let need_reduce          = true in
-    let need_lower_case      = true in
-    let need_normalize       = true in
-
-    let need_poly            = false in
-    let need_false           = true in
-
-    let need_high            = true in
-    let need_move_unifies_up = true in
-    let activate_tactic      = Det in
-    let need_CbN             = false in
-    let subst_only_q         = false in
-
     let start_index = get_max_index tast in
-    let reductor    = beta_reductor start_index subst_only_q in
-    (if need_high
-      then translate_high tast start_index need_lower_case activate_tactic
-      else translate tast start_index need_lower_case need_poly need_false need_standart_bool) |>
+    let reductor    = beta_reductor start_index params.subst_only_util_vars in
+    (if params.unnesting_mode then translate else translate_high) tast start_index params |>
     add_packages |>
-    eval_if_need need_reduce    (reductor.structure reductor) |>
-    eval_if_need need_normalize (let mapper = fresh_and_conjs_normalizer need_move_unifies_up in
-                                 mapper.structure mapper) |>
-    eval_if_need need_CbN call_by_need_creator |>
+    eval_if_need params.beta_reduction
+                 (reductor.structure reductor) |>
+    eval_if_need params.normalization
+                 (let mapper = fresh_and_conjs_normalizer params.move_unifications in mapper.structure mapper) |>
+    eval_if_need params.high_order_paprams.use_call_by_need call_by_need_creator |>
     Put_distrib.process |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
