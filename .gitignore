@@ -1,9 +1,5 @@
-\ *undo-tree*
 *.native
 *.byte
-*.swp
 _build
-
-# ocamldoc related
-/style.css
-/MiniKanren.docdir
+regression/*.ml
+regression/*.log
