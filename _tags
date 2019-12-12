@@ -1,1 +1,3 @@
 <src/*.*>: package(ppx_tools.metaquot,compiler-libs.common)
+<samples/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
+<regression/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
