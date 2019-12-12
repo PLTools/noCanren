@@ -6,6 +6,8 @@ open Format
 open Typedtree
 open Util
 
+let need_print_result = ref false
+
 let tool_name = "noCanren"
 
 let print_if ppf flag printer arg =
@@ -32,14 +34,18 @@ let translate ppf params =
     in
     let untyped = Translator.only_generate { Misc.sourcefile = params.input_name } typedtree params in
     let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
-    let () = Pprintast.structure Format.std_formatter untyped in
+    let () = if !need_print_result || params.output_name == None
+             then Pprintast.structure Format.std_formatter tree_without_attrs in
 
     let () =
-      let ch = open_out params.output_name in
-      let fmt = Format.formatter_of_out_channel ch in
-      Format.pp_set_margin fmt 180;
-      Pprintast.structure fmt tree_without_attrs;
-      fprintf fmt "%!" in
+      match params.output_name with
+      | None             -> ()
+      | Some output_name ->
+        let ch = open_out output_name in
+        let fmt = Format.formatter_of_out_channel ch in
+        Format.pp_set_margin fmt 180;
+        Pprintast.structure fmt tree_without_attrs;
+        fprintf fmt "%!" in
 
     let () =
       match params.output_name_for_spec_tree with
@@ -142,6 +148,10 @@ let all_options =
     "-spec-tree",
     Arg.String (fun path -> output_name_for_spec_tree := Some path),
     "<file>  Set output file name for specialization tree to <file>"
+    ;
+    "-show-result",
+    Arg.Unit (fun path -> need_print_result := true),
+    " Show result of conversion in terminal"
   ]
 
 let mk_noCanren_params () =
@@ -154,7 +164,7 @@ let mk_noCanren_params () =
     else if !use_standart_bool_relations then failwith "Standart bool relations cannot be used with high-order mode."
     end;
   let input_name = match !input_name with Some s -> s | None -> failwith "Input file not specified" in
-  let output_name = match !output_name with Some s -> s | None -> failwith "Output file not specified" in
+  let output_name = !output_name in
   let unnesting_params =
   {
     polymorphism_supported = !polymorphism_supported;

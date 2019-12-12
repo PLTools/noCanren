@@ -65,5 +65,6 @@ Available options:
 -leave-constuctors  Conversion is without lawercase-renaming of constructors (for both modes)
 -subst-only-util-vars  Use beta-reduction only for additional variables (for both modes)
 -spec-tree <file>  Set output file name for specialization tree to <file>
+-show-result  Show result of conversion in terminal
 -help  Display this list of options
 ```

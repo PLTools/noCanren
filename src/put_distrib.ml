@@ -193,7 +193,7 @@ let revisit_adt ~loc tdecl ctors =
     if FoldInfo.is_empty mapa
     then
       let fmap_for_typ = prepare_fmap ~loc full_t in
-      let () = print_endline "fmap prepared" in
+      (* let () = print_endline "fmap prepared" in *)
       full_t, (*(str_type_ ~loc Nonrecursive [full_t]) ::*) (prepare_distribs ~loc full_t fmap_for_typ)
     else
       let functor_typ =

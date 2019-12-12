@@ -18,7 +18,7 @@ type noCanren_unnesting_params =
 type noCanren_params =
   {
     input_name                : string;
-    output_name               : string;
+    output_name               : string option;
     unnesting_mode            : bool;
     beta_reduction            : bool;
     normalization             : bool;
