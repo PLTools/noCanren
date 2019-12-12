@@ -96,7 +96,7 @@ let t3, t3' =
 (*******************************************)
 
 (** For high order conversion **)
-(* let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r *)
+let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r
 
 (** For call-by-need conversion **)
 (* let check_uni q t1 t2 r = (snd check_uni) ([Obj.magic q], (===) q) ([], (===) t1) ([], (===) t2) r *)

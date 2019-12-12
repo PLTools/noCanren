@@ -55,7 +55,7 @@ let rec lambda_reifier l =
 
 (*************************************************)
 (** For high order conversion **)
-(* let nat_type_inference p t = nat_type_inference ((===) p) t *)
+let nat_type_inference p t = nat_type_inference ((===) p) t
 
 let _ =
   let term0 = abst !!"x" (var_ !!"x") in

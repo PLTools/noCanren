@@ -26,7 +26,7 @@ let myshow = show_sudoku4x4
 
 (*************************************************)
 (** For high order conversion **)
-(* let check_sudoku q r = check_sudoku ((===) q) r *)
+let check_sudoku q r = check_sudoku ((===) q) r
 
 (** For call-by-need conversion **)
 (* let check_sudoku q r = (snd check_sudoku) ([Obj.magic q], (===) q) r *)

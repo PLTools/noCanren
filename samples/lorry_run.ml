@@ -28,7 +28,7 @@ let myshow x = show List.ground show_step x
 let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
 
 (** For high order conversion **)
-(* let checkAnswer a q p r = checkAnswer ((===) a) ((===) q) ((===) p) r *)
+let checkAnswer a q p r = checkAnswer ((===) a) ((===) q) ((===) p) r
 
 let () =
   run_exn myshow (1) q qh ("answers", fun q ->

@@ -98,7 +98,7 @@ let w1, w2 =
   appendo (cons vX vXs) (vYs)         (cons vX vZs) (* append([X | Xs], Ys    , [X | Zs]) *)
 
 (** For high order conversion **)
-(* let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r *)
+let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r
 
 let _ =
   full_run (-1) q qh ("answers1", fun q -> check_uni q t1  t1  !!true);

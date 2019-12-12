@@ -33,7 +33,7 @@ let gen_pin n =
 let gen n = triple (gen_pin n) (nil ()) (nil ())
 
 (** For high order conversion **)
-(* let check p q r = check ((===) p) ((===) q) r *)
+let check p q r = check ((===) p) ((===) q) r
 
 let _ =
   run 1 q qh ("first", fun q ->

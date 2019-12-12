@@ -28,7 +28,7 @@ let myshow x = show List.ground show_step x
 let rec of_int i = if i = 0 then o () else s @@ of_int @@ i - 1
 
 (** For high order conversion **)
-(* let checkAnswer a q p r = checkAnswer ((===) a) ((===) q) ((===) p) r *)
+let checkAnswer a q p r = checkAnswer ((===) a) ((===) q) ((===) p) r
 
 (** For call-by-need conversion **)
 (* let checkAnswer q a b r = (snd checkAnswer) ([Obj.magic q], (===) q) ([], (===) a) ([], (===) b) r *)

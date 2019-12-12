@@ -1,4 +1,4 @@
-open GT
+(* open GT *)
 
 open OCanren
 open OCanren.Std
@@ -19,7 +19,7 @@ let myshow x = show List.ground show_person x
 (*************************************************)
 
 (** For high order conversion **)
-(* let checkAnswer q r = checkAnswer ((===) q) r *)
+let checkAnswer q r = checkAnswer ((===) q) r
 
 (** For call-by-need conversion **)
 (* let checkAnswer q r = (snd checkAnswer) ([Obj.magic q], (===) q) r *)

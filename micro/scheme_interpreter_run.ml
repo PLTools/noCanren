@@ -39,7 +39,7 @@ let run x = runR term_reify show_term' show_lterm x
 
 (*************************************************)
 (** For high order conversion **)
-(* let eval q l r = eval ((===) q) ((===) l) r *)
+let eval q l r = eval ((===) q) ((===) l) r
 
 (** For call-by-need conversion **)
 (* let eval q l r = (snd eval) ([Obj.magic q], (===) q) ([], (===) l) r *)

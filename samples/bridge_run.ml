@@ -25,7 +25,7 @@ let myshow x = show List.ground (show_step show_person) x
 let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
 
 (** For high order conversion **)
-(* let getAnswer q t r = getAnswer ((===) q) t r *)
+let getAnswer q t r = getAnswer ((===) q) t r
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->

@@ -25,7 +25,7 @@ let myshow x = show List.ground (show_step show_person) x
 let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
 
 (** For high order conversion **)
-(* let getAnswer q r = getAnswer ((===) q) r *)
+let getAnswer q r = getAnswer ((===) q) r
 
 (** For call-by-need conversion **)
 (* let getAnswer q r = (snd getAnswer) ([Obj.magic q], (===) q) r *)

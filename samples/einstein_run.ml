@@ -52,7 +52,7 @@ let myshow = show_state
 (*************************************************)
 
 (** For high order conversion **)
-(* let check_state q r = check_state ((===) q) r *)
+let check_state q r = check_state ((===) q) r
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
