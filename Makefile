@@ -8,11 +8,12 @@ compile:
 define TESTRULES
 
 test_$(1):
-	cp samples/$(1)_run.ml regression/$(1)_run.ml
-	./noCanren.native -o regression/$(1).ml samples/$(1).ml2mk.ml
-	$(OB) -I regression $(1)_run.native
+	mkdir -p regression/output
+	./noCanren.native -o regression/output/$(1).ml samples/$(1).ml2mk.ml
+	$(OB) -Is samples,regression/output $(1)_run.native
 
 promote_test_$(1):
+	mkdir -p regression/orig
 	./$(1)_run.native > regression/orig/$(1).log
 	./noCanren.native -o regression/orig/$(1).ml samples/$(1).ml2mk.ml
 
@@ -27,7 +28,21 @@ promote_tests:
 
 run_tests: tests
 	$(foreach T, $(TESTS), \
-		./$(T)_run.native > regression $(T).log)
+		./$(T)_run.native > regression/output/$(T).log; \
+		if diff -u regression/orig/${T}.log regression/output/${T}.log > regression/output/${T}.log.diff; \
+			then \
+				rm regression/output/${T}.log.diff; \
+				if diff -u regression/orig/${T}.ml regression/output/${T}.ml > regression/output/${T}.ml.diff; \
+					then \
+						rm regression/output/${T}.ml.diff; \
+						echo "${T}: PASSED"; \
+					else echo "${T}: FAILED (see regression/output/${T}.ml.diff)"; \
+				fi; \
+			else echo "${T}: FAILED (see regression/output/${T}.log.diff)"; \
+		fi;)
 
-clean:
-	$(RM) -r _build *.native *.log regression/*.ml regression/*.log
+clean_tests:
+	$(RM) -r regression/output
+
+clean: clean_tests
+	$(RM) -r _build *.native *.log regression/*.ml
