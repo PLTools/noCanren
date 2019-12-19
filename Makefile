@@ -20,13 +20,13 @@ promote_test_$(1):
 endef
 $(foreach i,$(TESTS),$(eval $(call TESTRULES,$(i))))
 
-tests: compile
+compile_tests:
 	$(foreach T, $(TESTS), make test_$(T);)
 
 promote_tests:
 	$(foreach T, $(TESTS), make promote_test_$(T);)
 
-run_tests: tests
+test: compile_tests
 	$(foreach T, $(TESTS), \
 		./$(T)_run.native > regression/output/$(T).log; \
 		if diff -u regression/orig/${T}.log regression/output/${T}.log > regression/output/${T}.log.diff; \
@@ -46,3 +46,6 @@ clean_tests:
 
 clean: clean_tests
 	$(RM) -r _build *.native *.log regression/*.ml
+
+install:
+	cp -i _build/src/noCanren.native $(PREFIX)/bin/noCanren
