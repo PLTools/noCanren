@@ -191,9 +191,14 @@ let mk_noCanren_params () =
     output_name_for_spec_tree = !output_name_for_spec_tree;
   }
 
-
 let () =
-    readenv ppf Before_args;
     Arg.parse all_options (fun path -> input_name := Some path) usage;
-    translate ppf @@ mk_noCanren_params ();
-    ()
+    try begin
+      readenv ppf Before_args;
+      translate ppf @@ mk_noCanren_params ()
+    end with Failure     s -> (Printf.printf "%s\n%!" s; Arg.usage all_options usage)
+           | Sys_error   s -> Printf.printf "%s\n%!" s
+           | e             -> begin match Location.error_of_exn e with
+                              | Some (`Ok e) -> Format.eprintf "%a\n%!" Location.report_error e
+                              | _            -> raise e
+                              end
