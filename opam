@@ -8,8 +8,10 @@ homepage: "https://github.com/Lozov-Petr/noCanren"
 bug-reports: "https://github.com/Lozov-Petr/noCanren/issues"
 
 depends: [
-  "ocaml" {>= "4.07"}
+  "ocaml" {= "4.07.1"}
   "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "ppx_tools" {build}
 ]
 build: [
   [make]

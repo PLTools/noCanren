@@ -2,6 +2,14 @@
 
 noCanren is translator from subset of OCaml to OCanren.
 
+## Installatiom ##
+
+noCanren can be installing using [opam](https://opam.ocaml.org/doc/Install.html):
+
+`opam pin add noCanren https://github.com/Lozov-Petr/noCanren.git -y`
+
+To run the tests, you should install [OCanren](https://github.com/JetBrains-Research/OCanren) manually.
+
 ## Subset of OCaml ##
 
 Available syntax of OCaml subset:
