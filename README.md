@@ -52,7 +52,7 @@ match S with
 ## Translating ##
 Usage:
 ```
-noCnanren <options> <input-file>
+noCanren <options> <input-file>
 ```
 
 Available options:
