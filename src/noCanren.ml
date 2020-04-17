@@ -64,7 +64,7 @@ let translate ppf params =
     | x -> raise x
 
 
-let usage = "Usage: noCnanren <options> <file>\nOptions are:"
+let usage = "Usage: noCanren <options> <file>\nOptions are:"
 
 let ppf = Format.err_formatter
 
