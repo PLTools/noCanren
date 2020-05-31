@@ -1,4 +1,6 @@
 <src/*.*>: package(ppx_tools.metaquot,compiler-libs.common)
 <samples/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
+<samples/multifiles/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
 <regression/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
 <regression/output/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
+<regression/multifiles/*.*>: rectypes, syntax(camlp5o), package(GT,GT.syntax.all,ocanren,ocanren.syntax,ocanren.tester)
