@@ -1,3 +1,5 @@
+open Longident
+
 (**************************** Util types ********************************)
 
 type tactic = Off | Nondet | Det
@@ -19,6 +21,7 @@ type noCanren_params =
   {
     input_name                : string;
     output_name               : string option;
+    include_dirs              : string list;
     unnesting_mode            : bool;
     beta_reduction            : bool;
     normalization             : bool;
@@ -39,3 +42,9 @@ let mangle_construct_name name =
   | "val" | "if" | "else" | "for" | "do" | "let" | "open" | "not" | "pair" | "conj"
           | "var" | "snd" | "fst" -> low ^ "_"
   | _ -> low
+
+let rec longident_eq a b =
+  match a, b with
+  | Lident x,        Lident y        -> x = y
+  | Ldot (a, x),     Ldot (b, y)     -> x = y && longident_eq a b
+  | Lapply (a1, a2), Lapply (b1, b2) -> longident_eq a1 b1 && longident_eq a2 b2

@@ -83,7 +83,7 @@ let create_pat s = mknoloc s |> Pat.var
 let rec lowercase_lident = function
   | Lident s      -> Lident (mangle_construct_name s)
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident r)
-  | Ldot (t, s)   -> Ldot (lowercase_lident t, s)
+  | Ldot (t, s)   -> Ldot (t, mangle_construct_name s)
 
 let rec is_primary_type (t : Types.type_expr) =
   match t.desc with
@@ -307,14 +307,14 @@ and translate_if cond th el =
           ([%e create_id b] === !!false) &&& ([%e translate_expression el] [%e create_id q])
         ]))]
 
-and translate_ident i =
-  match i with
-  | "&&"  -> translate_bool_funs false
-  | "||"  -> translate_bool_funs true
-  | "not" -> translate_not_fun ()
-  | "="   -> translate_eq_funs true
-  | "<>"  -> translate_eq_funs false
-  |  _    -> create_id i
+and translate_ident txt =
+  match txt with
+  | Lident "&&"  -> translate_bool_funs false
+  | Lident "||"  -> translate_bool_funs true
+  | Lident "not" -> translate_not_fun ()
+  | Lident "="   -> translate_eq_funs true
+  | Lident "<>"  -> translate_eq_funs false
+  | _            -> mknoloc txt |> Exp.ident
 
 and translate_abstraciton case =
 
@@ -351,6 +351,7 @@ and translate_abstraciton case =
         List.fold_left eval_if_need count args
       | Texp_ident (_, { txt = Longident.Lident name }, _) ->
         if var_name = name then count + 1 else count
+      | Texp_ident _ -> count
       | Texp_function { cases=[case] } ->
         if var_name = get_pat_name case.c_lhs then count else two_or_more_mentions case.c_rhs count
       | Texp_apply (func, args) ->
@@ -458,16 +459,16 @@ and translate_let flag bind expr =
 
 and translate_expression e =
   match e.exp_desc with
-  | Texp_constant _                          -> translate_construct e
-  | Texp_construct _                         -> translate_construct e
-  | Texp_tuple [l; r]                        -> translate_construct e
-  | Texp_ident (_, { txt = Lident name }, _) -> translate_ident name
-  | Texp_function {cases = [case]}           -> translate_abstraciton case
-  | Texp_apply (f, a)                        -> translate_apply f a e.exp_loc
-  | Texp_match (s, cs, _, _)                 -> translate_match e.exp_loc s cs e.exp_type
-  | Texp_ifthenelse (cond, th, Some el)      -> translate_if cond th el
-  | Texp_let (flag, [bind], expr)            -> translate_let flag bind expr
-  | _                                        -> fail_loc e.exp_loc "Incorrect expression" in
+  | Texp_constant _                     -> translate_construct e
+  | Texp_construct _                    -> translate_construct e
+  | Texp_tuple [l; r]                   -> translate_construct e
+  | Texp_ident (_, { txt }, _)          -> translate_ident txt
+  | Texp_function {cases = [case]}      -> translate_abstraciton case
+  | Texp_apply (f, a)                   -> translate_apply f a e.exp_loc
+  | Texp_match (s, cs, _, _)            -> translate_match e.exp_loc s cs e.exp_type
+  | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
+  | Texp_let (flag, [bind], expr)       -> translate_let flag bind expr
+  | _                                   -> fail_loc e.exp_loc "Incorrect expression" in
 
 let translate_external_value_binding vb =
   let pat  = untyper.pat untyper vb.vb_pat in
@@ -484,6 +485,7 @@ let translate_structure_item i =
   | Tstr_type (rec_flag, decls) ->
     let new_decls = List.map mark_type_declaration decls in
     untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }
+  | Tstr_open _ -> untyper.structure_item untyper i
   | _ -> fail_loc i.str_loc "Incorrect structure item" in
 
 let translate_structure t = List.map translate_structure_item t.str_items in
@@ -806,7 +808,8 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
                                                    then fail_loc expr.exp_loc "Operator 'not' in not-false mode"
                                                    else translate_not_fun ()
 
-    | Texp_ident (_, { txt = Lident name }, _) -> translate_ident let_vars name expr.exp_type
+    | Texp_ident (_, { txt = Lident name }, _)  -> translate_ident let_vars name expr.exp_type
+    | Texp_ident (_, { txt },               _)  -> mknoloc txt |> Exp.ident
 
     | Texp_let (flag, [bind], expr) -> translate_let let_vars flag bind expr
 
@@ -827,6 +830,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       untyper.structure_item untyper { stri with str_desc = Tstr_type (rec_flag, new_decls) }
+    | Tstr_open _ -> untyper.structure_item untyper stri
     | _ -> fail_loc stri.str_loc "Incorrect structure item" in
 
 
