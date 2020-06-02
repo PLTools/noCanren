@@ -18,6 +18,7 @@ let (++) x f = f x
 
 let translate ppf params =
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
+  Clflags.open_modules := List.append params.opens !Clflags.open_modules;
   Compmisc.init_path false;
   let outputprefix = output_prefix params.input_name in
   let modulename = module_of_filename ppf params.input_name outputprefix in
@@ -71,6 +72,7 @@ let ppf = Format.err_formatter
 let input_name                  = ref None
 let output_name                 = ref None
 let include_dirs                = ref []
+let opens                       = ref []
 let unnesting_mode              = ref false
 let activate_tactic             = ref Det
 let use_call_by_need            = ref false
@@ -93,6 +95,10 @@ let all_options =
     "-I",
     Arg.String (fun dir -> include_dirs := dir :: !include_dirs),
     "<dir>  Add <dir> to the list of include directories"
+    ;
+    "-open",
+    Arg.String (fun o -> opens := o :: !opens),
+    "<module>  Opens the module <module> before typing"
     ;
     "-high-order-mode",
     Arg.Unit (fun _ -> unnesting_mode := false),
@@ -185,6 +191,7 @@ let mk_noCanren_params () =
     input_name = input_name;
     output_name = output_name;
     include_dirs = !include_dirs;
+    opens = !opens;
     unnesting_mode = !unnesting_mode;
     beta_reduction = !beta_reduction;
     normalization = !normalization;

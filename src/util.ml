@@ -22,6 +22,7 @@ type noCanren_params =
     input_name                : string;
     output_name               : string option;
     include_dirs              : string list;
+    opens                     : string list;
     unnesting_mode            : bool;
     beta_reduction            : bool;
     normalization             : bool;
