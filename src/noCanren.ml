@@ -19,21 +19,21 @@ let (++) x f = f x
 let translate ppf params =
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
   Clflags.open_modules := List.append params.opens !Clflags.open_modules;
-  Compmisc.init_path false;
+  Compmisc.init_path ();
   let outputprefix = output_prefix params.input_name in
-  let modulename = module_of_filename ppf params.input_name outputprefix in
+  let modulename = module_of_filename params.input_name outputprefix in
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
   try
     let (typedtree, coercion) =
-      Pparse.parse_implementation ~tool_name ppf params.input_name
+      Pparse.parse_implementation ~tool_name params.input_name
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation params.input_name outputprefix modulename env
       ++ print_if ppf Clflags.dump_typedtree
         Printtyped.implementation_with_coercion
     in
-    let untyped = Translator.only_generate { Misc.sourcefile = params.input_name } typedtree params in
+    let untyped = Translator.only_generate typedtree params in
     let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
     let () = if !need_print_result || params.output_name == None
              then Pprintast.structure Format.std_formatter tree_without_attrs in
@@ -212,6 +212,6 @@ let () =
     end with Failure     s -> (Printf.printf "%s\n%!" s; Arg.usage all_options usage)
            | Sys_error   s -> Printf.printf "%s\n%!" s
            | e             -> begin match Location.error_of_exn e with
-                              | Some (`Ok e) -> Format.eprintf "%a\n%!" Location.report_error e
+                              | Some (`Ok e) -> Location.print_report ppf e
                               | _            -> raise e
                               end

@@ -11,8 +11,8 @@ let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "l
 
 
   let rec has_attr attr = function
-  | (x, _) :: xs -> x.Location.txt = attr || has_attr attr xs
-  | []           -> false in
+  | x :: xs -> x.attr_name.Location.txt = attr || has_attr attr xs
+  | []      -> false in
 
 
   let rec get_args_and_body expr =

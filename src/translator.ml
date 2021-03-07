@@ -47,7 +47,7 @@ let fail_loc loc fmt =
   let f = Format.formatter_of_buffer b in
   let () = Format.fprintf f fmt in
   let () = Format.fprintf f ". " in
-  let () = Location.print f loc in
+  let () = Location.print_loc f loc in
   Format.pp_print_flush f ();
   failwith (Buffer.contents b)
 
@@ -142,20 +142,20 @@ let filter_vars vars1 vars2 =
 
 let mark_type_declaration td =
     match td.typ_kind with
-    | Ttype_variant cds -> { td with typ_attributes = [(mknoloc "put_distrib_here", Parsetree.PStr [])] }
+    | Ttype_variant cds -> { td with typ_attributes = [Attr.mk (mknoloc "put_distrib_here") (Parsetree.PStr [])] }
     | _                 -> fail_loc td.typ_loc "Incrorrect type declaration"
 
 let mark_constr expr = { expr with
-  pexp_attributes = (mknoloc "it_was_constr", Parsetree.PStr []) :: expr.pexp_attributes }
+  pexp_attributes = (Attr.mk (mknoloc "it_was_constr") (Parsetree.PStr [])) :: expr.pexp_attributes }
 
 let mark_fo_arg expr = { expr with
-  pexp_attributes = (mknoloc "need_CbN", Parsetree.PStr []) :: expr.pexp_attributes }
+  pexp_attributes = (Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])) :: expr.pexp_attributes }
 
 let is_active_arg pat =
-  List.exists (fun a -> (fst a).txt = "active") pat.pat_attributes
+  List.exists (fun a -> a.attr_name.txt = "active") pat.pat_attributes
 
 let create_logic_var name =
-  { (create_pat name) with ppat_attributes = [mknoloc "logic", Parsetree.PStr []] }
+  { (create_pat name) with ppat_attributes = [Attr.mk (mknoloc "logic") (Parsetree.PStr [])] }
 
 let rec have_unifier p1 p2 =
   match p1.pat_desc, p2.pat_desc with
@@ -366,7 +366,7 @@ and translate_abstraciton case =
         let bindings = List.filter (fun b -> var_name <> get_pat_name b.vb_pat) bindings in
         let exprs = expr :: List.map (fun b -> b.vb_expr) bindings in
         List.fold_left eval_if_need count exprs
-      | Texp_match (e, cs, _, _) ->
+      | Texp_match (e, cs, _) ->
         let cases = List.filter (fun c -> List.for_all ((<>) var_name) @@ get_pat_vars c.c_lhs) cs in
         let exprs = List.map (fun c -> c.c_rhs) cases in
         if tactic = Nondet
@@ -450,7 +450,7 @@ and translate_match loc s cases typ =
 and translate_let flag bind expr =
   let nvb = Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr) in
   let nvb = if is_primary_type bind.vb_expr.exp_type
-            then { nvb with pvb_attributes = [mknoloc "need_CbN", Parsetree.PStr []] }
+            then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
             else nvb in
 
   Exp.let_ flag
@@ -465,7 +465,7 @@ and translate_expression e =
   | Texp_ident (_, { txt }, _)          -> translate_ident txt
   | Texp_function {cases = [case]}      -> translate_abstraciton case
   | Texp_apply (f, a)                   -> translate_apply f a e.exp_loc
-  | Texp_match (s, cs, _, _)            -> translate_match e.exp_loc s cs e.exp_type
+  | Texp_match (s, cs, _)               -> translate_match e.exp_loc s cs e.exp_type
   | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
   | Texp_let (flag, [bind], expr)       -> translate_let flag bind expr
   | _                                   -> fail_loc e.exp_loc "Incorrect expression" in
@@ -475,7 +475,7 @@ let translate_external_value_binding vb =
   let expr = translate_expression vb.vb_expr in
   let nvb  = Vb.mk pat expr in
   if is_primary_type vb.vb_expr.exp_type
-    then { nvb with pvb_attributes = [mknoloc "need_CbN", Parsetree.PStr []] }
+    then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
     else nvb in
 
 let translate_structure_item i =
@@ -643,7 +643,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
     let body = translate_expression let_vars bind.vb_expr in
     let typ  = bind.vb_expr.exp_type in
 
-    let has_tabled_attr = List.exists (fun a -> (fst a).txt = tabling_attr_name) bind.vb_attributes in
+    let has_tabled_attr = List.exists (fun a -> a.attr_name.txt = tabling_attr_name) bind.vb_attributes in
 
     if not has_tabled_attr
     then let let_part = Exp.let_ Recursive [Vb.mk (untyper.pat untyper bind.vb_pat) body] in
@@ -788,7 +788,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 
     | Texp_apply _             -> translate_apply let_vars expr
 
-    | Texp_match (e, cs, _, _) -> translate_match let_vars expr.exp_loc e cs expr.exp_type
+    | Texp_match (e, cs, _)    -> translate_match let_vars expr.exp_loc e cs expr.exp_type
 
     | Texp_ifthenelse (cond, th, Some el) -> if params.unnesting_params.remove_false
                                              then fail_loc expr.exp_loc "if-then-else expression in not-false mode"
@@ -852,7 +852,7 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
 (*****************************************************************************************************************************)
 
 let add_packages ast =
-  List.map (fun n -> Lident n |> mknoloc |> Opn.mk |> Str.open_) packages @ ast
+  List.map (fun n -> Lident n |> mknoloc |> Mod.ident |> Opn.mk |> Str.open_) packages @ ast
 
 (*****************************************************************************************************************************)
 
@@ -944,7 +944,7 @@ let beta_reductor minimal_index only_q =
 
 let fresh_and_conjs_normalizer need_move_unifies_up =
 
-  let has_heavy_attr e = List.exists (fun a -> (fst a).txt = "heavy") e.pexp_attributes in
+  let has_heavy_attr e = List.exists (fun a -> a.attr_name.txt = "heavy") e.pexp_attributes in
 
   let rec split_conjs = function
   | []      -> [], [], []
@@ -1017,8 +1017,8 @@ let ea4t = "ea4t"
 let call_by_need_creator tree =
 
   let rec has_attr attr = function
-    | (x, _) :: xs -> x.Location.txt = attr || has_attr attr xs
-    | []           -> false in
+    | x :: xs -> x.attr_name.Location.txt = attr || has_attr attr xs
+    | []      -> false in
 
   let has_attr_for_expr attr expr = has_attr attr expr.pexp_attributes in
 
@@ -1233,7 +1233,7 @@ let print_if ppf flag printer arg =
 let eval_if_need flag f =
   if flag then f else fun x -> x
 
-let only_generate hook_info tast params =
+let only_generate tast params =
   try
     let open Transl in
     let start_index = get_max_index tast in

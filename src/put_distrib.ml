@@ -64,10 +64,11 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   let open Location in
   let open Longident in
   let Ptype_variant constructors = tdecl.ptype_kind in
-
-  let gen_module_str = mknoloc @@ "For_" ^ tdecl.ptype_name.txt in
+  let module_str = "For_" ^ tdecl.ptype_name.txt in
+  let gen_module_str = mknoloc module_str in
+  let gen_module_opt_str = mknoloc @@ Some module_str in
   let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
-  [ Str.module_ @@ Mb.mk gen_module_str @@
+  [ Str.module_ @@ Mb.mk gen_module_opt_str @@
       Mod.(apply (ident (mknoloc @@ Lident (let n = List.length tdecl.ptype_params in if n = 1 then "Fmap" else sprintf "Fmap%d" n))) @@ structure
         [ fmap_decl
         ; str_type_ Recursive ~loc [ Type.mk ~params:tdecl.ptype_params
@@ -91,7 +92,7 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
             constr_itself (Some (tuple @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
       in
       let body = [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [nolabel, body] ] ] in
-      Vb.mk ~attrs:[(mknoloc "service_function", Parsetree.PStr [])] (Pat.var @@ lower_lid pcd_name)
+      Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])] (Pat.var @@ lower_lid pcd_name)
         (match names with
         | [] -> [%expr fun () -> [%e body]]
         | names -> List.fold_right (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc) names body)
@@ -107,7 +108,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
   else let Ptype_variant constructors = tdecl.ptype_kind in
        constructors |>
        List.map (fun {pcd_name} ->
-         Vb.mk ~attrs:[(mknoloc "service_function", Parsetree.PStr [])]
+         Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])]
                (Pat.var @@ lower_lid pcd_name)
                ([%expr fun () -> !! [%e construct (mknoloc (Lident pcd_name.txt)) None]])) |>
        List.map (fun vb -> Str.value Nonrecursive [vb])
@@ -158,7 +159,7 @@ let prepare_fmap ~loc tdecl =
 
 let revisit_adt ~loc tdecl ctors =
   let tdecl = {tdecl with ptype_attributes =
-    List.filter (fun (name,_) -> name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
+    List.filter (fun a -> a.attr_name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
   in
   let der_typ_name = tdecl.ptype_name.Asttypes.txt in
   (* Let's forget about mutal recursion for now *)
@@ -222,7 +223,7 @@ let revisit_adt ~loc tdecl ctors =
     ] @ typ_to_add
 
 let has_to_gen_attr (xs: attributes) =
-  try let _ = List.find (fun (name,_) -> name.Location.txt = "put_distrib_here") xs in
+  try let _ = List.find (fun a -> a.attr_name.Location.txt = "put_distrib_here") xs in
       true
   with Not_found -> false
 
