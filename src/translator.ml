@@ -211,12 +211,6 @@ let create_fresh_var_name () =
   incr curr_index;
   name in
 
-let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
-  match typ.desc with
-  | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
-  | Tlink typ                   -> create_fresh_argument_names_by_type typ
-  | _                           -> [create_fresh_var_name ()] in
-
 let rec create_fresh_argument_names_by_args (typ : Types.type_expr) =
   match typ.desc with
   | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_args right_typ

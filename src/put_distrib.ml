@@ -161,7 +161,6 @@ let revisit_adt ~loc tdecl ctors =
   let tdecl = {tdecl with ptype_attributes =
     List.filter (fun a -> a.attr_name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
   in
-  let der_typ_name = tdecl.ptype_name.Asttypes.txt in
   (* Let's forget about mutal recursion for now *)
   (* For every constructor argument we need to put ground types to parameters *)
   let mapa, full_t =

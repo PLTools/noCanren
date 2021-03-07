@@ -38,7 +38,7 @@ type noCanren_params =
 (************************** Util funcions *******************************)
 
 let mangle_construct_name name =
-  let low = String.mapi (function 0 -> Char.lowercase | _ -> fun x -> x ) name in
+  let low = String.mapi (function 0 -> Char.lowercase_ascii | _ -> fun x -> x ) name in
   match low with
   | "val" | "if" | "else" | "for" | "do" | "let" | "open" | "not" | "pair" | "conj"
           | "var" | "snd" | "fst" -> low ^ "_"
@@ -49,3 +49,4 @@ let rec longident_eq a b =
   | Lident x,        Lident y        -> x = y
   | Ldot (a, x),     Ldot (b, y)     -> x = y && longident_eq a b
   | Lapply (a1, a2), Lapply (b1, b2) -> longident_eq a1 b1 && longident_eq a2 b2
+  | _                                -> false

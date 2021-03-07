@@ -132,6 +132,6 @@ let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "l
   Format.pp_print_flush buf_fmt ();
   let text = Buffer.contents buf |> String.escaped in
 
-  fprintf fmt "@[module %s where @\n@\n@]" (String.capitalize module_name);
+  fprintf fmt "@[module %s where @\n@\n@]" (String.capitalize_ascii module_name);
   fprintf fmt "@[import Syntax@\n@\n@]";
   fprintf fmt "@[<h2>%s = \n (\\%s -> @\n%a@\n@\n,@\n@\n\"%s\")%!@]" tree_name last_goal print_structure_items tree_without_types text
