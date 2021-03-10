@@ -1,6 +1,8 @@
 OB = ocamlbuild -use-ocamlfind -classic-display
 
-TESTS = bottles bridge einstein GCW
+TESTS   =  GCW
+SAMPLES = bottles bridge einstein GCW hanoi hanoi2 hm_inferencer logic_interpreter lorry scheme_interpreter sudoku4x4 unify
+
 
 compile:
 	$(OB) -I src noCanren.native
@@ -27,9 +29,9 @@ define TESTRULES
 
 test_$(1):
 	mkdir -p regression/output
-	mkdir -p _build/samples/
-	cp samples/$(1).ml2mk.ml _build/samples/$(1).ml2mk.ml
-	./noCanren.native -o regression/output/$(1).ml _build/samples/$(1).ml2mk.ml
+	mkdir -p _build/regression/
+	cp samples/$(1).ml2mk.ml _build/regression/$(1).ml2mk.ml
+	./noCanren.native -o regression/output/$(1).ml _build/regression/$(1).ml2mk.ml
 	$(OB) -Is samples,regression/output $(1)_run.native
 
 promote_test_$(1):
@@ -39,6 +41,19 @@ promote_test_$(1):
 
 endef
 $(foreach i,$(TESTS),$(eval $(call TESTRULES,$(i))))
+
+define SAMPLERULES
+
+sample_$(1):
+	mkdir -p regression/output
+	mkdir -p _build/samples/
+	cp samples/$(1).ml2mk.ml _build/samples/$(1).ml2mk.ml
+	cp samples/$(1)_run.ml _build/samples/$(1)_run.ml
+	./noCanren.native -o regression/output/$(1).ml _build/samples/$(1).ml2mk.ml
+	$(OB) -Is samples,regression/output $(1)_run.native
+
+endef
+$(foreach i,$(SAMPLES),$(eval $(call SAMPLERULES,$(i))))
 
 compile_tests:
 	$(foreach T, $(TESTS), make test_$(T);)

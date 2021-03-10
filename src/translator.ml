@@ -91,7 +91,6 @@ let rec is_primary_type (t : Types.type_expr) =
   | Tlink t' -> is_primary_type t'
   | _        -> true
 
-
 let get_pat_name p =
   match p.pat_desc with
   | Tpat_var (n, _) -> name n
@@ -210,6 +209,13 @@ let create_fresh_var_name () =
   let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
   incr curr_index;
   name in
+
+let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
+  match typ.desc with
+  | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
+  | Tlink typ                   -> create_fresh_argument_names_by_type typ
+  | _                           -> [] in
+
 
 let rec create_fresh_argument_names_by_args (typ : Types.type_expr) =
   match typ.desc with
@@ -441,12 +447,87 @@ and translate_match loc s cases typ =
 
   else fail_loc loc "Pattern matching contains unified patterns"
 
-and translate_let flag bind expr =
-  let nvb = Vb.mk (untyper.pat untyper bind.vb_pat) (translate_expression bind.vb_expr) in
-  let nvb = if is_primary_type bind.vb_expr.exp_type
-            then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
-            else nvb in
+and translate_bind bind =
+  let rec is_func_type (t : Types.type_expr) =
+    match t.desc with
+    | Tarrow _ -> true
+    | Tlink t' -> is_func_type t'
+    | _        -> false in
 
+  let rec has_func_arg (t : Types.type_expr) =
+    match t.desc with
+    | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
+    | Tlink t'         -> has_func_arg t'
+    | _                -> false in
+
+  let rec get_tabling_rank (typ : Types.type_expr) =
+    match typ.desc with
+    | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
+    | Tlink typ                   -> get_tabling_rank typ
+    | _                           -> [%expr Tabling.one] in
+
+  let body            = bind.vb_expr in
+  let new_body        = translate_expression body in
+  let typ             = body.exp_type in
+  let has_tabled_attr = List.exists (fun a -> a.attr_name.txt = tabling_attr_name) bind.vb_attributes in
+  let tabled_body     =
+    if not has_tabled_attr || has_func_arg typ then new_body else
+      let name                  = get_pat_name bind.vb_pat in
+      let unrec_body            = create_fun name new_body in
+      let recfunc_argument_name = create_fresh_var_name () in
+      let recfunc_argument      = create_id recfunc_argument_name in
+
+      let argument_names1       = create_fresh_argument_names_by_type typ in
+      let arguments1            = List.map create_id argument_names1 in
+      let res_arg_name_1        = create_fresh_var_name () in
+      let rec_arg_1             = create_id res_arg_name_1 in
+
+      let argument_names2       = create_fresh_argument_names_by_type typ in
+      let arguments2            = List.map create_id argument_names2 in
+
+      let recfunc_with_args     = create_apply recfunc_argument (List.append arguments2 [rec_arg_1]) in
+      let conjuncts1            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments1 arguments2 in
+      let conjs_and_recfunc     = create_conj @@ List.append conjuncts1 [recfunc_with_args] in
+      let freshing_and_recfunc  = List.fold_right create_fresh argument_names2 conjs_and_recfunc in
+      let lambdas_and_recfunc   = List.fold_right create_fun (List.append argument_names1 [res_arg_name_1]) freshing_and_recfunc in
+
+      let argument_names3       = create_fresh_argument_names_by_type typ in
+      let arguments3            = List.map create_id argument_names3 in
+
+      let argument_names4       = create_fresh_argument_names_by_type typ in
+      let arguments4            = List.map create_id argument_names4 in
+      let unified_vars1         = List.map2 (fun a b -> [%expr [%e a] === [%e b]]) arguments3 arguments4 in
+      let lambda_vars1          = List.map2 create_fun argument_names3 unified_vars1 in
+
+      let new_nody              = create_apply unrec_body (lambdas_and_recfunc :: lambda_vars1) in
+      let lambda_new_body       = List.fold_right create_fun (recfunc_argument_name :: argument_names4) new_nody in
+
+      let abling_rank           = get_tabling_rank typ in
+      let tabled_body           = create_apply [%expr Tabling.tabledrec] [abling_rank ; lambda_new_body] in
+
+      let argument_names5       = create_fresh_argument_names_by_type typ in
+      let arguments5            = List.map create_id argument_names5 in
+      let res_arg_name_5        = create_fresh_var_name () in
+      let rec_arg_5             = create_id res_arg_name_5 in
+
+      let argument_names6       = create_fresh_argument_names_by_type typ in
+      let arguments6            = List.map create_id argument_names6 in
+
+      let tabled_body_with_args = create_apply tabled_body (List.append arguments6 [rec_arg_5]) in
+
+      let conjuncts2            = List.map2 (fun q1 q2 -> create_apply q1 [q2]) arguments5 arguments6 in
+      let conjs_and_tabled      = create_conj (List.append conjuncts2 [tabled_body_with_args]) in
+      let freshing_and_tabled   = List.fold_right create_fresh argument_names6 conjs_and_tabled in
+      let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
+      lambdas_and_tabled in
+
+  let nvb = Vb.mk (untyper.pat untyper bind.vb_pat) tabled_body in
+  if is_primary_type bind.vb_expr.exp_type
+    then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
+    else nvb
+
+and translate_let flag bind expr =
+  let nvb = translate_bind bind in
   Exp.let_ flag
            [nvb]
            (translate_expression expr)
@@ -464,18 +545,10 @@ and translate_expression e =
   | Texp_let (flag, [bind], expr)       -> translate_let flag bind expr
   | _                                   -> fail_loc e.exp_loc "Incorrect expression" in
 
-let translate_external_value_binding vb =
-  let pat  = untyper.pat untyper vb.vb_pat in
-  let expr = translate_expression vb.vb_expr in
-  let nvb  = Vb.mk pat expr in
-  if is_primary_type vb.vb_expr.exp_type
-    then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
-    else nvb in
-
 let translate_structure_item i =
   match i.str_desc with
   | Tstr_value (rec_flag, [bind]) ->
-      Str.value rec_flag [translate_external_value_binding bind]
+      Str.value rec_flag [translate_bind bind]
   | Tstr_type (rec_flag, decls) ->
     let new_decls = List.map mark_type_declaration decls in
     untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }
