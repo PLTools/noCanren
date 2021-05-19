@@ -86,6 +86,8 @@ let leave_constuctors           = ref false
 let subst_only_util_vars        = ref false
 let output_name_for_spec_tree   = ref None
 
+module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
+
 let all_options =
   [
     "-o",
@@ -163,7 +165,7 @@ let all_options =
     "-show-result",
     Arg.Unit (fun path -> need_print_result := true),
     " Show result of conversion in terminal"
-  ]
+  ] @ OcamlcOptions.list
 
 let mk_noCanren_params () =
   if !unnesting_mode then begin
