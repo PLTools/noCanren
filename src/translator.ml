@@ -91,6 +91,11 @@ let rec is_primary_type (t : Types.type_expr) =
   | Tlink t' -> is_primary_type t'
   | _        -> true
 
+let pat_is_var p =
+  match p.pat_desc with
+  | Tpat_var (_, _) -> true
+  | _               -> false
+
 let get_pat_name p =
   match p.pat_desc with
   | Tpat_var (n, _) -> name n
@@ -320,7 +325,7 @@ and translate_abstraciton case =
 
   let rec normalize_abstraction expr acc =
     match expr.exp_desc with
-    | Texp_function { cases=[case] } ->
+    | Texp_function { cases=[case] } when pat_is_var case.c_lhs ->
       normalize_abstraction case.c_rhs (case.c_lhs :: acc)
     | _ -> expr, List.rev acc in
 
@@ -352,8 +357,12 @@ and translate_abstraciton case =
       | Texp_ident (_, { txt = Longident.Lident name }, _) ->
         if var_name = name then count + 1 else count
       | Texp_ident _ -> count
-      | Texp_function { cases=[case] } ->
-        if var_name = get_pat_name case.c_lhs then count else two_or_more_mentions case.c_rhs count
+      | Texp_function { cases } ->
+        let cases = List.filter (fun c -> List.for_all ((<>) var_name) @@ get_pat_vars c.c_lhs) cases in
+        let exprs = List.map (fun c -> c.c_rhs) cases in
+        if tactic = Nondet
+          then List.fold_left eval_if_need count @@ exprs
+          else List.fold_left max count @@ List.map (eval_if_need count) exprs
       | Texp_apply (func, args) ->
         let args = List.map (fun (_, Some a) -> a) args in
         List.fold_left eval_if_need count @@ func :: args
@@ -414,7 +423,19 @@ and translate_apply f a l =
                                        else translate_expression e
                        | _ -> fail_loc l "Incorrect argument") a)
 
-and translate_match loc s cases typ =
+and translate_match_without_scrutinee loc cases (typ : Types.type_expr) =
+  match typ.desc with
+    | Tarrow (_, _, r, _) ->
+      let new_scrutinee    = create_fresh_var_name () in
+      let translated_match = translate_match loc (create_id new_scrutinee) [] cases r in
+      create_fun new_scrutinee translated_match
+    | Tlink typ ->  translate_match_without_scrutinee loc cases typ
+    | _  -> fail_loc loc "Incorrect type for 'function'"
+
+and translate_match_with_scrutinee loc s cases typ =
+  translate_match loc (translate_expression s) s.exp_attributes cases typ
+
+and translate_match loc translated_scrutinee attrs cases typ =
   if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then
     let high_extra_args = create_fresh_argument_names_by_args typ in
     let result_arg = create_fresh_var_name () in
@@ -438,8 +459,8 @@ and translate_match loc s cases typ =
 
     let new_cases = List.map translate_case cases in
     let disj      = create_disj new_cases in
-    let scrutinee = create_apply (translate_expression s) [create_id scrutinee_var] in
-    let scrutinee = { scrutinee with pexp_attributes = s.exp_attributes } in
+    let scrutinee = create_apply translated_scrutinee [create_id scrutinee_var] in
+    let scrutinee = { scrutinee with pexp_attributes = attrs } in
     let conj      = create_conj [scrutinee; disj] in
     let fresh     = create_fresh scrutinee_var conj in
     let with_res  = [%expr fun [%p create_logic_var result_arg] -> [%e fresh]] in
@@ -534,16 +555,17 @@ and translate_let flag bind expr =
 
 and translate_expression e =
   match e.exp_desc with
-  | Texp_constant _                     -> translate_construct e
-  | Texp_construct _                    -> translate_construct e
-  | Texp_tuple [l; r]                   -> translate_construct e
-  | Texp_ident (_, { txt }, _)          -> translate_ident txt
-  | Texp_function {cases = [case]}      -> translate_abstraciton case
-  | Texp_apply (f, a)                   -> translate_apply f a e.exp_loc
-  | Texp_match (s, cs, _)               -> translate_match e.exp_loc s cs e.exp_type
-  | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
-  | Texp_let (flag, [bind], expr)       -> translate_let flag bind expr
-  | _                                   -> fail_loc e.exp_loc "Incorrect expression" in
+  | Texp_constant _                                     -> translate_construct e
+  | Texp_construct _                                    -> translate_construct e
+  | Texp_tuple [l; r]                                   -> translate_construct e
+  | Texp_ident (_, { txt }, _)                          -> translate_ident txt
+  | Texp_function {cases = [c]} when pat_is_var c.c_lhs -> translate_abstraciton c
+  | Texp_function { cases }                             -> translate_match_without_scrutinee e.exp_loc cases e.exp_type
+  | Texp_apply (f, a)                                   -> translate_apply f a e.exp_loc
+  | Texp_match (s, cs, _)                               -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
+  | Texp_ifthenelse (cond, th, Some el)                 -> translate_if cond th el
+  | Texp_let (flag, [bind], expr)                       -> translate_let flag bind expr
+  | _                                                   -> fail_loc e.exp_loc "Incorrect expression" in
 
 let translate_structure_item i =
   match i.str_desc with
