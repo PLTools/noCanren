@@ -75,6 +75,11 @@ let get_max_index tast =
 
 (*****************************************************************************************************************************)
 
+let rec fold_right1 f = function
+| [h]  -> h
+| h::t -> f h (fold_right1 f t)
+| []   -> failwith "fold_right1"
+
 let untyper = Untypeast.default_mapper
 
 let create_id  s = Lident s |> mknoloc |> Exp.ident
@@ -189,10 +194,10 @@ let rec translate_pat pat fresher =
       | Lident "::" -> [%expr (%)]
       | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
     create_apply (mark_constr constr) args, vars
-  | Tpat_tuple [l; r] ->
-    let args, vars = List.map (fun q -> translate_pat q fresher) [l; r] |> List.split in
+  | Tpat_tuple l ->
+    let args, vars = List.map (fun q -> translate_pat q fresher) l |> List.split in
     let vars = List.concat vars in
-    create_apply (mark_constr [%expr pair]) args, vars
+    fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, vars
   | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
 
 let rec is_disj_pats = function
@@ -234,14 +239,14 @@ let rec unnest_constuct e =
     create_inj (Exp.constant (Untypeast.constant c)), []
   | Texp_construct ({txt = Lident s}, _, []) when s = "true" || s = "false" ->
     create_inj (untyper.expr untyper e), []
-  | Texp_tuple [a; b] ->
-      let arg1, fv1 = unnest_constuct a in
-      let arg2, fv2 = unnest_constuct b in
-      create_apply (mark_constr [%expr pair]) [arg1; arg2], fv1 @ fv2
+  | Texp_tuple l ->
+      let new_args, fv = List.map unnest_constuct l |> List.split in
+      let fv           = List.concat fv in
+      fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) new_args, fv
   | Texp_construct (name, _, args) ->
     let new_args, fv = List.map unnest_constuct args |> List.split in
     let fv           = List.concat fv in
-    let new_args     = match new_args with [] -> [[%expr ()]] | l  -> l in
+    let new_args     = match new_args with [] -> [[%expr ()]] | l -> l in
     let new_name     = match name.txt with
                        | Lident "[]" -> Lident "nil"
                        | Lident "::" -> Lident "%"
@@ -557,7 +562,7 @@ and translate_expression e =
   match e.exp_desc with
   | Texp_constant _                                     -> translate_construct e
   | Texp_construct _                                    -> translate_construct e
-  | Texp_tuple [l; r]                                   -> translate_construct e
+  | Texp_tuple _                                        -> translate_construct e
   | Texp_ident (_, { txt }, _)                          -> translate_ident txt
   | Texp_function {cases = [c]} when pat_is_var c.c_lhs -> translate_abstraciton c
   | Texp_function { cases }                             -> translate_match_without_scrutinee e.exp_loc cases e.exp_type
