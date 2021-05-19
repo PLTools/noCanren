@@ -30,56 +30,55 @@ let rec sub a b q22 =
   fresh (q16) (b q16)
     (((q16 === (o ())) &&& (a q22)) |||
        (fresh (y q18) (q16 === (s y)) (a q18) (((q18 === (o ())) &&& (q22 === (o ()))) ||| (fresh (x) (q18 === (s x)) (sub (fun q20 -> x === q20) (fun q21 -> y === q21) q22)))))
-let anotherBottle b q27 = fresh (q24) (b q24) (((q24 === (fst_ ())) &&& (q27 === (snd_ ()))) ||| ((q24 === (snd_ ())) &&& (q27 === (fst_ ()))))
+let anotherBottle q23 q24 = fresh (q25) (q23 q25) (((q25 === (fst_ ())) &&& (q24 === (snd_ ()))) ||| ((q25 === (snd_ ())) &&& (q24 === (fst_ ()))))
 let createState bottle lvl1 lvl2 q36 =
   fresh (q29) (bottle q29)
     ((fresh (q30 q31) (q29 === (fst_ ())) (q36 === (pair q30 q31)) (lvl1 q30) (lvl2 q31)) ||| (fresh (q33 q34) (q29 === (snd_ ())) (q36 === (pair q33 q34)) (lvl2 q33) (lvl1 q34)))
-let checkStep state0 step0 capacities q80 =
-  fresh (q38 f s q40 t b) (q38 === (pair f s)) (q40 === (pair t b)) (
-    state0 q38) (step0 q40)
-    (let lvl1 q41 = fresh (q42) (b === q42) (((q42 === (fst_ ())) &&& (f === q41)) ||| ((q42 === (snd_ ())) &&& (s === q41))) in
-     let lvl2 q43 = fresh (q44) (b === q44) (((q44 === (fst_ ())) &&& (s === q43)) ||| ((q44 === (snd_ ())) &&& (f === q43))) in
-     fresh (q46) (t === q46)
+let checkStep q37 q39 q38 q40 =
+  fresh (q41 f s q45 t b) (q41 === (pair f s)) (q45 === (pair t b)) (
+    q37 q41) (q39 q45)
+    (let lvl1 q46 = fresh (q47) (b === q47) (((q47 === (fst_ ())) &&& (f === q46)) ||| ((q47 === (snd_ ())) &&& (s === q46))) in
+     let lvl2 q48 = fresh (q49) (b === q49) (((q49 === (fst_ ())) &&& (s === q48)) ||| ((q49 === (snd_ ())) &&& (f === q48))) in
+     fresh (q51) (t === q51)
        (conde
-          [fresh (q50 q51) (q46 === (fill ())) (q51 === (o ())) (lvl1 q50) (conde [(q50 === q51) &&& (q80 === (!! true)); (q80 === (!! false)) &&& (q50 =/= q51)]);
-          fresh (q55 q56) (q46 === (empty ())) (lvl1 q55) (capacities (fun q77 -> b === q77) q56)
-            (conde [(q55 === q56) &&& (q80 === (!! true)); (q80 === (!! false)) &&& (q55 =/= q56)]);
-          (q46 === (pour ())) &&&
-            ((let b' = anotherBottle (fun q77 -> b === q77) in
-              fresh (q74 q71 q61 q62) (q62 === (o ())) (lvl1 q61) (conde [(q61 === q62) &&& (q71 === (!! true)); (q71 === (!! false)) &&& (q61 =/= q62)])
+          [fresh (q55 q56) (q51 === (fill ())) (q56 === (o ())) (lvl1 q55) (conde [(q55 === q56) &&& (q40 === (!! true)); (q40 === (!! false)) &&& (q55 =/= q56)]);
+          fresh (q60 q61) (q51 === (empty ())) (lvl1 q60) (q38 (fun q83 -> b === q83) q61) (conde [(q60 === q61) &&& (q40 === (!! true)); (q40 === (!! false)) &&& (q60 =/= q61)]);
+          (q51 === (pour ())) &&&
+            ((let b' = anotherBottle (fun q83 -> b === q83) in
+              fresh (q79 q76 q66 q67) (q67 === (o ())) (lvl1 q66) (conde [(q66 === q67) &&& (q76 === (!! true)); (q76 === (!! false)) &&& (q66 =/= q67)])
                 (conde
-                   [(q71 === (!! true)) &&& (q74 === (!! true));
-                   fresh (q66 q67) (q71 === (!! false)) (lvl2 q66) (capacities b' q67) (conde [(q66 === q67) &&& (q74 === (!! true)); (q74 === (!! false)) &&& (q66 =/= q67)])])
-                (conde [(q74 === (!! true)) &&& (q80 === (!! false)); (q74 === (!! false)) &&& (q80 === (!! true))])))]))
-let doStep state0 step0 capacities q97 =
-  fresh (q82 f s q84 t b) (q82 === (pair f s)) (q84 === (pair t b)) (
-    state0 q82) (step0 q84)
-    (let lvl2 q85 = fresh (q86) (b === q86) (((q86 === (fst_ ())) &&& (s === q85)) ||| ((q86 === (snd_ ())) &&& (f === q85))) in
-     fresh (q88) (t === q88)
+                   [(q76 === (!! true)) &&& (q79 === (!! true));
+                   fresh (q71 q72) (q76 === (!! false)) (lvl2 q71) (q38 b' q72) (conde [(q71 === q72) &&& (q79 === (!! true)); (q79 === (!! false)) &&& (q71 =/= q72)])])
+                (conde [(q79 === (!! true)) &&& (q40 === (!! false)); (q79 === (!! false)) &&& (q40 === (!! true))])))]))
+let doStep q86 q88 q87 q89 =
+  fresh (q90 f s q94 t b) (q90 === (pair f s)) (q94 === (pair t b)) (
+    q86 q90) (q88 q94)
+    (let lvl2 q95 = fresh (q96) (b === q96) (((q96 === (fst_ ())) &&& (s === q95)) ||| ((q96 === (snd_ ())) &&& (f === q95))) in
+     fresh (q98) (t === q98)
        (conde
-          [(q88 === (fill ())) &&& (createState (fun q94 -> b === q94) (capacities (fun q94 -> b === q94)) lvl2 q97);
-          (q88 === (empty ())) &&& (createState (fun q94 -> b === q94) (fun q89 -> q89 === (o ())) lvl2 q97);
-          (q88 === (pour ())) &&&
-            ((let sum = add (fun q95 -> f === q95) (fun q96 -> s === q96) in
-              let cap2 = capacities (anotherBottle (fun q94 -> b === q94)) in
-              fresh (q90) (greater sum cap2 q90)
+          [(q98 === (fill ())) &&& (createState (fun q105 -> b === q105) (q87 (fun q105 -> b === q105)) lvl2 q89);
+          (q98 === (empty ())) &&& (createState (fun q105 -> b === q105) (fun q99 -> q99 === (o ())) lvl2 q89);
+          (q98 === (pour ())) &&&
+            ((let sum = add (fun q106 -> f === q106) (fun q107 -> s === q107) in
+              let cap2 = q87 (anotherBottle (fun q105 -> b === q105)) in
+              fresh (q100) (greater sum cap2 q100)
                 (conde
-                   [(q90 === (!! true)) &&& (createState (fun q94 -> b === q94) (sub sum cap2) cap2 q97);
-                   (q90 === (!! false)) &&& (createState (fun q94 -> b === q94) (fun q92 -> q92 === (o ())) sum q97)])))]))
-let isFinishState state0 reqLvl q116 =
-  fresh (q117 q99 f s q112 q102 q103) (q99 === (pair f s)) (f === q102) (
-    q103 === q117) (reqLvl q117) (state0 q99) (conde [(q102 === q103) &&& (q112 === (!! true)); (q112 === (!! false)) &&& (q102 =/= q103)])
+                   [(q100 === (!! true)) &&& (createState (fun q105 -> b === q105) (sub sum cap2) cap2 q89);
+                   (q100 === (!! false)) &&& (createState (fun q105 -> b === q105) (fun q102 -> q102 === (o ())) sum q89)])))]))
+let isFinishState q108 q109 q110 =
+  fresh (q111 f s q127 q124 q114 q115) (q111 === (pair f s)) (f === q114) (
+    q115 === q127) (q108 q111) (q109 q127) (conde [(q114 === q115) &&& (q124 === (!! true)); (q124 === (!! false)) &&& (q114 =/= q115)])
     (conde
-       [(q112 === (!! true)) &&& (q116 === (!! true));
-       fresh (q107 q108) (q112 === (!! false)) (s === q107) (q108 === q117) (conde [(q107 === q108) &&& (q116 === (!! true)); (q116 === (!! false)) &&& (q107 =/= q108)])])
-let checkAnswer answer capacities reqLvl q130 =
-  let rec checkAnswer state0 answer q126 =
-    fresh (q127 q120) (state0 q127) (answer q120)
-      (((q120 === (nil ())) &&& (isFinishState (fun q128 -> q128 === q127) reqLvl q126)) |||
-         (fresh (x xs q121) (q120 === (x % xs)) (checkStep (fun q128 -> q128 === q127) (fun q124 -> x === q124) capacities q121)
+       [(q124 === (!! true)) &&& (q110 === (!! true));
+       fresh (q119 q120) (q124 === (!! false)) (s === q119) (q120 === q127) (conde [(q119 === q120) &&& (q110 === (!! true)); (q110 === (!! false)) &&& (q119 =/= q120)])])
+let checkAnswer answer capacities reqLvl q144 =
+  let rec checkAnswer state0 q131 q140 =
+    fresh (q141 q134) (state0 q141) (q131 q134)
+      (((q134 === (nil ())) &&& (isFinishState (fun q142 -> q142 === q141) reqLvl q140)) |||
+         (fresh (x xs q135) (q134 === (x % xs)) (checkStep (fun q142 -> q142 === q141) (fun q138 -> x === q138) capacities q135)
             (conde
-               [(q121 === (!! true)) &&& (checkAnswer (doStep (fun q128 -> q128 === q127) (fun q124 -> x === q124) capacities) (fun q125 -> xs === q125) q126);
-               (q121 === (!! false)) &&& (q126 === (!! false))]))) in
-  let startState q129 = q129 === (pair (o ()) (o ())) in checkAnswer startState answer q130
-let capacities1 b q135 =
-  fresh (q132) (b q132) (((q132 === (fst_ ())) &&& (q135 === (s (s (s (s (o ()))))))) ||| ((q132 === (snd_ ())) &&& (q135 === (s (s (s (s (s (s (s (s (s (o ())))))))))))))
+               [(q135 === (!! true)) &&& (checkAnswer (doStep (fun q142 -> q142 === q141) (fun q138 -> x === q138) capacities) (fun q139 -> xs === q139) q140);
+               (q135 === (!! false)) &&& (q140 === (!! false))]))) in
+  let startState q143 = q143 === (pair (o ()) (o ())) in checkAnswer startState answer q144
+let capacities1 q145 q146 =
+  fresh (q147) (q145 q147) (((q147 === (fst_ ())) &&& (q146 === (s (s (s (s (o ()))))))) ||| ((q147 === (snd_ ())) &&& (q146 === (s (s (s (s (s (s (s (s (s (o ())))))))))))))

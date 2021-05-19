@@ -56,409 +56,399 @@ let hourse () = !! Hourse
 let snails () = !! Snails
 let dog () = !! Dog
 let zebra () = !! Zebra
-type ('a4, 'a3, 'a2, 'a1, 'a0) gperson =
-  | Person of 'a4 * 'a3 * 'a2 * 'a1 * 'a0 
-module For_gperson =
-  (Fmap5)(struct
-            let rec fmap fa4 fa3 fa2 fa1 fa0 = function | Person (a4_0, a3_1, a2_2, a1_3, a0_4) -> Person ((fa4 a4_0), (fa3 a3_1), (fa2 a2_2), (fa1 a1_3), (fa0 a0_4))
-            type ('a4, 'a3, 'a2, 'a1, 'a0) t = ('a4, 'a3, 'a2, 'a1, 'a0) gperson
-          end)
-let rec person x__0 x__1 x__2 x__3 x__4 = inj (For_gperson.distrib (Person (x__0, x__1, x__2, x__3, x__4)))
-type 'a0 gstate =
-  | State of 'a0 * 'a0 * 'a0 * 'a0 * 'a0 
-module For_gstate =
-  (Fmap)(struct let rec fmap fa0 = function | State (a0_0, a0_1, a0_2, a0_3, a0_4) -> State ((fa0 a0_0), (fa0 a0_1), (fa0 a0_2), (fa0 a0_3), (fa0 a0_4))
-                type 'a0 t = 'a0 gstate end)
-let rec state x__0 x__1 x__2 x__3 x__4 = inj (For_gstate.distrib (State (x__0, x__1, x__2, x__3, x__4)))
-let all_different st q99 =
-  let two_different a b q55 =
-    fresh (q1 c1 n1 d1 s1 p1 q3 c2 n2 d2 s2 p2 q43 q6 q7) (q1 === (person c1 n1 d1 s1 p1)) (
-      q3 === (person c2 n2 d2 s2 p2)) (c1 === q6) (c2 === q7) (a q1) (
-      b q3) (conde [(q6 === q7) &&& (q43 === (!! false)); (q43 === (!! true)) &&& (q6 =/= q7)])
-      (conde
-         [(q43 === (!! false)) &&& (q55 === (!! false));
-         fresh (q39 q11 q12) (q43 === (!! true)) (n1 === q11) (n2 === q12) (
-           conde [(q11 === q12) &&& (q39 === (!! false)); (q39 === (!! true)) &&& (q11 =/= q12)])
-           (conde
-              [(q39 === (!! false)) &&& (q55 === (!! false));
-              fresh (q35 q16 q17) (q39 === (!! true)) (d1 === q16) (d2 === q17) (
-                conde [(q16 === q17) &&& (q35 === (!! false)); (q35 === (!! true)) &&& (q16 =/= q17)])
-                (conde
-                   [(q35 === (!! false)) &&& (q55 === (!! false));
-                   fresh (q31 q21 q22) (q35 === (!! true)) (s1 === q21) (
-                     s2 === q22) (conde [(q21 === q22) &&& (q31 === (!! false)); (q31 === (!! true)) &&& (q21 =/= q22)])
-                     (conde
-                        [(q31 === (!! false)) &&& (q55 === (!! false));
-                        fresh (q26 q27) (q31 === (!! true)) (p1 === q26) (p2 === q27) (conde [(q26 === q27) &&& (q55 === (!! false)); (q55 === (!! true)) &&& (q26 =/= q27)])])])])]) in
-  fresh (q57 p1 p2 p3 p4 p5 q92) (q57 === (state p1 p2 p3 p4 p5)) (st q57) (
-    two_different (fun q94 -> p1 === q94) (fun q95 -> p2 === q95) q92)
-    (conde
-       [(q92 === (!! false)) &&& (q99 === (!! false));
-       fresh (q88) (q92 === (!! true)) (two_different (fun q94 -> p1 === q94) (fun q96 -> p3 === q96) q88)
+let all_different q0 q1 =
+  fresh (q2 p1 p2 p3 p4 p5) (q2 === (pair p1 (pair p2 (pair p3 (pair p4 p5))))) (
+    q0 q2)
+    (let two_different a b q58 =
+       fresh (q4 c1 n1 d1 s1 p1 q6 c2 n2 d2 s2 p2 q46 q9 q10) (q4 === (pair c1 (pair n1 (pair d1 (pair s1 p1))))) (
+         q6 === (pair c2 (pair n2 (pair d2 (pair s2 p2))))) (c1 === q9) (
+         c2 === q10) (a q4) (b q6) (conde [(q9 === q10) &&& (q46 === (!! false)); (q46 === (!! true)) &&& (q9 =/= q10)])
          (conde
-            [(q88 === (!! false)) &&& (q99 === (!! false));
-            fresh (q84) (q88 === (!! true)) (two_different (fun q94 -> p1 === q94) (fun q97 -> p4 === q97) q84)
+            [(q46 === (!! false)) &&& (q58 === (!! false));
+            fresh (q42 q14 q15) (q46 === (!! true)) (n1 === q14) (n2 === q15) (
+              conde [(q14 === q15) &&& (q42 === (!! false)); (q42 === (!! true)) &&& (q14 =/= q15)])
               (conde
-                 [(q84 === (!! false)) &&& (q99 === (!! false));
-                 fresh (q80) (q84 === (!! true)) (two_different (fun q94 -> p1 === q94) (fun q98 -> p5 === q98) q80)
+                 [(q42 === (!! false)) &&& (q58 === (!! false));
+                 fresh (q38 q19 q20) (q42 === (!! true)) (d1 === q19) (
+                   d2 === q20) (conde [(q19 === q20) &&& (q38 === (!! false)); (q38 === (!! true)) &&& (q19 =/= q20)])
                    (conde
-                      [(q80 === (!! false)) &&& (q99 === (!! false));
-                      fresh (q76) (q80 === (!! true)) (two_different (fun q95 -> p2 === q95) (fun q96 -> p3 === q96) q76)
+                      [(q38 === (!! false)) &&& (q58 === (!! false));
+                      fresh (q34 q24 q25) (q38 === (!! true)) (s1 === q24) (
+                        s2 === q25) (conde [(q24 === q25) &&& (q34 === (!! false)); (q34 === (!! true)) &&& (q24 =/= q25)])
                         (conde
-                           [(q76 === (!! false)) &&& (q99 === (!! false));
-                           fresh (q72) (q76 === (!! true)) (two_different (fun q95 -> p2 === q95) (fun q97 -> p4 === q97) q72)
-                             (conde
-                                [(q72 === (!! false)) &&& (q99 === (!! false));
-                                fresh (q68) (q72 === (!! true)) (two_different (fun q95 -> p2 === q95) (fun q98 -> p5 === q98) q68)
-                                  (conde
-                                     [(q68 === (!! false)) &&& (q99 === (!! false));
-                                     fresh (q64) (q68 === (!! true)) (
-                                       two_different (fun q96 -> p3 === q96) (fun q97 -> p4 === q97) q64)
-                                       (conde
-                                          [(q64 === (!! false)) &&& (q99 === (!! false));
-                                          fresh (q60) (q64 === (!! true)) (
-                                            two_different (fun q96 -> p3 === q96) (fun q98 -> p5 === q98) q60)
-                                            (conde
-                                               [(q60 === (!! false)) &&& (q99 === (!! false));
-                                               (q60 === (!! true)) &&& (two_different (fun q97 -> p4 === q97) (fun q98 -> p5 === q98) q99)])])])])])])])])])
-let any_of_person f st q123 =
-  fresh (q101 p1 p2 p3 p4 p5 q116) (q101 === (state p1 p2 p3 p4 p5)) (
-    st q101) (f (fun q118 -> p1 === q118) q116)
+                           [(q34 === (!! false)) &&& (q58 === (!! false));
+                           fresh (q29 q30) (q34 === (!! true)) (p1 === q29) (p2 === q30) (conde [(q29 === q30) &&& (q58 === (!! false)); (q58 === (!! true)) &&& (q29 =/= q30)])])])])]) in
+     fresh (q93) (two_different (fun q95 -> p1 === q95) (fun q96 -> p2 === q96) q93)
+       (conde
+          [(q93 === (!! false)) &&& (q1 === (!! false));
+          fresh (q89) (q93 === (!! true)) (two_different (fun q95 -> p1 === q95) (fun q97 -> p3 === q97) q89)
+            (conde
+               [(q89 === (!! false)) &&& (q1 === (!! false));
+               fresh (q85) (q89 === (!! true)) (two_different (fun q95 -> p1 === q95) (fun q98 -> p4 === q98) q85)
+                 (conde
+                    [(q85 === (!! false)) &&& (q1 === (!! false));
+                    fresh (q81) (q85 === (!! true)) (two_different (fun q95 -> p1 === q95) (fun q99 -> p5 === q99) q81)
+                      (conde
+                         [(q81 === (!! false)) &&& (q1 === (!! false));
+                         fresh (q77) (q81 === (!! true)) (two_different (fun q96 -> p2 === q96) (fun q97 -> p3 === q97) q77)
+                           (conde
+                              [(q77 === (!! false)) &&& (q1 === (!! false));
+                              fresh (q73) (q77 === (!! true)) (two_different (fun q96 -> p2 === q96) (fun q98 -> p4 === q98) q73)
+                                (conde
+                                   [(q73 === (!! false)) &&& (q1 === (!! false));
+                                   fresh (q69) (q73 === (!! true)) (two_different (fun q96 -> p2 === q96) (fun q99 -> p5 === q99) q69)
+                                     (conde
+                                        [(q69 === (!! false)) &&& (q1 === (!! false));
+                                        fresh (q65) (q69 === (!! true)) (
+                                          two_different (fun q97 -> p3 === q97) (fun q98 -> p4 === q98) q65)
+                                          (conde
+                                             [(q65 === (!! false)) &&& (q1 === (!! false));
+                                             fresh (q61) (q65 === (!! true)) (
+                                               two_different (fun q97 -> p3 === q97) (fun q99 -> p5 === q99) q61)
+                                               (conde
+                                                  [(q61 === (!! false)) &&& (q1 === (!! false));
+                                                  (q61 === (!! true)) &&& (two_different (fun q98 -> p4 === q98) (fun q99 -> p5 === q99) q1)])])])])])])])])]))
+let any_of_person f q100 q125 =
+  fresh (q103 p1 p2 p3 p4 p5 q118) (q103 === (pair p1 (pair p2 (pair p3 (pair p4 p5))))) (
+    q100 q103) (f (fun q120 -> p1 === q120) q118)
     (conde
-       [(q116 === (!! true)) &&& (q123 === (!! true));
-       fresh (q112) (q116 === (!! false)) (f (fun q119 -> p2 === q119) q112)
+       [(q118 === (!! true)) &&& (q125 === (!! true));
+       fresh (q114) (q118 === (!! false)) (f (fun q121 -> p2 === q121) q114)
          (conde
-            [(q112 === (!! true)) &&& (q123 === (!! true));
-            fresh (q108) (q112 === (!! false)) (f (fun q120 -> p3 === q120) q108)
+            [(q114 === (!! true)) &&& (q125 === (!! true));
+            fresh (q110) (q114 === (!! false)) (f (fun q122 -> p3 === q122) q110)
               (conde
-                 [(q108 === (!! true)) &&& (q123 === (!! true));
-                 fresh (q104) (q108 === (!! false)) (f (fun q121 -> p4 === q121) q104)
-                   (conde [(q104 === (!! true)) &&& (q123 === (!! true)); (q104 === (!! false)) &&& (f (fun q122 -> p5 === q122) q123)])])])])
-let any_of_neighbors_pair f st q143 =
-  fresh (q125 p1 p2 p3 p4 p5 q136) (q125 === (state p1 p2 p3 p4 p5)) (
-    st q125) (f (fun q138 -> p1 === q138) (fun q139 -> p2 === q139) q136)
+                 [(q110 === (!! true)) &&& (q125 === (!! true));
+                 fresh (q106) (q110 === (!! false)) (f (fun q123 -> p4 === q123) q106)
+                   (conde [(q106 === (!! true)) &&& (q125 === (!! true)); (q106 === (!! false)) &&& (f (fun q124 -> p5 === q124) q125)])])])])
+let any_of_neighbors_pair f q126 q147 =
+  fresh (q129 p1 p2 p3 p4 p5 q140) (q129 === (pair p1 (pair p2 (pair p3 (pair p4 p5))))) (
+    q126 q129) (f (fun q142 -> p1 === q142) (fun q143 -> p2 === q143) q140)
     (conde
-       [(q136 === (!! true)) &&& (q143 === (!! true));
-       fresh (q132) (q136 === (!! false)) (f (fun q139 -> p2 === q139) (fun q140 -> p3 === q140) q132)
+       [(q140 === (!! true)) &&& (q147 === (!! true));
+       fresh (q136) (q140 === (!! false)) (f (fun q143 -> p2 === q143) (fun q144 -> p3 === q144) q136)
          (conde
-            [(q132 === (!! true)) &&& (q143 === (!! true));
-            fresh (q128) (q132 === (!! false)) (f (fun q140 -> p3 === q140) (fun q141 -> p4 === q141) q128)
-              (conde [(q128 === (!! true)) &&& (q143 === (!! true)); (q128 === (!! false)) &&& (f (fun q141 -> p4 === q141) (fun q142 -> p5 === q142) q143)])])])
-let clue02 st q171 =
-  let for_person per q170 =
-    fresh (q145 c n q146 q147 q148 q163 q152 q153) (q145 === (person c n q146 q147 q148)) (
-      n === q152) (q153 === (englishman ())) (per q145) (conde [(q152 === q153) &&& (q163 === (!! true)); (q163 === (!! false)) &&& (q152 =/= q153)])
+            [(q136 === (!! true)) &&& (q147 === (!! true));
+            fresh (q132) (q136 === (!! false)) (f (fun q144 -> p3 === q144) (fun q145 -> p4 === q145) q132)
+              (conde [(q132 === (!! true)) &&& (q147 === (!! true)); (q132 === (!! false)) &&& (f (fun q145 -> p4 === q145) (fun q146 -> p5 === q146) q147)])])])
+let clue02 st q175 =
+  let for_person q148 q149 =
+    fresh (q150 c n q151 q152 q153 q168 q157 q158) (q150 === (pair c (pair n (pair q151 (pair q152 q153))))) (
+      n === q157) (q158 === (englishman ())) (q148 q150) (conde [(q157 === q158) &&& (q168 === (!! true)); (q168 === (!! false)) &&& (q157 =/= q158)])
       (conde
-         [(q163 === (!! false)) &&& (q170 === (!! false));
-         fresh (q158 q159) (q163 === (!! true)) (c === q158) (q159 === (red ())) (conde [(q158 === q159) &&& (q170 === (!! true)); (q170 === (!! false)) &&& (q158 =/= q159)])]) in
-  any_of_person for_person st q171
-let clue03 st q199 =
-  let for_person per q198 =
-    fresh (q173 q174 n q175 q176 p q191 q180 q181) (q173 === (person q174 n q175 q176 p)) (
-      n === q180) (q181 === (spaniard ())) (per q173) (conde [(q180 === q181) &&& (q191 === (!! true)); (q191 === (!! false)) &&& (q180 =/= q181)])
+         [(q168 === (!! false)) &&& (q149 === (!! false));
+         fresh (q163 q164) (q168 === (!! true)) (c === q163) (q164 === (red ())) (conde [(q163 === q164) &&& (q149 === (!! true)); (q149 === (!! false)) &&& (q163 =/= q164)])]) in
+  any_of_person for_person st q175
+let clue03 st q203 =
+  let for_person q176 q177 =
+    fresh (q178 q179 n q180 q181 p q196 q185 q186) (q178 === (pair q179 (pair n (pair q180 (pair q181 p))))) (
+      n === q185) (q186 === (spaniard ())) (q176 q178) (conde [(q185 === q186) &&& (q196 === (!! true)); (q196 === (!! false)) &&& (q185 =/= q186)])
       (conde
-         [(q191 === (!! false)) &&& (q198 === (!! false));
-         fresh (q186 q187) (q191 === (!! true)) (p === q186) (q187 === (dog ())) (conde [(q186 === q187) &&& (q198 === (!! true)); (q198 === (!! false)) &&& (q186 =/= q187)])]) in
-  any_of_person for_person st q199
-let clue04 st q227 =
-  let for_person per q226 =
-    fresh (q201 c q202 d q203 q204 q219 q208 q209) (q201 === (person c q202 d q203 q204)) (
-      c === q208) (q209 === (green ())) (per q201) (conde [(q208 === q209) &&& (q219 === (!! true)); (q219 === (!! false)) &&& (q208 =/= q209)])
+         [(q196 === (!! false)) &&& (q177 === (!! false));
+         fresh (q191 q192) (q196 === (!! true)) (p === q191) (q192 === (dog ())) (conde [(q191 === q192) &&& (q177 === (!! true)); (q177 === (!! false)) &&& (q191 =/= q192)])]) in
+  any_of_person for_person st q203
+let clue04 st q231 =
+  let for_person q204 q205 =
+    fresh (q206 c q207 d q208 q209 q224 q213 q214) (q206 === (pair c (pair q207 (pair d (pair q208 q209))))) (
+      c === q213) (q214 === (green ())) (q204 q206) (conde [(q213 === q214) &&& (q224 === (!! true)); (q224 === (!! false)) &&& (q213 =/= q214)])
       (conde
-         [(q219 === (!! false)) &&& (q226 === (!! false));
-         fresh (q214 q215) (q219 === (!! true)) (d === q214) (q215 === (coffee ())) (conde [(q214 === q215) &&& (q226 === (!! true)); (q226 === (!! false)) &&& (q214 =/= q215)])]) in
-  any_of_person for_person st q227
-let clue05 st q255 =
-  let for_person per q254 =
-    fresh (q229 q230 n d q231 q232 q247 q236 q237) (q229 === (person q230 n d q231 q232)) (
-      n === q236) (q237 === (ukrainian ())) (per q229) (conde [(q236 === q237) &&& (q247 === (!! true)); (q247 === (!! false)) &&& (q236 =/= q237)])
+         [(q224 === (!! false)) &&& (q205 === (!! false));
+         fresh (q219 q220) (q224 === (!! true)) (d === q219) (q220 === (coffee ())) (conde [(q219 === q220) &&& (q205 === (!! true)); (q205 === (!! false)) &&& (q219 =/= q220)])]) in
+  any_of_person for_person st q231
+let clue05 st q259 =
+  let for_person q232 q233 =
+    fresh (q234 q235 n d q236 q237 q252 q241 q242) (q234 === (pair q235 (pair n (pair d (pair q236 q237))))) (
+      n === q241) (q242 === (ukrainian ())) (q232 q234) (conde [(q241 === q242) &&& (q252 === (!! true)); (q252 === (!! false)) &&& (q241 =/= q242)])
       (conde
-         [(q247 === (!! false)) &&& (q254 === (!! false));
-         fresh (q242 q243) (q247 === (!! true)) (d === q242) (q243 === (tea ())) (conde [(q242 === q243) &&& (q254 === (!! true)); (q254 === (!! false)) &&& (q242 =/= q243)])]) in
-  any_of_person for_person st q255
-let clue06 st q295 =
-  let for_neighbors_pair per1 per2 q294 =
-    fresh (q257 c1 q258 q259 q260 q261 q263 c2 q264 q265 q266 q267 q282 q271 q272) (
-      q257 === (person c1 q258 q259 q260 q261)) (q263 === (person c2 q264 q265 q266 q267)) (
-      c1 === q271) (q272 === (ivory ())) (per1 q257) (per2 q263) (conde [(q271 === q272) &&& (q282 === (!! true)); (q282 === (!! false)) &&& (q271 =/= q272)])
+         [(q252 === (!! false)) &&& (q233 === (!! false));
+         fresh (q247 q248) (q252 === (!! true)) (d === q247) (q248 === (tea ())) (conde [(q247 === q248) &&& (q233 === (!! true)); (q233 === (!! false)) &&& (q247 =/= q248)])]) in
+  any_of_person for_person st q259
+let clue06 st q301 =
+  let for_neighbors_pair q260 q261 q262 =
+    fresh (q263 c1 q264 q265 q266 q267 q270 c2 q271 q272 q273 q274 q289 q278 q279) (
+      q263 === (pair c1 (pair q264 (pair q265 (pair q266 q267))))) (q270 === (pair c2 (pair q271 (pair q272 (pair q273 q274))))) (
+      c1 === q278) (q279 === (ivory ())) (q260 q263) (q261 q270) (conde [(q278 === q279) &&& (q289 === (!! true)); (q289 === (!! false)) &&& (q278 =/= q279)])
       (conde
-         [(q282 === (!! false)) &&& (q294 === (!! false));
-         fresh (q277 q278) (q282 === (!! true)) (c2 === q277) (q278 === (green ())) (conde [(q277 === q278) &&& (q294 === (!! true)); (q294 === (!! false)) &&& (q277 =/= q278)])]) in
-  any_of_neighbors_pair for_neighbors_pair st q295
-let clue07 st q323 =
-  let for_person per q322 =
-    fresh (q297 q298 q299 q300 s p q315 q304 q305) (q297 === (person q298 q299 q300 s p)) (
-      s === q304) (q305 === (old_Gold ())) (per q297) (conde [(q304 === q305) &&& (q315 === (!! true)); (q315 === (!! false)) &&& (q304 =/= q305)])
+         [(q289 === (!! false)) &&& (q262 === (!! false));
+         fresh (q284 q285) (q289 === (!! true)) (c2 === q284) (q285 === (green ())) (conde [(q284 === q285) &&& (q262 === (!! true)); (q262 === (!! false)) &&& (q284 =/= q285)])]) in
+  any_of_neighbors_pair for_neighbors_pair st q301
+let clue07 st q329 =
+  let for_person q302 q303 =
+    fresh (q304 q305 q306 q307 s p q322 q311 q312) (q304 === (pair q305 (pair q306 (pair q307 (pair s p))))) (
+      s === q311) (q312 === (old_Gold ())) (q302 q304) (conde [(q311 === q312) &&& (q322 === (!! true)); (q322 === (!! false)) &&& (q311 =/= q312)])
       (conde
-         [(q315 === (!! false)) &&& (q322 === (!! false));
-         fresh (q310 q311) (q315 === (!! true)) (p === q310) (q311 === (snails ())) (conde [(q310 === q311) &&& (q322 === (!! true)); (q322 === (!! false)) &&& (q310 =/= q311)])]) in
-  any_of_person for_person st q323
-let clue08 st q351 =
-  let for_person per q350 =
-    fresh (q325 c q326 q327 s q328 q343 q332 q333) (q325 === (person c q326 q327 s q328)) (
-      c === q332) (q333 === (yellow ())) (per q325) (conde [(q332 === q333) &&& (q343 === (!! true)); (q343 === (!! false)) &&& (q332 =/= q333)])
+         [(q322 === (!! false)) &&& (q303 === (!! false));
+         fresh (q317 q318) (q322 === (!! true)) (p === q317) (q318 === (snails ())) (conde [(q317 === q318) &&& (q303 === (!! true)); (q303 === (!! false)) &&& (q317 =/= q318)])]) in
+  any_of_person for_person st q329
+let clue08 st q357 =
+  let for_person q330 q331 =
+    fresh (q332 c q333 q334 s q335 q350 q339 q340) (q332 === (pair c (pair q333 (pair q334 (pair s q335))))) (
+      c === q339) (q340 === (yellow ())) (q330 q332) (conde [(q339 === q340) &&& (q350 === (!! true)); (q350 === (!! false)) &&& (q339 =/= q340)])
       (conde
-         [(q343 === (!! false)) &&& (q350 === (!! false));
-         fresh (q338 q339) (q343 === (!! true)) (s === q338) (q339 === (kools ())) (conde [(q338 === q339) &&& (q350 === (!! true)); (q350 === (!! false)) &&& (q338 =/= q339)])]) in
-  any_of_person for_person st q351
-let clue09 st q377 =
-  fresh (q353 q354 q355 q356 q357 d q358 q359 q360 q361 q365 q366) (q353 === (state q354 q355 (person q356 q357 d q358 q359) q360 q361)) (
-    d === q365) (q366 === (milk ())) (st q353) (conde [(q365 === q366) &&& (q377 === (!! true)); (q377 === (!! false)) &&& (q365 =/= q366)])
-let clue10 st q403 =
-  fresh (q379 q380 n q381 q382 q383 q384 q385 q386 q387 q391 q392) (q379 === (state (person q380 n q381 q382 q383) q384 q385 q386 q387)) (
-    n === q391) (q392 === (norwegian ())) (st q379) (conde [(q391 === q392) &&& (q403 === (!! true)); (q403 === (!! false)) &&& (q391 =/= q392)])
-let clue11 st q461 =
-  let for_neighbors_pair per1 per2 q460 =
-    fresh (q405 q406 q407 q408 s1 p1 q410 q411 q412 q413 s2 p2 q448 q428 q417 q418) (
-      q405 === (person q406 q407 q408 s1 p1)) (q410 === (person q411 q412 q413 s2 p2)) (
-      s1 === q417) (q418 === (chesterfield ())) (per1 q405) (per2 q410) (
-      conde [(q417 === q418) &&& (q428 === (!! true)); (q428 === (!! false)) &&& (q417 =/= q418)])
+         [(q350 === (!! false)) &&& (q331 === (!! false));
+         fresh (q345 q346) (q350 === (!! true)) (s === q345) (q346 === (kools ())) (conde [(q345 === q346) &&& (q331 === (!! true)); (q331 === (!! false)) &&& (q345 =/= q346)])]) in
+  any_of_person for_person st q357
+let clue09 q358 q359 =
+  fresh (q360 q361 q362 q363 q364 d q365 q366 q367 q368 q372 q373) (q360 === (pair q361 (pair q362 (pair (pair q363 (pair q364 (pair d (pair q365 q366)))) (pair q367 q368)))))
+    (d === q372) (q373 === (milk ())) (q358 q360) (conde [(q372 === q373) &&& (q359 === (!! true)); (q359 === (!! false)) &&& (q372 =/= q373)])
+let clue10 q384 q385 =
+  fresh (q386 q387 n q388 q389 q390 q391 q392 q393 q394 q398 q399) (q386 === (pair (pair q387 (pair n (pair q388 (pair q389 q390)))) (pair q391 (pair q392 (pair q393 q394)))))
+    (n === q398) (q399 === (norwegian ())) (q384 q386) (conde [(q398 === q399) &&& (q385 === (!! true)); (q385 === (!! false)) &&& (q398 =/= q399)])
+let clue11 st q469 =
+  let for_neighbors_pair q410 q411 q412 =
+    fresh (q413 q414 q415 q416 s1 p1 q419 q420 q421 q422 s2 p2 q457 q437 q426 q427) (
+      q413 === (pair q414 (pair q415 (pair q416 (pair s1 p1))))) (q419 === (pair q420 (pair q421 (pair q422 (pair s2 p2))))) (
+      s1 === q426) (q427 === (chesterfield ())) (q410 q413) (q411 q419) (
+      conde [(q426 === q427) &&& (q437 === (!! true)); (q437 === (!! false)) &&& (q426 =/= q427)])
       (conde
-         [(q428 === (!! false)) &&& (q448 === (!! false));
-         fresh (q423 q424) (q428 === (!! true)) (p2 === q423) (q424 === (fox ())) (conde [(q423 === q424) &&& (q448 === (!! true)); (q448 === (!! false)) &&& (q423 =/= q424)])])
+         [(q437 === (!! false)) &&& (q457 === (!! false));
+         fresh (q432 q433) (q437 === (!! true)) (p2 === q432) (q433 === (fox ())) (conde [(q432 === q433) &&& (q457 === (!! true)); (q457 === (!! false)) &&& (q432 =/= q433)])])
       (conde
-         [(q448 === (!! true)) &&& (q460 === (!! true));
-         fresh (q444 q433 q434) (q448 === (!! false)) (p1 === q433) (
-           q434 === (fox ())) (conde [(q433 === q434) &&& (q444 === (!! true)); (q444 === (!! false)) &&& (q433 =/= q434)])
+         [(q457 === (!! true)) &&& (q412 === (!! true));
+         fresh (q453 q442 q443) (q457 === (!! false)) (p1 === q442) (
+           q443 === (fox ())) (conde [(q442 === q443) &&& (q453 === (!! true)); (q453 === (!! false)) &&& (q442 =/= q443)])
            (conde
-              [(q444 === (!! false)) &&& (q460 === (!! false));
-              fresh (q439 q440) (q444 === (!! true)) (s2 === q439) (q440 === (chesterfield ()))
-                (conde [(q439 === q440) &&& (q460 === (!! true)); (q460 === (!! false)) &&& (q439 =/= q440)])])]) in
-  any_of_neighbors_pair for_neighbors_pair st q461
-let clue12 st q519 =
-  let for_neighbors_pair per1 per2 q518 =
-    fresh (q463 q464 q465 q466 s1 p1 q468 q469 q470 q471 s2 p2 q506 q486 q475 q476) (
-      q463 === (person q464 q465 q466 s1 p1)) (q468 === (person q469 q470 q471 s2 p2)) (
-      s1 === q475) (q476 === (kools ())) (per1 q463) (per2 q468) (conde [(q475 === q476) &&& (q486 === (!! true)); (q486 === (!! false)) &&& (q475 =/= q476)])
+              [(q453 === (!! false)) &&& (q412 === (!! false));
+              fresh (q448 q449) (q453 === (!! true)) (s2 === q448) (q449 === (chesterfield ()))
+                (conde [(q448 === q449) &&& (q412 === (!! true)); (q412 === (!! false)) &&& (q448 =/= q449)])])]) in
+  any_of_neighbors_pair for_neighbors_pair st q469
+let clue12 st q529 =
+  let for_neighbors_pair q470 q471 q472 =
+    fresh (q473 q474 q475 q476 s1 p1 q479 q480 q481 q482 s2 p2 q517 q497 q486 q487) (
+      q473 === (pair q474 (pair q475 (pair q476 (pair s1 p1))))) (q479 === (pair q480 (pair q481 (pair q482 (pair s2 p2))))) (
+      s1 === q486) (q487 === (kools ())) (q470 q473) (q471 q479) (conde [(q486 === q487) &&& (q497 === (!! true)); (q497 === (!! false)) &&& (q486 =/= q487)])
       (conde
-         [(q486 === (!! false)) &&& (q506 === (!! false));
-         fresh (q481 q482) (q486 === (!! true)) (p2 === q481) (q482 === (hourse ())) (conde [(q481 === q482) &&& (q506 === (!! true)); (q506 === (!! false)) &&& (q481 =/= q482)])])
+         [(q497 === (!! false)) &&& (q517 === (!! false));
+         fresh (q492 q493) (q497 === (!! true)) (p2 === q492) (q493 === (hourse ())) (conde [(q492 === q493) &&& (q517 === (!! true)); (q517 === (!! false)) &&& (q492 =/= q493)])])
       (conde
-         [(q506 === (!! true)) &&& (q518 === (!! true));
-         fresh (q502 q491 q492) (q506 === (!! false)) (p1 === q491) (
-           q492 === (hourse ())) (conde [(q491 === q492) &&& (q502 === (!! true)); (q502 === (!! false)) &&& (q491 =/= q492)])
+         [(q517 === (!! true)) &&& (q472 === (!! true));
+         fresh (q513 q502 q503) (q517 === (!! false)) (p1 === q502) (
+           q503 === (hourse ())) (conde [(q502 === q503) &&& (q513 === (!! true)); (q513 === (!! false)) &&& (q502 =/= q503)])
            (conde
-              [(q502 === (!! false)) &&& (q518 === (!! false));
-              fresh (q497 q498) (q502 === (!! true)) (s2 === q497) (q498 === (kools ()))
-                (conde [(q497 === q498) &&& (q518 === (!! true)); (q518 === (!! false)) &&& (q497 =/= q498)])])]) in
-  any_of_neighbors_pair for_neighbors_pair st q519
-let clue13 st q547 =
-  let for_person p q546 =
-    fresh (q521 q522 q523 d s q524 q539 q528 q529) (q521 === (person q522 q523 d s q524)) (
-      s === q528) (q529 === (lacky_Strike ())) (p q521) (conde [(q528 === q529) &&& (q539 === (!! true)); (q539 === (!! false)) &&& (q528 =/= q529)])
+              [(q513 === (!! false)) &&& (q472 === (!! false));
+              fresh (q508 q509) (q513 === (!! true)) (s2 === q508) (q509 === (kools ()))
+                (conde [(q508 === q509) &&& (q472 === (!! true)); (q472 === (!! false)) &&& (q508 =/= q509)])])]) in
+  any_of_neighbors_pair for_neighbors_pair st q529
+let clue13 st q557 =
+  let for_person q530 q531 =
+    fresh (q532 q533 q534 d s q535 q550 q539 q540) (q532 === (pair q533 (pair q534 (pair d (pair s q535))))) (
+      s === q539) (q540 === (lacky_Strike ())) (q530 q532) (conde [(q539 === q540) &&& (q550 === (!! true)); (q550 === (!! false)) &&& (q539 =/= q540)])
       (conde
-         [(q539 === (!! false)) &&& (q546 === (!! false));
-         fresh (q534 q535) (q539 === (!! true)) (d === q534) (q535 === (orange_juice ()))
-           (conde [(q534 === q535) &&& (q546 === (!! true)); (q546 === (!! false)) &&& (q534 =/= q535)])]) in
-  any_of_person for_person st q547
-let clue14 st q575 =
-  let for_person per q574 =
-    fresh (q549 q550 n q551 s q552 q567 q556 q557) (q549 === (person q550 n q551 s q552)) (
-      n === q556) (q557 === (japanese ())) (per q549) (conde [(q556 === q557) &&& (q567 === (!! true)); (q567 === (!! false)) &&& (q556 =/= q557)])
+         [(q550 === (!! false)) &&& (q531 === (!! false));
+         fresh (q545 q546) (q550 === (!! true)) (d === q545) (q546 === (orange_juice ()))
+           (conde [(q545 === q546) &&& (q531 === (!! true)); (q531 === (!! false)) &&& (q545 =/= q546)])]) in
+  any_of_person for_person st q557
+let clue14 st q585 =
+  let for_person q558 q559 =
+    fresh (q560 q561 n q562 s q563 q578 q567 q568) (q560 === (pair q561 (pair n (pair q562 (pair s q563))))) (
+      n === q567) (q568 === (japanese ())) (q558 q560) (conde [(q567 === q568) &&& (q578 === (!! true)); (q578 === (!! false)) &&& (q567 =/= q568)])
       (conde
-         [(q567 === (!! false)) &&& (q574 === (!! false));
-         fresh (q562 q563) (q567 === (!! true)) (s === q562) (q563 === (parliament ()))
-           (conde [(q562 === q563) &&& (q574 === (!! true)); (q574 === (!! false)) &&& (q562 =/= q563)])]) in
-  any_of_person for_person st q575
-let clue15 st q633 =
-  let for_neighbors_pair per1 per2 q632 =
-    fresh (q577 c1 n1 q578 q579 q580 q582 c2 n2 q583 q584 q585 q620 q600 q589 q590) (
-      q577 === (person c1 n1 q578 q579 q580)) (q582 === (person c2 n2 q583 q584 q585)) (
-      n1 === q589) (q590 === (norwegian ())) (per1 q577) (per2 q582) (
-      conde [(q589 === q590) &&& (q600 === (!! true)); (q600 === (!! false)) &&& (q589 =/= q590)])
+         [(q578 === (!! false)) &&& (q559 === (!! false));
+         fresh (q573 q574) (q578 === (!! true)) (s === q573) (q574 === (parliament ()))
+           (conde [(q573 === q574) &&& (q559 === (!! true)); (q559 === (!! false)) &&& (q573 =/= q574)])]) in
+  any_of_person for_person st q585
+let clue15 st q645 =
+  let for_neighbors_pair q586 q587 q588 =
+    fresh (q589 c1 n1 q590 q591 q592 q595 c2 n2 q596 q597 q598 q633 q613 q602 q603) (
+      q589 === (pair c1 (pair n1 (pair q590 (pair q591 q592))))) (q595 === (pair c2 (pair n2 (pair q596 (pair q597 q598))))) (
+      n1 === q602) (q603 === (norwegian ())) (q586 q589) (q587 q595) (
+      conde [(q602 === q603) &&& (q613 === (!! true)); (q613 === (!! false)) &&& (q602 =/= q603)])
       (conde
-         [(q600 === (!! false)) &&& (q620 === (!! false));
-         fresh (q595 q596) (q600 === (!! true)) (c2 === q595) (q596 === (blue ())) (conde [(q595 === q596) &&& (q620 === (!! true)); (q620 === (!! false)) &&& (q595 =/= q596)])])
+         [(q613 === (!! false)) &&& (q633 === (!! false));
+         fresh (q608 q609) (q613 === (!! true)) (c2 === q608) (q609 === (blue ())) (conde [(q608 === q609) &&& (q633 === (!! true)); (q633 === (!! false)) &&& (q608 =/= q609)])])
       (conde
-         [(q620 === (!! true)) &&& (q632 === (!! true));
-         fresh (q616 q605 q606) (q620 === (!! false)) (c1 === q605) (
-           q606 === (blue ())) (conde [(q605 === q606) &&& (q616 === (!! true)); (q616 === (!! false)) &&& (q605 =/= q606)])
+         [(q633 === (!! true)) &&& (q588 === (!! true));
+         fresh (q629 q618 q619) (q633 === (!! false)) (c1 === q618) (
+           q619 === (blue ())) (conde [(q618 === q619) &&& (q629 === (!! true)); (q629 === (!! false)) &&& (q618 =/= q619)])
            (conde
-              [(q616 === (!! false)) &&& (q632 === (!! false));
-              fresh (q611 q612) (q616 === (!! true)) (n2 === q611) (q612 === (norwegian ()))
-                (conde [(q611 === q612) &&& (q632 === (!! true)); (q632 === (!! false)) &&& (q611 =/= q612)])])]) in
-  any_of_neighbors_pair for_neighbors_pair st q633
-let all_present st q911 =
-  let for_person per q887 =
-    fresh (q635 c n d s p q880 q680 q639 q640) (q635 === (person c n d s p)) (
-      c === q639) (q640 === (yellow ())) (per q635) (conde [(q639 === q640) &&& (q680 === (!! true)); (q680 === (!! false)) &&& (q639 =/= q640)])
-      (conde
-         [(q680 === (!! true)) &&& (q880 === (!! true));
-         fresh (q676 q645 q646) (q680 === (!! false)) (c === q645) (q646 === (blue ()))
-           (conde [(q645 === q646) &&& (q676 === (!! true)); (q676 === (!! false)) &&& (q645 =/= q646)])
-           (conde
-              [(q676 === (!! true)) &&& (q880 === (!! true));
-              fresh (q672 q651 q652) (q676 === (!! false)) (c === q651) (
-                q652 === (red ())) (conde [(q651 === q652) &&& (q672 === (!! true)); (q672 === (!! false)) &&& (q651 =/= q652)])
-                (conde
-                   [(q672 === (!! true)) &&& (q880 === (!! true));
-                   fresh (q668 q657 q658) (q672 === (!! false)) (c === q657) (
-                     q658 === (ivory ())) (conde [(q657 === q658) &&& (q668 === (!! true)); (q668 === (!! false)) &&& (q657 =/= q658)])
-                     (conde
-                        [(q668 === (!! true)) &&& (q880 === (!! true));
-                        fresh (q663 q664) (q668 === (!! false)) (c === q663) (
-                          q664 === (green ())) (conde [(q663 === q664) &&& (q880 === (!! true)); (q880 === (!! false)) &&& (q663 =/= q664)])])])])])
-      (conde
-         [(q880 === (!! false)) &&& (q887 === (!! false));
-         fresh (q876 q726 q685 q686) (q880 === (!! true)) (n === q685) (
-           q686 === (norwegian ())) (conde [(q685 === q686) &&& (q726 === (!! true)); (q726 === (!! false)) &&& (q685 =/= q686)])
-           (conde
-              [(q726 === (!! true)) &&& (q876 === (!! true));
-              fresh (q722 q691 q692) (q726 === (!! false)) (n === q691) (
-                q692 === (ukrainian ())) (conde [(q691 === q692) &&& (q722 === (!! true)); (q722 === (!! false)) &&& (q691 =/= q692)])
-                (conde
-                   [(q722 === (!! true)) &&& (q876 === (!! true));
-                   fresh (q718 q697 q698) (q722 === (!! false)) (n === q697) (
-                     q698 === (englishman ())) (conde [(q697 === q698) &&& (q718 === (!! true)); (q718 === (!! false)) &&& (q697 =/= q698)])
-                     (conde
-                        [(q718 === (!! true)) &&& (q876 === (!! true));
-                        fresh (q714 q703 q704) (q718 === (!! false)) (
-                          n === q703) (q704 === (spaniard ())) (conde [(q703 === q704) &&& (q714 === (!! true)); (q714 === (!! false)) &&& (q703 =/= q704)])
-                          (conde
-                             [(q714 === (!! true)) &&& (q876 === (!! true));
-                             fresh (q709 q710) (q714 === (!! false)) (
-                               n === q709) (q710 === (japanese ())) (
-                               conde [(q709 === q710) &&& (q876 === (!! true)); (q876 === (!! false)) &&& (q709 =/= q710)])])])])])
-           (conde
-              [(q876 === (!! false)) &&& (q887 === (!! false));
-              fresh (q872 q772 q731 q732) (q876 === (!! true)) (d === q731) (
-                q732 === (water ())) (conde [(q731 === q732) &&& (q772 === (!! true)); (q772 === (!! false)) &&& (q731 =/= q732)])
-                (conde
-                   [(q772 === (!! true)) &&& (q872 === (!! true));
-                   fresh (q768 q737 q738) (q772 === (!! false)) (d === q737) (
-                     q738 === (tea ())) (conde [(q737 === q738) &&& (q768 === (!! true)); (q768 === (!! false)) &&& (q737 =/= q738)])
-                     (conde
-                        [(q768 === (!! true)) &&& (q872 === (!! true));
-                        fresh (q764 q743 q744) (q768 === (!! false)) (
-                          d === q743) (q744 === (milk ())) (conde [(q743 === q744) &&& (q764 === (!! true)); (q764 === (!! false)) &&& (q743 =/= q744)])
-                          (conde
-                             [(q764 === (!! true)) &&& (q872 === (!! true));
-                             fresh (q760 q749 q750) (q764 === (!! false)) (
-                               d === q749) (q750 === (orange_juice ())) (
-                               conde [(q749 === q750) &&& (q760 === (!! true)); (q760 === (!! false)) &&& (q749 =/= q750)])
-                               (conde
-                                  [(q760 === (!! true)) &&& (q872 === (!! true));
-                                  fresh (q755 q756) (q760 === (!! false)) (
-                                    d === q755) (q756 === (coffee ())) (
-                                    conde [(q755 === q756) &&& (q872 === (!! true)); (q872 === (!! false)) &&& (q755 =/= q756)])])])])])
-                (conde
-                   [(q872 === (!! false)) &&& (q887 === (!! false));
-                   fresh (q868 q818 q777 q778) (q872 === (!! true)) (
-                     s === q777) (q778 === (kools ())) (conde [(q777 === q778) &&& (q818 === (!! true)); (q818 === (!! false)) &&& (q777 =/= q778)])
-                     (conde
-                        [(q818 === (!! true)) &&& (q868 === (!! true));
-                        fresh (q814 q783 q784) (q818 === (!! false)) (
-                          s === q783) (q784 === (chesterfield ())) (conde [(q783 === q784) &&& (q814 === (!! true)); (q814 === (!! false)) &&& (q783 =/= q784)])
-                          (conde
-                             [(q814 === (!! true)) &&& (q868 === (!! true));
-                             fresh (q810 q789 q790) (q814 === (!! false)) (
-                               s === q789) (q790 === (old_Gold ())) (
-                               conde [(q789 === q790) &&& (q810 === (!! true)); (q810 === (!! false)) &&& (q789 =/= q790)])
-                               (conde
-                                  [(q810 === (!! true)) &&& (q868 === (!! true));
-                                  fresh (q806 q795 q796) (q810 === (!! false)) (
-                                    s === q795) (q796 === (lacky_Strike ())) (
-                                    conde [(q795 === q796) &&& (q806 === (!! true)); (q806 === (!! false)) &&& (q795 =/= q796)])
-                                    (conde
-                                       [(q806 === (!! true)) &&& (q868 === (!! true));
-                                       fresh (q801 q802) (q806 === (!! false)) (
-                                         s === q801) (q802 === (parliament ())) (
-                                         conde [(q801 === q802) &&& (q868 === (!! true)); (q868 === (!! false)) &&& (q801 =/= q802)])])])])])
-                     (conde
-                        [(q868 === (!! false)) &&& (q887 === (!! false));
-                        fresh (q864 q823 q824) (q868 === (!! true)) (
-                          p === q823) (q824 === (fox ())) (conde [(q823 === q824) &&& (q864 === (!! true)); (q864 === (!! false)) &&& (q823 =/= q824)])
-                          (conde
-                             [(q864 === (!! true)) &&& (q887 === (!! true));
-                             fresh (q860 q829 q830) (q864 === (!! false)) (
-                               p === q829) (q830 === (hourse ())) (conde [(q829 === q830) &&& (q860 === (!! true)); (q860 === (!! false)) &&& (q829 =/= q830)])
-                               (conde
-                                  [(q860 === (!! true)) &&& (q887 === (!! true));
-                                  fresh (q856 q835 q836) (q860 === (!! false)) (
-                                    p === q835) (q836 === (snails ())) (
-                                    conde [(q835 === q836) &&& (q856 === (!! true)); (q856 === (!! false)) &&& (q835 =/= q836)])
-                                    (conde
-                                       [(q856 === (!! true)) &&& (q887 === (!! true));
-                                       fresh (q852 q841 q842) (q856 === (!! false)) (
-                                         p === q841) (q842 === (dog ())) (
-                                         conde [(q841 === q842) &&& (q852 === (!! true)); (q852 === (!! false)) &&& (q841 =/= q842)])
-                                         (conde
-                                            [(q852 === (!! true)) &&& (q887 === (!! true));
-                                            fresh (q847 q848) (q852 === (!! false)) (
-                                              p === q847) (q848 === (zebra ())) (
-                                              conde [(q847 === q848) &&& (q887 === (!! true)); (q887 === (!! false)) &&& (q847 =/= q848)])])])])])])])])]) in
-  fresh (q889 p1 p2 p3 p4 p5 q904) (q889 === (state p1 p2 p3 p4 p5)) (
-    st q889) (for_person (fun q906 -> p1 === q906) q904)
-    (conde
-       [(q904 === (!! false)) &&& (q911 === (!! false));
-       fresh (q900) (q904 === (!! true)) (for_person (fun q907 -> p2 === q907) q900)
+              [(q629 === (!! false)) &&& (q588 === (!! false));
+              fresh (q624 q625) (q629 === (!! true)) (n2 === q624) (q625 === (norwegian ()))
+                (conde [(q624 === q625) &&& (q588 === (!! true)); (q588 === (!! false)) &&& (q624 =/= q625)])])]) in
+  any_of_neighbors_pair for_neighbors_pair st q645
+let all_present q646 q647 =
+  fresh (q648 p1 p2 p3 p4 p5) (q648 === (pair p1 (pair p2 (pair p3 (pair p4 p5))))) (
+    q646 q648)
+    (let for_person q649 q650 =
+       fresh (q651 c n d s p q896 q696 q655 q656) (q651 === (pair c (pair n (pair d (pair s p))))) (
+         c === q655) (q656 === (yellow ())) (q649 q651) (conde [(q655 === q656) &&& (q696 === (!! true)); (q696 === (!! false)) &&& (q655 =/= q656)])
          (conde
-            [(q900 === (!! false)) &&& (q911 === (!! false));
-            fresh (q896) (q900 === (!! true)) (for_person (fun q908 -> p3 === q908) q896)
+            [(q696 === (!! true)) &&& (q896 === (!! true));
+            fresh (q692 q661 q662) (q696 === (!! false)) (c === q661) (
+              q662 === (blue ())) (conde [(q661 === q662) &&& (q692 === (!! true)); (q692 === (!! false)) &&& (q661 =/= q662)])
               (conde
-                 [(q896 === (!! false)) &&& (q911 === (!! false));
-                 fresh (q892) (q896 === (!! true)) (for_person (fun q909 -> p4 === q909) q892)
-                   (conde [(q892 === (!! false)) &&& (q911 === (!! false)); (q892 === (!! true)) &&& (for_person (fun q910 -> p5 === q910) q911)])])])])
-let check_state st q972 =
-  fresh (q973 q970) (st q973) (all_different (fun q974 -> q974 === q973) q970)
-    (conde
-       [(q970 === (!! false)) &&& (q972 === (!! false));
-       fresh (q966) (q970 === (!! true)) (clue02 (fun q974 -> q974 === q973) q966)
-         (conde
-            [(q966 === (!! false)) &&& (q972 === (!! false));
-            fresh (q962) (q966 === (!! true)) (clue03 (fun q974 -> q974 === q973) q962)
-              (conde
-                 [(q962 === (!! false)) &&& (q972 === (!! false));
-                 fresh (q958) (q962 === (!! true)) (clue04 (fun q974 -> q974 === q973) q958)
+                 [(q692 === (!! true)) &&& (q896 === (!! true));
+                 fresh (q688 q667 q668) (q692 === (!! false)) (c === q667) (
+                   q668 === (red ())) (conde [(q667 === q668) &&& (q688 === (!! true)); (q688 === (!! false)) &&& (q667 =/= q668)])
                    (conde
-                      [(q958 === (!! false)) &&& (q972 === (!! false));
-                      fresh (q954) (q958 === (!! true)) (clue05 (fun q974 -> q974 === q973) q954)
+                      [(q688 === (!! true)) &&& (q896 === (!! true));
+                      fresh (q684 q673 q674) (q688 === (!! false)) (c === q673) (
+                        q674 === (ivory ())) (conde [(q673 === q674) &&& (q684 === (!! true)); (q684 === (!! false)) &&& (q673 =/= q674)])
                         (conde
-                           [(q954 === (!! false)) &&& (q972 === (!! false));
-                           fresh (q950) (q954 === (!! true)) (clue06 (fun q974 -> q974 === q973) q950)
+                           [(q684 === (!! true)) &&& (q896 === (!! true));
+                           fresh (q679 q680) (q684 === (!! false)) (c === q679) (
+                             q680 === (green ())) (conde [(q679 === q680) &&& (q896 === (!! true)); (q896 === (!! false)) &&& (q679 =/= q680)])])])])])
+         (conde
+            [(q896 === (!! false)) &&& (q650 === (!! false));
+            fresh (q892 q742 q701 q702) (q896 === (!! true)) (n === q701) (
+              q702 === (norwegian ())) (conde [(q701 === q702) &&& (q742 === (!! true)); (q742 === (!! false)) &&& (q701 =/= q702)])
+              (conde
+                 [(q742 === (!! true)) &&& (q892 === (!! true));
+                 fresh (q738 q707 q708) (q742 === (!! false)) (n === q707) (
+                   q708 === (ukrainian ())) (conde [(q707 === q708) &&& (q738 === (!! true)); (q738 === (!! false)) &&& (q707 =/= q708)])
+                   (conde
+                      [(q738 === (!! true)) &&& (q892 === (!! true));
+                      fresh (q734 q713 q714) (q738 === (!! false)) (n === q713) (
+                        q714 === (englishman ())) (conde [(q713 === q714) &&& (q734 === (!! true)); (q734 === (!! false)) &&& (q713 =/= q714)])
+                        (conde
+                           [(q734 === (!! true)) &&& (q892 === (!! true));
+                           fresh (q730 q719 q720) (q734 === (!! false)) (
+                             n === q719) (q720 === (spaniard ())) (conde [(q719 === q720) &&& (q730 === (!! true)); (q730 === (!! false)) &&& (q719 =/= q720)])
                              (conde
-                                [(q950 === (!! false)) &&& (q972 === (!! false));
-                                fresh (q946) (q950 === (!! true)) (clue07 (fun q974 -> q974 === q973) q946)
+                                [(q730 === (!! true)) &&& (q892 === (!! true));
+                                fresh (q725 q726) (q730 === (!! false)) (
+                                  n === q725) (q726 === (japanese ())) (
+                                  conde [(q725 === q726) &&& (q892 === (!! true)); (q892 === (!! false)) &&& (q725 =/= q726)])])])])])
+              (conde
+                 [(q892 === (!! false)) &&& (q650 === (!! false));
+                 fresh (q888 q788 q747 q748) (q892 === (!! true)) (d === q747) (
+                   q748 === (water ())) (conde [(q747 === q748) &&& (q788 === (!! true)); (q788 === (!! false)) &&& (q747 =/= q748)])
+                   (conde
+                      [(q788 === (!! true)) &&& (q888 === (!! true));
+                      fresh (q784 q753 q754) (q788 === (!! false)) (d === q753) (
+                        q754 === (tea ())) (conde [(q753 === q754) &&& (q784 === (!! true)); (q784 === (!! false)) &&& (q753 =/= q754)])
+                        (conde
+                           [(q784 === (!! true)) &&& (q888 === (!! true));
+                           fresh (q780 q759 q760) (q784 === (!! false)) (
+                             d === q759) (q760 === (milk ())) (conde [(q759 === q760) &&& (q780 === (!! true)); (q780 === (!! false)) &&& (q759 =/= q760)])
+                             (conde
+                                [(q780 === (!! true)) &&& (q888 === (!! true));
+                                fresh (q776 q765 q766) (q780 === (!! false)) (
+                                  d === q765) (q766 === (orange_juice ())) (
+                                  conde [(q765 === q766) &&& (q776 === (!! true)); (q776 === (!! false)) &&& (q765 =/= q766)])
                                   (conde
-                                     [(q946 === (!! false)) &&& (q972 === (!! false));
-                                     fresh (q942) (q946 === (!! true)) (
-                                       clue08 (fun q974 -> q974 === q973) q942)
+                                     [(q776 === (!! true)) &&& (q888 === (!! true));
+                                     fresh (q771 q772) (q776 === (!! false)) (
+                                       d === q771) (q772 === (coffee ())) (
+                                       conde [(q771 === q772) &&& (q888 === (!! true)); (q888 === (!! false)) &&& (q771 =/= q772)])])])])])
+                   (conde
+                      [(q888 === (!! false)) &&& (q650 === (!! false));
+                      fresh (q884 q834 q793 q794) (q888 === (!! true)) (
+                        s === q793) (q794 === (kools ())) (conde [(q793 === q794) &&& (q834 === (!! true)); (q834 === (!! false)) &&& (q793 =/= q794)])
+                        (conde
+                           [(q834 === (!! true)) &&& (q884 === (!! true));
+                           fresh (q830 q799 q800) (q834 === (!! false)) (
+                             s === q799) (q800 === (chesterfield ())) (
+                             conde [(q799 === q800) &&& (q830 === (!! true)); (q830 === (!! false)) &&& (q799 =/= q800)])
+                             (conde
+                                [(q830 === (!! true)) &&& (q884 === (!! true));
+                                fresh (q826 q805 q806) (q830 === (!! false)) (
+                                  s === q805) (q806 === (old_Gold ())) (
+                                  conde [(q805 === q806) &&& (q826 === (!! true)); (q826 === (!! false)) &&& (q805 =/= q806)])
+                                  (conde
+                                     [(q826 === (!! true)) &&& (q884 === (!! true));
+                                     fresh (q822 q811 q812) (q826 === (!! false)) (
+                                       s === q811) (q812 === (lacky_Strike ())) (
+                                       conde [(q811 === q812) &&& (q822 === (!! true)); (q822 === (!! false)) &&& (q811 =/= q812)])
                                        (conde
-                                          [(q942 === (!! false)) &&& (q972 === (!! false));
-                                          fresh (q938) (q942 === (!! true)) (
-                                            clue09 (fun q974 -> q974 === q973) q938)
+                                          [(q822 === (!! true)) &&& (q884 === (!! true));
+                                          fresh (q817 q818) (q822 === (!! false)) (
+                                            s === q817) (q818 === (parliament ())) (
+                                            conde [(q817 === q818) &&& (q884 === (!! true)); (q884 === (!! false)) &&& (q817 =/= q818)])])])])])
+                        (conde
+                           [(q884 === (!! false)) &&& (q650 === (!! false));
+                           fresh (q880 q839 q840) (q884 === (!! true)) (
+                             p === q839) (q840 === (fox ())) (conde [(q839 === q840) &&& (q880 === (!! true)); (q880 === (!! false)) &&& (q839 =/= q840)])
+                             (conde
+                                [(q880 === (!! true)) &&& (q650 === (!! true));
+                                fresh (q876 q845 q846) (q880 === (!! false)) (
+                                  p === q845) (q846 === (hourse ())) (
+                                  conde [(q845 === q846) &&& (q876 === (!! true)); (q876 === (!! false)) &&& (q845 =/= q846)])
+                                  (conde
+                                     [(q876 === (!! true)) &&& (q650 === (!! true));
+                                     fresh (q872 q851 q852) (q876 === (!! false)) (
+                                       p === q851) (q852 === (snails ())) (
+                                       conde [(q851 === q852) &&& (q872 === (!! true)); (q872 === (!! false)) &&& (q851 =/= q852)])
+                                       (conde
+                                          [(q872 === (!! true)) &&& (q650 === (!! true));
+                                          fresh (q868 q857 q858) (q872 === (!! false)) (
+                                            p === q857) (q858 === (dog ())) (
+                                            conde [(q857 === q858) &&& (q868 === (!! true)); (q868 === (!! false)) &&& (q857 =/= q858)])
                                             (conde
-                                               [(q938 === (!! false)) &&& (q972 === (!! false));
-                                               fresh (q934) (q938 === (!! true)) (
-                                                 clue10 (fun q974 -> q974 === q973) q934)
+                                               [(q868 === (!! true)) &&& (q650 === (!! true));
+                                               fresh (q863 q864) (q868 === (!! false)) (
+                                                 p === q863) (q864 === (zebra ())) (
+                                                 conde [(q863 === q864) &&& (q650 === (!! true)); (q650 === (!! false)) &&& (q863 =/= q864)])])])])])])])])]) in
+     fresh (q917) (for_person (fun q919 -> p1 === q919) q917)
+       (conde
+          [(q917 === (!! false)) &&& (q647 === (!! false));
+          fresh (q913) (q917 === (!! true)) (for_person (fun q920 -> p2 === q920) q913)
+            (conde
+               [(q913 === (!! false)) &&& (q647 === (!! false));
+               fresh (q909) (q913 === (!! true)) (for_person (fun q921 -> p3 === q921) q909)
+                 (conde
+                    [(q909 === (!! false)) &&& (q647 === (!! false));
+                    fresh (q905) (q909 === (!! true)) (for_person (fun q922 -> p4 === q922) q905)
+                      (conde [(q905 === (!! false)) &&& (q647 === (!! false)); (q905 === (!! true)) &&& (for_person (fun q923 -> p5 === q923) q647)])])])]))
+let check_state st q984 =
+  fresh (q985 q982) (st q985) (all_different (fun q986 -> q986 === q985) q982)
+    (conde
+       [(q982 === (!! false)) &&& (q984 === (!! false));
+       fresh (q978) (q982 === (!! true)) (clue02 (fun q986 -> q986 === q985) q978)
+         (conde
+            [(q978 === (!! false)) &&& (q984 === (!! false));
+            fresh (q974) (q978 === (!! true)) (clue03 (fun q986 -> q986 === q985) q974)
+              (conde
+                 [(q974 === (!! false)) &&& (q984 === (!! false));
+                 fresh (q970) (q974 === (!! true)) (clue04 (fun q986 -> q986 === q985) q970)
+                   (conde
+                      [(q970 === (!! false)) &&& (q984 === (!! false));
+                      fresh (q966) (q970 === (!! true)) (clue05 (fun q986 -> q986 === q985) q966)
+                        (conde
+                           [(q966 === (!! false)) &&& (q984 === (!! false));
+                           fresh (q962) (q966 === (!! true)) (clue06 (fun q986 -> q986 === q985) q962)
+                             (conde
+                                [(q962 === (!! false)) &&& (q984 === (!! false));
+                                fresh (q958) (q962 === (!! true)) (clue07 (fun q986 -> q986 === q985) q958)
+                                  (conde
+                                     [(q958 === (!! false)) &&& (q984 === (!! false));
+                                     fresh (q954) (q958 === (!! true)) (
+                                       clue08 (fun q986 -> q986 === q985) q954)
+                                       (conde
+                                          [(q954 === (!! false)) &&& (q984 === (!! false));
+                                          fresh (q950) (q954 === (!! true)) (
+                                            clue09 (fun q986 -> q986 === q985) q950)
+                                            (conde
+                                               [(q950 === (!! false)) &&& (q984 === (!! false));
+                                               fresh (q946) (q950 === (!! true)) (
+                                                 clue10 (fun q986 -> q986 === q985) q946)
                                                  (conde
-                                                    [(q934 === (!! false)) &&& (q972 === (!! false));
-                                                    fresh (q930) (q934 === (!! true)) (
-                                                      clue11 (fun q974 -> q974 === q973) q930)
+                                                    [(q946 === (!! false)) &&& (q984 === (!! false));
+                                                    fresh (q942) (q946 === (!! true)) (
+                                                      clue11 (fun q986 -> q986 === q985) q942)
                                                       (conde
-                                                         [(q930 === (!! false)) &&& (q972 === (!! false));
-                                                         fresh (q926) (
-                                                           q930 === (!! true)) (
-                                                           clue12 (fun q974 -> q974 === q973) q926)
+                                                         [(q942 === (!! false)) &&& (q984 === (!! false));
+                                                         fresh (q938) (
+                                                           q942 === (!! true)) (
+                                                           clue12 (fun q986 -> q986 === q985) q938)
                                                            (conde
-                                                              [(q926 === (!! false)) &&& (q972 === (!! false));
-                                                              fresh (q922) (
-                                                                q926 === (!! true)) (
-                                                                clue13 (fun q974 -> q974 === q973) q922)
+                                                              [(q938 === (!! false)) &&& (q984 === (!! false));
+                                                              fresh (q934) (
+                                                                q938 === (!! true)) (
+                                                                clue13 (fun q986 -> q986 === q985) q934)
                                                                 (conde
-                                                                   [(q922 === (!! false)) &&& (q972 === (!! false));
+                                                                   [(q934 === (!! false)) &&& (q984 === (!! false));
                                                                    fresh 
-                                                                    (q918) (
-                                                                    q922 === (!! true)) (
-                                                                    clue14 (fun q974 -> q974 === q973) q918)
+                                                                    (q930) (
+                                                                    q934 === (!! true)) (
+                                                                    clue14 (fun q986 -> q986 === q985) q930)
                                                                     (conde
                                                                     [
-                                                                    (q918 === (!! false)) &&& (q972 === (!! false));
+                                                                    (q930 === (!! false)) &&& (q984 === (!! false));
                                                                     fresh 
-                                                                    (q914) (
-                                                                    q918 === (!! true)) (
-                                                                    clue15 (fun q974 -> q974 === q973) q914)
+                                                                    (q926) (
+                                                                    q930 === (!! true)) (
+                                                                    clue15 (fun q986 -> q986 === q985) q926)
                                                                     (conde
                                                                     [
-                                                                    (q914 === (!! false)) &&& (q972 === (!! false));
-                                                                    (q914 === (!! true)) &&& (all_present (fun q974 -> q974 === q973) q972)])])])])])])])])])])])])])])])
+                                                                    (q926 === (!! false)) &&& (q984 === (!! false));
+                                                                    (q926 === (!! true)) &&& (all_present (fun q986 -> q986 === q985) q984)])])])])])])])])])])])])])])])

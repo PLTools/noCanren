@@ -1,7 +1,6 @@
 type peano  = O | S of peano
 type person = A | B | C | D
 type step   = One of person | Two of person * person
-type state = St of bool * bool * bool * bool * bool
 
 
 let rec greater a0 b0 =
@@ -29,39 +28,29 @@ let rec add a0 b0 =
   | S x -> add x (S b0)
 
 
-let checkPerson state person =
-  match state with
-  | St (l, a0, b0, c0, d0) ->
-    match person with
-    | A -> a0 = l
-    | B -> b0 = l
-    | C -> c0 = l
-    | D -> d0 = l
+let checkPerson (l, a0, b0, c0, d0) = function
+  | A -> a0 = l
+  | B -> b0 = l
+  | C -> c0 = l
+  | D -> d0 = l
 
 
-let checkStep state step =
-  match step with
+let checkStep state = function
   | One p      -> checkPerson state p
   | Two (p, q) -> checkPerson state p && checkPerson state q && grForPerson p q
 
 
-let moveLight state =
-  match state with
-  | St (l, a0, b0, c0, d0) -> St (not l, a0, b0, c0, d0)
+let moveLight (l, a0, b0, c0, d0) = (not l, a0, b0, c0, d0)
 
 
-let movePerson state person =
-  match state with
-  | St (l, a0, b0, c0, d0) ->
-    match person with
-    | A -> St (l, not a0, b0, c0, d0)
-    | B -> St (l, a0, not b0, c0, d0)
-    | C -> St (l, a0, b0, not c0, d0)
-    | D -> St (l, a0, b0, c0, not d0)
+let movePerson (l, a0, b0, c0, d0)  = function
+  | A -> (l, not a0, b0, c0, d0)
+  | B -> (l, a0, not b0, c0, d0)
+  | C -> (l, a0, b0, not c0, d0)
+  | D -> (l, a0, b0, c0, not d0)
 
 
-let step state step =
-  match step with
+let step state = function
   | One p      -> moveLight (movePerson state p)
   | Two (p, q) -> moveLight (movePerson (movePerson state p) q)
 
@@ -72,8 +61,8 @@ let getTime state times =
 
 
 let getAnswer answer times =
-  let start  = St (true, true, true, true, true) in
-  let finish = St (false, false, false, false, false) in
+  let start  = (true, true, true, true, true) in
+  let finish = (false, false, false, false, false) in
 
   let rec getAnswer answer state =
       match answer with
@@ -88,8 +77,7 @@ let getAnswer answer times =
   getAnswer answer start
 
 
-let standartTimes p =
-  match p with
+let standartTimes = function
   | A -> S O
   | B -> S (S O)
   | C -> S (S (S (S (S O))))

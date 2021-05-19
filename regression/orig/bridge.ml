@@ -24,12 +24,6 @@ module For_gstep = (Fmap)(struct let rec fmap fa0 = function | One a0 -> One (fa
                                  type 'a0 t = 'a0 gstep end)
 let rec one x__0 = inj (For_gstep.distrib (One x__0))
 and two x__0 x__1 = inj (For_gstep.distrib (Two (x__0, x__1)))
-type 'a0 gstate =
-  | St of 'a0 * 'a0 * 'a0 * 'a0 * 'a0 
-module For_gstate =
-  (Fmap)(struct let rec fmap fa0 = function | St (a0_0, a0_1, a0_2, a0_3, a0_4) -> St ((fa0 a0_0), (fa0 a0_1), (fa0 a0_2), (fa0 a0_3), (fa0 a0_4))
-                type 'a0 t = 'a0 gstate end)
-let rec st x__0 x__1 x__2 x__3 x__4 = inj (For_gstate.distrib (St (x__0, x__1, x__2, x__3, x__4)))
 let rec greater a0 b0 q8 =
   fresh (q1) (a0 q1)
     (((q1 === (o ())) &&& (q8 === (!! false))) |||
@@ -61,71 +55,71 @@ let max a0 b0 q33 =
     (conde [(q31 === (!! true)) &&& (q33 === q34); (q31 === (!! false)) &&& (q33 === q35)])
 let rec add a0 b0 q43 =
   fresh (q39) (a0 q39) (((q39 === (o ())) &&& (b0 q43)) ||| (fresh (x) (q39 === (s x)) (add (fun q42 -> x === q42) (fun q41 -> fresh (q40) (q41 === (s q40)) (b0 q40)) q43)))
-let checkPerson state person q73 =
-  fresh (q45 l a0 b0 c0 d0 q47) (q45 === (st l a0 b0 c0 d0)) (state q45) (
-    person q47)
+let checkPerson q44 q45 q46 =
+  fresh (q47 l a0 b0 c0 d0 q50) (q47 === (pair l (pair a0 (pair b0 (pair c0 d0))))) (
+    q44 q47) (q45 q50)
     (conde
-       [fresh (q50 q51) (q47 === (a ())) (a0 === q50) (l === q51) (conde [(q50 === q51) &&& (q73 === (!! true)); (q73 === (!! false)) &&& (q50 =/= q51)]);
-       fresh (q55 q56) (q47 === (b ())) (b0 === q55) (l === q56) (conde [(q55 === q56) &&& (q73 === (!! true)); (q73 === (!! false)) &&& (q55 =/= q56)]);
-       fresh (q60 q61) (q47 === (c ())) (c0 === q60) (l === q61) (conde [(q60 === q61) &&& (q73 === (!! true)); (q73 === (!! false)) &&& (q60 =/= q61)]);
-       fresh (q65 q66) (q47 === (d ())) (d0 === q65) (l === q66) (conde [(q65 === q66) &&& (q73 === (!! true)); (q73 === (!! false)) &&& (q65 =/= q66)])])
-let checkStep state step q87 =
-  fresh (q88 q75) (state q88) (step q75)
-    ((fresh (p) (q75 === (one p)) (checkPerson (fun q89 -> q89 === q88) (fun q76 -> p === q76) q87)) |||
-       (fresh (p q q83) (q75 === (two p q)) (checkPerson (fun q89 -> q89 === q88) (fun q85 -> p === q85) q83)
+       [fresh (q53 q54) (q50 === (a ())) (a0 === q53) (l === q54) (conde [(q53 === q54) &&& (q46 === (!! true)); (q46 === (!! false)) &&& (q53 =/= q54)]);
+       fresh (q58 q59) (q50 === (b ())) (b0 === q58) (l === q59) (conde [(q58 === q59) &&& (q46 === (!! true)); (q46 === (!! false)) &&& (q58 =/= q59)]);
+       fresh (q63 q64) (q50 === (c ())) (c0 === q63) (l === q64) (conde [(q63 === q64) &&& (q46 === (!! true)); (q46 === (!! false)) &&& (q63 =/= q64)]);
+       fresh (q68 q69) (q50 === (d ())) (d0 === q68) (l === q69) (conde [(q68 === q69) &&& (q46 === (!! true)); (q46 === (!! false)) &&& (q68 =/= q69)])])
+let checkStep state q76 q91 =
+  fresh (q92 q79) (state q92) (q76 q79)
+    ((fresh (p) (q79 === (one p)) (checkPerson (fun q93 -> q93 === q92) (fun q80 -> p === q80) q91)) |||
+       (fresh (p q q87) (q79 === (two p q)) (checkPerson (fun q93 -> q93 === q92) (fun q89 -> p === q89) q87)
           (conde
-             [(q83 === (!! false)) &&& (q87 === (!! false));
-             fresh (q79) (q83 === (!! true)) (checkPerson (fun q89 -> q89 === q88) (fun q86 -> q === q86) q79)
-               (conde [(q79 === (!! false)) &&& (q87 === (!! false)); (q79 === (!! true)) &&& (grForPerson (fun q85 -> p === q85) (fun q86 -> q === q86) q87)])])))
-let moveLight state q106 =
-  fresh (q91 l a0 b0 c0 d0 q92 q93 q94 q95 q96 q99) (q91 === (st l a0 b0 c0 d0)) (
-    q106 === (st q92 q93 q94 q95 q96)) (l === q99) (a0 === q93) (b0 === q94) (
-    c0 === q95) (d0 === q96) (state q91) (conde [(q99 === (!! true)) &&& (q92 === (!! false)); (q99 === (!! false)) &&& (q92 === (!! true))])
-let movePerson state person q152 =
-  fresh (q108 l a0 b0 c0 d0 q110) (q108 === (st l a0 b0 c0 d0)) (state q108) (
-    person q110)
+             [(q87 === (!! false)) &&& (q91 === (!! false));
+             fresh (q83) (q87 === (!! true)) (checkPerson (fun q93 -> q93 === q92) (fun q90 -> q === q90) q83)
+               (conde [(q83 === (!! false)) &&& (q91 === (!! false)); (q83 === (!! true)) &&& (grForPerson (fun q89 -> p === q89) (fun q90 -> q === q90) q91)])])))
+let moveLight q94 q95 =
+  fresh (q96 l a0 b0 c0 d0 q97 q98 q99 q100 q101 q104) (q96 === (pair l (pair a0 (pair b0 (pair c0 d0))))) (
+    q95 === (pair q97 (pair q98 (pair q99 (pair q100 q101))))) (l === q104) (
+    a0 === q98) (b0 === q99) (c0 === q100) (d0 === q101) (q94 q96) (conde [(q104 === (!! true)) &&& (q97 === (!! false)); (q104 === (!! false)) &&& (q97 === (!! true))])
+let movePerson q111 q112 q113 =
+  fresh (q114 l a0 b0 c0 d0 q117) (q114 === (pair l (pair a0 (pair b0 (pair c0 d0))))) (
+    q111 q114) (q112 q117)
     (conde
-       [fresh (q111 q112 q113 q114 q115 q118) (q110 === (a ())) (q152 === (st q111 q112 q113 q114 q115)) (
-          l === q111) (a0 === q118) (b0 === q113) (c0 === q114) (d0 === q115)
-          (conde [(q118 === (!! true)) &&& (q112 === (!! false)); (q118 === (!! false)) &&& (q112 === (!! true))]);
-       fresh (q120 q121 q122 q123 q124 q127) (q110 === (b ())) (q152 === (st q120 q121 q122 q123 q124)) (
-         l === q120) (a0 === q121) (b0 === q127) (c0 === q123) (d0 === q124)
-         (conde [(q127 === (!! true)) &&& (q122 === (!! false)); (q127 === (!! false)) &&& (q122 === (!! true))]);
-       fresh (q129 q130 q131 q132 q133 q136) (q110 === (c ())) (q152 === (st q129 q130 q131 q132 q133)) (
-         l === q129) (a0 === q130) (b0 === q131) (c0 === q136) (d0 === q133)
-         (conde [(q136 === (!! true)) &&& (q132 === (!! false)); (q136 === (!! false)) &&& (q132 === (!! true))]);
-       fresh (q138 q139 q140 q141 q142 q145) (q110 === (d ())) (q152 === (st q138 q139 q140 q141 q142)) (
-         l === q138) (a0 === q139) (b0 === q140) (c0 === q141) (d0 === q145)
-         (conde [(q145 === (!! true)) &&& (q142 === (!! false)); (q145 === (!! false)) &&& (q142 === (!! true))])])
-let step state step q158 =
-  fresh (q154) (step q154)
-    ((fresh (p) (q154 === (one p)) (moveLight (movePerson state (fun q155 -> p === q155)) q158)) |||
-       (fresh (p q) (q154 === (two p q)) (moveLight (movePerson (movePerson state (fun q156 -> p === q156)) (fun q157 -> q === q157)) q158)))
-let getTime state times q164 =
-  fresh (q160) (state q160)
-    ((fresh (p) (q160 === (one p)) (times (fun q161 -> p === q161) q164)) |||
-       (fresh (p q) (q160 === (two p q)) (max (times (fun q162 -> p === q162)) (times (fun q163 -> q === q163)) q164)))
-let getAnswer answer times q192 =
-  let start q165 = q165 === (st (!! true) (!! true) (!! true) (!! true) (!! true)) in
-  let finish q166 = q166 === (st (!! false) (!! false) (!! false) (!! false) (!! false)) in
-  let rec getAnswer answer state q189 =
-    fresh (q190 q168) (state q190) (answer q168)
-      ((fresh (x xs q169) (q168 === (x % xs)) (checkStep (fun q191 -> q191 === q190) (fun q178 -> x === q178) q169)
+       [fresh (q118 q119 q120 q121 q122 q125) (q117 === (a ())) (q113 === (pair q118 (pair q119 (pair q120 (pair q121 q122))))) (
+          l === q118) (a0 === q125) (b0 === q120) (c0 === q121) (d0 === q122)
+          (conde [(q125 === (!! true)) &&& (q119 === (!! false)); (q125 === (!! false)) &&& (q119 === (!! true))]);
+       fresh (q127 q128 q129 q130 q131 q134) (q117 === (b ())) (q113 === (pair q127 (pair q128 (pair q129 (pair q130 q131))))) (
+         l === q127) (a0 === q128) (b0 === q134) (c0 === q130) (d0 === q131)
+         (conde [(q134 === (!! true)) &&& (q129 === (!! false)); (q134 === (!! false)) &&& (q129 === (!! true))]);
+       fresh (q136 q137 q138 q139 q140 q143) (q117 === (c ())) (q113 === (pair q136 (pair q137 (pair q138 (pair q139 q140))))) (
+         l === q136) (a0 === q137) (b0 === q138) (c0 === q143) (d0 === q140)
+         (conde [(q143 === (!! true)) &&& (q139 === (!! false)); (q143 === (!! false)) &&& (q139 === (!! true))]);
+       fresh (q145 q146 q147 q148 q149 q152) (q117 === (d ())) (q113 === (pair q145 (pair q146 (pair q147 (pair q148 q149))))) (
+         l === q145) (a0 === q146) (b0 === q147) (c0 === q148) (d0 === q152)
+         (conde [(q152 === (!! true)) &&& (q149 === (!! false)); (q152 === (!! false)) &&& (q149 === (!! true))])])
+let step state q159 q166 =
+  fresh (q162) (q159 q162)
+    ((fresh (p) (q162 === (one p)) (moveLight (movePerson state (fun q163 -> p === q163)) q166)) |||
+       (fresh (p q) (q162 === (two p q)) (moveLight (movePerson (movePerson state (fun q164 -> p === q164)) (fun q165 -> q === q165)) q166)))
+let getTime state times q172 =
+  fresh (q168) (state q168)
+    ((fresh (p) (q168 === (one p)) (times (fun q169 -> p === q169) q172)) |||
+       (fresh (p q) (q168 === (two p q)) (max (times (fun q170 -> p === q170)) (times (fun q171 -> q === q171)) q172)))
+let getAnswer answer times q200 =
+  let start q173 = q173 === (pair (!! true) (pair (!! true) (pair (!! true) (pair (!! true) (!! true))))) in
+  let finish q174 = q174 === (pair (!! false) (pair (!! false) (pair (!! false) (pair (!! false) (!! false))))) in
+  let rec getAnswer answer state q197 =
+    fresh (q198 q176) (state q198) (answer q176)
+      ((fresh (x xs q177) (q176 === (x % xs)) (checkStep (fun q199 -> q199 === q198) (fun q186 -> x === q186) q177)
           (conde
-             [fresh (q173) (q169 === (!! true))
-                (((q173 === (none ())) &&& (q189 === (none ()))) |||
-                   (fresh (t1 q175) (q173 === (some t1)) (q189 === (some q175)) (add (getTime (fun q178 -> x === q178) times) (fun q177 -> t1 === q177) q175)))
-                (getAnswer (fun q179 -> xs === q179) (step (fun q191 -> q191 === q190) (fun q178 -> x === q178)) q173);
-             (q169 === (!! false)) &&& (q189 === (none ()))]))
+             [fresh (q181) (q177 === (!! true))
+                (((q181 === (none ())) &&& (q197 === (none ()))) |||
+                   (fresh (t1 q183) (q181 === (some t1)) (q197 === (some q183)) (add (getTime (fun q186 -> x === q186) times) (fun q185 -> t1 === q185) q183)))
+                (getAnswer (fun q187 -> xs === q187) (step (fun q199 -> q199 === q198) (fun q186 -> x === q186)) q181);
+             (q177 === (!! false)) &&& (q197 === (none ()))]))
          |||
-         (fresh (q180 q186 q187) (q168 === (nil ())) (q186 === q190) (
-            finish q187) (conde [(q186 === q187) &&& (q180 === (!! true)); (q180 === (!! false)) &&& (q186 =/= q187)])
-            (conde [(q180 === (!! true)) &&& (q189 === (some (o ()))); (q180 === (!! false)) &&& (q189 === (none ()))]))) in
-  getAnswer answer start q192
-let standartTimes p q199 =
-  fresh (q194) (p q194)
+         (fresh (q188 q194 q195) (q176 === (nil ())) (q194 === q198) (
+            finish q195) (conde [(q194 === q195) &&& (q188 === (!! true)); (q188 === (!! false)) &&& (q194 =/= q195)])
+            (conde [(q188 === (!! true)) &&& (q197 === (some (o ()))); (q188 === (!! false)) &&& (q197 === (none ()))]))) in
+  getAnswer answer start q200
+let standartTimes q201 q202 =
+  fresh (q203) (q201 q203)
     (conde
-       [(q194 === (a ())) &&& (q199 === (s (o ())));
-       (q194 === (b ())) &&& (q199 === (s (s (o ()))));
-       (q194 === (c ())) &&& (q199 === (s (s (s (s (s (o ())))))));
-       (q194 === (d ())) &&& (q199 === (s (s (s (s (s (s (s (s (s (s (o ()))))))))))))])
+       [(q203 === (a ())) &&& (q202 === (s (o ())));
+       (q203 === (b ())) &&& (q202 === (s (s (o ()))));
+       (q203 === (c ())) &&& (q202 === (s (s (s (s (s (o ())))))));
+       (q203 === (d ())) &&& (q202 === (s (s (s (s (s (s (s (s (s (s (o ()))))))))))))])

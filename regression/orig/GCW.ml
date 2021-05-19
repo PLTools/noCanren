@@ -10,54 +10,50 @@ let g () = !! G
 let c () = !! C
 let w () = !! W
 let n () = !! N
-type 'a0 gstate =
-  | St of 'a0 * 'a0 * 'a0 * 'a0 
-module For_gstate = (Fmap)(struct let rec fmap fa0 = function | St (a0_0, a0_1, a0_2, a0_3) -> St ((fa0 a0_0), (fa0 a0_1), (fa0 a0_2), (fa0 a0_3))
-                                  type 'a0 t = 'a0 gstate end)
-let rec st x__0 x__1 x__2 x__3 = inj (For_gstate.distrib (St (x__0, x__1, x__2, x__3)))
-let checkState s q27 =
-  fresh (q1 i0 g0 c0 w0 q2 q20 q21) (q1 === (st i0 g0 c0 w0)) (i0 === q20) (
-    g0 === q21) (s q1) (conde [(q20 === q21) &&& (q2 === (!! true)); (q2 === (!! false)) &&& (q20 =/= q21)])
+let checkState q0 q1 =
+  fresh (q2 i0 g0 c0 w0 q3 q21 q22) (q2 === (pair i0 (pair g0 (pair c0 w0)))) (
+    i0 === q21) (g0 === q22) (q0 q2) (conde [(q21 === q22) &&& (q3 === (!! true)); (q3 === (!! false)) &&& (q21 =/= q22)])
     (conde
-       [(q2 === (!! true)) &&& (q27 === (!! true));
-       fresh (q4 q14 q15) (q2 === (!! false)) (i0 === q14) (c0 === q15) (
-         conde [(q14 === q15) &&& (q4 === (!! true)); (q4 === (!! false)) &&& (q14 =/= q15)])
+       [(q3 === (!! true)) &&& (q1 === (!! true));
+       fresh (q5 q15 q16) (q3 === (!! false)) (i0 === q15) (c0 === q16) (
+         conde [(q15 === q16) &&& (q5 === (!! true)); (q5 === (!! false)) &&& (q15 =/= q16)])
          (conde
-            [fresh (q9 q10) (q4 === (!! true)) (i0 === q9) (w0 === q10) (conde [(q9 === q10) &&& (q27 === (!! true)); (q27 === (!! false)) &&& (q9 =/= q10)]);
-            (q4 === (!! false)) &&& (q27 === (!! false))])])
-let checkStep state step q52 =
-  fresh (q29 i0 g0 c0 w0 q31) (q29 === (st i0 g0 c0 w0)) (state q29) (
-    step q31)
+            [fresh (q10 q11) (q5 === (!! true)) (i0 === q10) (w0 === q11) (conde [(q10 === q11) &&& (q1 === (!! true)); (q1 === (!! false)) &&& (q10 =/= q11)]);
+            (q5 === (!! false)) &&& (q1 === (!! false))])])
+let checkStep q28 q29 q30 =
+  fresh (q31 i0 g0 c0 w0 q34) (q31 === (pair i0 (pair g0 (pair c0 w0)))) (
+    q28 q31) (q29 q34)
     (conde
-       [(q31 === (n ())) &&& (q52 === (!! true));
-       fresh (q35 q36) (q31 === (g ())) (i0 === q35) (g0 === q36) (conde [(q35 === q36) &&& (q52 === (!! true)); (q52 === (!! false)) &&& (q35 =/= q36)]);
-       fresh (q40 q41) (q31 === (c ())) (i0 === q40) (c0 === q41) (conde [(q40 === q41) &&& (q52 === (!! true)); (q52 === (!! false)) &&& (q40 =/= q41)]);
-       fresh (q45 q46) (q31 === (w ())) (i0 === q45) (w0 === q46) (conde [(q45 === q46) &&& (q52 === (!! true)); (q52 === (!! false)) &&& (q45 =/= q46)])])
-let step s p q102 =
-  fresh (q54 i0 g0 c0 w0 q56) (q54 === (st i0 g0 c0 w0)) (s q54) (p q56)
+       [(q34 === (n ())) &&& (q30 === (!! true));
+       fresh (q38 q39) (q34 === (g ())) (i0 === q38) (g0 === q39) (conde [(q38 === q39) &&& (q30 === (!! true)); (q30 === (!! false)) &&& (q38 =/= q39)]);
+       fresh (q43 q44) (q34 === (c ())) (i0 === q43) (c0 === q44) (conde [(q43 === q44) &&& (q30 === (!! true)); (q30 === (!! false)) &&& (q43 =/= q44)]);
+       fresh (q48 q49) (q34 === (w ())) (i0 === q48) (w0 === q49) (conde [(q48 === q49) &&& (q30 === (!! true)); (q30 === (!! false)) &&& (q48 =/= q49)])])
+let step q55 q56 q57 =
+  fresh (q58 i0 g0 c0 w0 q61) (q58 === (pair i0 (pair g0 (pair c0 w0)))) (
+    q55 q58) (q56 q61)
     (conde
-       [fresh (q57 q58 q59 q60 q63 q66) (q56 === (g ())) (q102 === (st q57 q58 q59 q60)) (
-          i0 === q63) (g0 === q66) (c0 === q59) (w0 === q60) (conde [(q63 === (!! true)) &&& (q57 === (!! false)); (q63 === (!! false)) &&& (q57 === (!! true))])
-          (conde [(q66 === (!! true)) &&& (q58 === (!! false)); (q66 === (!! false)) &&& (q58 === (!! true))]);
-       fresh (q68 q69 q70 q71 q74 q77) (q56 === (c ())) (q102 === (st q68 q69 q70 q71)) (
-         i0 === q74) (g0 === q69) (c0 === q77) (w0 === q71) (conde [(q74 === (!! true)) &&& (q68 === (!! false)); (q74 === (!! false)) &&& (q68 === (!! true))])
-         (conde [(q77 === (!! true)) &&& (q70 === (!! false)); (q77 === (!! false)) &&& (q70 === (!! true))]);
-       fresh (q79 q80 q81 q82 q85 q88) (q56 === (w ())) (q102 === (st q79 q80 q81 q82)) (
-         i0 === q85) (g0 === q80) (c0 === q81) (w0 === q88) (conde [(q85 === (!! true)) &&& (q79 === (!! false)); (q85 === (!! false)) &&& (q79 === (!! true))])
-         (conde [(q88 === (!! true)) &&& (q82 === (!! false)); (q88 === (!! false)) &&& (q82 === (!! true))]);
-       fresh (q90 q91 q92 q93 q96) (q56 === (n ())) (q102 === (st q90 q91 q92 q93)) (
-         i0 === q96) (g0 === q91) (c0 === q92) (w0 === q93) (conde [(q96 === (!! true)) &&& (q90 === (!! false)); (q96 === (!! false)) &&& (q90 === (!! true))])])
-let checkAnswer a q123 =
-  let startState q103 = q103 === (st (!! true) (!! true) (!! true) (!! true)) in
-  let finishState q104 = q104 === (st (!! false) (!! false) (!! false) (!! false)) in
-  let rec checkAnswer a state q120 =
-    fresh (q121 q106) (state q121) (a q106)
-      ((fresh (q109 q110) (q106 === (nil ())) (q109 === q121) (finishState q110) (conde [(q109 === q110) &&& (q120 === (!! true)); (q120 === (!! false)) &&& (q109 =/= q110)])) |||
-         (fresh (x xs q112) (q106 === (x % xs)) (checkStep (fun q122 -> q122 === q121) (fun q118 -> x === q118) q112)
+       [fresh (q62 q63 q64 q65 q68 q71) (q61 === (g ())) (q57 === (pair q62 (pair q63 (pair q64 q65)))) (
+          i0 === q68) (g0 === q71) (c0 === q64) (w0 === q65) (conde [(q68 === (!! true)) &&& (q62 === (!! false)); (q68 === (!! false)) &&& (q62 === (!! true))])
+          (conde [(q71 === (!! true)) &&& (q63 === (!! false)); (q71 === (!! false)) &&& (q63 === (!! true))]);
+       fresh (q73 q74 q75 q76 q79 q82) (q61 === (c ())) (q57 === (pair q73 (pair q74 (pair q75 q76)))) (
+         i0 === q79) (g0 === q74) (c0 === q82) (w0 === q76) (conde [(q79 === (!! true)) &&& (q73 === (!! false)); (q79 === (!! false)) &&& (q73 === (!! true))])
+         (conde [(q82 === (!! true)) &&& (q75 === (!! false)); (q82 === (!! false)) &&& (q75 === (!! true))]);
+       fresh (q84 q85 q86 q87 q90 q93) (q61 === (w ())) (q57 === (pair q84 (pair q85 (pair q86 q87)))) (
+         i0 === q90) (g0 === q85) (c0 === q86) (w0 === q93) (conde [(q90 === (!! true)) &&& (q84 === (!! false)); (q90 === (!! false)) &&& (q84 === (!! true))])
+         (conde [(q93 === (!! true)) &&& (q87 === (!! false)); (q93 === (!! false)) &&& (q87 === (!! true))]);
+       fresh (q95 q96 q97 q98 q101) (q61 === (n ())) (q57 === (pair q95 (pair q96 (pair q97 q98)))) (
+         i0 === q101) (g0 === q96) (c0 === q97) (w0 === q98) (conde [(q101 === (!! true)) &&& (q95 === (!! false)); (q101 === (!! false)) &&& (q95 === (!! true))])])
+let checkAnswer a q127 =
+  let startState q107 = q107 === (pair (!! true) (pair (!! true) (pair (!! true) (!! true)))) in
+  let finishState q108 = q108 === (pair (!! false) (pair (!! false) (pair (!! false) (!! false)))) in
+  let rec checkAnswer a state q124 =
+    fresh (q125 q110) (state q125) (a q110)
+      ((fresh (q113 q114) (q110 === (nil ())) (q113 === q125) (finishState q114) (conde [(q113 === q114) &&& (q124 === (!! true)); (q124 === (!! false)) &&& (q113 =/= q114)])) |||
+         (fresh (x xs q116) (q110 === (x % xs)) (checkStep (fun q126 -> q126 === q125) (fun q122 -> x === q122) q116)
             (conde
-               [(q112 === (!! true)) &&&
-                  ((let newState = step (fun q122 -> q122 === q121) (fun q118 -> x === q118) in
-                    fresh (q115) (checkState newState q115)
-                      (conde [(q115 === (!! true)) &&& (checkAnswer (fun q119 -> xs === q119) newState q120); (q115 === (!! false)) &&& (q120 === (!! false))])));
-               (q112 === (!! false)) &&& (q120 === (!! false))]))) in
-  checkAnswer a startState q123
+               [(q116 === (!! true)) &&&
+                  ((let newState = step (fun q126 -> q126 === q125) (fun q122 -> x === q122) in
+                    fresh (q119) (checkState newState q119)
+                      (conde [(q119 === (!! true)) &&& (checkAnswer (fun q123 -> xs === q123) newState q124); (q119 === (!! false)) &&& (q124 === (!! false))])));
+               (q116 === (!! false)) &&& (q124 === (!! false))]))) in
+  checkAnswer a startState q127
