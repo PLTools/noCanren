@@ -1,6 +1,6 @@
 OB = ocamlbuild -use-ocamlfind -classic-display
 
-TESTS   = bottles bridge einstein GCW
+TESTS   = bottles bridge einstein GCW hanoi2
 SAMPLES = bottles bridge einstein GCW hanoi hanoi2 hm_inferencer logic_interpreter lorry scheme_interpreter sudoku4x4 unify
 
 

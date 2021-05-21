@@ -1,7 +1,7 @@
 open GT
 open OCanren
 open OCanren.Std
-type person =
+type gperson =
   | G 
   | C 
   | W 

@@ -1,7 +1,7 @@
 open GT
 open OCanren
 open OCanren.Std
-type hause_color =
+type ghause_color =
   | Yellow 
   | Blue 
   | Red 
@@ -12,7 +12,7 @@ let blue () = !! Blue
 let red () = !! Red
 let ivory () = !! Ivory
 let green () = !! Green
-type nationality =
+type gnationality =
   | Norwegian 
   | Ukrainian 
   | Englishman 
@@ -23,7 +23,7 @@ let ukrainian () = !! Ukrainian
 let englishman () = !! Englishman
 let spaniard () = !! Spaniard
 let japanese () = !! Japanese
-type drink =
+type gdrink =
   | Water 
   | Tea 
   | Milk 
@@ -34,7 +34,7 @@ let tea () = !! Tea
 let milk () = !! Milk
 let orange_juice () = !! Orange_juice
 let coffee () = !! Coffee
-type smoke =
+type gsmoke =
   | Kools 
   | Chesterfield 
   | Old_Gold 
@@ -45,7 +45,7 @@ let chesterfield () = !! Chesterfield
 let old_Gold () = !! Old_Gold
 let lacky_Strike () = !! Lacky_Strike
 let parliament () = !! Parliament
-type pet =
+type gpet =
   | Fox 
   | Hourse 
   | Snails 

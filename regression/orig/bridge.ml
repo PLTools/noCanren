@@ -8,7 +8,7 @@ module For_gpeano = (Fmap)(struct let rec fmap fa0 = function | O -> O | S a0 ->
                                   type 'a0 t = 'a0 gpeano end)
 let rec o () = inj (For_gpeano.distrib O)
 and s x__0 = inj (For_gpeano.distrib (S x__0))
-type person =
+type gperson =
   | A 
   | B 
   | C 

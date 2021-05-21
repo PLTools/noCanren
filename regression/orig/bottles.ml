@@ -1,12 +1,12 @@
 open GT
 open OCanren
 open OCanren.Std
-type bottle =
+type gbottle =
   | Fst 
   | Snd 
 let fst_ () = !! Fst
 let snd_ () = !! Snd
-type stepType =
+type gstepType =
   | Fill 
   | Empty 
   | Pour 

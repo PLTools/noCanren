@@ -80,6 +80,14 @@ let rec fold_right1 f = function
 | h::t -> f h (fold_right1 f t)
 | []   -> failwith "fold_right1"
 
+let filteri f l =
+  let rec filteri l n =
+    match l with
+    | []               -> []
+    | x::xs when f n x -> x :: filteri xs (n+1)
+    | _::xs            -> filteri xs (n+1) in
+  filteri l 0
+
 let untyper = Untypeast.default_mapper
 
 let create_id  s = Lident s |> mknoloc |> Exp.ident
@@ -145,14 +153,32 @@ let create_fresh var body =
 
 let create_inj expr = [%expr !! [%e expr]]
 
+let rec path2ident = function
+  | Path.Pident i      -> Lident (name i)
+  | Path.Pdot (l, r)   -> Ldot (path2ident l, r)
+  | Path.Papply (l, r) -> Lapply (path2ident l, path2ident r)
+
+let ctor_for_record loc typ =
+  let rec get_id (typ : Types.type_expr) =
+    match typ.desc with
+    | Tlink t           -> get_id t
+    | Tconstr (p, _, _) -> begin match path2ident p with
+                           | Lident i    -> Lident ("ctor_g" ^ i)
+                           | Ldot (l, r) -> Ldot (l, "ctor_g" ^ r)
+                           | Lapply _    -> fail_loc loc "What is 'Lapply'?"
+                           end
+    | _                 -> fail_loc loc "Incorrect type of record" in
+  get_id typ |> mknoloc |> Exp.ident
+
 
 let filter_vars vars1 vars2 =
   List.filter (fun v -> List.for_all ((<>) v) vars2) vars1
 
 let mark_type_declaration td =
     match td.typ_kind with
-    | Ttype_variant cds -> { td with typ_attributes = [Attr.mk (mknoloc "put_distrib_here") (Parsetree.PStr [])] }
-    | _                 -> fail_loc td.typ_loc "Incrorrect type declaration"
+    | Ttype_variant _
+    | Ttype_record  _ -> { td with typ_attributes = [Attr.mk (mknoloc "put_distrib_here") (Parsetree.PStr [])] }
+    | _               -> fail_loc td.typ_loc "Incrorrect type declaration"
 
 let mark_constr expr = { expr with
   pexp_attributes = (Attr.mk (mknoloc "it_was_constr") (Parsetree.PStr [])) :: expr.pexp_attributes }
@@ -198,6 +224,27 @@ let rec translate_pat pat fresher =
     let args, vars = List.map (fun q -> translate_pat q fresher) l |> List.split in
     let vars = List.concat vars in
     fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, vars
+  | Tpat_record (fields, _) ->
+    let (_, info, _) = List.hd fields in
+    let count = Array.length info.lbl_all in
+    let rec translate_record_pat fresher fields index =
+      if index == count then [], [] else
+      match fields with
+      | (_, (i : Types.label_description), _) :: xs when i.lbl_pos > index ->
+        let var        = fresher () in
+        let pats, vars = translate_record_pat fresher fields (index+1) in
+        create_id var :: pats, var :: vars
+      | (_, i, p) :: xs ->
+        let pat , vars  = translate_pat p fresher in
+        let pats, vars' = translate_record_pat fresher xs (index+1) in
+        pat :: pats, vars @ vars'
+      | [] ->
+        let var       = fresher () in
+        let pats, vars = translate_record_pat fresher [] (index+1) in
+        create_id var :: pats, var :: vars in
+    let args, vars = translate_record_pat fresher fields 0 in
+    let ctor       = ctor_for_record pat.pat_loc pat.pat_type in
+    create_apply ctor args, vars
   | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
 
 let rec is_disj_pats = function
@@ -352,7 +399,8 @@ and translate_abstraciton case =
         | Tpat_constant _             -> []
         | Tpat_var (n, _)             -> [name n]
         | Tpat_tuple pats
-        | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats in
+        | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats
+        | Tpat_record (l, _)          -> List.concat @@ List.map (fun (_, _, p) -> get_pat_vars p) l in
 
       match expr.exp_desc with
       | Texp_constant _ -> count
@@ -386,7 +434,18 @@ and translate_abstraciton case =
         if tactic = Nondet
           then List.fold_left eval_if_need count @@ e :: exprs
           else let c1 = eval_if_need count e in
-               List.fold_left max c1 @@ List.map (eval_if_need c1) exprs in
+               List.fold_left max c1 @@ List.map (eval_if_need c1) exprs
+      | Texp_record { fields; extended_expression } ->
+        let c' = match extended_expression with
+                 | None   -> count
+                 | Some e -> eval_if_need count e in
+        Array.fold_left (fun c (_, ld) -> match ld with
+                                         | Overridden (_, e) -> eval_if_need c e
+                                         | _                 -> c
+                        ) c' fields
+      | Texp_field (e, _, _) -> eval_if_need count e
+
+in
     two_or_more_mentions expr 0 >= 2 in
 
   let need_to_activate p e =
@@ -558,18 +617,70 @@ and translate_let flag bind expr =
            [nvb]
            (translate_expression expr)
 
+and translate_new_record fields typ loc =
+  let fields  = Array.to_list fields in
+  let ctor    = ctor_for_record loc typ in
+  let mvar    = create_fresh_var_name () in
+  let vars    = List.map (fun _ -> create_fresh_var_name ()) fields in
+  let exprs   = List.map (fun (_, Overridden (_, expr)) -> translate_expression expr) fields in
+  let calls   = List.map2 (fun e v -> create_apply e [create_id v]) exprs vars in
+  let uni     = [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id vars)]] in
+  let conj    = create_conj (uni :: calls) in
+  let with_fr = List.fold_right create_fresh vars conj in
+  create_fun mvar with_fr
+
+and translate_extended_record expr fields typ loc =
+  let fields   = Array.to_list fields in
+  let ctor     = ctor_for_record loc typ in
+  let mvar     = create_fresh_var_name () in
+  let vars     = List.map (fun _ -> create_fresh_var_name ()) fields in
+  let bas_call = create_apply (translate_expression expr) [create_apply ctor (List.map create_id vars)] in
+  let exprs    = fields |> List.map (function
+                              | (_, Overridden (_, e)) -> Some (translate_expression e, create_fresh_var_name ())
+                              | _                      -> None) in
+  let calls    = exprs |> List.filter_map (function
+                              | Some (e, v) -> Some (create_apply e [create_id v])
+                              | None        -> None) in
+  let real_vs  = List.map2 (fun e v ->
+                            match (e, v) with
+                              | Some (_, v), _ -> v
+                              | None,        v -> v) exprs vars in
+  let add_vs   = exprs |> List.filter_map (function
+                              | Some (e, v) -> Some v
+                              | None        -> None) in
+  let uni      = [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id real_vs)]] in
+  let conj     = create_conj (uni :: bas_call :: calls) in
+  let with_fr  = List.fold_right create_fresh (vars @ add_vs) conj in
+  create_fun mvar with_fr
+
+and translate_field expr field (field_info : Types.label_description) loc =
+  let ctor         = ctor_for_record loc expr.exp_type in
+  let mvar         = create_fresh_var_name () in
+  let fields       = Array.to_list field_info.lbl_all in
+  let index        = field_info.lbl_pos in
+  let all_vars     = fields |> List.mapi (fun i _ ->
+                           if i == index then mvar else create_fresh_var_name ()) in
+  let without_mvar = all_vars |> filteri (fun i _ -> i <> index) in
+  let arg          = create_apply ctor (List.map create_id all_vars) in
+  let call         = create_apply (translate_expression expr) [arg] in
+  let with_fr      = List.fold_right create_fresh without_mvar call in
+  create_fun mvar with_fr
+
 and translate_expression e =
   match e.exp_desc with
-  | Texp_constant _                                     -> translate_construct e
-  | Texp_construct _                                    -> translate_construct e
-  | Texp_tuple _                                        -> translate_construct e
-  | Texp_ident (_, { txt }, _)                          -> translate_ident txt
-  | Texp_function {cases = [c]} when pat_is_var c.c_lhs -> translate_abstraciton c
-  | Texp_function { cases }                             -> translate_match_without_scrutinee e.exp_loc cases e.exp_type
-  | Texp_apply (f, a)                                   -> translate_apply f a e.exp_loc
-  | Texp_match (s, cs, _)                               -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
-  | Texp_ifthenelse (cond, th, Some el)                 -> translate_if cond th el
-  | Texp_let (flag, [bind], expr)                       -> translate_let flag bind expr
+  | Texp_constant _                                      -> translate_construct e
+  | Texp_construct _                                     -> translate_construct e
+  | Texp_tuple _                                         -> translate_construct e
+  | Texp_ident (_, { txt }, _)                           -> translate_ident txt
+  | Texp_function {cases = [c]} when pat_is_var c.c_lhs  -> translate_abstraciton c
+  | Texp_function { cases }                              -> translate_match_without_scrutinee e.exp_loc cases e.exp_type
+  | Texp_apply (f, a)                                    -> translate_apply f a e.exp_loc
+  | Texp_match (s, cs, _)                                -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
+  | Texp_ifthenelse (cond, th, Some el)                  -> translate_if cond th el
+  | Texp_let (flag, [bind], expr)                        -> translate_let flag bind expr
+  | Texp_record { fields; extended_expression = None }   -> translate_new_record fields e.exp_type e.exp_loc
+  | Texp_record { fields; extended_expression = Some a } -> translate_extended_record a fields e.exp_type e.exp_loc
+  | Texp_field  (expr, field, field_info)                -> translate_field expr field field_info e.exp_loc
   | _                                                   -> fail_loc e.exp_loc "Incorrect expression" in
 
 let translate_structure_item i =
@@ -1339,7 +1450,7 @@ let only_generate tast params =
     eval_if_need params.normalization
                  (let mapper = fresh_and_conjs_normalizer params.move_unifications in mapper.structure mapper) |>
     eval_if_need params.high_order_paprams.use_call_by_need call_by_need_creator |>
-    Put_distrib.process |>
+    Put_distrib.process params.useGT |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
   with

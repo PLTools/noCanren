@@ -23,8 +23,8 @@ let gen_pin n =
     if m = n then nil () else toN m % gen_pin (m + 1) in
   gen_pin 0
 
-let start n  = set (gen_pin n) (nil ()) (nil ())
-let finish n = set (nil ()) (nil ()) (gen_pin n)
+let start n  = ctor_gset (gen_pin n) (nil ()) (nil ())
+let finish n = ctor_gset (nil ()) (nil ()) (gen_pin n)
 
 let _ =
   Printf.printf "%s\n" @@

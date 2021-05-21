@@ -1,16 +1,13 @@
 type nat    = Z | S of nat
-type set    = Set of nat list * nat list * nat list
+type set    = { pin1 : nat list; pin2 : nat list; pin3 : nat list }
 type pin    = A | B | C
 
-let rec less x y =
-  match y with
-  | S y' -> match x with
-           | Z    -> true
-           | S x' -> less x' y'
+let rec less x (S y') =
+  match x with
+  | Z    -> true
+  | S x' -> less x' y'
 
-
-let extra pin =
-  match pin with
+let extra = function
   | (A, B) -> C
   | (B, A) -> C
   | (A, C) -> B
@@ -18,28 +15,25 @@ let extra pin =
   | (B, C) -> A
   | (C, B) -> A
 
-let select s pin =
-  match s with
-  | Set (x, y, z) ->
-    match pin with
-    | A -> x
-    | B -> y
-    | C -> z
+let select s = function
+    | A -> s.pin1
+    | B -> s.pin2
+    | C -> s.pin3
 
 let permut move s =
   match move with
-  | (x, y) -> Set (select s x, select s y, select s (extra move))
+  | (x, y) -> { pin1 = select s x; pin2 = select s y; pin3 = select s (extra move) }
 
 let tumrep move s =
   match s with
-  | Set (x, y, z) ->
+  | {pin1 = x; pin2 = y; pin3 = z } ->
     match move with
-    | (A, B) -> Set (x, y, z)
-    | (B, A) -> Set (y, x, z)
-    | (A, C) -> Set (x, z, y)
-    | (C, A) -> Set (y, z, x)
-    | (B, C) -> Set (z, x, y)
-    | (C, B) -> Set (z, y, x)
+    | (A, B) -> { pin1 = x; pin2 = y; pin3 = z }
+    | (B, A) -> { pin2 = x; pin1 = y; pin3 = z }
+    | (A, C) -> { pin1 = x; pin3 = y; pin2 = z }
+    | (C, A) -> { pin3 = x; pin1 = y; pin2 = z }
+    | (B, C) -> { pin2 = x; pin3 = y; pin1 = z }
+    | (C, B) -> { pin3 = x; pin2 = y; pin1 = z }
 
 let[@tabled] rec eval p s =
   match p with
@@ -52,12 +46,10 @@ let[@tabled] rec eval p s =
           then s
           else
             match permut move s with
-            | Set (onA, onB, onC) ->
+            | { pin1 = topA :: restA; pin2 = onB; pin3 = onC } ->
               tumrep move (
-                match onA with
-                | topA :: restA ->
-                  match onB with
-                  | []                           -> Set (restA, [topA], onC)
-                  | topB :: _  when topB >= topA ->
-                    match less topA topB with
-                    | true -> Set (restA, topA :: onB, onC)))
+                match onB with
+                | []         -> { pin1 = restA; pin2 = [topA]; pin3 = onC }
+                | topB :: _  ->
+                  match less topA topB with
+                  | true -> { pin1 = restA; pin2 = topA :: onB; pin3 = onC }))

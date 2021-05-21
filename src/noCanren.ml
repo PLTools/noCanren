@@ -85,6 +85,7 @@ let move_unifications           = ref true
 let leave_constuctors           = ref false
 let subst_only_util_vars        = ref false
 let output_name_for_spec_tree   = ref None
+let useGT                       = ref false
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -165,6 +166,10 @@ let all_options =
     "-show-result",
     Arg.Unit (fun path -> need_print_result := true),
     " Show result of conversion in terminal"
+    ;
+    "-useGT",
+    Arg.Unit (fun _ -> useGT := true),
+    " Use GT in translated code"
   ] @ OcamlcOptions.list
 
 let mk_noCanren_params () =
@@ -202,6 +207,7 @@ let mk_noCanren_params () =
     subst_only_util_vars = !subst_only_util_vars;
     high_order_paprams = high_order_paprams;
     unnesting_params = unnesting_params;
+    useGT = !useGT;
 
     output_name_for_spec_tree = !output_name_for_spec_tree;
   }
