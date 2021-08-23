@@ -155,7 +155,8 @@ let translate_high tast start_index params =
           | Tpat_var (n, _)             -> [name n]
           | Tpat_tuple pats
           | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats
-          | Tpat_record (l, _)          -> List.concat @@ List.map (fun (_, _, p) -> get_pat_vars p) l in
+          | Tpat_record (l, _)          -> List.concat @@ List.map (fun (_, _, p) -> get_pat_vars p) l
+          | Tpat_alias (t, n, _)        -> name n :: get_pat_vars t in
 
         match expr.exp_desc with
         | Texp_constant _ -> count
@@ -267,13 +268,14 @@ let translate_high tast start_index params =
         create_fun abs_v unify in
 
       let translate_case case =
-        let pat, vars  = translate_pat case.c_lhs create_fresh_var_name in
-        let unify      = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-        let body       = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
-        let abst_body  = List.fold_right create_fun vars body in
-        let subst      = List.map create_subst vars in
-        let total_body = create_apply abst_body subst in
-        let conj       = create_conj [unify; total_body] in
+        let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
+        let unify          = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+        let unifies        = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+        let body           = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
+        let abst_body      = List.fold_right create_fun vars body in
+        let subst          = List.map create_subst vars in
+        let total_body     = create_apply abst_body subst in
+        let conj           = create_conj (unify :: unifies @ [total_body]) in
         List.fold_right create_fresh vars conj in
 
       let new_cases = List.map translate_case cases in

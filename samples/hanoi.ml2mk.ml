@@ -34,11 +34,11 @@ let one_step step state =
       match get fromN state with
       | x :: xs ->
         match get toN state with
-        | []      -> set toN [x] (set fromN xs state)
-        | y :: ys ->
+        | []             -> set toN [x] (set fromN xs state)
+        | (y :: ys) as r ->
           match less x y with
           | true ->
-            set toN (x :: y :: ys) (set fromN xs state)
+            set toN (x :: r) (set fromN xs state)
 
 
 let rec check state steps =

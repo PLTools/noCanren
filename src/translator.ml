@@ -14,23 +14,23 @@ let () = Printexc.record_backtrace true
 
 let translate tast start_index params =
 
-let lowercase_lident x =
-  if params.leave_constuctors
-  then x
-  else lowercase_lident x in
+  let lowercase_lident x =
+    if params.leave_constuctors
+    then x
+    else lowercase_lident x in
 
-let curr_index = ref start_index in
+  let curr_index = ref start_index in
 
-let create_fresh_var_name () =
-  let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
-  incr curr_index;
-  name in
+  let create_fresh_var_name () =
+    let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
+    incr curr_index;
+    name in
 
-let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
-  match typ.desc with
-  | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
-  | Tlink typ                   -> create_fresh_argument_names_by_type typ
-  | _                           -> [create_fresh_var_name ()] in
+  let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
+    match typ.desc with
+    | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
+    | Tlink typ                   -> create_fresh_argument_names_by_type typ
+    | _                           -> [create_fresh_var_name ()] in
 
   (*************************************************)
 
@@ -198,17 +198,18 @@ let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
       | _ -> pat in
 
     let translate_case case =
-      let pat, vars  = translate_pat case.c_lhs create_fresh_var_name in
-      let is_overlap = List.mem scrutinee_var vars in
-      let new_var    = if is_overlap then create_fresh_var_name () else "" in
-      let pat        = if is_overlap then rename scrutinee_var new_var pat else pat in
-      let vars       = if is_overlap then List.map (fun n -> if n = scrutinee_var then new_var else n) vars else vars in
+      let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
+      let is_overlap     = List.mem scrutinee_var vars in
+      let new_var        = if is_overlap then create_fresh_var_name () else "" in
+      let pat            = if is_overlap then rename scrutinee_var new_var pat else pat in
+      let vars           = if is_overlap then List.map (fun n -> if n = scrutinee_var then new_var else n) vars else vars in
 
 
       let unify      = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+      let unifies    = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
       let body       = create_apply (translate_expression (filter_vars let_vars vars) case.c_rhs) (List.map create_id args) in
       let body       = if is_overlap then create_apply (create_fun scrutinee_var body) [create_id new_var] else body in
-      let conj       = create_conj [unify; body] in
+      let conj       = create_conj (unify :: unifies @ [body]) in
       List.fold_right create_fresh vars conj in
 
     if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then

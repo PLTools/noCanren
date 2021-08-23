@@ -135,6 +135,11 @@ let filteri f l =
     | _::xs            -> filteri xs (n+1) in
   filteri l 0
 
+
+let rec split3 = function
+| []         -> [], [], []
+| (h1,h2,h3)::t -> let t1, t2, t3 = split3 t in h1::t1, h2::t2, h3::t3
+
 (********************** Translator util funcions ****************************)
 
 let untyper = Untypeast.default_mapper
@@ -264,46 +269,51 @@ let rec have_unifier p1 p2 =
 
 let rec translate_pat pat fresher =
   match pat.pat_desc with
-  | Tpat_any                                       -> let var = fresher () in create_id var, [var]
-  | Tpat_var (v, _)                                -> create_id (name v), [name v]
-  | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, []
-  | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  []
-  | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], []
-  | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], []
-  | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], []
+  | Tpat_any                                       -> let var = fresher () in create_id var, [], [var]
+  | Tpat_var (v, _)                                -> create_id (name v), [], [name v]
+  | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, [], []
+  | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  [], []
+  | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], [], []
+  | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], [], []
+  | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
   | Tpat_construct ({txt}, _, args)                ->
-    let args, vars = List.map (fun q -> translate_pat q fresher) args |> List.split in
+    let args, als, vars = List.map (fun q -> translate_pat q fresher) args |> split3 in
     let vars = List.concat vars in
+    let als  = List.concat als  in
     let constr =
       match txt with
       | Lident "::" -> [%expr (%)]
       | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
-    create_apply (mark_constr constr) args, vars
+    create_apply (mark_constr constr) args, als, vars
   | Tpat_tuple l ->
-    let args, vars = List.map (fun q -> translate_pat q fresher) l |> List.split in
+    let args, als, vars = List.map (fun q -> translate_pat q fresher) l |> split3 in
     let vars = List.concat vars in
-    fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, vars
+    let als  = List.concat als in
+    fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, als, vars
   | Tpat_record (fields, _) ->
     let (_, info, _) = List.hd fields in
     let count = Array.length info.lbl_all in
     let rec translate_record_pat fresher fields index =
-      if index == count then [], [] else
+      if index == count then [], [], [] else
       match fields with
       | (_, (i : Types.label_description), _) :: xs when i.lbl_pos > index ->
         let var        = fresher () in
-        let pats, vars = translate_record_pat fresher fields (index+1) in
-        create_id var :: pats, var :: vars
+        let pats, als, vars = translate_record_pat fresher fields (index+1) in
+        create_id var :: pats, als, var :: vars
       | (_, i, p) :: xs ->
-        let pat , vars  = translate_pat p fresher in
-        let pats, vars' = translate_record_pat fresher xs (index+1) in
-        pat :: pats, vars @ vars'
+        let pat , als,  vars  = translate_pat p fresher in
+        let pats, als', vars' = translate_record_pat fresher xs (index+1) in
+        pat :: pats, als @ als', vars @ vars'
       | [] ->
         let var       = fresher () in
-        let pats, vars = translate_record_pat fresher [] (index+1) in
-        create_id var :: pats, var :: vars in
-    let args, vars = translate_record_pat fresher fields 0 in
-    let ctor       = ctor_for_record pat.pat_loc pat.pat_type in
-    create_apply ctor args, vars
+        let pats, als, vars = translate_record_pat fresher [] (index+1) in
+        create_id var :: pats, als, var :: vars in
+    let args, als, vars = translate_record_pat fresher fields 0 in
+    let ctor            = ctor_for_record pat.pat_loc pat.pat_type in
+    create_apply ctor args, als, vars
+  | Tpat_alias (p, v, _) ->
+    let pat, als, vars = translate_pat p fresher in
+    create_id (name v), (create_id (name v), pat) :: als, name v :: vars
   | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
 
 
