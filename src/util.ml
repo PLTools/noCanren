@@ -120,7 +120,6 @@ let rec lowercase_lident = function
   | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident r)
   | Ldot (t, s)   -> Ldot (t, mangle_construct_name s)
 
-
 let rec fold_right1 f = function
 | [h]  -> h
 | h::t -> f h (fold_right1 f t)
@@ -320,3 +319,8 @@ let rec translate_pat pat fresher =
 let rec is_disj_pats = function
   | []      -> true
   | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs
+
+let rec id2id_o = function
+  | Lident s    -> Lident (s ^ "_o")
+  | Ldot (t, s) -> Ldot (t, s ^ "_o")
+  | _           -> failwith "id2id_o: undexpected ID"

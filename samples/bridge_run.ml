@@ -25,9 +25,9 @@ let myshow x = show List.ground (show_step show_person) x
 let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
 
 (** For high order conversion **)
-let getAnswer q t r = getAnswer ((===) q) t r
+let getAnswer_o q t r = getAnswer_o ((===) q) t r
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
-    getAnswer q standartTimes (int2nat 17 |> some)
+    getAnswer_o q standartTimes_o (int2nat 17 |> some)
   )

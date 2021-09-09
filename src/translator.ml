@@ -129,7 +129,7 @@ let translate_high tast start_index params =
     | Lident "not" -> translate_not_fun ()
     | Lident "="   -> translate_eq_funs true
     | Lident "<>"  -> translate_eq_funs false
-    | _            -> mknoloc txt |> Exp.ident
+    | _            -> id2id_o txt |> mknoloc |> Exp.ident
 
   and translate_abstraciton case =
 
@@ -225,7 +225,7 @@ let translate_high tast start_index params =
     let body_with_eta_args  = create_apply translated_body @@
                               List.map create_id @@
                               List.map fst eta_vars @ [result_var] in
-    let active_vars         = List.map get_pat_name @@
+    let active_vars         = List.map (fun p -> get_pat_name p ^ "_o") @@
                               List.filter (fun p -> need_to_activate p body) real_vars in
     let fresh_vars          = List.map (fun _ -> create_fresh_var_name ()) active_vars in
     let abstr_body          = List.fold_right create_fun active_vars body_with_eta_args in
@@ -236,7 +236,7 @@ let translate_high tast start_index params =
     let with_fresh          = List.fold_right create_fresh fresh_vars full_conj in
     let first_fun           = create_fun result_var with_fresh in
     let with_eta            = List.fold_right create_fun (List.map fst eta_vars) first_fun in
-    List.fold_right create_fun (List.map get_pat_name real_vars) with_eta
+    List.fold_right create_fun (List.map (fun p -> get_pat_name p ^ "_o") real_vars) with_eta
 
   and translate_apply f a l =
     create_apply
@@ -275,7 +275,7 @@ let translate_high tast start_index params =
         let unify          = [%expr [%e create_id scrutinee_var] === [%e pat]] in
         let unifies        = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
         let body           = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
-        let abst_body      = List.fold_right create_fun vars body in
+        let abst_body      = List.fold_right create_fun (List.map (fun v -> v ^ "_o") vars) body in
         let subst          = List.map create_subst vars in
         let total_body     = create_apply abst_body subst in
         let conj           = create_conj (unify :: unifies @ [total_body]) in
@@ -317,7 +317,7 @@ let translate_high tast start_index params =
     let has_tabled_attr = List.exists (fun a -> a.attr_name.txt = tabling_attr_name) bind.vb_attributes in
     let tabled_body     =
       if not has_tabled_attr || has_func_arg typ then new_body else
-        let name                  = get_pat_name bind.vb_pat in
+        let name                  = get_pat_name bind.vb_pat ^ "_o" in
         let unrec_body            = create_fun name new_body in
         let recfunc_argument_name = create_fresh_var_name () in
         let recfunc_argument      = create_id recfunc_argument_name in
@@ -366,7 +366,8 @@ let translate_high tast start_index params =
         let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
         lambdas_and_tabled in
 
-    let nvb = Vb.mk (untyper.pat untyper bind.vb_pat) tabled_body in
+    let new_name = create_pat (get_pat_name bind.vb_pat ^ "_o") in
+    let nvb      = Vb.mk new_name tabled_body in
     if is_primary_type bind.vb_expr.exp_type
       then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
       else nvb

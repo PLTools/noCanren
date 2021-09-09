@@ -55,7 +55,7 @@ let rec lambda_reifier l =
 
 (*************************************************)
 (** For high order conversion **)
-let nat_type_inference p t = nat_type_inference ((===) p) t
+let nat_type_inference_o p t = nat_type_inference_o ((===) p) t
 
 let _ =
   let term0 = abst !!"x" (var_ !!"x") in
@@ -72,9 +72,9 @@ let _ =
   let term4 = lit (lInt !!6) in
   let term5 = lit (lBool !!true) in
 
-  run_exn myshow (-1) q qh ("typeof term0", fun q -> nat_type_inference term0 q);
-  run_exn myshow (-1) q qh ("typeof term1", fun q -> nat_type_inference term1 q);
-  run_exn myshow (-1) q qh ("typeof term2", fun q -> nat_type_inference term2 q);
-  run_exn myshow (-1) q qh ("typeof term5", fun q -> nat_type_inference term5 q);
-  run_exn myshow (-1) q qh ("typeof term4", fun q -> nat_type_inference term4 q);
-  run_exn myshow (-1) q qh ("typeof term3", fun q -> nat_type_inference term3 q)
+  run_exn myshow (-1) q qh ("typeof term0", fun q -> nat_type_inference_o term0 q);
+  run_exn myshow (-1) q qh ("typeof term1", fun q -> nat_type_inference_o term1 q);
+  run_exn myshow (-1) q qh ("typeof term2", fun q -> nat_type_inference_o term2 q);
+  run_exn myshow (-1) q qh ("typeof term5", fun q -> nat_type_inference_o term5 q);
+  run_exn myshow (-1) q qh ("typeof term4", fun q -> nat_type_inference_o term4 q);
+  run_exn myshow (-1) q qh ("typeof term3", fun q -> nat_type_inference_o term3 q)

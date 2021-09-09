@@ -22,9 +22,10 @@ type gpin =
 let a () = !! A
 let b () = !! B
 let c () = !! C
-let rec less x q0 q9 =
-  fresh (q3 y' q5) (q3 === (s y')) (q0 q3) (x q5) (((q5 === (z ())) &&& (q9 === (!! true))) ||| (fresh (x') (q5 === (s x')) (less (fun q7 -> x' === q7) (fun q8 -> y' === q8) q9)))
-let extra q10 q11 =
+let rec less_o x_o q0 q9 =
+  fresh (q3 y' q5) (q3 === (s y')) (q0 q3) (x_o q5)
+    (((q5 === (z ())) &&& (q9 === (!! true))) ||| (fresh (x') (q5 === (s x')) (less_o (fun q7 -> x' === q7) (fun q8 -> y' === q8) q9)))
+let extra_o q10 q11 =
   fresh (q12) (q10 q12)
     (conde
        [(q12 === (pair (a ()) (b ()))) &&& (q11 === (c ()));
@@ -33,18 +34,18 @@ let extra q10 q11 =
        (q12 === (pair (c ()) (a ()))) &&& (q11 === (b ()));
        (q12 === (pair (b ()) (c ()))) &&& (q11 === (a ()));
        (q12 === (pair (c ()) (b ()))) &&& (q11 === (a ()))])
-let select s q19 q32 =
+let select_o s_o q19 q32 =
   fresh (q22) (q19 q22)
     (conde
-       [fresh (q24 q25) (q22 === (a ())) (s (ctor_gset q32 q24 q25));
-       fresh (q27 q28) (q22 === (b ())) (s (ctor_gset q27 q32 q28));
-       fresh (q30 q31) (q22 === (c ())) (s (ctor_gset q30 q31 q32))])
-let permut move s q41 =
+       [fresh (q24 q25) (q22 === (a ())) (s_o (ctor_gset q32 q24 q25));
+       fresh (q27 q28) (q22 === (b ())) (s_o (ctor_gset q27 q32 q28));
+       fresh (q30 q31) (q22 === (c ())) (s_o (ctor_gset q30 q31 q32))])
+let permut_o move_o s_o q41 =
   fresh (q42 q43 q34 x y q36 q37 q38) (q34 === q42) (q34 === (pair x y)) (
-    q41 === (ctor_gset q36 q37 q38)) (move q42) (s q43) (select (fun q45 -> q45 === q43) (fun q39 -> x === q39) q36) (
-    select (fun q45 -> q45 === q43) (fun q40 -> y === q40) q37) (select (fun q45 -> q45 === q43) (extra (fun q44 -> q44 === q42)) q38)
-let tumrep move s q77 =
-  fresh (q47 x y z q49) (q47 === (ctor_gset x y z)) (s q47) (move q49)
+    q41 === (ctor_gset q36 q37 q38)) (move_o q42) (s_o q43) (select_o (fun q45 -> q45 === q43) (fun q39 -> x === q39) q36)
+    (select_o (fun q45 -> q45 === q43) (fun q40 -> y === q40) q37) (select_o (fun q45 -> q45 === q43) (extra_o (fun q44 -> q44 === q42)) q38)
+let tumrep_o move_o s_o q77 =
+  fresh (q47 x y z q49) (q47 === (ctor_gset x y z)) (s_o q47) (move_o q49)
     (conde
        [fresh (q51 q52 q53) (q49 === (pair (a ()) (b ()))) (q77 === (ctor_gset q51 q52 q53)) (x === q51) (y === q52) (z === q53);
        fresh (q55 q56 q57) (q49 === (pair (b ()) (a ()))) (q77 === (ctor_gset q55 q56 q57)) (y === q55) (x === q56) (z === q57);
@@ -52,7 +53,7 @@ let tumrep move s q77 =
        fresh (q63 q64 q65) (q49 === (pair (c ()) (a ()))) (q77 === (ctor_gset q63 q64 q65)) (y === q63) (z === q64) (x === q65);
        fresh (q67 q68 q69) (q49 === (pair (b ()) (c ()))) (q77 === (ctor_gset q67 q68 q69)) (z === q67) (x === q68) (y === q69);
        fresh (q71 q72 q73) (q49 === (pair (c ()) (b ()))) (q77 === (ctor_gset q71 q72 q73)) (z === q71) (y === q72) (x === q73)])
-let rec eval q131 q130 q132 =
+let rec eval_o q131 q130 q132 =
   fresh (q134 q133) (q131 q134) (q130 q133)
     (Tabling.tabledrec (Tabling.succ (Tabling.succ Tabling.one))
        (fun q120 ->
@@ -68,8 +69,8 @@ let rec eval q131 q130 q132 =
                            [(q82 === (!! true)) &&& (q124 === q128);
                            fresh (q85 topA restA onB onC) (q82 === (!! false)) (
                              q85 === (ctor_gset (topA % restA) onB onC)) (
-                             permut (fun q117 -> move === q117) (fun q126 -> q126 === q128) q85)
-                             (tumrep (fun q117 -> move === q117)
+                             permut_o (fun q117 -> move === q117) (fun q126 -> q126 === q128) q85)
+                             (tumrep_o (fun q117 -> move === q117)
                                 (fun q86 ->
                                    fresh (q87) (onB === q87)
                                      ((fresh (q89 q90 q91 q92) (q87 === (nil ())) (
@@ -82,5 +83,5 @@ let rec eval q131 q130 q132 =
                                            q86 === (ctor_gset q98 q99 q100)) (
                                            restA === q98) (q99 === (q101 % q102)) (
                                            topA === q101) (onB === q102) (
-                                           onC === q100) (less (fun q106 -> topA === q106) (fun q104 -> topB === q104) q96)))) q124)]) (
+                                           onC === q100) (less_o (fun q106 -> topA === q106) (fun q104 -> topB === q104) q96)))) q124)]) (
                         q120 q125 q124 q119)))) q134 q133 q132)

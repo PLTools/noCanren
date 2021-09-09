@@ -98,20 +98,20 @@ let w1, w2 =
   appendo (cons vX vXs) (vYs)         (cons vX vZs) (* append([X | Xs], Ys    , [X | Zs]) *)
 
 (** For high order conversion **)
-let check_uni q t1 t2 r = check_uni ((===) q) ((===) t1) ((===) t2) r
+let check_uni_o q t1 t2 r = check_uni_o ((===) q) ((===) t1) ((===) t2) r
 
 let _ =
-  full_run (-1) q qh ("answers1", fun q -> check_uni q t1  t1  !!true);
-  full_run (-1) q qh ("answers2", fun q -> check_uni q t2  t2  !!true);
-  full_run (-1) q qh ("answers3", fun q -> check_uni q t1  t2  !!true);
-  full_run (-1) q qh ("answers4", fun q -> check_uni q t3  t4  !!true);
-  full_run (-1) q qh ("answers5", fun q -> check_uni q t3  t5  !!true);
-  full_run (-1) q qh ("answers6", fun q -> check_uni q t4  t5  !!true);
-  full_run (-1) q qh ("answers7", fun q -> check_uni q x1  x2  !!true);
-  full_run (-1) q qh ("answers8", fun q -> check_uni q x1' x2' !!true);
-  full_run (-1) q qh ("answers9", fun q -> check_uni q y1  y2  !!true);
+  full_run (-1) q qh ("answers1", fun q -> check_uni_o q t1  t1  !!true);
+  full_run (-1) q qh ("answers2", fun q -> check_uni_o q t2  t2  !!true);
+  full_run (-1) q qh ("answers3", fun q -> check_uni_o q t1  t2  !!true);
+  full_run (-1) q qh ("answers4", fun q -> check_uni_o q t3  t4  !!true);
+  full_run (-1) q qh ("answers5", fun q -> check_uni_o q t3  t5  !!true);
+  full_run (-1) q qh ("answers6", fun q -> check_uni_o q t4  t5  !!true);
+  full_run (-1) q qh ("answers7", fun q -> check_uni_o q x1  x2  !!true);
+  full_run (-1) q qh ("answers8", fun q -> check_uni_o q x1' x2' !!true);
+  full_run (-1) q qh ("answers9", fun q -> check_uni_o q y1  y2  !!true);
 
-  full_run (-1) q qh ("answers_bad", fun q -> check_uni q t2 t2' !!true);
+  full_run (-1) q qh ("answers_bad", fun q -> check_uni_o q t2 t2' !!true);
 
-  full_run (-1) q qh ("answers", fun q -> check_uni q w1 w2 !!true);
+  full_run (-1) q qh ("answers", fun q -> check_uni_o q w1 w2 !!true);
   ()

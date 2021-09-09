@@ -27,9 +27,9 @@ let myshow x = show List.ground show_step x
 let rec int2nat n = if n = 0 then o () else s @@ int2nat @@ n - 1
 
 (** For high order conversion **)
-let checkAnswer q c n r = checkAnswer ((===) q) c ((===) n) r
+let checkAnswer_o q c n r = checkAnswer_o ((===) q) c ((===) n) r
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
-    checkAnswer q capacities1 (int2nat 7) !!true
+    checkAnswer_o q capacities1_o (int2nat 7) !!true
   )

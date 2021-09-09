@@ -26,9 +26,9 @@ let myshow = show_sudoku4x4
 
 (*************************************************)
 (** For high order conversion **)
-let check_sudoku q r = check_sudoku ((===) q) r
+let check_sudoku_o q r = check_sudoku_o ((===) q) r
 
 let _ =
   run_exn myshow (1) q qh ("sudoku", fun q ->
-    check_sudoku q !!true
+    check_sudoku_o q !!true
     )

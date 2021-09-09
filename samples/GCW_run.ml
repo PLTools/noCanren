@@ -19,9 +19,9 @@ let myshow x = show List.ground show_person x
 (*************************************************)
 
 (** For high order conversion **)
-let checkAnswer q r = checkAnswer ((===) q) r
+let checkAnswer_o q r = checkAnswer_o ((===) q) r
 
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
-    checkAnswer q !!true
+    checkAnswer_o q !!true
   )
