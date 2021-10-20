@@ -61,20 +61,8 @@ compile_tests:
 promote_tests:
 	$(foreach T, $(TESTS), make promote_test_$(T);)
 
-test: compile_tests
-	$(foreach T, $(TESTS), \
-		./$(T)_run.native > regression/output/$(T).log; \
-		if diff -u regression/orig/${T}.log regression/output/${T}.log > regression/output/${T}.log.diff; \
-			then \
-				rm regression/output/${T}.log.diff; \
-				if diff -u regression/orig/${T}.ml regression/output/${T}.ml > regression/output/${T}.ml.diff; \
-					then \
-						rm regression/output/${T}.ml.diff; \
-						echo "${T}: PASSED"; \
-					else echo "${T}: FAILED (see regression/output/${T}.ml.diff)"; \
-				fi; \
-			else echo "${T}: FAILED (see regression/output/${T}.log.diff)"; \
-		fi;)
+test:
+	dune runtest
 
 clean_tests:
 	$(RM) -r regression/output
@@ -87,4 +75,5 @@ sanitize:
 	$(RM) micro/*.cmi samples/*.cmi samples/multifiles/*.cmi
 
 install:
-	cp -i _build/src/noCanren.native $(PREFIX)/bin/noCanren
+	dune build @install -p noCanren
+	dune install noCanren

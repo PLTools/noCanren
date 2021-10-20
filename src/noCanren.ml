@@ -1,9 +1,5 @@
-open Config
-open Clflags
 open Compenv
-open Misc
 open Format
-open Typedtree
 open Util
 
 let need_print_result = ref false

@@ -113,7 +113,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
   let open Longident in
   let open Exp in
   if List.length tdecl.ptype_params > 0
-  then prepare_distribs_for_FAT loc tdecl fmap_decl
+  then prepare_distribs_for_FAT ~loc tdecl fmap_decl
   else let Ptype_variant constructors = tdecl.ptype_kind in
        constructors |>
        List.map (fun {pcd_name} ->
@@ -137,7 +137,7 @@ let prepare_fmap ~loc tdecl useGT =
         let argnames = get_param_names pcd_args in
         let cname = pcd_name.txt in
         let clid = mknoloc @@ Longident.Lident cname in
-        let rec make_f_expr name = Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name) in
+        let make_f_expr name = Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name) in
         let pc_lhs, pc_rhs =
           let wrap_one_arg typname new_name =
             Exp.(apply (make_f_expr typname) [nolabel, ident @@ mknoloc @@ Longident.Lident new_name] )
@@ -238,7 +238,6 @@ let revisit_type loc tdecl useGT =
       if FoldInfo.is_empty mapa then full_t else
         let extra_params = FoldInfo.map mapa
           ~f:(fun fi -> (Ast_helper.Typ.var fi.FoldInfo.param_name, Asttypes.Invariant)) in
-        let open Location in
         {full_t with ptype_params = full_t.ptype_params @ extra_params} in
 
       let fmap_for_typ = prepare_fmap ~loc result_type useGT in

@@ -1,3 +1,13 @@
+| Upstream master         | Kakadu dune          |
+| ------------------------|----------------------|
+| [![noCanren][1]][2]     | [![noCanren[3]][4]   |
+
+
+[1]:  https://github.com/Lozov-Petr/noCanren/workflows/XXXXXXXX/badge.svg?branch=master
+[2]:  https://github.com/Lozov-Petr/noCanren/actions
+[3]:  https://github.com/Kakadu/noCanren/workflows/Build/badge.svg?branch=dune
+[2]:  https://github.com/Kakadu/noCanren/actions
+
 # README #
 
 noCanren is translator from subset of OCaml to OCanren.

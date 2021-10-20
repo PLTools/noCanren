@@ -179,6 +179,7 @@ let create_apply f = function
 
 
 let create_apply_to_list f arg_list =
+  let loc = f.pexp_loc in
   let new_arg = List.fold_right (fun x acc -> [%expr [%e x] :: [%e acc]]) arg_list [%expr []] in
   create_apply f [new_arg]
 
@@ -186,26 +187,30 @@ let create_apply_to_list f arg_list =
 let create_conj = function
 | []     -> failwith "Conjunction needs one or more arguments"
 | [x]    -> x
-| [x; y] -> [%expr [%e x] &&& [%e y]]
-| l      -> create_apply_to_list [%expr (?&)] l
+| [x; y] -> let loc = Ppxlib.Location.none in [%expr [%e x] &&& [%e y]]
+| l      -> let loc = Ppxlib.Location.none in create_apply_to_list [%expr (?&)] l
 
 
 let create_disj = function
 | []     -> failwith "Conjunction needs one or more arguments"
 | [x]    -> x
-| [x; y] -> [%expr [%e x] ||| [%e y]]
-| l      -> create_apply_to_list [%expr conde] l
+| [x; y] -> let loc = Ppxlib.Location.none in [%expr [%e x] ||| [%e y]]
+| l      -> let loc = Ppxlib.Location.none in create_apply_to_list [%expr conde] l
 
 
 let create_fun var body =
+  let loc = Ppxlib.Location.none in
   [%expr fun [%p create_pat var] -> [%e body]]
 
 
 let create_fresh var body =
+  let loc = Ppxlib.Location.none in
   create_apply [%expr call_fresh] [create_fun var body]
 
 
-let create_inj expr = [%expr !! [%e expr]]
+let create_inj expr =
+  let loc = Ppxlib.Location.none in
+  [%expr !! [%e expr]]
 
 
 let rec path2ident = function
@@ -267,6 +272,7 @@ let rec have_unifier p1 p2 =
 
 
 let rec translate_pat pat fresher =
+  let loc = pat.pat_loc in
   match pat.pat_desc with
   | Tpat_any                                       -> let var = fresher () in create_id var, [], [var]
   | Tpat_var (v, _)                                -> create_id (name v), [], [name v]
@@ -295,11 +301,11 @@ let rec translate_pat pat fresher =
     let rec translate_record_pat fresher fields index =
       if index == count then [], [], [] else
       match fields with
-      | (_, (i : Types.label_description), _) :: xs when i.lbl_pos > index ->
+      | (_, (i : Types.label_description), _) :: _xs when i.lbl_pos > index ->
         let var        = fresher () in
         let pats, als, vars = translate_record_pat fresher fields (index+1) in
         create_id var :: pats, als, var :: vars
-      | (_, i, p) :: xs ->
+      | (_, _i, p) :: xs ->
         let pat , als,  vars  = translate_pat p fresher in
         let pats, als', vars' = translate_record_pat fresher xs (index+1) in
         pat :: pats, als @ als', vars @ vars'
@@ -320,7 +326,7 @@ let rec is_disj_pats = function
   | []      -> true
   | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs
 
-let rec id2id_o = function
+let id2id_o = function
   | Lident s    -> Lident (s ^ "_o")
   | Ldot (t, s) -> Ldot (t, s ^ "_o")
   | _           -> failwith "id2id_o: undexpected ID"

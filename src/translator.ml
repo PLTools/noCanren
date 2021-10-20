@@ -39,6 +39,7 @@ let translate_high tast start_index params =
     | _                           -> [] in
 
   let rec unnest_constuct e =
+    let loc = Ppxlib.Location.none in
     match e.exp_desc with
     | Texp_constant c ->
       create_inj (Exp.constant (Untypeast.constant c)), []
@@ -62,6 +63,7 @@ let translate_high tast start_index params =
       create_id fr_var, [(fr_var, e)]
 
   and translate_construct expr =
+    let loc = Ppxlib.Location.none in
     let constr, binds = unnest_constuct expr in
     let out_var_name  = create_fresh_var_name () in
     let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
@@ -75,6 +77,7 @@ let translate_high tast start_index params =
     let a2  = create_fresh_var_name () in
     let b   = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     let fst = if is_or then [%expr !!true]  else [%expr !!false] in
     let snd = if is_or then [%expr !!false] else [%expr !!true]  in
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
@@ -90,6 +93,7 @@ let translate_high tast start_index params =
     let b1  = create_fresh_var_name () in
     let b2  = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
@@ -105,6 +109,7 @@ let translate_high tast start_index params =
     let a  = create_fresh_var_name () in
     let b  = create_fresh_var_name () in
     let q  = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     [%expr fun [%p create_pat a] [%p create_logic_var q] ->
      call_fresh (fun [%p create_pat b] ->
             ([%e create_id a] [%e create_id b]) &&&
@@ -115,6 +120,7 @@ let translate_high tast start_index params =
   and translate_if cond th el =
     let b   = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     [%expr fun [%p create_logic_var q] -> call_fresh (fun [%p create_pat b] ->
         ([%e translate_expression cond] [%e create_id b]) &&& (
           conde [
@@ -216,6 +222,7 @@ let translate_high tast start_index params =
 
     let create_simple_arg var =
       let fresh_n = create_fresh_var_name () in
+      let loc = Ppxlib.Location.none in
       create_fun fresh_n [%expr [%e create_id fresh_n] === [%e create_id var]] in
 
     let body, real_vars     = normalize_abstraction case.c_rhs [case.c_lhs] in
@@ -306,6 +313,7 @@ let translate_high tast start_index params =
       | _                -> false in
 
     let rec get_tabling_rank (typ : Types.type_expr) =
+      let loc = Ppxlib.Location.none in
       match typ.desc with
       | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
       | Tlink typ                   -> get_tabling_rank typ
@@ -341,6 +349,7 @@ let translate_high tast start_index params =
 
         let argument_names4       = create_fresh_argument_names_by_type typ in
         let arguments4            = List.map create_id argument_names4 in
+        let loc = Ppxlib.Location.none in
         let unified_vars1         = List.map2 (fun a b -> [%expr [%e a] === [%e b]]) arguments3 arguments4 in
         let lambda_vars1          = List.map2 create_fun argument_names3 unified_vars1 in
 
@@ -383,7 +392,8 @@ let translate_high tast start_index params =
     let ctor    = ctor_for_record loc typ in
     let mvar    = create_fresh_var_name () in
     let vars    = List.map (fun _ -> create_fresh_var_name ()) fields in
-    let exprs   = List.map (fun (_, Overridden (_, expr)) -> translate_expression expr) fields in
+    let exprs   = List.map (function (_, Overridden (_, expr)) -> translate_expression expr
+                           | (_,Kept _) -> failwith "not implemented" ) fields in
     let calls   = List.map2 (fun e v -> create_apply e [create_id v]) exprs vars in
     let uni     = [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id vars)]] in
     let conj    = create_conj (uni :: calls) in
@@ -493,6 +503,7 @@ let beta_reductor minimal_index only_q =
     | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
     | Pexp_fun (_, _, pat, body) ->
       let name = name_from_pat pat in
+      let loc = Ppxlib.Location.none in
       if name = var then expr else [%expr fun [%p pat] -> [%e substitute body var subst]]
     | Pexp_apply (func, args) ->
       List.map snd args |>
@@ -531,7 +542,8 @@ let beta_reductor minimal_index only_q =
                 | _          -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction" in
       begin match args with
         | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
-        | _ -> create_apply ([%expr fun [%p pat] -> [%e beta_reduction body []]]) args
+        | _ -> let loc = Ppxlib.Location.none in
+          create_apply ([%expr fun [%p pat] -> [%e beta_reduction body []]]) args
       end
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs  = List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs in
@@ -591,7 +603,7 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
 
     | _ -> [expr], [] in
 
-  let rec normalizer sub expr =
+  let normalizer sub expr =
     let conjs, vars = get_conjs_and_vars expr in
     let conjs = List.map (Ast_mapper.default_mapper.expr sub) conjs in
 
@@ -610,7 +622,9 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
       | _   -> vars_as_apply vars in
 
     if List.length vars > 0
-    then create_apply [%expr fresh] (vars_arg vars :: conjs)
+    then
+      let loc = Ppxlib.Location.none in
+      create_apply [%expr fresh] (vars_arg vars :: conjs)
     else create_conj conjs in
 
     { Ast_mapper.default_mapper with expr = normalizer }
@@ -744,6 +758,7 @@ let call_by_need_creator tree =
   let var_is_logic pat = has_attr "logic" pat.ppat_attributes in
 
   let rec update_expr env e =
+    let loc = Ppxlib.Location.none in
     match e.pexp_desc with
     | Pexp_ident {txt = Lident name} ->
       if is_ctor e || snd (lookup name env) = First then e
@@ -785,6 +800,7 @@ let call_by_need_creator tree =
       | None -> vars
       | Some n -> List.filter ((<>) n) vars in
     let f, h = split_vars env vars in
+    let loc = Ppxlib.Location.none in
     let h_part =
       match h with
       | []      -> [%expr []]

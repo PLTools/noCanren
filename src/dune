@@ -1,0 +1,17 @@
+(env
+ (_
+  (flags
+   (:standard -w -8-9-27))))
+
+(executable
+ (name noCanren)
+ (libraries compiler-libs.common ppxlib)
+ (modules
+  Util
+  Put_distrib
+  Translator
+  Translator_unnesting
+  Printer_in_spec
+  noCanren)
+ (preprocess
+  (pps ppxlib.metaquot)))
