@@ -28,6 +28,7 @@
   dune
   (GT :with-test)
   (OCanren :with-test)
+  (OCanren-ppx :with-test)
   (odoc :with-doc)
   (ocamlformat :build)
   ppxlib

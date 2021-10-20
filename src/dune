@@ -5,6 +5,8 @@
 
 (executable
  (name noCanren)
+ (public_name noCanren)
+ (package noCanren)
  (libraries compiler-libs.common ppxlib)
  (modules
   Util

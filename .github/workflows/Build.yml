@@ -47,10 +47,11 @@ jobs:
           # invalidate cache daily, gets built daily using a scheduled job
           key: ${{ steps.cache-key.outputs.date }}
 
-      - name: Use OCaml ${{ matrix.ocaml-version }}
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
         uses: avsm/setup-ocaml@v2
         with:
-          ocaml-version: ${{ matrix.ocaml-version }}
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
 
       - run: opam pin add . --no-action
 
@@ -61,7 +62,10 @@ jobs:
         run: opam install . --deps-only --with-test
 
       - name: Building
-        run: opam exec -- dune build --profile=release
+        run: opam exec -- dune build --profile=release -p noCanren
+
+      - name: Installing dependencies for testing
+        run: opam exec -- dune external-lib-deps -p noCanren-tests . --missing  | cut -f1 | xargs opam install --yes GT
 
       - name: Testing
-        run: opam exec -- dune runtest --profile=release
+        run: opam exec -- dune runtest --profile=release -p noCanren,noCanren-tests
