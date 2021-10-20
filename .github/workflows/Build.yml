@@ -9,6 +9,7 @@ on:
       # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-ignoring-paths
     branches:
       - 'master'
+      - 'dune'
 
   #schedule:
   # - cron: "0 13 * * 1"
