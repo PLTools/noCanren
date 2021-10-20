@@ -20,8 +20,8 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-        ocaml-version:
-          - 4.10.1
+        ocaml-compiler:
+          - 4.10.x
 
     runs-on: ${{ matrix.os }}
 
@@ -34,24 +34,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Retrieve date for cache key
-        id: cache-key
-        run: echo "::set-output name=date::$(/bin/date -u "+%Y%m%d")"
-        shell: bash
-
-      - name: Restore opam cache
-        id: opam-cache
-        uses: actions/cache@v2
-        with:
-          path: "~/.opam"
-          # invalidate cache daily, gets built daily using a scheduled job
-          key: ${{ steps.cache-key.outputs.date }}
-
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
         uses: avsm/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           dune-cache: true
+          cache-prefix: v21
 
       - run: opam pin add . --no-action
 
@@ -69,3 +57,12 @@ jobs:
 
       - name: Testing
         run: opam exec -- dune runtest --profile=release -p noCanren,noCanren-tests
+
+      - name: Installing a package
+        run: |
+          opam exec -- dune build @install --profile=release
+          opam exec -- dune install --profile=release noCanren
+
+      - name: Listing files
+        run: |
+          opam show noCanren --list-files
