@@ -46,7 +46,8 @@
  (targets test_add.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
-  (:input stuff/test_add.ml))
+  (:input stuff/test_add.ml)
+  stuff/stuff.cma)
  (action
   (run
    sh
@@ -65,7 +66,8 @@
  (targets test_mul.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
-  (:input stuff/test_mul.ml))
+  (:input stuff/test_mul.ml)
+  stuff/stuff.cma)
  (action
   (run
    sh
