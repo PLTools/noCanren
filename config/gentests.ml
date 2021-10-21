@@ -41,8 +41,7 @@ let () =
   let tail = "_run.ml" in
   let taillen = String.length tail in
   let names =
-    Array.filter_map
-      ~f:(fun s ->
+    Array.filter_map files ~f:(fun s ->
         if String.length s > taillen && (String.equal tail @@ Str.last_chars s taillen)
         then (
           let name = String.chop_suffix_exn s ~suffix:tail in
@@ -50,7 +49,7 @@ let () =
           | "logic_interpreter" | "lorry" -> None
           | _ -> Some name)
         else None)
-      files
+    |> Array.sorted_copy ~compare:String.compare
   in
   (* Array.iter names ~f:Stdio.print_endline; *)
   Stdio.printf "%s\n%!" header;

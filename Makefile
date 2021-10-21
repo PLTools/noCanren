@@ -1,11 +1,12 @@
-OB = ocamlbuild -use-ocamlfind -classic-display
-
 TESTS   = bottles bridge einstein GCW hanoi hanoi2
 SAMPLES = bottles bridge einstein GCW hanoi hanoi2 hm_inferencer logic_interpreter lorry scheme_interpreter sudoku4x4 unify
 
-
+.PHONY: compile discover_tests
 compile:
-	$(OB) -I src noCanren.native
+	dune build
+
+discover_tests:
+	dune build config/gentests.exe && _build/default/config/gentests.exe samples > samples/dune
 
 multifiles_test_compile:
 	mkdir -p _build/samples/multifiles/orig
@@ -56,10 +57,10 @@ endef
 $(foreach i,$(SAMPLES),$(eval $(call SAMPLERULES,$(i))))
 
 compile_tests:
-	$(foreach T, $(TESTS), make test_$(T);)
+	dune build samples/
 
 promote_tests:
-	$(foreach T, $(TESTS), make promote_test_$(T);)
+	dune runtest --auto-promote
 
 test:
 	dune runtest
