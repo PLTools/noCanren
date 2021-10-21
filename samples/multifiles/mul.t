@@ -1,0 +1,1 @@
+$ ./mul_run.exe
