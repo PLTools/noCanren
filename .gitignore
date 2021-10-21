@@ -3,4 +3,6 @@
 _build
 regression/output/*
 regression/multifiles/*
-noCanren-tests.opam
+/noCanren-tests.opam
+/noCanren.install
+
