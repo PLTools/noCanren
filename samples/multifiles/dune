@@ -3,74 +3,71 @@
   (flags
    (:standard -rectypes -w -27-33-39))))
 
-; (executable
-; (name mul_run)
-; (package noCanren-tests)
-; (public_name noCanren-tests.GCW)
-; (libraries GT OCanren OCanren.tester test_nat test_add test_mul)
-; (modules mul_run)
-; (preprocess
-; (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+(executable
+ (name mul_run)
+ (package noCanren-tests)
+ (public_name noCanren-tests.GCW)
+ (libraries GT OCanren OCanren.tester test_nat test_add test_mul)
+ (modules mul_run)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
 
-; (cram
-; (deps ./mul_run.exe))
+(cram
+ (deps ./mul_run.exe))
 
-; (library
-; (name test_nat)
-; (modules test_nat)
-; (wrapped false)
-; (libraries OCanren)
-; (preprocess
-; (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+(library
+ (name test_nat)
+ (modules test_nat)
+ (wrapped false)
+ (libraries OCanren)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
 
-; (rule
-; (targets test_nat.ml)
-; (deps
-; (:exec %{project_root}/src/noCanren.exe)
-; (:input test_nat.ml2mk.ml))
-; (action
-; (run
-; sh
-; -c
-; "%{exec} %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+(rule
+ (targets test_nat.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input stuff/test_nat.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
-; (library
-; (name test_add)
-; (modules test_add)
-; (wrapped false)
-; (libraries test_nat)
-; (preprocess
-; (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+(library
+ (name test_add)
+ (modules test_add)
+ (wrapped false)
+ (libraries test_nat)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
 
-; (rule
-; (targets test_add.ml)
-; (deps
-; (:exec %{project_root}/src/noCanren.exe)
-; (:input test_add.ml2mk.ml)
-; test_nat.cmxa)
-; (action
-; (run
-; sh
-; -c
-; "%{exec} %{input} -rectypes -I .test_nat.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+(rule
+ (targets test_add.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input stuff/test_add.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} %{input} -rectypes -I stuff/.stuff.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
-; (library
-; (name test_mul)
-; (modules test_mul)
-; (wrapped false)
-; (libraries test_nat test_add GT)
-; (preprocess
-; (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+(library
+ (name test_mul)
+ (modules test_mul)
+ (wrapped false)
+ (libraries test_nat test_add GT)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
 
-; (rule
-; (targets test_mul.ml)
-; (deps
-; (:exec %{project_root}/src/noCanren.exe)
-; (:input test_mul.ml2mk.ml)
-; test_nat.cmxa
-; test_add.cmxa)
-; (action
-; (run
-; sh
-; -c
-; "%{exec} %{input} -rectypes -I .test_nat.objs/byte -I .test_add.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+(rule
+ (targets test_mul.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input stuff/test_mul.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} %{input} -rectypes -I stuff/.stuff.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
