@@ -75,5 +75,5 @@ sanitize:
 	$(RM) micro/*.cmi samples/*.cmi samples/multifiles/*.cmi
 
 install:
-	dune build @install -p noCanren
+	dune build @install
 	dune install noCanren

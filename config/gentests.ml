@@ -10,27 +10,27 @@ let header =
 ;;
 
 let wrap name =
-  Printf.sprintf
-    "(executable\n\
-    \ (name %s_run)\n\
-    \ (package noCanren-tests)\n\
-    \ (public_name noCanren-tests.%s)\n\
-    \ (libraries GT OCanren OCanren.tester)\n\
-    \ (modules %s %s_run)\n\
-    \ (preprocess\n\
-    \  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))\n\n\
-     (rule\n\
-    \ (targets %s.ml)\n\
-    \ (deps %s.ml2mk.ml)\n\
-    \ (action\n\
-    \  (run sh -c \"%%{project_root}/src/noCanren.exe %%{deps} -o %%{targets} | \
-     ocamlformat --enable-outside-detected-project --impl -\")))\n"
-    name
-    name
-    name
-    name
-    name
-    name
+  let where =
+    {|
+(executable
+ (name TEMPLATE_run)
+ (package noCanren-tests)
+ (public_name noCanren-tests.TEMPLATE)
+ (libraries GT OCanren OCanren.tester)
+ (modules TEMPLATE TEMPLATE_run)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+
+(rule
+ (targets TEMPLATE.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input TEMPLATE.ml2mk.ml))
+ (action
+  (run sh -c "%{exec} %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+|}
+  in
+  Str.global_replace (Str.regexp "TEMPLATE") name where
 ;;
 
 let footer names = Array.iter names ~f:(Stdio.printf "(cram (deps ./%s_run.exe))\n%!")
