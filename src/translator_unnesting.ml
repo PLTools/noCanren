@@ -180,7 +180,7 @@ let translate tast start_index params =
     | Nonrecursive -> translate_nonrec_let let_vars bind expr
 
 
-  and translate_match let_vars loc expr cases typ =
+  and translate_match (type a) let_vars loc expr (cases : a Typedtree.case list  ) typ =
     let args = create_fresh_argument_names_by_type typ in
 
     let scrutinee_is_var =
@@ -200,7 +200,7 @@ let translate tast start_index params =
       | Pexp_apply (f, args) -> List.map snd args |> List.map (rename var1 var2) |> create_apply f
       | _ -> pat in
 
-    let translate_case case =
+    let translate_case (type a) (case: a Typedtree.case) : _ =
       let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
       let is_overlap     = List.mem scrutinee_var vars in
       let new_var        = if is_overlap then create_fresh_var_name () else "" in

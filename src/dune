@@ -1,7 +1,7 @@
 (env
  (_
   (flags
-   (:standard -w -8-9-27))))
+   (:standard -w -9-27))))
 
 (executable
  (name noCanren)
@@ -16,4 +16,4 @@
   Printer_in_spec
   noCanren)
  (preprocess
-  (pps ppxlib.metaquot)))
+  (pps ppxlib.metaquot ppx_optcomp)))

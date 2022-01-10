@@ -166,6 +166,10 @@ let all_options =
     "-useGT",
     Arg.Unit (fun _ -> useGT := true),
     " Use GT in translated code"
+    ;
+    "-dtypedtree",
+    Arg.Unit (fun _ -> Clflags.dump_typedtree := true),
+    " Trace typed tree"
   ] @ OcamlcOptions.list
 
 let mk_noCanren_params () =

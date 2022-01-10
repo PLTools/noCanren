@@ -157,15 +157,22 @@ let translate_high tast start_index params =
     let two_or_more_mentions tactic var_name expr =
       let rec two_or_more_mentions expr count =
         let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
-        let rec get_pat_vars p =
-          match p.pat_desc with
-          | Tpat_any
-          | Tpat_constant _             -> []
-          | Tpat_var (n, _)             -> [name n]
-          | Tpat_tuple pats
-          | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats
-          | Tpat_record (l, _)          -> List.concat @@ List.map (fun (_, _, p) -> get_pat_vars p) l
-          | Tpat_alias (t, n, _)        -> name n :: get_pat_vars t in
+        let get_pat_vars =
+          let rec helper: type a . a Typedtree.general_pattern -> _ = fun p ->
+            match p.pat_desc with
+            | Tpat_any
+            | Tpat_constant _             -> []
+            | Tpat_var (n, _)             -> [name n]
+            | Tpat_tuple pats             -> List.concat_map helper pats
+            | Tpat_construct (_, _, pats) -> List.concat_map helper pats
+            | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> helper p) l
+            | Tpat_alias (t, n, _)        -> name n :: helper t
+            | Tpat_value x                -> helper (x :> Typedtree.pattern)
+            | Tpat_lazy _ | Tpat_array _ | Tpat_exception _ | Tpat_or (_, _, _)
+            | Tpat_variant _ -> failwith "Not implemented"
+          in
+          helper
+        in
 
         match expr.exp_desc with
         | Texp_constant _ -> count
@@ -182,7 +189,7 @@ let translate_high tast start_index params =
             then List.fold_left eval_if_need count @@ exprs
             else List.fold_left max count @@ List.map (eval_if_need count) exprs
         | Texp_apply (func, args) ->
-          let args = List.map (fun (_, Some a) -> a) args in
+          let args = List.map (function (_, Some a) -> a | (_,None) -> failwith "Not implemented") args in
           List.fold_left eval_if_need count @@ func :: args
         | Texp_ifthenelse (cond, th, Some el) ->
           if tactic = Nondet
@@ -209,6 +216,14 @@ let translate_high tast start_index params =
                                            | _                 -> c
                           ) c' fields
         | Texp_field (e, _, _) -> eval_if_need count e
+        | (Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
+        Texp_setfield (_, _, _, _)|Texp_array _|Texp_sequence (_, _)|
+        Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|Texp_send (_, _, _)|
+        Texp_new (_, _, _)|Texp_instvar (_, _, _)|Texp_setinstvar (_, _, _, _)|
+        Texp_override (_, _)|Texp_letmodule (_, _, _, _, _)|Texp_letexception (_, _)|
+        Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|Texp_letop _|
+        Texp_extension_constructor (_, _)|Texp_open (_, _))
+        | Texp_ifthenelse (_, _, None) -> failwith "Not implemented"
 
   in
       two_or_more_mentions expr 0 >= 2 in
@@ -253,7 +268,7 @@ let translate_high tast start_index params =
                                          else translate_expression e
                          | _ -> fail_loc l "Incorrect argument") a)
 
-  and translate_match_without_scrutinee loc cases (typ : Types.type_expr) =
+  and translate_match_without_scrutinee loc (cases: 'a Typedtree.case list) (typ : Types.type_expr) =
     match typ.desc with
       | Tarrow (_, _, r, _) ->
         let new_scrutinee    = create_fresh_var_name () in
@@ -262,10 +277,23 @@ let translate_high tast start_index params =
       | Tlink typ ->  translate_match_without_scrutinee loc cases typ
       | _  -> fail_loc loc "Incorrect type for 'function'"
 
-  and translate_match_with_scrutinee loc s cases typ =
-    translate_match loc (translate_expression s) s.exp_attributes cases typ
+  and translate_match_with_scrutinee : 'a .
+      loc ->
+      Typedtree.expression ->
+      'a Typedtree.case list ->
+      Types.type_expr ->
+      Parsetree.expression =
+    fun (type a) loc s (cases: a Typedtree.case list ) typ ->
+      translate_match loc (translate_expression s) s.exp_attributes cases typ
 
-  and translate_match loc translated_scrutinee attrs cases typ =
+  and translate_match: 'a .
+        loc ->
+        Parsetree.expression ->
+        attributes ->
+        'a Typedtree.case list ->
+        Types.type_expr ->
+        Parsetree.expression
+    = fun (type a) loc translated_scrutinee attrs (cases: a Typedtree.case list) typ ->
     if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then
       let high_extra_args = create_fresh_argument_names_by_args typ in
       let result_arg = create_fresh_var_name () in
@@ -716,7 +744,7 @@ let call_by_need_creator tree =
       let args = List.map snd args in
       if is_fresh_ident f
       then
-        let vars :: bodies = args in
+        let vars,bodies = List.hd args, List.tl args in
         let vars = convert_fresh_apply_to_vars vars in
         uniq @@ remove_vars vars @@ List.concat @@ List.map fv bodies
       else uniq (fv f @ List.concat (List.map fv args))
@@ -771,11 +799,13 @@ let call_by_need_creator tree =
       if name = "&&&" || name = "|||" || name = "conde" then
         create_apply f @@ List.map (update_expr env) args
       else if name = "fresh" then
-        let v::conjs = args in
-        let vars = convert_fresh_apply_to_vars v in
-        let new_env = List.map (fun x -> (x, First)) vars @ env in
-        let new_conjs = List.map (update_expr new_env) conjs in
-        create_apply f (v::new_conjs)
+        match args with
+        | v::conjs ->
+            let vars = convert_fresh_apply_to_vars v in
+            let new_env = List.map (fun x -> (x, First)) vars @ env in
+            let new_conjs = List.map (update_expr new_env) conjs in
+            create_apply f (v::new_conjs)
+        | [] -> failwith "not implemented"
       else
         let need_tabling = List.map (fun a -> expr_is_logic a && not @@ is_unify_expr a) args in
         let new_args = List.map2 (update_arg env) args need_tabling in

@@ -1,13 +1,12 @@
-type bottle = Fst | Snd
-type stepType = Fill | Empty | Pour
 type nat = O | S of nat
-
 
 let rec add a b =
   match a with
   | O   -> b
   | S x -> add x (S b)
 
+type bottle = Fst | Snd
+type stepType = Fill | Empty | Pour
 
 let rec greater a b =
   match a with

@@ -50,9 +50,9 @@ let nolabel =
       Asttypes.Nolabel
 
 let get_param_names pcd_args =
-  let Pcstr_tuple pcd_args  = pcd_args in
-  extract_names pcd_args
-
+  match pcd_args with
+  | Pcstr_tuple pcd_args -> extract_names pcd_args
+  | _ -> failwith "not implemented"
 
 let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
 
@@ -77,8 +77,9 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   | Ptype_variant constructors ->
     Str.value Recursive @@ List.map (fun {pcd_name; pcd_args} ->
         let names =
-          let Pcstr_tuple xs = pcd_args in
+          let[@warning "-8"]  Pcstr_tuple xs = pcd_args in
           List.mapi (fun n _ -> Printf.sprintf "x__%d" n) xs
+
         in
 
       let open Exp in
@@ -106,6 +107,8 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
     |> List.fold_right (function | { pld_name } -> Exp.fun_ nolabel None Pat.(var @@ mknoloc pld_name.txt)) fields
     |> Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])] (Pat.var @@ mknoloc @@ sprintf "ctor_%s" type_name)
     |> fun vb -> Str.value Nonrecursive [vb]
+  | Ptype_abstract
+  | Ptype_open -> failwith "Not supported"
     ]
 
 let prepare_distribs ~loc tdecl fmap_decl =
@@ -114,7 +117,9 @@ let prepare_distribs ~loc tdecl fmap_decl =
   let open Exp in
   if List.length tdecl.ptype_params > 0
   then prepare_distribs_for_FAT ~loc tdecl fmap_decl
-  else let Ptype_variant constructors = tdecl.ptype_kind in
+  else match  tdecl.ptype_kind with
+     | (Ptype_abstract|Ptype_open|Ptype_record _) -> failwith "Not supported"
+     | Ptype_variant constructors ->
        constructors |>
        List.map (fun {pcd_name} ->
          Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])]
@@ -176,7 +181,8 @@ let prepare_fmap ~loc tdecl useGT =
         List.fold_right (fun name ->
           Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
         ) param_names body ] ]
-
+  | Ptype_abstract
+  | Ptype_open -> failwith "Not supported"
 
 
 
@@ -229,15 +235,25 @@ let revisit_type loc tdecl useGT =
         )
       fields (0, FoldInfo.empty, [])
       |>  (fun (_, mapa, fields) -> mapa, {tdecl with ptype_kind = Ptype_record fields})
+  | Ptype_abstract
+  | Ptype_open -> failwith "Not supported"
   in
 
   (* now we need to add some parameters if we collected ones *)
   let functor_typ, typ_to_add =
+    let open (struct
+      [%%if ocaml_version < (4, 11, 0)]
+      let make_simple_arg x = (x, Asttypes.Invariant)
+      [%%else ]
+      let make_simple_arg x = (x, (Asttypes.NoVariance, Asttypes.NoInjectivity))
+      [%%endif]
+      end)
+    in
     let full_t = {full_t with ptype_name = { full_t.ptype_name with txt = "g" ^ full_t.ptype_name.txt }} in
     let result_type =
       if FoldInfo.is_empty mapa then full_t else
         let extra_params = FoldInfo.map mapa
-          ~f:(fun fi -> (Ast_helper.Typ.var fi.FoldInfo.param_name, Asttypes.Invariant)) in
+          ~f:(fun fi -> (make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)) in
         {full_t with ptype_params = full_t.ptype_params @ extra_params} in
 
       let fmap_for_typ = prepare_fmap ~loc result_type useGT in
