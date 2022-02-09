@@ -22,6 +22,6 @@ let myshow x = show List.ground show_person x
 let checkAnswer_o q r = checkAnswer_o ((===) q) r
 
 let _ =
-  run_exn myshow (1) q qh ("answers", fun q ->
+  run_r (Std.List.prj_exn OCanren.prj_exn) myshow (1) q qh ("answers", fun q ->
     checkAnswer_o q !!true
   )

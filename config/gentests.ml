@@ -2,11 +2,11 @@ open Base
 
 let header =
   {|; THIS FILE IS GENERATED AUTOMATICALLY
+
 (env
  (_
   (flags
-   (:standard -rectypes -w -27-33-39))))
-|}
+   (:standard -rectypes -w -27-33-39))))|}
 ;;
 
 let wrap name =
@@ -19,7 +19,11 @@ let wrap name =
  (libraries GT OCanren OCanren.tester)
  (modules TEMPLATE TEMPLATE_run)
  (preprocess
-  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+  (pps
+    OCanren-ppx.ppx_repr
+    OCanren-ppx.ppx_fresh
+    OCanren-ppx.ppx_distrib
+    GT.ppx_all)))
 
 (rule
  (targets TEMPLATE.ml)
@@ -27,7 +31,10 @@ let wrap name =
   (:exec %{project_root}/src/noCanren.exe)
   (:input TEMPLATE.ml2mk.ml))
  (action
-  (run sh -c "%{exec} %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 |}
   in
   Str.global_replace (Str.regexp "TEMPLATE") name where
@@ -53,6 +60,6 @@ let () =
   in
   (* Array.iter names ~f:Stdio.print_endline; *)
   Stdio.printf "%s\n%!" header;
-  Array.iter names ~f:(fun name -> Stdio.printf "%s\n%!" (wrap name));
+  Array.iter names ~f:(fun name -> Stdio.printf "%s%!" (wrap name));
   footer names
 ;;

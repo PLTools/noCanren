@@ -10,7 +10,11 @@
  (libraries GT OCanren OCanren.tester test_nat test_add test_mul)
  (modules mul_run)
  (preprocess
-  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (cram
  (deps ./mul_run.exe))

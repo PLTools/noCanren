@@ -7,6 +7,23 @@ open Tester
 open Unify
 
 (*************************************************)
+module For_gnat = struct
+  [%%distrib
+    type nonrec 'a0 t = 'a0 Unify.gnat =
+    | O
+    | S of 'a0
+    [@@deriving gt ~options:{show; gmap}]
+    type ground = ground t]
+end
+
+module For_gterm = struct
+  [%%distrib
+    type nonrec ('a1, 'a0) t = ('a1, 'a0) Unify.gterm =
+    | Var_ of 'a1
+    | Constr of 'a1 * 'a0
+    [@@deriving gt ~options:{show; gmap}]
+    type ground = (For_gnat.ground, ground Std.List.ground) t]
+end
 
 let show_number x =
   let rec nat2int =
@@ -18,7 +35,7 @@ let show_number x =
 let show_lnumber x =
   let rec nat2int x =
     match x with
-    | Var _       -> 0, Some (show(logic) (fun _ -> "") x)
+    | Var _       -> 0, Some (show(OCanren.logic) (fun _ -> "") x)
     | Value O     -> 0, None
     | Value (S n) -> let a, s = nat2int n in a + 1, s in
   match nat2int x with
@@ -46,15 +63,15 @@ let rec show_gterm f g = function
 | Constr (n, a) -> Printf.sprintf "C %s %s" (f n) (g a)
 
 let rec show_term  f x = show_gterm f (show List.ground (show_term f)) x
-let rec show_lterm f x = show logic (show_gterm f (show (List.logic) (show_lterm f))) x
+let rec show_lterm f x = show OCanren.logic (show_gterm f (show (List.logic) (show_lterm f))) x
 
 let my_show x = show(List.ground) (show_term show_number) x
 let my_lshow x = show_llist (show_lterm show_lnumber) x
-let rec nat_reifier x = For_gnat.reify nat_reifier x
-let rec term_reifier r x = For_gterm.reify r (List.reify (term_reifier r)) x
-let my_reifier = List.reify ( (term_reifier nat_reifier))
+let nat_reifier x = For_gnat.reify x
+let term_reifier x = For_gterm.reify x
+let my_reifier = List.reify term_reifier
 
-let full_run = runR my_reifier my_show my_lshow
+let full_run = run_r my_reifier my_lshow
 
 (*************************************************)
 

@@ -5,6 +5,21 @@ open Tester
 open Sudoku4x4
 
 (*************************************************)
+module Gnum = struct
+[%%distrib
+    type nonrec t = Sudoku4x4.gnum =  N1 | N2 | N3 | N4
+    [@@deriving gt ~options:{gmap}]
+    type nonrec ground = t
+  ]
+end
+include (struct
+  [%%distrib
+    type nonrec 'a t = 'a Sudoku4x4.gsudoku4X4 =
+    | S4x4 of 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+    [@@deriving gt ~options:{gmap}]
+    type nonrec ground = Gnum.ground t
+  ]
+end)
 
 let show_num = function
 | N1 -> "1"
@@ -28,6 +43,7 @@ let myshow = show_sudoku4x4
 (** For high order conversion **)
 let check_sudoku_o q r = check_sudoku_o ((===) q) r
 
+let run_exn eta = run_r prj_exn eta
 let _ =
   run_exn myshow (1) q qh ("sudoku", fun q ->
     check_sudoku_o q !!true

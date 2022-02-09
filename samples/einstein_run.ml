@@ -48,12 +48,18 @@ let show_state = function
   | (p1, (p2, (p3, (p4, p5)))) -> Printf.sprintf "\n  %s\n  %s\n  %s\n  %s\n  %s\n" (show_person p1) (show_person p2) (show_person p3) (show_person p4) (show_person p5)
 
 let myshow = show_state
+let reify_state () =
+  (* right associative *)
+  let ( ** ) = Std.Pair.prj_exn in
+  let person = prj_exn ** prj_exn ** prj_exn ** prj_exn ** prj_exn in
+  person ** person ** person ** person ** person
 
 (*************************************************)
 
 (** For high order conversion **)
 let check_state_o q r = check_state_o ((===) q) r
 
+let run_exn eta = run_r (reify_state ()) eta
 let _ =
   run_exn myshow (1) q qh ("answers", fun q ->
     check_state_o q !!true
