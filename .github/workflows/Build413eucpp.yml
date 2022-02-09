@@ -1,4 +1,4 @@
-name: Build413
+name: Build413eucpp
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       # do not run CI if we are writing a paper
       # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-ignoring-paths
     branches:
-      - dune-4.13
+      - dune-4.13-eucpp
 
   #schedule:
   # - cron: "0 13 * * 1"
@@ -59,9 +59,9 @@ jobs:
 
       - name: Installing a package
         run: |
-          opam exec -- dune build @install -p noCanren --profile=release
+          opam exec -- dune build @install --profile=release
           #opam exec -- dune install --profile=release noCanren
-          opam install noCanren --yes
+          opam install . --yes
 
       - name: Listing files
         run: |
