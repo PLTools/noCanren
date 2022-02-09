@@ -258,113 +258,26 @@ let is_active_arg pat =
 let create_logic_var name =
   { (create_pat name) with ppat_attributes = [Attr.mk (mknoloc "logic") (Parsetree.PStr [])] }
 
-module _ = struct
-  (* OCaml 3.12.1 *)
-  open Typedtree
-  type ttt = { self : 'a . 'a pattern_desc pattern_data -> bool}
-
-  (* Kind of what I want but long *)
-  let _hack =
-    let helper (type a)
-        (self : ttt)
-        (p1: a Typedtree.pattern_desc pattern_data)  =
-      match p1.pat_desc with
-      | Tpat_any
-      | Tpat_var _ -> true
-      | Tpat_constant c1 -> true
-      | Tpat_tuple t1 -> List.for_all self.self t1
-      | Tpat_construct (_, cd1, a1) -> List.for_all self.self a1
-      | Tpat_value v1 ->
-          self.self
-            (v1 :> Typedtree.pattern)
-      | Tpat_exception _
-      | _ -> false
-    in
-    let rec ans  = { self = (fun eta -> helper ans eta) } in
-    ans
-
-  let _hack_no_open_recursion =
-    let rec helper = { self = (fun (type a) (p1: a Typedtree.pattern_desc pattern_data)  ->
-      match p1.pat_desc with
-      | Tpat_any
-      | Tpat_var _ -> true
-      | Tpat_constant c1 -> true
-      | Tpat_tuple t1 -> List.for_all helper.self t1
-      | Tpat_construct (_, cd1, a1) -> List.for_all helper.self a1
-      | Tpat_value v1 ->
-          helper.self
-            (v1 :> Typedtree.pattern)
-      | Tpat_exception _
-      | _ -> false
-    )}
-    in
-    helper
-
-  (* `'a general_pattern -> bool` YESSS *)
-  let rec _hack_bad2: type a . a Typedtree.pattern_desc pattern_data -> bool = fun p1 ->
-      match p1.pat_desc with
-      | Tpat_any
-      | Tpat_var _ -> true
-      | Tpat_constant c1 -> true
-      | Tpat_tuple t1 -> List.for_all _hack_bad2 t1
-      | Tpat_construct (_, cd1, a1) -> List.for_all _hack_bad2 a1
-      | Tpat_value v1 ->
-          _hack_bad2
-            (v1 :> value Typedtree.pattern_desc Typedtree.pattern_data)
-      | Tpat_exception _
-      | _ -> false
-(*
-  (* compilation error *)
-  let _hack_bad =
-    let helper (type a)
-        (self : a pattern_desc pattern_data -> bool)
-        (p1: a Typedtree.pattern_desc pattern_data)  =
-      match p1.pat_desc with
-      | Tpat_any
-      | Tpat_var _ -> true
-      | Tpat_constant c1 -> true
-      | Tpat_tuple t1 -> List.for_all self t1
-      | Tpat_construct (_, cd1, a1) -> List.for_all self a1
-      | Tpat_value v1 ->
-          self
-            (v1 :> value Typedtree.pattern_desc Typedtree.pattern_data)
-          (*
-          Error: This expression has type value Typedtree.pattern_desc pattern_data
-                but an expression was expected of type
-                  a Typedtree.pattern_desc pattern_data
-                Type value is not compatible with type a
-          *)
-      | Tpat_exception _
-      | _ -> false
-    in
-    let rec ans eta = helper ans eta  in
-    ans
-    *)
-end
-
 let have_unifier =
-  let helper (type a b)
-    (self : a Typedtree.pattern_desc pattern_data -> b Typedtree.pattern_desc pattern_data -> bool)
-    (p1: a Typedtree.pattern_desc pattern_data) (p2: b Typedtree.pattern_desc pattern_data) =
-  match p1.pat_desc, p2.pat_desc with
-  | Tpat_any  , _ | _, Tpat_any
-  | Tpat_var _, _ | _, Tpat_var _ -> true
-  | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
-  | Tpat_tuple t1, Tpat_tuple t2 ->
-    List.length t1 = List.length t2 && List.for_all2 self t1 t2
-  | Tpat_construct (_, cd1, a1), Tpat_construct (_, cd2, a2) ->
-    cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 self a1 a2
-  (* | Tpat_value v1, Tpat_value v2  ->
-      self
-        (v1 :> Typedtree.value Typedtree.pattern_desc Typedtree.pattern_data)
-        (v2 :> Typedtree.value Typedtree.pattern_desc Typedtree.pattern_data) *)
-  | Tpat_exception _, _
-  | _, Tpat_exception _
-  | _ -> false
+  let rec helper: type a b. a Typedtree.pattern_desc pattern_data -> b Typedtree.pattern_desc pattern_data -> bool
+  = fun p1 p2 ->
+    match p1.pat_desc, p2.pat_desc with
+    | Tpat_any  , _ | _, Tpat_any
+    | Tpat_var _, _ | _, Tpat_var _ -> true
+    | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
+    | Tpat_tuple t1, Tpat_tuple t2 ->
+      List.length t1 = List.length t2 && List.for_all2 helper t1 t2
+    | Tpat_construct (_, cd1, a1, _), Tpat_construct (_, cd2, a2,_) ->
+      cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 helper a1 a2
+    | Tpat_value v1, Tpat_value v2  ->
+        helper
+          (v1 :> Typedtree.value Typedtree.general_pattern)
+          (v2 :> Typedtree.value Typedtree.general_pattern)
+    | Tpat_exception _, _
+    | _, Tpat_exception _
+    | _ -> false
   in
-
-  let rec ans eta = helper ans eta in
-  ans
+  helper
 
 let translate_pat pat fresher =
   let rec helper : type a . a Typedtree.pattern_desc pattern_data -> _ = fun pat ->
@@ -374,14 +287,13 @@ let translate_pat pat fresher =
     | Tpat_any                                       -> let var = fresher () in create_id var, [], [var]
     | Tpat_var (v, _)                                -> create_id (name v), [], [name v]
     | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, [], []
-    | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  [], []
-    | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], [], []
-    | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], [], []
-    | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
-    (* | Tpat_value {pat_desc = Tpat_construct ({txt}, _, args)} *)
+    | Tpat_construct ({txt = Lident "true"},  _, [], _) -> [%expr !!true],  [], []
+    | Tpat_construct ({txt = Lident "false"}, _, [], _) -> [%expr !!false], [], []
+    | Tpat_construct ({txt = Lident "[]"},    _, [], _) -> [%expr [%e mark_constr [%expr nil]] ()], [], []
+    | Tpat_construct (id              ,       _, [], _) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
     | Tpat_value x ->
       helper (x :> (Typedtree.value Typedtree.general_pattern))
-    | Tpat_construct ({txt}, _, args)                ->
+    | Tpat_construct ({txt}, _, args, _)                ->
       let args, als, vars = List.map (fun q -> helper q) args |> split3 in
       let vars = List.concat vars in
       let als  = List.concat als  in

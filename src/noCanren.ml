@@ -21,13 +21,12 @@ let translate ppf params =
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
   try
-    let (typedtree, coercion) =
+    let { Typedtree.structure = typedtree; _ } =
       Pparse.parse_implementation ~tool_name params.input_name
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation params.input_name outputprefix modulename env
-      ++ print_if ppf Clflags.dump_typedtree
-        Printtyped.implementation_with_coercion
+      ++ print_if ppf Clflags.dump_typedtree Printtyped.implementation_with_coercion
     in
     let untyped = Translator.only_generate typedtree params in
     let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in

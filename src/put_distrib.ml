@@ -150,9 +150,9 @@ let prepare_fmap ~loc tdecl useGT =
           let get_pat_name i name = sprintf "%s_%d" name i in
           match argnames with
           | [] -> (None, None)
-          | [s] -> Some (Ast_helper.Pat.var (mknoloc s)), (Some (wrap_one_arg s s))
+          | [s] -> Some ([], Ast_helper.Pat.var (mknoloc s)), (Some (wrap_one_arg s s))
           | ___ ->
-              Some Ast_helper.Pat.(tuple @@ List.mapi (fun n name -> var (mknoloc @@ get_pat_name n name)) argnames),
+              Some ([], Ast_helper.Pat.(tuple @@ List.mapi (fun n name -> var (mknoloc @@ get_pat_name n name)) argnames)),
               Some (Exp.tuple @@ List.mapi (fun n name -> wrap_one_arg name @@ get_pat_name n name) argnames)
         in
         let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in

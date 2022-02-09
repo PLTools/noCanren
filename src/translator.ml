@@ -164,7 +164,7 @@ let translate_high tast start_index params =
             | Tpat_constant _             -> []
             | Tpat_var (n, _)             -> [name n]
             | Tpat_tuple pats             -> List.concat_map helper pats
-            | Tpat_construct (_, _, pats) -> List.concat_map helper pats
+            | Tpat_construct (_, _, pats,_) -> List.concat_map helper pats
             | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> helper p) l
             | Tpat_alias (t, n, _)        -> name n :: helper t
             | Tpat_value x                -> helper (x :> Typedtree.pattern)
