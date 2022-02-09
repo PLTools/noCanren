@@ -241,14 +241,7 @@ let revisit_type loc tdecl useGT =
 
   (* now we need to add some parameters if we collected ones *)
   let functor_typ, typ_to_add =
-    let open (struct
-      [%%if ocaml_version < (4, 11, 0)]
-      let make_simple_arg x = (x, Asttypes.Invariant)
-      [%%else ]
-      let make_simple_arg x = (x, (Asttypes.NoVariance, Asttypes.NoInjectivity))
-      [%%endif]
-      end)
-    in
+    let make_simple_arg x = (x, (Asttypes.NoVariance, Asttypes.NoInjectivity)) in
     let full_t = {full_t with ptype_name = { full_t.ptype_name with txt = "g" ^ full_t.ptype_name.txt }} in
     let result_type =
       if FoldInfo.is_empty mapa then full_t else

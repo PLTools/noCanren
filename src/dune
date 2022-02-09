@@ -16,4 +16,4 @@
   Printer_in_spec
   noCanren)
  (preprocess
-  (pps ppxlib.metaquot ppx_optcomp)))
+  (pps ppxlib.metaquot)))
