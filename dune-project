@@ -6,6 +6,8 @@
 
 ;(license LGPL-3.0-only)
 
+(name noCanren)
+
 (authors
  "https://github.com/Lozov-Petr"
  "https://github.com/Kakadu"
