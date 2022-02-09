@@ -57,6 +57,9 @@ let translate ppf params =
       Typetexp.report_error env Format.std_formatter e;
       Format.printf "\n%!";
       raise exc
+    | Util.TranslatorError e ->
+      Format.eprintf "%a\n%!" Util.report_error e;
+      exit 1
     | x -> raise x
 
 
@@ -216,8 +219,8 @@ let () =
     try begin
       readenv ppf Before_args;
       translate ppf @@ mk_noCanren_params ()
-    end with Failure     s -> (Printf.printf "%s\n%!" s; Arg.usage all_options usage)
-           | Sys_error   s -> Printf.printf "%s\n%!" s
+    end with Failure     s -> (Printf.eprintf "%s\n%!" s; Arg.usage all_options usage)
+           | Sys_error   s -> Printf.eprintf "%s\n%!" s
            | e             -> begin match Location.error_of_exn e with
                               | Some (`Ok e) -> Location.print_report ppf e
                               | _            -> raise e

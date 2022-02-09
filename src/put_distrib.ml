@@ -34,6 +34,14 @@ module FoldInfo = struct
       {param_name; rtyp; ltyp} :: ts
 end
 
+
+let str_type_ = Ast_helper.Str.type_
+
+let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
+
+(*
+let extract_names = List.map extract_name
+
 let extract_name typ =
     match typ.ptyp_desc with
     | Ptyp_var s -> s
@@ -42,19 +50,12 @@ let extract_name typ =
       Pprintast.core_type Format.str_formatter typ;
       failwith (sprintf "Don't know what to do with %s" (Format.flush_str_formatter ()))
 
-let extract_names = List.map extract_name
-
-let str_type_ = Ast_helper.Str.type_
-
-let nolabel =
-      Asttypes.Nolabel
-
 let get_param_names pcd_args =
   match pcd_args with
   | Pcstr_tuple pcd_args -> extract_names pcd_args
   | _ -> failwith "not implemented"
 
-let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
+let nolabel = Asttypes.Nolabel
 
 let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   let open Location in
@@ -108,7 +109,7 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
     |> Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])] (Pat.var @@ mknoloc @@ sprintf "ctor_%s" type_name)
     |> fun vb -> Str.value Nonrecursive [vb]
   | Ptype_abstract
-  | Ptype_open -> failwith "Not supported"
+  | Ptype_open -> Util.fail_loc loc "Not supported"
     ]
 
 let prepare_distribs ~loc tdecl fmap_decl =
@@ -118,7 +119,7 @@ let prepare_distribs ~loc tdecl fmap_decl =
   if List.length tdecl.ptype_params > 0
   then prepare_distribs_for_FAT ~loc tdecl fmap_decl
   else match  tdecl.ptype_kind with
-     | (Ptype_abstract|Ptype_open|Ptype_record _) -> failwith "Not supported"
+     | (Ptype_abstract|Ptype_open|Ptype_record _) -> Util.fail_loc loc "Not supported"
      | Ptype_variant constructors ->
        constructors |>
        List.map (fun {pcd_name} ->
@@ -126,8 +127,77 @@ let prepare_distribs ~loc tdecl fmap_decl =
                (Pat.var @@ lower_lid pcd_name)
                ([%expr fun () -> !! [%e construct (mknoloc (Lident pcd_name.txt)) None]])) |>
        List.map (fun vb -> Str.value Nonrecursive [vb])
+*)
+let prepare_distribs_new ~loc tdecl =
+  let for_record pat_name add_constr labs =
+    let open Longident in
+    let r =
+      Exp.record (List.map (fun {pld_name} ->
+                    let lid = mkloc (Lident pld_name.txt) pld_name.loc in
+                    (lid, Exp.ident lid)) labs
+                  )
+                  None in
 
+      [%stri let [%p pat_name] =
+              [%e List.fold_right
+                    (fun {pld_name} acc ->
+                      [%expr fun [%p Pat.var @@ mkloc (Printf.sprintf "%s" pld_name.txt) loc] -> [%e acc ]])
+                  labs
+                  [%expr OCanren.inj [%e add_constr r] ]]
+      ]
+  in
+  match tdecl.ptype_kind with
+  | Ptype_abstract|Ptype_open-> Util.fail_loc loc "Not supported %s %d" __FILE__ __LINE__
+  | Ptype_record labs ->
+    [ for_record (Pat.var (mkloc (Printf.sprintf "ctor_%s" tdecl.ptype_name.txt) tdecl.ptype_name.loc)) (fun r -> r) labs ]
+  | Ptype_variant cs ->
+    let open Exp in
+    let open Longident in
+    cs |>
+      List.map (fun {pcd_name; pcd_args} ->
+        let construct_expr = construct (mknoloc (Lident pcd_name.txt)) in
+        match pcd_args with
+        | Pcstr_record labs ->
+            for_record (Pat.var (lower_lid pcd_name)) (fun r -> construct_expr (Some r)) labs
+            (* let r =
+              Exp.record (List.map (fun {pld_name} ->
+                            let lid = mkloc (Lident pld_name.txt) pld_name.loc in
+                            (lid, Exp.ident lid)) labs
+                         )
+                         None in
 
+            [%stri let [%p Pat.var (lower_lid pcd_name)] =
+                    [%e List.fold_right
+                          (fun {pld_name} acc ->
+                            [%expr fun [%p Pat.var @@ mkloc (Printf.sprintf "x%s" pld_name.txt) loc] -> [%e acc ]])
+                        labs
+                        [%expr OCanren.inj [%e construct_expr (Some r)] ]]
+                    ] *)
+        | Pcstr_tuple [] ->
+          (* There we need to add extra unit argument *)
+          [%stri let [%p Pat.var (lower_lid pcd_name)] = fun () ->
+                    OCanren.inj [%e construct_expr None]]
+        | Pcstr_tuple ts ->
+          let ns = List.mapi (fun n _ -> n) ts in
+          let add_abs =
+            List.fold_right
+              (fun n acc next -> [%expr fun [%p Pat.var @@ mkloc (Printf.sprintf "x%d" n) loc] -> [%e acc next]])
+              ns
+              (fun x -> x)
+          in
+          let add_args =
+            construct_expr @@ Option.some @@ Exp.tuple @@
+            List.map
+              (fun x -> Exp.ident (mknoloc (Lident (Printf.sprintf "x%d" x))))
+              ns
+          in
+          Str.value Nonrecursive
+            [ Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])]
+                (Pat.var @@ lower_lid pcd_name)
+                (add_abs [%expr OCanren.inj [%e add_args]])]
+      )
+
+(*
 let prepare_fmap ~loc tdecl useGT =
   if useGT
     then [%stri let[@service_function] fmap eta = GT.gmap t eta]
@@ -182,8 +252,8 @@ let prepare_fmap ~loc tdecl useGT =
           Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
         ) param_names body ] ]
   | Ptype_abstract
-  | Ptype_open -> failwith "Not supported"
-
+  | Ptype_open -> Util.fail_loc loc "Not supported"
+*)
 
 
 
@@ -236,7 +306,7 @@ let revisit_type loc tdecl useGT =
       fields (0, FoldInfo.empty, [])
       |>  (fun (_, mapa, fields) -> mapa, {tdecl with ptype_kind = Ptype_record fields})
   | Ptype_abstract
-  | Ptype_open -> failwith "Not supported"
+  | Ptype_open -> Util.fail_loc loc "Not supported"
   in
 
   (* now we need to add some parameters if we collected ones *)
@@ -249,8 +319,9 @@ let revisit_type loc tdecl useGT =
           ~f:(fun fi -> (make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)) in
         {full_t with ptype_params = full_t.ptype_params @ extra_params} in
 
-      let fmap_for_typ = prepare_fmap ~loc result_type useGT in
-      result_type, (prepare_distribs ~loc result_type fmap_for_typ)
+      (* let fmap_for_typ = prepare_fmap ~loc result_type useGT in
+      result_type, (prepare_distribs ~loc result_type fmap_for_typ) *)
+      result_type, (prepare_distribs_new ~loc result_type)
   in
     let gt_attribute =
       if useGT

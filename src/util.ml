@@ -68,13 +68,7 @@ let report_error fmt  = function
 
 
 let fail_loc loc fmt =
-  let b = Buffer.create 100 in
-  let f = Format.formatter_of_buffer b in
-  let () = Format.fprintf f fmt in
-  let () = Format.fprintf f ". " in
-  let () = Location.print_loc f loc in
-  Format.pp_print_flush f ();
-  failwith (Buffer.contents b)
+  Format.kasprintf (fun s -> failwith (Format.asprintf "%s. %a" s Location.print_loc loc)) fmt
 
 (************************** Util funcions *******************************)
 
