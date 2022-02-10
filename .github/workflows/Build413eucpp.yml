@@ -42,6 +42,12 @@ jobs:
 
       - run: opam pin add . --no-action
 
+      - name: Pinning new GT
+        run: opam pin add https://github.com/Kakadu/GT.git --no-action
+
+      - name: Pinning new OCanren
+        run: opam pin add OCanren https://github.com/Kakadu/OCanren.git#eucpp-final --no-action
+
       - name: Installing depexts
         run: opam depext noCanren --yes --with-test
 
