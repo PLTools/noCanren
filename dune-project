@@ -25,9 +25,10 @@
 (package
  (name noCanren)
  (synopsis "Translator from subset of OCaml to OCanren")
- (version 0.2.0)
+ (version 0.3.0)
  (depends
   dune
+  (ocaml (and (>= "4.13") (< "4.14")))
   (GT :with-test)
   (OCanren :with-test)
   (OCanren-ppx :with-test)
