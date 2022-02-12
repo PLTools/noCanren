@@ -6,7 +6,7 @@
 (executable
  (name mul_run)
  ;(package noCanren-tests)
- (public_name noCanren.multifile-mul)
+ ;(public_name noCanren.multifile-mul)
  (libraries GT OCanren OCanren.tester test_nat test_add test_mul)
  (modules mul_run)
  (preprocess

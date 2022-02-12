@@ -65,7 +65,7 @@ promote_tests:
 test:
 	dune runtest
 
-clean: clean_tests
+clean:
 	dune clean
 
 install:
