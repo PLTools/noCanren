@@ -60,10 +60,10 @@ jobs:
         run: opam exec -- dune build --profile=release -p noCanren
 
       - name: Installing dependencies for testing
-        run: opam exec -- dune external-lib-deps -p noCanren-tests . --missing | cut -f1 | xargs opam install --yes GT
+        run: opam exec -- dune external-lib-deps -p noCanren . --missing | cut -f1 | xargs opam install --yes GT
 
       - name: Testing
-        run: opam exec -- dune runtest --profile=release -p noCanren,noCanren-tests
+        run: opam exec -- dune runtest --profile=release -p noCanren
 
       - name: Installing a package
         run: |
