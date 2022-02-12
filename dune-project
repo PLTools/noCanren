@@ -20,9 +20,6 @@
 (homepage "https://github.com/Lozov-Petr/noCanren")
 
 (package
- (name noCanren-tests))
-
-(package
  (name noCanren)
  (synopsis "Translator from subset of OCaml to OCanren")
  (version 0.3.0)

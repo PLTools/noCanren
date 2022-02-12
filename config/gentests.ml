@@ -14,8 +14,8 @@ let wrap name =
     {|
 (executable
  (name TEMPLATE_run)
- (package noCanren-tests)
- (public_name noCanren-tests.TEMPLATE)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.TEMPLATE)
  (libraries GT OCanren OCanren.tester)
  (modules TEMPLATE TEMPLATE_run)
  (preprocess
@@ -40,7 +40,12 @@ let wrap name =
   Str.global_replace (Str.regexp "TEMPLATE") name where
 ;;
 
-let footer names = Array.iter names ~f:(Stdio.printf "(cram (deps ./%s_run.exe))\n%!")
+let footer names =
+  Stdio.printf "(cram\n";
+  Stdio.printf " ;(package noCanren-tests)\n";
+  Stdio.printf " (deps\n";
+  Array.iter names ~f:(Stdio.printf "  ./%s_run.exe\n");
+  Stdio.printf "))\n"
 
 let () =
   let path = (Sys.get_argv ()).(1) in

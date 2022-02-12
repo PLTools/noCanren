@@ -5,8 +5,8 @@
 
 (executable
  (name mul_run)
- (package noCanren-tests)
- (public_name noCanren-tests.multifile-mul)
+ ;(package noCanren-tests)
+ (public_name noCanren.multifile-mul)
  (libraries GT OCanren OCanren.tester test_nat test_add test_mul)
  (modules mul_run)
  (preprocess
@@ -17,6 +17,7 @@
    GT.ppx_all)))
 
 (cram
+ ;(package noCanren)
  (deps ./mul_run.exe))
 
 (library
@@ -60,6 +61,7 @@
 
 (library
  (name test_mul)
+ ;(package noCanren)
  (modules test_mul)
  (wrapped false)
  (libraries test_nat test_add GT)
@@ -68,6 +70,7 @@
 
 (rule
  (targets test_mul.ml)
+ ;(package noCanren-tests)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
   (:input stuff/test_mul.ml)

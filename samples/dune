@@ -7,8 +7,8 @@
 
 (executable
  (name GCW_run)
- (package noCanren-tests)
- (public_name noCanren-tests.GCW)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.GCW)
  (libraries GT OCanren OCanren.tester)
  (modules GCW GCW_run)
  (preprocess
@@ -31,8 +31,8 @@
 
 (executable
  (name bottles_run)
- (package noCanren-tests)
- (public_name noCanren-tests.bottles)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.bottles)
  (libraries GT OCanren OCanren.tester)
  (modules bottles bottles_run)
  (preprocess
@@ -55,8 +55,8 @@
 
 (executable
  (name bridge_run)
- (package noCanren-tests)
- (public_name noCanren-tests.bridge)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.bridge)
  (libraries GT OCanren OCanren.tester)
  (modules bridge bridge_run)
  (preprocess
@@ -79,8 +79,8 @@
 
 (executable
  (name einstein_run)
- (package noCanren-tests)
- (public_name noCanren-tests.einstein)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.einstein)
  (libraries GT OCanren OCanren.tester)
  (modules einstein einstein_run)
  (preprocess
@@ -103,8 +103,8 @@
 
 (executable
  (name hanoi_run)
- (package noCanren-tests)
- (public_name noCanren-tests.hanoi)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.hanoi)
  (libraries GT OCanren OCanren.tester)
  (modules hanoi hanoi_run)
  (preprocess
@@ -127,8 +127,8 @@
 
 (executable
  (name hanoi2_run)
- (package noCanren-tests)
- (public_name noCanren-tests.hanoi2)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.hanoi2)
  (libraries GT OCanren OCanren.tester)
  (modules hanoi2 hanoi2_run)
  (preprocess
@@ -151,8 +151,8 @@
 
 (executable
  (name hm_inferencer_run)
- (package noCanren-tests)
- (public_name noCanren-tests.hm_inferencer)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.hm_inferencer)
  (libraries GT OCanren OCanren.tester)
  (modules hm_inferencer hm_inferencer_run)
  (preprocess
@@ -175,8 +175,8 @@
 
 (executable
  (name scheme_interpreter_run)
- (package noCanren-tests)
- (public_name noCanren-tests.scheme_interpreter)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.scheme_interpreter)
  (libraries GT OCanren OCanren.tester)
  (modules scheme_interpreter scheme_interpreter_run)
  (preprocess
@@ -199,8 +199,8 @@
 
 (executable
  (name sudoku4x4_run)
- (package noCanren-tests)
- (public_name noCanren-tests.sudoku4x4)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.sudoku4x4)
  (libraries GT OCanren OCanren.tester)
  (modules sudoku4x4 sudoku4x4_run)
  (preprocess
@@ -223,8 +223,8 @@
 
 (executable
  (name unify_run)
- (package noCanren-tests)
- (public_name noCanren-tests.unify)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.unify)
  (libraries GT OCanren OCanren.tester)
  (modules unify unify_run)
  (preprocess
@@ -244,13 +244,17 @@
    sh
    -c
    "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
-(cram (deps ./GCW_run.exe))
-(cram (deps ./bottles_run.exe))
-(cram (deps ./bridge_run.exe))
-(cram (deps ./einstein_run.exe))
-(cram (deps ./hanoi_run.exe))
-(cram (deps ./hanoi2_run.exe))
-(cram (deps ./hm_inferencer_run.exe))
-(cram (deps ./scheme_interpreter_run.exe))
-(cram (deps ./sudoku4x4_run.exe))
-(cram (deps ./unify_run.exe))
+(cram
+ ;(package noCanren-tests)
+ (deps
+  ./GCW_run.exe
+  ./bottles_run.exe
+  ./bridge_run.exe
+  ./einstein_run.exe
+  ./hanoi_run.exe
+  ./hanoi2_run.exe
+  ./hm_inferencer_run.exe
+  ./scheme_interpreter_run.exe
+  ./sudoku4x4_run.exe
+  ./unify_run.exe
+))
