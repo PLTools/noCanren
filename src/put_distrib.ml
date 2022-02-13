@@ -39,10 +39,9 @@ let str_type_ = Ast_helper.Str.type_
 
 let lower_lid lid = Location.{lid with txt = Util.mangle_construct_name lid.Location.txt }
 
-(*
-let extract_names = List.map extract_name
+module Old_OCanren = struct
 
-let extract_name typ =
+  let extract_name typ =
     match typ.ptyp_desc with
     | Ptyp_var s -> s
     | _ ->
@@ -50,12 +49,14 @@ let extract_name typ =
       Pprintast.core_type Format.str_formatter typ;
       failwith (sprintf "Don't know what to do with %s" (Format.flush_str_formatter ()))
 
-let get_param_names pcd_args =
-  match pcd_args with
-  | Pcstr_tuple pcd_args -> extract_names pcd_args
-  | _ -> failwith "not implemented"
+  let extract_names = List.map extract_name
 
-let nolabel = Asttypes.Nolabel
+  let get_param_names pcd_args =
+    match pcd_args with
+    | Pcstr_tuple pcd_args -> extract_names pcd_args
+    | _ -> failwith "not implemented"
+
+  let nolabel = Asttypes.Nolabel
 
 let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   let open Location in
@@ -112,22 +113,79 @@ let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
   | Ptype_open -> Util.fail_loc loc "Not supported"
     ]
 
-let prepare_distribs ~loc tdecl fmap_decl =
-  let open Location in
-  let open Longident in
-  let open Exp in
-  if List.length tdecl.ptype_params > 0
-  then prepare_distribs_for_FAT ~loc tdecl fmap_decl
-  else match  tdecl.ptype_kind with
-     | (Ptype_abstract|Ptype_open|Ptype_record _) -> Util.fail_loc loc "Not supported"
-     | Ptype_variant constructors ->
-       constructors |>
-       List.map (fun {pcd_name} ->
-         Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])]
-               (Pat.var @@ lower_lid pcd_name)
-               ([%expr fun () -> !! [%e construct (mknoloc (Lident pcd_name.txt)) None]])) |>
-       List.map (fun vb -> Str.value Nonrecursive [vb])
-*)
+  let prepare_distribs ~loc tdecl fmap_decl =
+    let open Location in
+    let open Longident in
+    let open Exp in
+    if List.length tdecl.ptype_params > 0
+    then prepare_distribs_for_FAT ~loc tdecl fmap_decl
+    else match  tdecl.ptype_kind with
+      | (Ptype_abstract|Ptype_open|Ptype_record _) -> Util.fail_loc loc "Not supported"
+      | Ptype_variant constructors ->
+        constructors |>
+        List.map (fun {pcd_name} ->
+          Vb.mk ~attrs:[Attr.mk (mknoloc "service_function") (Parsetree.PStr [])]
+                (Pat.var @@ lower_lid pcd_name)
+                ([%expr fun () -> !! [%e construct (mknoloc (Lident pcd_name.txt)) None]])) |>
+        List.map (fun vb -> Str.value Nonrecursive [vb])
+
+  let prepare_fmap ~loc tdecl useGT =
+    if useGT
+      then [%stri let[@service_function] fmap eta = GT.gmap t eta]
+      else
+
+      let open Location in
+      let open Ast_helper in
+      let param_names = extract_names (List.map fst tdecl.ptype_params) in
+      match tdecl.ptype_kind with
+      | Ptype_variant constructors ->
+        let cases = constructors |> List.map (fun {pcd_name; pcd_args} ->
+          let argnames = get_param_names pcd_args in
+          let cname = pcd_name.txt in
+          let clid = mknoloc @@ Longident.Lident cname in
+          let make_f_expr name = Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name) in
+          let pc_lhs, pc_rhs =
+            let wrap_one_arg typname new_name =
+              Exp.(apply (make_f_expr typname) [nolabel, ident @@ mknoloc @@ Longident.Lident new_name] )
+            in
+            let get_pat_name i name = sprintf "%s_%d" name i in
+            match argnames with
+            | [] -> (None, None)
+            | [s] -> Some ([], Ast_helper.Pat.var (mknoloc s)), (Some (wrap_one_arg s s))
+            | ___ ->
+                Some ([], Ast_helper.Pat.(tuple @@ List.mapi (fun n name -> var (mknoloc @@ get_pat_name n name)) argnames)),
+                Some (Exp.tuple @@ List.mapi (fun n name -> wrap_one_arg name @@ get_pat_name n name) argnames)
+          in
+          let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in
+          let pc_rhs = Exp.construct clid pc_rhs in
+          let pc_guard = None in
+          { pc_rhs; pc_lhs; pc_guard }
+        ) in
+        [%stri let[@service_function] rec fmap = [%e
+          List.fold_right (function
+          | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
+          ) param_names (Exp.function_ cases) ] ]
+      | Ptype_record fields ->
+        let pattern = fields |> List.map (fun { pld_name } ->
+          let name = pld_name.txt in
+          let lid  = mknoloc @@ Longident.Lident name in
+          lid, Pat.var @@ mknoloc name)
+          |> fun b -> Pat.record b Closed in
+        let body = fields |> List.map (fun { pld_type; pld_name } ->
+          let type_name = Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ extract_name pld_type) in
+          let lid       = mknoloc @@ Longident.Lident pld_name.txt in
+          lid, Exp.apply type_name [nolabel, Exp.ident lid])
+          |> fun b -> Exp.record b None
+          |> Exp.fun_ Asttypes.Nolabel None pattern in
+
+        [%stri let[@service_function] rec fmap = [%e
+          List.fold_right (fun name ->
+            Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
+          ) param_names body ] ]
+    | Ptype_abstract
+    | Ptype_open -> Util.fail_loc loc "Not supported"
+end
+
 let prepare_distribs_new ~loc tdecl =
   let for_record pat_name add_constr labs =
     let open Longident in
@@ -159,20 +217,6 @@ let prepare_distribs_new ~loc tdecl =
         match pcd_args with
         | Pcstr_record labs ->
             for_record (Pat.var (lower_lid pcd_name)) (fun r -> construct_expr (Some r)) labs
-            (* let r =
-              Exp.record (List.map (fun {pld_name} ->
-                            let lid = mkloc (Lident pld_name.txt) pld_name.loc in
-                            (lid, Exp.ident lid)) labs
-                         )
-                         None in
-
-            [%stri let [%p Pat.var (lower_lid pcd_name)] =
-                    [%e List.fold_right
-                          (fun {pld_name} acc ->
-                            [%expr fun [%p Pat.var @@ mkloc (Printf.sprintf "x%s" pld_name.txt) loc] -> [%e acc ]])
-                        labs
-                        [%expr OCanren.inj [%e construct_expr (Some r)] ]]
-                    ] *)
         | Pcstr_tuple [] ->
           (* There we need to add extra unit argument *)
           [%stri let [%p Pat.var (lower_lid pcd_name)] = fun () ->
@@ -197,67 +241,7 @@ let prepare_distribs_new ~loc tdecl =
                 (add_abs [%expr OCanren.inj [%e add_args]])]
       )
 
-(*
-let prepare_fmap ~loc tdecl useGT =
-  if useGT
-    then [%stri let[@service_function] fmap eta = GT.gmap t eta]
-    else
-
-    let open Location in
-    let open Ast_helper in
-    let param_names = extract_names (List.map fst tdecl.ptype_params) in
-    match tdecl.ptype_kind with
-    | Ptype_variant constructors ->
-      let cases = constructors |> List.map (fun {pcd_name; pcd_args} ->
-        let argnames = get_param_names pcd_args in
-        let cname = pcd_name.txt in
-        let clid = mknoloc @@ Longident.Lident cname in
-        let make_f_expr name = Exp.ident @@ mknoloc @@ Longident.Lident ("f"^name) in
-        let pc_lhs, pc_rhs =
-          let wrap_one_arg typname new_name =
-            Exp.(apply (make_f_expr typname) [nolabel, ident @@ mknoloc @@ Longident.Lident new_name] )
-          in
-          let get_pat_name i name = sprintf "%s_%d" name i in
-          match argnames with
-          | [] -> (None, None)
-          | [s] -> Some ([], Ast_helper.Pat.var (mknoloc s)), (Some (wrap_one_arg s s))
-          | ___ ->
-              Some ([], Ast_helper.Pat.(tuple @@ List.mapi (fun n name -> var (mknoloc @@ get_pat_name n name)) argnames)),
-              Some (Exp.tuple @@ List.mapi (fun n name -> wrap_one_arg name @@ get_pat_name n name) argnames)
-        in
-        let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in
-        let pc_rhs = Exp.construct clid pc_rhs in
-        let pc_guard = None in
-        { pc_rhs; pc_lhs; pc_guard }
-      ) in
-      [%stri let[@service_function] rec fmap = [%e
-        List.fold_right (function
-        | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
-        ) param_names (Exp.function_ cases) ] ]
-    | Ptype_record fields ->
-      let pattern = fields |> List.map (fun { pld_name } ->
-        let name = pld_name.txt in
-        let lid  = mknoloc @@ Longident.Lident name in
-        lid, Pat.var @@ mknoloc name)
-        |> fun b -> Pat.record b Closed in
-      let body = fields |> List.map (fun { pld_type; pld_name } ->
-        let type_name = Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ extract_name pld_type) in
-        let lid       = mknoloc @@ Longident.Lident pld_name.txt in
-        lid, Exp.apply type_name [nolabel, Exp.ident lid])
-        |> fun b -> Exp.record b None
-        |> Exp.fun_ Asttypes.Nolabel None pattern in
-
-      [%stri let[@service_function] rec fmap = [%e
-        List.fold_right (fun name ->
-          Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f"^name))
-        ) param_names body ] ]
-  | Ptype_abstract
-  | Ptype_open -> Util.fail_loc loc "Not supported"
-*)
-
-
-
-let revisit_type loc tdecl useGT =
+let revisit_type loc tdecl ~old_ocanren useGT =
   let tdecl = {tdecl with ptype_attributes =
     List.filter (fun a -> a.attr_name.Location.txt <> "put_distrib_here") tdecl.ptype_attributes }
   in
@@ -319,9 +303,12 @@ let revisit_type loc tdecl useGT =
           ~f:(fun fi -> (make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)) in
         {full_t with ptype_params = full_t.ptype_params @ extra_params} in
 
-      (* let fmap_for_typ = prepare_fmap ~loc result_type useGT in
-      result_type, (prepare_distribs ~loc result_type fmap_for_typ) *)
-      result_type, (prepare_distribs_new ~loc result_type)
+      (result_type,
+      if old_ocanren
+      then
+        let fmap_for_typ = Old_OCanren.prepare_fmap ~loc result_type useGT in
+        Old_OCanren.prepare_distribs ~loc result_type fmap_for_typ
+      else prepare_distribs_new ~loc result_type)
   in
     let gt_attribute =
       if useGT
@@ -336,13 +323,13 @@ let has_to_gen_attr (xs: attributes) =
       true
   with Not_found -> false
 
-let main_mapper useGT =
+let main_mapper ~old_ocanren useGT =
   let wrap_tydecls loc ts =
     let f tdecl =
       match tdecl.ptype_kind with
       | Ptype_variant _
       | Ptype_record  _ when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-          revisit_type loc tdecl useGT
+          revisit_type loc tdecl ~old_ocanren useGT
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
@@ -358,5 +345,6 @@ let main_mapper useGT =
       List.flatten (List.map f ss)
   }
 
-let process useGT x =
-  (main_mapper useGT).structure (main_mapper useGT) x
+let process ~old_ocanren useGT  =
+  let mapper = main_mapper ~old_ocanren useGT in
+  mapper.structure mapper

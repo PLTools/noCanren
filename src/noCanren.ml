@@ -84,6 +84,7 @@ let leave_constuctors           = ref false
 let subst_only_util_vars        = ref false
 let output_name_for_spec_tree   = ref None
 let useGT                       = ref false
+let old_ocanren                 = ref false
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -169,6 +170,10 @@ let all_options =
     Arg.Unit (fun _ -> useGT := true),
     " Use GT in translated code"
     ;
+    "-old-ocanren",
+    Arg.Unit (fun _ -> old_ocanren := true),
+    " Generate interface for old oCanren (<0.3): FMap1/2/3, etc."
+    ;
     "-dtypedtree",
     Arg.Unit (fun _ -> Clflags.dump_typedtree := true),
     " Trace typed tree"
@@ -210,6 +215,7 @@ let mk_noCanren_params () =
     high_order_paprams = high_order_paprams;
     unnesting_params = unnesting_params;
     useGT = !useGT;
+    old_ocanren = !old_ocanren;
 
     output_name_for_spec_tree = !output_name_for_spec_tree;
   }
