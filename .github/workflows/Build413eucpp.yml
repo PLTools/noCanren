@@ -39,6 +39,7 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           dune-cache: true
           opam-pin: false
+          opam-depext: false
           cache-prefix: v21
 
       - run: opam pin add . --no-action
