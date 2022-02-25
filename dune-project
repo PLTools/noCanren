@@ -31,9 +31,9 @@
     (< "4.14")))
   GT
   (OCanren
-   (>= "0.3.0"))
+   (>= "0.3.0~"))
   (OCanren-ppx
-   (>= "0.3.0"))
+   (>= "0.3.0~"))
   (odoc :with-doc)
   (ocamlformat :with-test)
   ppxlib
