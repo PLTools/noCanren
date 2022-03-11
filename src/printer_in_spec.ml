@@ -1,6 +1,5 @@
 open Parsetree
 open Format
-open Ast_iterator
 
 let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "last_goal") fmt tree =
 
@@ -29,7 +28,7 @@ let print_tree ?(module_name = "program") ?(tree_name = "tree") ?(last_goal = "l
   | []                   -> () in
 
 
-  let rec expr_as_ident expr =
+  let expr_as_ident expr =
     match expr.pexp_desc with
    | Pexp_ident {txt = Lident name} -> name
    | _  -> failwith "Expression isn't ident" in

@@ -1,9 +1,5 @@
-open Config
-open Clflags
 open Compenv
-open Misc
 open Format
-open Typedtree
 open Util
 
 let need_print_result = ref false
@@ -25,13 +21,12 @@ let translate ppf params =
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
   try
-    let (typedtree, coercion) =
+    let { Typedtree.structure = typedtree; _ } =
       Pparse.parse_implementation ~tool_name params.input_name
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation params.input_name outputprefix modulename env
-      ++ print_if ppf Clflags.dump_typedtree
-        Printtyped.implementation_with_coercion
+      ++ print_if ppf Clflags.dump_typedtree Printtyped.implementation_with_coercion
     in
     let untyped = Translator.only_generate typedtree params in
     let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
@@ -62,6 +57,9 @@ let translate ppf params =
       Typetexp.report_error env Format.std_formatter e;
       Format.printf "\n%!";
       raise exc
+    | Util.TranslatorError e ->
+      Format.eprintf "%a\n%!" Util.report_error e;
+      exit 1
     | x -> raise x
 
 
@@ -86,6 +84,7 @@ let leave_constuctors           = ref false
 let subst_only_util_vars        = ref false
 let output_name_for_spec_tree   = ref None
 let useGT                       = ref false
+let old_ocanren                 = ref false
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -170,6 +169,14 @@ let all_options =
     "-useGT",
     Arg.Unit (fun _ -> useGT := true),
     " Use GT in translated code"
+    ;
+    "-old-ocanren",
+    Arg.Unit (fun _ -> old_ocanren := true),
+    " Generate interface for old oCanren (<0.3): FMap1/2/3, etc."
+    ;
+    "-dtypedtree",
+    Arg.Unit (fun _ -> Clflags.dump_typedtree := true),
+    " Trace typed tree"
   ] @ OcamlcOptions.list
 
 let mk_noCanren_params () =
@@ -208,6 +215,7 @@ let mk_noCanren_params () =
     high_order_paprams = high_order_paprams;
     unnesting_params = unnesting_params;
     useGT = !useGT;
+    old_ocanren = !old_ocanren;
 
     output_name_for_spec_tree = !output_name_for_spec_tree;
   }
@@ -217,8 +225,8 @@ let () =
     try begin
       readenv ppf Before_args;
       translate ppf @@ mk_noCanren_params ()
-    end with Failure     s -> (Printf.printf "%s\n%!" s; Arg.usage all_options usage)
-           | Sys_error   s -> Printf.printf "%s\n%!" s
+    end with Failure     s -> (Printf.eprintf "%s\n%!" s; Arg.usage all_options usage)
+           | Sys_error   s -> Printf.eprintf "%s\n%!" s
            | e             -> begin match Location.error_of_exn e with
                               | Some (`Ok e) -> Location.print_report ppf e
                               | _            -> raise e

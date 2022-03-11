@@ -39,6 +39,7 @@ let translate_high tast start_index params =
     | _                           -> [] in
 
   let rec unnest_constuct e =
+    let loc = Ppxlib.Location.none in
     match e.exp_desc with
     | Texp_constant c ->
       create_inj (Exp.constant (Untypeast.constant c)), []
@@ -62,6 +63,7 @@ let translate_high tast start_index params =
       create_id fr_var, [(fr_var, e)]
 
   and translate_construct expr =
+    let loc = Ppxlib.Location.none in
     let constr, binds = unnest_constuct expr in
     let out_var_name  = create_fresh_var_name () in
     let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
@@ -75,6 +77,7 @@ let translate_high tast start_index params =
     let a2  = create_fresh_var_name () in
     let b   = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     let fst = if is_or then [%expr !!true]  else [%expr !!false] in
     let snd = if is_or then [%expr !!false] else [%expr !!true]  in
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
@@ -90,6 +93,7 @@ let translate_high tast start_index params =
     let b1  = create_fresh_var_name () in
     let b2  = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
     [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
@@ -105,6 +109,7 @@ let translate_high tast start_index params =
     let a  = create_fresh_var_name () in
     let b  = create_fresh_var_name () in
     let q  = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     [%expr fun [%p create_pat a] [%p create_logic_var q] ->
      call_fresh (fun [%p create_pat b] ->
             ([%e create_id a] [%e create_id b]) &&&
@@ -115,6 +120,7 @@ let translate_high tast start_index params =
   and translate_if cond th el =
     let b   = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     [%expr fun [%p create_logic_var q] -> call_fresh (fun [%p create_pat b] ->
         ([%e translate_expression cond] [%e create_id b]) &&& (
           conde [
@@ -151,15 +157,22 @@ let translate_high tast start_index params =
     let two_or_more_mentions tactic var_name expr =
       let rec two_or_more_mentions expr count =
         let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
-        let rec get_pat_vars p =
-          match p.pat_desc with
-          | Tpat_any
-          | Tpat_constant _             -> []
-          | Tpat_var (n, _)             -> [name n]
-          | Tpat_tuple pats
-          | Tpat_construct (_, _, pats) -> List.concat @@ List.map get_pat_vars pats
-          | Tpat_record (l, _)          -> List.concat @@ List.map (fun (_, _, p) -> get_pat_vars p) l
-          | Tpat_alias (t, n, _)        -> name n :: get_pat_vars t in
+        let get_pat_vars =
+          let rec helper: type a . a Typedtree.general_pattern -> _ = fun p ->
+            match p.pat_desc with
+            | Tpat_any
+            | Tpat_constant _             -> []
+            | Tpat_var (n, _)             -> [name n]
+            | Tpat_tuple pats             -> List.concat_map helper pats
+            | Tpat_construct (_, _, pats,_) -> List.concat_map helper pats
+            | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> helper p) l
+            | Tpat_alias (t, n, _)        -> name n :: helper t
+            | Tpat_value x                -> helper (x :> Typedtree.pattern)
+            | Tpat_lazy _ | Tpat_array _ | Tpat_exception _ | Tpat_or (_, _, _)
+            | Tpat_variant _ -> failwith "Not implemented"
+          in
+          helper
+        in
 
         match expr.exp_desc with
         | Texp_constant _ -> count
@@ -176,7 +189,7 @@ let translate_high tast start_index params =
             then List.fold_left eval_if_need count @@ exprs
             else List.fold_left max count @@ List.map (eval_if_need count) exprs
         | Texp_apply (func, args) ->
-          let args = List.map (fun (_, Some a) -> a) args in
+          let args = List.map (function (_, Some a) -> a | (_,None) -> failwith "Not implemented") args in
           List.fold_left eval_if_need count @@ func :: args
         | Texp_ifthenelse (cond, th, Some el) ->
           if tactic = Nondet
@@ -203,6 +216,14 @@ let translate_high tast start_index params =
                                            | _                 -> c
                           ) c' fields
         | Texp_field (e, _, _) -> eval_if_need count e
+        | (Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
+        Texp_setfield (_, _, _, _)|Texp_array _|Texp_sequence (_, _)|
+        Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|Texp_send (_, _, _)|
+        Texp_new (_, _, _)|Texp_instvar (_, _, _)|Texp_setinstvar (_, _, _, _)|
+        Texp_override (_, _)|Texp_letmodule (_, _, _, _, _)|Texp_letexception (_, _)|
+        Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|Texp_letop _|
+        Texp_extension_constructor (_, _)|Texp_open (_, _))
+        | Texp_ifthenelse (_, _, None) -> failwith "Not implemented"
 
   in
       two_or_more_mentions expr 0 >= 2 in
@@ -216,6 +237,7 @@ let translate_high tast start_index params =
 
     let create_simple_arg var =
       let fresh_n = create_fresh_var_name () in
+      let loc = Ppxlib.Location.none in
       create_fun fresh_n [%expr [%e create_id fresh_n] === [%e create_id var]] in
 
     let body, real_vars     = normalize_abstraction case.c_rhs [case.c_lhs] in
@@ -246,7 +268,7 @@ let translate_high tast start_index params =
                                          else translate_expression e
                          | _ -> fail_loc l "Incorrect argument") a)
 
-  and translate_match_without_scrutinee loc cases (typ : Types.type_expr) =
+  and translate_match_without_scrutinee loc (cases: 'a Typedtree.case list) (typ : Types.type_expr) =
     match typ.desc with
       | Tarrow (_, _, r, _) ->
         let new_scrutinee    = create_fresh_var_name () in
@@ -255,10 +277,23 @@ let translate_high tast start_index params =
       | Tlink typ ->  translate_match_without_scrutinee loc cases typ
       | _  -> fail_loc loc "Incorrect type for 'function'"
 
-  and translate_match_with_scrutinee loc s cases typ =
-    translate_match loc (translate_expression s) s.exp_attributes cases typ
+  and translate_match_with_scrutinee : 'a .
+      loc ->
+      Typedtree.expression ->
+      'a Typedtree.case list ->
+      Types.type_expr ->
+      Parsetree.expression =
+    fun (type a) loc s (cases: a Typedtree.case list ) typ ->
+      translate_match loc (translate_expression s) s.exp_attributes cases typ
 
-  and translate_match loc translated_scrutinee attrs cases typ =
+  and translate_match: 'a .
+        loc ->
+        Parsetree.expression ->
+        attributes ->
+        'a Typedtree.case list ->
+        Types.type_expr ->
+        Parsetree.expression
+    = fun (type a) loc translated_scrutinee attrs (cases: a Typedtree.case list) typ ->
     if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats then
       let high_extra_args = create_fresh_argument_names_by_args typ in
       let result_arg = create_fresh_var_name () in
@@ -306,6 +341,7 @@ let translate_high tast start_index params =
       | _                -> false in
 
     let rec get_tabling_rank (typ : Types.type_expr) =
+      let loc = Ppxlib.Location.none in
       match typ.desc with
       | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
       | Tlink typ                   -> get_tabling_rank typ
@@ -341,6 +377,7 @@ let translate_high tast start_index params =
 
         let argument_names4       = create_fresh_argument_names_by_type typ in
         let arguments4            = List.map create_id argument_names4 in
+        let loc = Ppxlib.Location.none in
         let unified_vars1         = List.map2 (fun a b -> [%expr [%e a] === [%e b]]) arguments3 arguments4 in
         let lambda_vars1          = List.map2 create_fun argument_names3 unified_vars1 in
 
@@ -383,7 +420,8 @@ let translate_high tast start_index params =
     let ctor    = ctor_for_record loc typ in
     let mvar    = create_fresh_var_name () in
     let vars    = List.map (fun _ -> create_fresh_var_name ()) fields in
-    let exprs   = List.map (fun (_, Overridden (_, expr)) -> translate_expression expr) fields in
+    let exprs   = List.map (function (_, Overridden (_, expr)) -> translate_expression expr
+                           | (_,Kept _) -> failwith "not implemented" ) fields in
     let calls   = List.map2 (fun e v -> create_apply e [create_id v]) exprs vars in
     let uni     = [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id vars)]] in
     let conj    = create_conj (uni :: calls) in
@@ -493,6 +531,7 @@ let beta_reductor minimal_index only_q =
     | Pexp_ident {txt = Lident name} -> if name = var then subst else expr
     | Pexp_fun (_, _, pat, body) ->
       let name = name_from_pat pat in
+      let loc = Ppxlib.Location.none in
       if name = var then expr else [%expr fun [%p pat] -> [%e substitute body var subst]]
     | Pexp_apply (func, args) ->
       List.map snd args |>
@@ -531,7 +570,8 @@ let beta_reductor minimal_index only_q =
                 | _          -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction" in
       begin match args with
         | arg::args' when need_subst var arg -> beta_reduction (substitute body var arg) args'
-        | _ -> create_apply ([%expr fun [%p pat] -> [%e beta_reduction body []]]) args
+        | _ -> let loc = Ppxlib.Location.none in
+          create_apply ([%expr fun [%p pat] -> [%e beta_reduction body []]]) args
       end
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs  = List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs in
@@ -591,7 +631,7 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
 
     | _ -> [expr], [] in
 
-  let rec normalizer sub expr =
+  let normalizer sub expr =
     let conjs, vars = get_conjs_and_vars expr in
     let conjs = List.map (Ast_mapper.default_mapper.expr sub) conjs in
 
@@ -610,7 +650,9 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
       | _   -> vars_as_apply vars in
 
     if List.length vars > 0
-    then create_apply [%expr fresh] (vars_arg vars :: conjs)
+    then
+      let loc = Ppxlib.Location.none in
+      create_apply [%expr fresh] (vars_arg vars :: conjs)
     else create_conj conjs in
 
     { Ast_mapper.default_mapper with expr = normalizer }
@@ -702,7 +744,7 @@ let call_by_need_creator tree =
       let args = List.map snd args in
       if is_fresh_ident f
       then
-        let vars :: bodies = args in
+        let vars,bodies = List.hd args, List.tl args in
         let vars = convert_fresh_apply_to_vars vars in
         uniq @@ remove_vars vars @@ List.concat @@ List.map fv bodies
       else uniq (fv f @ List.concat (List.map fv args))
@@ -744,6 +786,7 @@ let call_by_need_creator tree =
   let var_is_logic pat = has_attr "logic" pat.ppat_attributes in
 
   let rec update_expr env e =
+    let loc = Ppxlib.Location.none in
     match e.pexp_desc with
     | Pexp_ident {txt = Lident name} ->
       if is_ctor e || snd (lookup name env) = First then e
@@ -756,11 +799,13 @@ let call_by_need_creator tree =
       if name = "&&&" || name = "|||" || name = "conde" then
         create_apply f @@ List.map (update_expr env) args
       else if name = "fresh" then
-        let v::conjs = args in
-        let vars = convert_fresh_apply_to_vars v in
-        let new_env = List.map (fun x -> (x, First)) vars @ env in
-        let new_conjs = List.map (update_expr new_env) conjs in
-        create_apply f (v::new_conjs)
+        match args with
+        | v::conjs ->
+            let vars = convert_fresh_apply_to_vars v in
+            let new_env = List.map (fun x -> (x, First)) vars @ env in
+            let new_conjs = List.map (update_expr new_env) conjs in
+            create_apply f (v::new_conjs)
+        | [] -> failwith "not implemented"
       else
         let need_tabling = List.map (fun a -> expr_is_logic a && not @@ is_unify_expr a) args in
         let new_args = List.map2 (update_arg env) args need_tabling in
@@ -785,6 +830,7 @@ let call_by_need_creator tree =
       | None -> vars
       | Some n -> List.filter ((<>) n) vars in
     let f, h = split_vars env vars in
+    let loc = Ppxlib.Location.none in
     let h_part =
       match h with
       | []      -> [%expr []]
@@ -852,7 +898,7 @@ let only_generate tast params =
     eval_if_need params.normalization
                  (let mapper = fresh_and_conjs_normalizer params.move_unifications in mapper.structure mapper) |>
     eval_if_need params.high_order_paprams.use_call_by_need call_by_need_creator |>
-    Put_distrib.process params.useGT |>
+    Put_distrib.process ~old_ocanren:params.old_ocanren params.useGT |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>
     print_if Format.std_formatter Clflags.dump_source Pprintast.structure
   with

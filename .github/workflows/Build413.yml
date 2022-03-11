@@ -1,0 +1,68 @@
+name: Build413
+
+on:
+  push:
+    paths-ignore:
+      # do not run CI if we are writing a paper
+      # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-ignoring-paths
+    branches:
+      - dune-4.13
+
+  #schedule:
+  # - cron: "0 13 * * 1"
+  #   https://jasonet.co/posts/scheduled-actions/
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+        ocaml-compiler:
+          - 4.13.x
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.7.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: true
+          cache-prefix: v21
+
+      - run: opam pin add . --no-action
+
+      - name: Installing depexts
+        run: opam depext noCanren --yes --with-test
+
+      - name: Installing dependencies
+        run: opam install . --deps-only --with-test
+
+      - name: Building
+        run: opam exec -- dune build --profile=release -p noCanren
+
+      - name: Installing dependencies for testing
+        run: opam exec -- dune external-lib-deps -p noCanren-tests . --missing | cut -f1 | xargs opam install --yes GT
+
+      - name: Testing
+        run: opam exec -- dune runtest --profile=release -p noCanren,noCanren-tests
+
+      - name: Installing a package
+        run: |
+          opam exec -- dune build @install -p noCanren --profile=release
+          #opam exec -- dune install --profile=release noCanren
+          opam install noCanren --yes
+
+      - name: Listing files
+        run: |
+          opam show noCanren --list-files

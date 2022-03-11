@@ -33,6 +33,7 @@ let translate tast start_index params =
   (*************************************************)
 
   let rec unnest_expr let_vars expr =
+    let loc = expr.exp_loc in
     match expr.exp_desc with
     | Texp_ident (_, { txt = Longident.Lident name }, _) when List.for_all ((<>) name) let_vars -> untyper.expr untyper expr, []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), []
@@ -66,7 +67,7 @@ let translate tast start_index params =
   and translate_construct let_vars expr =
     let constr, binds = unnest_expr let_vars expr in
     let out_var_name  = create_fresh_var_name () in
-    let unify_constr  = [%expr [%e create_id out_var_name] === [%e constr]] in
+    let unify_constr  = let loc = Ppxlib.Location.none in [%expr [%e create_id out_var_name] === [%e constr]] in
     let conjs         = unify_constr :: List.map (fun (v,e) -> create_apply (translate_expression let_vars e) [create_id v]) binds in
     let conj          = create_conj conjs in
     let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
@@ -76,6 +77,7 @@ let translate tast start_index params =
   and translate_ident let_vars name typ =
     if is_primary_type typ && List.for_all ((<>) name) let_vars
       then let var = create_fresh_var_name () in
+           let loc = Ppxlib.Location.none in
            [%expr fun [%p create_pat var] -> [%e create_id name] === [%e create_id var]]
       else create_id name
 
@@ -111,6 +113,7 @@ let translate tast start_index params =
      let transl_expr = translate_expression let_vars expr in
      if is_primary_type expr.exp_type
      then let new_var = create_fresh_var_name () in
+      let loc = Ppxlib.Location.none in
       [%expr fun [%p create_pat new_var] -> [%e create_apply transl_expr [create_id new_var] |> let_part]]
      else let_part transl_expr
 
@@ -147,6 +150,7 @@ let translate tast start_index params =
       | _                -> false in
 
     let rec get_tabling_rank (typ : Types.type_expr) =
+      let loc = Ppxlib.Location.none in
       match typ.desc with
       | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
       | Tlink typ                   -> get_tabling_rank typ
@@ -165,6 +169,7 @@ let translate tast start_index params =
          else let name = get_pat_name bind.vb_pat in
               let abst = create_fun name body in
               let rank = get_tabling_rank typ in
+              let loc = Ppxlib.Location.none in
               let appl = create_apply [%expr Tabling.tabledrec] [rank; abst] in
               let let_part = Exp.let_ Nonrecursive [Vb.mk (untyper.pat untyper bind.vb_pat) appl] in
               eta_form_for_let let_part let_vars expr
@@ -175,7 +180,7 @@ let translate tast start_index params =
     | Nonrecursive -> translate_nonrec_let let_vars bind expr
 
 
-  and translate_match let_vars loc expr cases typ =
+  and translate_match (type a) let_vars loc expr (cases : a Typedtree.case list  ) typ =
     let args = create_fresh_argument_names_by_type typ in
 
     let scrutinee_is_var =
@@ -195,7 +200,7 @@ let translate tast start_index params =
       | Pexp_apply (f, args) -> List.map snd args |> List.map (rename var1 var2) |> create_apply f
       | _ -> pat in
 
-    let translate_case case =
+    let translate_case (type a) (case: a Typedtree.case) : _ =
       let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
       let is_overlap     = List.mem scrutinee_var vars in
       let new_var        = if is_overlap then create_fresh_var_name () else "" in
@@ -223,6 +228,7 @@ let translate tast start_index params =
     else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bool_funs is_or =
+    let loc = Ppxlib.Location.none in
     if params.unnesting_params.use_standart_bool_relations then
       if is_or then [%expr Bool.oro] else [%expr Bool.ando]
       else
@@ -246,6 +252,7 @@ let translate tast start_index params =
     let a1  = create_fresh_var_name () in
     let a2  = create_fresh_var_name () in
     let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
     let fst = if is_eq then [%expr !!true]  else [%expr !!false] in
     let snd = if is_eq then [%expr !!false] else [%expr !!true]  in
     if params.unnesting_params.remove_false then
@@ -257,6 +264,7 @@ let translate tast start_index params =
                     ([%e create_id a1] =/= [%e create_id a2]) &&& ([%e create_id q] === [%e snd])]]
 
   and translate_not_fun () =
+    let loc = Ppxlib.Location.none in
     if params.unnesting_params.use_standart_bool_relations then [%expr Bool.noto]
     else
       let a  = create_fresh_var_name () in
@@ -282,6 +290,7 @@ let translate tast start_index params =
   let th = create_apply (translate_expression let_vars th) (List.map create_id args) in
   let el = create_apply (translate_expression let_vars el) (List.map create_id args) in
 
+  let loc = Ppxlib.Location.none in
   let body = [%expr conde [([%e create_id cond_var] === !!true ) &&& [%e th];
                            ([%e create_id cond_var] === !!false) &&& [%e el]]]
   in
@@ -297,7 +306,7 @@ let translate tast start_index params =
     | Texp_constant _          -> translate_construct let_vars expr
     | Texp_construct _         -> translate_construct let_vars expr
 
-    | Texp_tuple [l; r]        -> translate_construct let_vars expr
+    | Texp_tuple [_; _]        -> translate_construct let_vars expr
 
     | Texp_apply _             -> translate_apply let_vars expr
 

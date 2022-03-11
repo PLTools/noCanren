@@ -7,7 +7,26 @@ open Tester
 open Bridge
 
 (*************************************************)
-
+module Gperson = struct
+  [%%distrib
+  type nonrec  t = Bridge.gperson =
+    | A
+    | B
+    | C
+    | D
+  [@@deriving gt ~options:{show; gmap}]
+  type nonrec ground = t
+  ]
+end
+module Gstep = struct
+  [%%distrib
+  type nonrec 'a0 t = 'a0 Bridge.gstep =
+  | One of 'a0
+  | Two of 'a0 * 'a0
+  [@@deriving gt ~options:{show; gmap}]
+  type nonrec ground = Gperson.ground t
+  ]
+end
 let show_person = function
  | A -> "A"
  | B -> "B"
@@ -28,6 +47,6 @@ let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
 let getAnswer_o q t r = getAnswer_o ((===) q) t r
 
 let _ =
-  run_exn myshow (1) q qh ("answers", fun q ->
+  run_r (Std.List.prj_exn Gstep.prj_exn) myshow (1) q qh ("answers", fun q ->
     getAnswer_o q standartTimes_o (int2nat 17 |> some)
   )

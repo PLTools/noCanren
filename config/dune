@@ -1,0 +1,3 @@
+(executable
+ (name gentests)
+ (libraries str stdio base))

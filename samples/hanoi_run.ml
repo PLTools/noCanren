@@ -17,9 +17,9 @@ let show_lstick = show logic show_stick
 
 let show_answer  = show List.ground @@ show Pair.ground show_stick  show_stick
 let lshow_answer = show List.logic  @@ show Pair.logic  show_lstick show_lstick
-let reify_answer x = List.reify (Pair.reify OCanren.reify OCanren.reify) x
+let reify_answer = List.reify (Pair.reify OCanren.reify OCanren.reify)
 
-let run x = runR reify_answer show_answer lshow_answer x
+let run x = run_r reify_answer lshow_answer x
 
 (*************************************************)
 

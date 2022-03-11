@@ -37,6 +37,7 @@ type noCanren_params =
     high_order_paprams        : noCanren_high_params;
     unnesting_params          : noCanren_unnesting_params;
     useGT                    : bool;
+    old_ocanren               : bool;
 
     output_name_for_spec_tree : string option;
   }
@@ -68,13 +69,7 @@ let report_error fmt  = function
 
 
 let fail_loc loc fmt =
-  let b = Buffer.create 100 in
-  let f = Format.formatter_of_buffer b in
-  let () = Format.fprintf f fmt in
-  let () = Format.fprintf f ". " in
-  let () = Location.print_loc f loc in
-  Format.pp_print_flush f ();
-  failwith (Buffer.contents b)
+  Format.kasprintf (fun s -> failwith (Format.asprintf "%s. %a" s Location.print_loc loc)) fmt
 
 (************************** Util funcions *******************************)
 
@@ -179,6 +174,7 @@ let create_apply f = function
 
 
 let create_apply_to_list f arg_list =
+  let loc = f.pexp_loc in
   let new_arg = List.fold_right (fun x acc -> [%expr [%e x] :: [%e acc]]) arg_list [%expr []] in
   create_apply f [new_arg]
 
@@ -186,26 +182,30 @@ let create_apply_to_list f arg_list =
 let create_conj = function
 | []     -> failwith "Conjunction needs one or more arguments"
 | [x]    -> x
-| [x; y] -> [%expr [%e x] &&& [%e y]]
-| l      -> create_apply_to_list [%expr (?&)] l
+| [x; y] -> let loc = Ppxlib.Location.none in [%expr [%e x] &&& [%e y]]
+| l      -> let loc = Ppxlib.Location.none in create_apply_to_list [%expr (?&)] l
 
 
 let create_disj = function
 | []     -> failwith "Conjunction needs one or more arguments"
 | [x]    -> x
-| [x; y] -> [%expr [%e x] ||| [%e y]]
-| l      -> create_apply_to_list [%expr conde] l
+| [x; y] -> let loc = Ppxlib.Location.none in [%expr [%e x] ||| [%e y]]
+| l      -> let loc = Ppxlib.Location.none in create_apply_to_list [%expr conde] l
 
 
 let create_fun var body =
+  let loc = Ppxlib.Location.none in
   [%expr fun [%p create_pat var] -> [%e body]]
 
 
 let create_fresh var body =
+  let loc = Ppxlib.Location.none in
   create_apply [%expr call_fresh] [create_fun var body]
 
 
-let create_inj expr = [%expr !! [%e expr]]
+let create_inj expr =
+  let loc = Ppxlib.Location.none in
+  [%expr !! [%e expr]]
 
 
 let rec path2ident = function
@@ -253,74 +253,95 @@ let is_active_arg pat =
 let create_logic_var name =
   { (create_pat name) with ppat_attributes = [Attr.mk (mknoloc "logic") (Parsetree.PStr [])] }
 
+let have_unifier =
+  let rec helper: type a b. a Typedtree.pattern_desc pattern_data -> b Typedtree.pattern_desc pattern_data -> bool
+  = fun p1 p2 ->
+    match p1.pat_desc, p2.pat_desc with
+    | Tpat_any  , _ | _, Tpat_any
+    | Tpat_var _, _ | _, Tpat_var _ -> true
+    | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
+    | Tpat_tuple t1, Tpat_tuple t2 ->
+      List.length t1 = List.length t2 && List.for_all2 helper t1 t2
+    | Tpat_construct (_, cd1, a1, _), Tpat_construct (_, cd2, a2,_) ->
+      cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 helper a1 a2
+    | Tpat_value v1, Tpat_value v2  ->
+        helper
+          (v1 :> Typedtree.value Typedtree.general_pattern)
+          (v2 :> Typedtree.value Typedtree.general_pattern)
+    | Tpat_exception _, _
+    | _, Tpat_exception _
+    | _ -> false
+  in
+  helper
 
-let rec have_unifier p1 p2 =
-  match p1.pat_desc, p2.pat_desc with
-  | Tpat_any  , _ | _, Tpat_any
-  | Tpat_var _, _ | _, Tpat_var _ -> true
-  | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
-  | Tpat_tuple t1, Tpat_tuple t2 ->
-    List.length t1 = List.length t2 && List.for_all2 have_unifier t1 t2
-  | Tpat_construct (_, cd1, a1), Tpat_construct (_, cd2, a2) ->
-    cd1.cstr_name = cd2.cstr_name && List.length a1 = List.length a2 && List.for_all2 have_unifier a1 a2
-  | _ -> false
+let translate_pat pat fresher =
+  let rec helper : type a . a Typedtree.pattern_desc pattern_data -> _ = fun pat ->
+    let open Typedtree in
+    let loc = pat.pat_loc in
+    match pat.pat_desc with
+    | Tpat_any                                       -> let var = fresher () in create_id var, [], [var]
+    | Tpat_var (v, _)                                -> create_id (name v), [], [name v]
+    | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, [], []
+    | Tpat_construct ({txt = Lident "true"},  _, [], _) -> [%expr !!true],  [], []
+    | Tpat_construct ({txt = Lident "false"}, _, [], _) -> [%expr !!false], [], []
+    | Tpat_construct ({txt = Lident "[]"},    _, [], _) -> [%expr [%e mark_constr [%expr nil]] ()], [], []
+    | Tpat_construct (id              ,       _, [], _) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
+    | Tpat_value x ->
+      helper (x :> (Typedtree.value Typedtree.general_pattern))
+    | Tpat_construct ({txt}, _, args, _)                ->
+      let args, als, vars = List.map (fun q -> helper q) args |> split3 in
+      let vars = List.concat vars in
+      let als  = List.concat als  in
+      let constr =
+        match txt with
+        | Lident "::" -> [%expr (%)]
+        | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
+      create_apply (mark_constr constr) args, als, vars
+    | Tpat_tuple l ->
+      let args, als, vars = List.map helper l |> split3 in
+      let vars = List.concat vars in
+      let als  = List.concat als in
+      fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, als, vars
+    | Tpat_record (fields, _) ->
+      let (_, info, _) = List.hd fields in
+      let count = Array.length info.lbl_all in
+      let rec translate_record_pat fresher fields index =
+        if index == count then [], [], [] else
+        match fields with
+        | (_, (i : Types.label_description), _) :: _xs when i.lbl_pos > index ->
+          let var        = fresher () in
+          let pats, als, vars = translate_record_pat fresher fields (index+1) in
+          create_id var :: pats, als, var :: vars
+        | (_, _i, p) :: xs ->
+          let pat , als,  vars  = helper p in
+          let pats, als', vars' = translate_record_pat fresher xs (index+1) in
+          pat :: pats, als @ als', vars @ vars'
+        | [] ->
+          let var       = fresher () in
+          let pats, als, vars = translate_record_pat fresher [] (index+1) in
+          create_id var :: pats, als, var :: vars in
+      let args, als, vars = translate_record_pat fresher fields 0 in
+      let ctor            = ctor_for_record pat.pat_loc pat.pat_type in
+      create_apply ctor args, als, vars
+    | Tpat_alias (p, v, _) ->
+      let pat, als, vars = helper p in
+      create_id (name v), (create_id (name v), pat) :: als, name v :: vars
+    | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
+  in
+  helper pat
 
 
-let rec translate_pat pat fresher =
-  match pat.pat_desc with
-  | Tpat_any                                       -> let var = fresher () in create_id var, [], [var]
-  | Tpat_var (v, _)                                -> create_id (name v), [], [name v]
-  | Tpat_constant c                                -> Untypeast.constant c |> Exp.constant |> create_inj, [], []
-  | Tpat_construct ({txt = Lident "true"},  _, []) -> [%expr !!true],  [], []
-  | Tpat_construct ({txt = Lident "false"}, _, []) -> [%expr !!false], [], []
-  | Tpat_construct ({txt = Lident "[]"},    _, []) -> [%expr [%e mark_constr [%expr nil]] ()], [], []
-  | Tpat_construct (id              ,       _, []) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
-  | Tpat_construct ({txt}, _, args)                ->
-    let args, als, vars = List.map (fun q -> translate_pat q fresher) args |> split3 in
-    let vars = List.concat vars in
-    let als  = List.concat als  in
-    let constr =
-      match txt with
-      | Lident "::" -> [%expr (%)]
-      | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
-    create_apply (mark_constr constr) args, als, vars
-  | Tpat_tuple l ->
-    let args, als, vars = List.map (fun q -> translate_pat q fresher) l |> split3 in
-    let vars = List.concat vars in
-    let als  = List.concat als in
-    fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, als, vars
-  | Tpat_record (fields, _) ->
-    let (_, info, _) = List.hd fields in
-    let count = Array.length info.lbl_all in
-    let rec translate_record_pat fresher fields index =
-      if index == count then [], [], [] else
-      match fields with
-      | (_, (i : Types.label_description), _) :: xs when i.lbl_pos > index ->
-        let var        = fresher () in
-        let pats, als, vars = translate_record_pat fresher fields (index+1) in
-        create_id var :: pats, als, var :: vars
-      | (_, i, p) :: xs ->
-        let pat , als,  vars  = translate_pat p fresher in
-        let pats, als', vars' = translate_record_pat fresher xs (index+1) in
-        pat :: pats, als @ als', vars @ vars'
-      | [] ->
-        let var       = fresher () in
-        let pats, als, vars = translate_record_pat fresher [] (index+1) in
-        create_id var :: pats, als, var :: vars in
-    let args, als, vars = translate_record_pat fresher fields 0 in
-    let ctor            = ctor_for_record pat.pat_loc pat.pat_type in
-    create_apply ctor args, als, vars
-  | Tpat_alias (p, v, _) ->
-    let pat, als, vars = translate_pat p fresher in
-    create_id (name v), (create_id (name v), pat) :: als, name v :: vars
-  | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
-
-
-let rec is_disj_pats = function
+let is_disj_pats =
+  let helper (type a)
+    (self: a Typedtree.pattern_desc pattern_data list -> bool) (xs : a Typedtree.pattern_desc pattern_data list) : bool =
+  match xs with
   | []      -> true
-  | x :: xs -> not (List.exists (have_unifier x) xs) && is_disj_pats xs
+  | x :: xs -> not (List.exists (have_unifier x) xs) && self xs
+  in
+  let rec ans eta = helper ans eta in
+  ans
 
-let rec id2id_o = function
+let id2id_o = function
   | Lident s    -> Lident (s ^ "_o")
   | Ldot (t, s) -> Ldot (t, s ^ "_o")
   | _           -> failwith "id2id_o: undexpected ID"

@@ -1,3 +1,15 @@
+| Upstream master         | Kakadu dune          | Kakadu 4.13          | Kakadu 4.13 + eucpp  |
+| ------------------------|----------------------|----------------------|----------------------|
+| [![noCanren][1]][2]     | [![noCanren][3]][4]  | [![noCanren][5]][4]  | [![noCanren][6]][4]  |
+
+
+[1]:  https://github.com/Lozov-Petr/noCanren/workflows/XXXXXXXX/badge.svg?branch=master
+[2]:  https://github.com/Lozov-Petr/noCanren/actions
+[3]:  https://github.com/Kakadu/noCanren/workflows/Build/badge.svg?branch=dune
+[4]:  https://github.com/Kakadu/noCanren/actions
+[5]:  https://github.com/Kakadu/noCanren/workflows/Build413/badge.svg?branch=dune-4.13
+[6]:  https://github.com/Kakadu/noCanren/workflows/Build413eucpp/badge.svg?branch=dune-4.13-eucpp
+
 # README #
 
 noCanren is translator from subset of OCaml to OCanren.

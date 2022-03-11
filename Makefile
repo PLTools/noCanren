@@ -1,90 +1,73 @@
-OB = ocamlbuild -use-ocamlfind -classic-display
+#TESTS   = bottles bridge einstein GCW hanoi hanoi2
+#SAMPLES = bottles bridge einstein GCW hanoi hanoi2 hm_inferencer logic_interpreter lorry scheme_interpreter sudoku4x4 unify
 
-TESTS   = bottles bridge einstein GCW hanoi hanoi2
-SAMPLES = bottles bridge einstein GCW hanoi hanoi2 hm_inferencer logic_interpreter lorry scheme_interpreter sudoku4x4 unify
-
-
+.PHONY: compile discover_tests
 compile:
-	$(OB) -I src noCanren.native
+	dune build
 
-multifiles_test_compile:
-	mkdir -p _build/samples/multifiles/orig
-	mkdir -p regression/multifiles
+discover_tests:
+	dune build config/gentests.exe && _build/default/config/gentests.exe samples > samples/dune
 
-	cp samples/multifiles/test_nat.ml2mk.ml _build/samples/multifiles/orig/test_nat.ml2mk.ml
-	cp samples/multifiles/test_add.ml2mk.ml _build/samples/multifiles/orig/test_add.ml2mk.ml
-	cp samples/multifiles/test_mul.ml2mk.ml _build/samples/multifiles/orig/test_mul.ml2mk.ml
+#multifiles_test_compile:
+#	mkdir -p _build/samples/multifiles/orig
+#	mkdir -p regression/multifiles
 
-	./noCanren.native -o regression/multifiles/test_nat.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_nat.ml2mk.ml
-	cp _build/samples/multifiles/orig/test_nat.ml2mk.cmi _build/samples/multifiles/orig/test_nat.cmi
+#	cp samples/multifiles/test_nat.ml2mk.ml _build/samples/multifiles/orig/test_nat.ml2mk.ml
+#	cp samples/multifiles/test_add.ml2mk.ml _build/samples/multifiles/orig/test_add.ml2mk.ml
+#	cp samples/multifiles/test_mul.ml2mk.ml _build/samples/multifiles/orig/test_mul.ml2mk.ml
 
-	./noCanren.native -o regression/multifiles/test_add.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_add.ml2mk.ml
-	cp _build/samples/multifiles/orig/test_add.ml2mk.cmi _build/samples/multifiles/orig/test_add.cmi
+#	./noCanren.native -o regression/multifiles/test_nat.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_nat.ml2mk.ml
+#	cp _build/samples/multifiles/orig/test_nat.ml2mk.cmi _build/samples/multifiles/orig/test_nat.cmi
 
-	./noCanren.native -o regression/multifiles/test_mul.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_mul.ml2mk.ml
+#	./noCanren.native -o regression/multifiles/test_add.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_add.ml2mk.ml
+#	cp _build/samples/multifiles/orig/test_add.ml2mk.cmi _build/samples/multifiles/orig/test_add.cmi
 
-	$(OB) -Is samples/multifiles,regression/multifiles mul_run.native
+#	./noCanren.native -o regression/multifiles/test_mul.ml -I _build/samples/multifiles/orig/ _build/samples/multifiles/orig/test_mul.ml2mk.ml
 
-define TESTRULES
+#	$(OB) -Is samples/multifiles,regression/multifiles mul_run.native
 
-test_$(1):
-	mkdir -p regression/output
-	mkdir -p _build/regression/
-	cp samples/$(1).ml2mk.ml _build/regression/$(1).ml2mk.ml
-	./noCanren.native -o regression/output/$(1).ml _build/regression/$(1).ml2mk.ml
-	$(OB) -Is samples,regression/output $(1)_run.native
+#define TESTRULES
+#
+#test_$(1):
+#	mkdir -p regression/output
+#	mkdir -p _build/regression/
+#	cp samples/$(1).ml2mk.ml _build/regression/$(1).ml2mk.ml
+#	./noCanren.native -o regression/output/$(1).ml _build/regression/$(1).ml2mk.ml
+#	$(OB) -Is samples,regression/output $(1)_run.native
+#
+#promote_test_$(1):
+#	mkdir -p regression/orig
+#	./$(1)_run.native > regression/orig/$(1).log
+#	./noCanren.native -o regression/orig/$(1).ml samples/$(1).ml2mk.ml
+#
+#endef
+#$(foreach i,$(TESTS),$(eval $(call TESTRULES,$(i))))
 
-promote_test_$(1):
-	mkdir -p regression/orig
-	./$(1)_run.native > regression/orig/$(1).log
-	./noCanren.native -o regression/orig/$(1).ml samples/$(1).ml2mk.ml
+#define SAMPLERULES
 
-endef
-$(foreach i,$(TESTS),$(eval $(call TESTRULES,$(i))))
+#sample_$(1):
+#	mkdir -p regression/output
+#	mkdir -p _build/samples/
+#	cp samples/$(1).ml2mk.ml _build/samples/$(1).ml2mk.ml
+#	cp samples/$(1)_run.ml _build/samples/$(1)_run.ml
+#	./noCanren.native -o regression/output/$(1).ml _build/samples/$(1).ml2mk.ml
+#	$(OB) -Is samples,regression/output $(1)_run.native
 
-define SAMPLERULES
-
-sample_$(1):
-	mkdir -p regression/output
-	mkdir -p _build/samples/
-	cp samples/$(1).ml2mk.ml _build/samples/$(1).ml2mk.ml
-	cp samples/$(1)_run.ml _build/samples/$(1)_run.ml
-	./noCanren.native -o regression/output/$(1).ml _build/samples/$(1).ml2mk.ml
-	$(OB) -Is samples,regression/output $(1)_run.native
-
-endef
-$(foreach i,$(SAMPLES),$(eval $(call SAMPLERULES,$(i))))
+#endef
+#$(foreach i,$(SAMPLES),$(eval $(call SAMPLERULES,$(i))))
 
 compile_tests:
-	$(foreach T, $(TESTS), make test_$(T);)
+	dune build samples/
 
 promote_tests:
-	$(foreach T, $(TESTS), make promote_test_$(T);)
+	dune runtest --auto-promote
 
-test: compile_tests
-	$(foreach T, $(TESTS), \
-		./$(T)_run.native > regression/output/$(T).log; \
-		if diff -u regression/orig/${T}.log regression/output/${T}.log > regression/output/${T}.log.diff; \
-			then \
-				rm regression/output/${T}.log.diff; \
-				if diff -u regression/orig/${T}.ml regression/output/${T}.ml > regression/output/${T}.ml.diff; \
-					then \
-						rm regression/output/${T}.ml.diff; \
-						echo "${T}: PASSED"; \
-					else echo "${T}: FAILED (see regression/output/${T}.ml.diff)"; \
-				fi; \
-			else echo "${T}: FAILED (see regression/output/${T}.log.diff)"; \
-		fi;)
+test:
+	dune runtest
 
-clean_tests:
-	$(RM) -r regression/output
-	$(RM) -r regression/multifiles
-
-clean: clean_tests
-	$(RM) -r _build *.native *.log regression/*.ml
-
-sanitize:
-	$(RM) micro/*.cmi samples/*.cmi samples/multifiles/*.cmi
+clean:
+	dune clean
 
 install:
-	cp -i _build/src/noCanren.native $(PREFIX)/bin/noCanren
+	dune build @install
+	dune install noCanren
