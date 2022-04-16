@@ -25,7 +25,7 @@ let translate tast start_index params =
     name in
 
   let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
-    match typ.desc with
+    match Types.get_desc typ with
     | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
     | Tlink typ                   -> create_fresh_argument_names_by_type typ
     | _                           -> [create_fresh_var_name ()] in
@@ -138,20 +138,20 @@ let translate tast start_index params =
 
   and translate_rec_let let_vars bind expr =
     let rec is_func_type (t : Types.type_expr) =
-      match t.desc with
+      match Types.get_desc t with
       | Tarrow _ -> true
       | Tlink t' -> is_func_type t'
       | _        -> false in
 
     let rec has_func_arg (t : Types.type_expr) =
-      match t.desc with
+      match Types.get_desc t with
       | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
       | Tlink t'         -> has_func_arg t'
       | _                -> false in
 
     let rec get_tabling_rank (typ : Types.type_expr) =
       let loc = Ppxlib.Location.none in
-      match typ.desc with
+      match Types.get_desc typ with
       | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
       | Tlink typ                   -> get_tabling_rank typ
       | _                           -> [%expr Tabling.one] in

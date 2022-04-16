@@ -36,6 +36,7 @@
    (>= "0.3.0~"))
   (odoc :with-doc)
   (ocamlformat :with-test)
+  ppx_optcomp
   ppxlib
-  ; After adding dependencies to 'dune' files and the same dependecies here too
+  ;
   ))
