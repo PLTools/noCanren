@@ -592,7 +592,7 @@ let beta_reductor minimal_index only_q =
 
 (*****************************************************************************************************************************)
 
-let fresh_and_conjs_normalizer need_move_unifies_up =
+let fresh_and_conjs_normalizer params =
 
   let has_heavy_attr e = List.exists (fun a -> a.attr_name.txt = "heavy") e.pexp_attributes in
 
@@ -637,7 +637,7 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
     let conjs = List.map (Ast_mapper.default_mapper.expr sub) conjs in
 
     let conjs =
-      if need_move_unifies_up then
+      if params.move_unifications then
         let unifies, conjs, heavies = split_conjs conjs in
         unifies @ conjs @ heavies
       else conjs in
@@ -653,7 +653,9 @@ let fresh_and_conjs_normalizer need_move_unifies_up =
     if List.length vars > 0
     then
       let loc = Ppxlib.Location.none in
-      create_apply [%expr fresh] (vars_arg vars :: conjs)
+      if params.syntax_extenstions then
+        create_apply [%expr fresh] (vars_arg vars :: conjs)
+      else List.fold_right create_fresh vars (create_conj conjs)
     else create_conj conjs in
 
     { Ast_mapper.default_mapper with expr = normalizer }
@@ -897,7 +899,7 @@ let only_generate tast params =
     eval_if_need params.beta_reduction
                  (reductor.structure reductor) |>
     eval_if_need params.normalization
-                 (let mapper = fresh_and_conjs_normalizer params.move_unifications in mapper.structure mapper) |>
+                 (let mapper = fresh_and_conjs_normalizer params in mapper.structure mapper) |>
     eval_if_need params.high_order_paprams.use_call_by_need call_by_need_creator |>
     Put_distrib.process ~old_ocanren:params.old_ocanren params.useGT |>
     print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation |>

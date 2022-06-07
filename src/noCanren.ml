@@ -85,6 +85,7 @@ let subst_only_util_vars        = ref false
 let output_name_for_spec_tree   = ref None
 let useGT                       = ref false
 let old_ocanren                 = ref false
+let syntax_extenstions          = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -177,6 +178,10 @@ let all_options =
     "-dtypedtree",
     Arg.Unit (fun _ -> Clflags.dump_typedtree := true),
     " Trace typed tree"
+    ;
+    "-remove-syntax-extensions",
+    Arg.Unit (fun _ -> syntax_extenstions := false),
+    " Remove suntax extensions ('call_fresh' instead of 'fresh')"
   ] @ OcamlcOptions.list
 
 let mk_noCanren_params () =
@@ -216,6 +221,7 @@ let mk_noCanren_params () =
     unnesting_params = unnesting_params;
     useGT = !useGT;
     old_ocanren = !old_ocanren;
+    syntax_extenstions = !syntax_extenstions;
 
     output_name_for_spec_tree = !output_name_for_spec_tree;
   }

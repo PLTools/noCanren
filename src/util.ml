@@ -45,8 +45,9 @@ type noCanren_params =
     subst_only_util_vars      : bool;
     high_order_paprams        : noCanren_high_params;
     unnesting_params          : noCanren_unnesting_params;
-    useGT                    : bool;
+    useGT                     : bool;
     old_ocanren               : bool;
+    syntax_extenstions        : bool;
 
     output_name_for_spec_tree : string option;
   }
