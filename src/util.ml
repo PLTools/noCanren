@@ -5,6 +5,15 @@ open Ast_helper
 open Ident
 open Parsetree
 
+[%%if ocaml_version >= (4, 14, 0)]
+module Types = Types
+[%%else]
+module Types = struct
+  include Types
+  let get_desc {desc} = desc
+end
+[%%endif]
+
 (**************************** Util types ********************************)
 
 type tactic = Off | Nondet | Det
@@ -146,7 +155,7 @@ let create_pat s = mknoloc s |> Pat.var
 
 
 let rec is_primary_type (t : Types.type_expr) =
-  match t.desc with
+  match Types.get_desc t with
   | Tarrow _ -> false
   | Tlink t' -> is_primary_type t'
   | _        -> true
@@ -216,7 +225,7 @@ let rec path2ident = function
 
 let ctor_for_record loc typ =
   let rec get_id (typ : Types.type_expr) =
-    match typ.desc with
+    match Types.get_desc typ with
     | Tlink t           -> get_id t
     | Tconstr (p, _, _) -> begin match path2ident p with
                            | Lident i    -> Lident ("ctor_g" ^ i)

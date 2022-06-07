@@ -12,12 +12,13 @@ homepage: "https://github.com/Lozov-Petr/noCanren"
 bug-reports: "https://github.com/Lozov-Petr/noCanren/issues"
 depends: [
   "dune" {>= "2.8"}
-  "ocaml" {>= "4.13" & < "4.14"}
+  "ocaml" {>= "4.13"}
   "GT"
   "OCanren" {>= "0.3.0~"}
   "OCanren-ppx" {>= "0.3.0~"}
   "odoc" {with-doc}
   "ocamlformat" {with-test}
+  "ppx_optcomp"
   "ppxlib"
 ]
 build: [

@@ -26,14 +26,14 @@ let translate_high tast start_index params =
     name in
 
   let rec create_fresh_argument_names_by_type (typ : Types.type_expr) =
-    match typ.desc with
+    match Types.get_desc typ with
     | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_type right_typ
     | Tlink typ                   -> create_fresh_argument_names_by_type typ
     | _                           -> [] in
 
 
   let rec create_fresh_argument_names_by_args (typ : Types.type_expr) =
-    match typ.desc with
+    match Types.get_desc typ with
     | Tarrow (_, _, right_typ, _) -> create_fresh_var_name () :: create_fresh_argument_names_by_args right_typ
     | Tlink typ                   -> create_fresh_argument_names_by_args typ
     | _                           -> [] in
@@ -147,7 +147,7 @@ let translate_high tast start_index params =
 
     let eta_extension expr =
       let rec get_arg_types (typ : Types.type_expr) =
-        match typ.desc with
+        match Types.get_desc typ with
         | Tarrow (_, l, r, _) -> l :: get_arg_types r
         | Tlink typ           -> get_arg_types typ
         | _                   -> [] in
@@ -218,12 +218,13 @@ let translate_high tast start_index params =
         | Texp_field (e, _, _) -> eval_if_need count e
         | (Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
         Texp_setfield (_, _, _, _)|Texp_array _|Texp_sequence (_, _)|
-        Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|Texp_send (_, _, _)|
+        Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|
         Texp_new (_, _, _)|Texp_instvar (_, _, _)|Texp_setinstvar (_, _, _, _)|
         Texp_override (_, _)|Texp_letmodule (_, _, _, _, _)|Texp_letexception (_, _)|
         Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|Texp_letop _|
         Texp_extension_constructor (_, _)|Texp_open (_, _))
-        | Texp_ifthenelse (_, _, None) -> failwith "Not implemented"
+        | Texp_ifthenelse (_, _, None)
+        | _ -> failwith "Not implemented"
 
   in
       two_or_more_mentions expr 0 >= 2 in
@@ -269,7 +270,7 @@ let translate_high tast start_index params =
                          | _ -> fail_loc l "Incorrect argument") a)
 
   and translate_match_without_scrutinee loc (cases: 'a Typedtree.case list) (typ : Types.type_expr) =
-    match typ.desc with
+    match Types.get_desc typ with
       | Tarrow (_, _, r, _) ->
         let new_scrutinee    = create_fresh_var_name () in
         let translated_match = translate_match loc (create_id new_scrutinee) [] cases r in
@@ -329,20 +330,20 @@ let translate_high tast start_index params =
 
   and translate_bind bind =
     let rec is_func_type (t : Types.type_expr) =
-      match t.desc with
+      match Types.get_desc t with
       | Tarrow _ -> true
       | Tlink t' -> is_func_type t'
       | _        -> false in
 
     let rec has_func_arg (t : Types.type_expr) =
-      match t.desc with
+      match Types.get_desc t with
       | Tarrow (_,f,s,_) -> is_func_type f || has_func_arg s
       | Tlink t'         -> has_func_arg t'
       | _                -> false in
 
     let rec get_tabling_rank (typ : Types.type_expr) =
       let loc = Ppxlib.Location.none in
-      match typ.desc with
+      match Types.get_desc typ with
       | Tarrow (_, _, right_typ, _) -> create_apply [%expr Tabling.succ] [get_tabling_rank right_typ]
       | Tlink typ                   -> get_tabling_rank typ
       | _                           -> [%expr Tabling.one] in

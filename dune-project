@@ -26,9 +26,7 @@
  (depends
   dune
   (ocaml
-   (and
-    (>= "4.13")
-    (< "4.14")))
+   (>= "4.13"))
   GT
   (OCanren
    (>= "0.3.0~"))
@@ -36,6 +34,7 @@
    (>= "0.3.0~"))
   (odoc :with-doc)
   (ocamlformat :with-test)
+  ppx_optcomp
   ppxlib
-  ; After adding dependencies to 'dune' files and the same dependecies here too
+  ;
   ))
