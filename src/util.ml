@@ -144,6 +144,10 @@ let rec split3 = function
 | []         -> [], [], []
 | (h1,h2,h3)::t -> let t1, t2, t3 = split3 t in h1::t1, h2::t2, h3::t3
 
+let rec uniq = function
+| [] -> []
+| x :: xs -> x :: uniq (List.filter ((<>) x) xs)
+
 (********************** Translator util funcions ****************************)
 
 let untyper = Untypeast.default_mapper
@@ -264,11 +268,15 @@ let create_logic_var name =
   { (create_pat name) with ppat_attributes = [Attr.mk (mknoloc "logic") (Parsetree.PStr [])] }
 
 let have_unifier =
-  let rec helper: type a b. a Typedtree.pattern_desc pattern_data -> b Typedtree.pattern_desc pattern_data -> bool
+  let rec helper: type a. a Typedtree.pattern_desc pattern_data -> a Typedtree.pattern_desc pattern_data -> bool
   = fun p1 p2 ->
     match p1.pat_desc, p2.pat_desc with
     | Tpat_any  , _ | _, Tpat_any
     | Tpat_var _, _ | _, Tpat_var _ -> true
+    | Tpat_or (a, b, _), _ -> helper a p2 || helper b p2
+    | _, Tpat_or (a, b, _) -> helper p1 a || helper p1 a
+    | Tpat_alias (p1, _, _), _ -> helper p1 p2
+    | _, Tpat_alias (p2, _, _) -> helper p1 p2
     | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
     | Tpat_tuple t1, Tpat_tuple t2 ->
       List.length t1 = List.length t2 && List.for_all2 helper t1 t2
@@ -340,8 +348,19 @@ let translate_pat pat fresher =
   in
   helper pat
 
+let rec split_or_pat pat =
+  match pat.pat_desc with
+  | Tpat_or (a, b, _) -> split_or_pat a @ split_or_pat b
+  | _                 -> [pat]
 
-let is_disj_pats =
+let translate_or_pats pat fresher =
+  let transl_pats = List.map (fun p -> translate_pat p fresher) @@ split_or_pat pat in
+  let vars = uniq @@ List.concat_map (fun (_, _, a) -> a) transl_pats in
+  List.map (fun (a, b, _) -> (a, b)) transl_pats, vars
+
+
+
+let is_disj_pats pats =
   let helper (type a)
     (self: a Typedtree.pattern_desc pattern_data list -> bool) (xs : a Typedtree.pattern_desc pattern_data list) : bool =
   match xs with
@@ -349,7 +368,7 @@ let is_disj_pats =
   | x :: xs -> not (List.exists (have_unifier x) xs) && self xs
   in
   let rec ans eta = helper ans eta in
-  ans
+  ans (List.concat_map split_or_pat pats)
 
 let id2id_o = function
   | Lident s    -> Lident (s ^ "_o")

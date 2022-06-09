@@ -306,16 +306,20 @@ let translate_high tast start_index params =
         let unify = [%expr [%e create_id v] === [%e create_id abs_v]] in
         create_fun abs_v unify in
 
-      let translate_case case =
-        let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
+      let translate_match_pat (pat, als) =
         let unify          = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-        let unifies        = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+        let unifies         = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+        create_conj (unify :: unifies) in
+
+      let translate_case case =
+        let p_with_als, vs = translate_or_pats case.c_lhs create_fresh_var_name in
+        let pats           = create_disj (List.map translate_match_pat p_with_als) in
         let body           = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
-        let abst_body      = List.fold_right create_fun (List.map (fun v -> v ^ "_o") vars) body in
-        let subst          = List.map create_subst vars in
+        let abst_body      = List.fold_right create_fun (List.map (fun v -> v ^ "_o") vs) body in
+        let subst          = List.map create_subst vs in
         let total_body     = create_apply abst_body subst in
-        let conj           = create_conj (unify :: unifies @ [total_body]) in
-        List.fold_right create_fresh vars conj in
+        let conj           = create_conj [pats; total_body] in
+        List.fold_right create_fresh vs conj in
 
       let new_cases = List.map translate_case cases in
       let disj      = create_disj new_cases in
