@@ -361,14 +361,11 @@ let translate_or_pats pat fresher =
 
 
 let is_disj_pats pats =
-  let helper (type a)
-    (self: a Typedtree.pattern_desc pattern_data list -> bool) (xs : a Typedtree.pattern_desc pattern_data list) : bool =
-  match xs with
+  let rec helper : type a . a Typedtree.general_pattern list -> bool = function
   | []      -> true
-  | x :: xs -> not (List.exists (have_unifier x) xs) && self xs
+  | x :: xs -> not (List.exists (have_unifier x) xs) && helper xs
   in
-  let rec ans eta = helper ans eta in
-  ans (List.concat_map split_or_pat pats)
+  helper (List.concat_map split_or_pat pats)
 
 let id2id_o = function
   | Lident s    -> Lident (s ^ "_o")
