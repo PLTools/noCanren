@@ -157,21 +157,18 @@ let translate_high tast start_index params =
     let two_or_more_mentions tactic var_name expr =
       let rec two_or_more_mentions expr count =
         let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
-        let get_pat_vars =
-          let rec helper: type a . a Typedtree.general_pattern -> _ = fun p ->
+        let rec get_pat_vars: type a . a Typedtree.general_pattern -> _ = fun p ->
             match p.pat_desc with
             | Tpat_any
             | Tpat_constant _             -> []
             | Tpat_var (n, _)             -> [name n]
-            | Tpat_tuple pats             -> List.concat_map helper pats
-            | Tpat_construct (_, _, pats,_) -> List.concat_map helper pats
-            | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> helper p) l
-            | Tpat_alias (t, n, _)        -> name n :: helper t
-            | Tpat_value x                -> helper (x :> Typedtree.pattern)
+            | Tpat_tuple pats             -> List.concat_map get_pat_vars pats
+            | Tpat_construct (_, _, pats,_) -> List.concat_map get_pat_vars pats
+            | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> get_pat_vars p) l
+            | Tpat_alias (t, n, _)        -> name n :: get_pat_vars t
+            | Tpat_value x                -> get_pat_vars (x :> Typedtree.pattern)
             | Tpat_lazy _ | Tpat_array _ | Tpat_exception _ | Tpat_or (_, _, _)
             | Tpat_variant _ -> failwith "Not implemented"
-          in
-          helper
         in
 
         match expr.exp_desc with
@@ -306,16 +303,20 @@ let translate_high tast start_index params =
         let unify = [%expr [%e create_id v] === [%e create_id abs_v]] in
         create_fun abs_v unify in
 
-      let translate_case case =
-        let pat, als, vars = translate_pat case.c_lhs create_fresh_var_name in
+      let translate_match_pat (pat, als) =
         let unify          = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-        let unifies        = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+        let unifies         = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+        create_conj (unify :: unifies) in
+
+      let translate_case case =
+        let p_with_als, vs = translate_or_pats case.c_lhs create_fresh_var_name in
+        let pats           = create_disj (List.map translate_match_pat p_with_als) in
         let body           = create_apply (translate_expression case.c_rhs) (List.map create_id extra_args) in
-        let abst_body      = List.fold_right create_fun (List.map (fun v -> v ^ "_o") vars) body in
-        let subst          = List.map create_subst vars in
+        let abst_body      = List.fold_right create_fun (List.map (fun v -> v ^ "_o") vs) body in
+        let subst          = List.map create_subst vs in
         let total_body     = create_apply abst_body subst in
-        let conj           = create_conj (unify :: unifies @ [total_body]) in
-        List.fold_right create_fresh vars conj in
+        let conj           = create_conj [pats; total_body] in
+        List.fold_right create_fresh vs conj in
 
       let new_cases = List.map translate_case cases in
       let disj      = create_disj new_cases in
