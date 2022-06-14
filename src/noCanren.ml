@@ -231,7 +231,7 @@ let () =
     try begin
       readenv ppf Before_args;
       translate ppf @@ mk_noCanren_params ()
-    end with Failure     s -> (Printf.eprintf "%s\n%!" s; Arg.usage all_options usage)
+    end with Failure     s -> (Printf.eprintf "%s\n%!" s)
            | Sys_error   s -> Printf.eprintf "%s\n%!" s
            | e             -> begin match Location.error_of_exn e with
                               | Some (`Ok e) -> Location.print_report ppf e

@@ -168,8 +168,9 @@ let translate_high tast start_index params =
             | Tpat_record (l, _)          -> List.concat_map (fun (_, _, p) -> get_pat_vars p) l
             | Tpat_alias (t, n, _)        -> name n :: get_pat_vars t
             | Tpat_value x                -> get_pat_vars (x :> Typedtree.pattern)
-            | Tpat_lazy _ | Tpat_array _ | Tpat_exception _ | Tpat_or (_, _, _)
-            | Tpat_variant _ -> failwith "Not implemented"
+            | Tpat_or (a, b, _)           -> get_pat_vars a @ get_pat_vars b
+            | Tpat_lazy _ | Tpat_array _ | Tpat_exception _
+            | Tpat_variant _ -> fail_loc expr.exp_loc "not implemented (get_pat_vars)"
         in
 
         match expr.exp_desc with
