@@ -65,6 +65,8 @@ let fresh_four_name     = "four"
 let fresh_five_name     = "five"
 let fresh_succ_name     = "succ"
 
+let source_bind_name    = "let*"
+let bind_name           = "let_star_bind"
 
 let packages = ["GT"; "OCanren"; "OCanren.Std"]
 
@@ -176,6 +178,11 @@ let get_pat_name p =
   match p.pat_desc with
   | Tpat_var (n, _) -> name n
   | _               -> fail_loc p.pat_loc "Incorrect pattern"
+
+let rename_pat p new_name =
+  match p.pat_desc with
+  | Tpat_var (n, d) -> { p with pat_desc = Tpat_var (create_local new_name, { d with txt = new_name }) }
+  | _               -> fail_loc p.pat_loc "Incorrect renamed pattern"
 
 
 let create_apply f = function
@@ -417,3 +424,8 @@ let id2id_o = function
   | Lident s    -> Lident (s ^ "_o")
   | Ldot (t, s) -> Ldot (t, s ^ "_o")
   | _           -> failwith "id2id_o: undexpected ID"
+
+let normalize_let_name pat =
+  if get_pat_name pat = source_bind_name then rename_pat pat bind_name
+  else pat
+

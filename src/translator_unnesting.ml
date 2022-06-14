@@ -176,6 +176,7 @@ let translate tast start_index params =
               eta_form_for_let let_part let_vars expr
 
   and translate_let let_vars flag bind expr =
+    let bind = { bind with vb_pat = normalize_let_name bind.vb_pat } in
     match flag with
     | Recursive    -> translate_rec_let    let_vars bind expr
     | Nonrecursive -> translate_nonrec_let let_vars bind expr
@@ -302,6 +303,22 @@ let translate tast start_index params =
 
     List.fold_right create_fun args with_fresh
 
+  and translate_let_star let_vars loc t let_ body =
+    if let_.bop_op_name.txt = source_bind_name then
+      let var         = get_pat_name @@ body.c_lhs in
+      let exp_in      = translate_expression let_vars body.c_rhs in
+      let body, binds = unnest_expr let_vars let_.bop_exp in
+      let new_args    = [body; create_fun var exp_in] in
+      if List.length binds = 0
+        then create_apply (create_id bind_name) new_args
+        else let eta_vars   = create_fresh_argument_names_by_type t in
+             let eta_call   = create_apply (create_id bind_name) (new_args @ List.map create_id eta_vars) in
+             let conjs      = List.map (fun (v,e) -> create_apply (translate_expression let_vars e) [create_id v]) binds @ [eta_call] in
+             let full_conj  = create_conj conjs in
+             let with_fresh = List.fold_right create_fresh (List.map fst binds) full_conj in
+             List.fold_right create_fun eta_vars with_fresh
+    else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
+
   and translate_expression let_vars expr =
     match expr.exp_desc with
     | Texp_constant _          -> translate_construct let_vars expr
@@ -337,11 +354,14 @@ let translate tast start_index params =
     | Texp_let (flag, [bind], expr) -> translate_let let_vars flag bind expr
 
     | Texp_let _ -> fail_loc expr.exp_loc "Operator LET ... AND isn't supported" (*TODO support LET ... AND*)
+
+    | Texp_letop { let_; body }                 -> translate_let_star let_vars expr.exp_loc expr.exp_type let_ body
+
     | _ -> fail_loc expr.exp_loc "Incorrect expression"
   in
 
   let translate_external_value_binding let_vars vb =
-    let pat  = untyper.pat untyper vb.vb_pat in
+    let pat  = untyper.pat untyper (normalize_let_name vb.vb_pat) in
     let expr = translate_expression let_vars vb.vb_expr in
     Vb.mk pat expr in
 

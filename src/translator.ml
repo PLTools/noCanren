@@ -331,6 +331,8 @@ let translate_high tast start_index params =
     else fail_loc loc "Pattern matching contains unified patterns"
 
   and translate_bind bind =
+    let bind = { bind with vb_pat = normalize_let_name bind.vb_pat } in
+
     let rec is_func_type (t : Types.type_expr) =
       match Types.get_desc t with
       | Tarrow _ -> true
@@ -468,6 +470,14 @@ let translate_high tast start_index params =
     let with_fr      = List.fold_right create_fresh without_mvar call in
     create_fun mvar with_fr
 
+    and translate_let_star loc let_ body =
+      if let_.bop_op_name.txt = source_bind_name then
+        let var    = (get_pat_name @@ body.c_lhs) ^ "_o" in
+        let exp_in = translate_expression body.c_rhs in
+        let body   = translate_expression let_.bop_exp in
+        create_apply (create_id @@ bind_name ^ "_o") [body; create_fun var exp_in]
+      else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
+
   and translate_expression e =
     match e.exp_desc with
     | Texp_constant _                                      -> translate_construct e
@@ -483,7 +493,8 @@ let translate_high tast start_index params =
     | Texp_record { fields; extended_expression = None }   -> translate_new_record fields e.exp_type e.exp_loc
     | Texp_record { fields; extended_expression = Some a } -> translate_extended_record a fields e.exp_type e.exp_loc
     | Texp_field  (expr, field, field_info)                -> translate_field expr field field_info e.exp_loc
-    | _                                                   -> fail_loc e.exp_loc "Incorrect expression" in
+    | Texp_letop { let_; body }                            -> translate_let_star e.exp_loc let_ body
+    | _                                                    -> fail_loc e.exp_loc "Incorrect expression" in
 
   let translate_structure_item i =
     match i.str_desc with
