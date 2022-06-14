@@ -49,7 +49,8 @@ let translate_high tast start_index params =
         let new_args, fv = List.map unnest_constuct l |> List.split in
         let fv           = List.concat fv in
         fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) new_args, fv
-    | Texp_construct (name, _, args) ->
+    | Texp_construct (name, desc, args) ->
+      let args         = get_constr_args loc desc args in
       let new_args, fv = List.map unnest_constuct args |> List.split in
       let fv           = List.concat fv in
       let new_args     = match new_args with [] -> [[%expr ()]] | l -> l in

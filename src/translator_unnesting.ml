@@ -43,7 +43,8 @@ let translate tast start_index params =
       let fv           = List.concat fv in
       create_apply (mark_constr [%expr pair]) new_args, fv
 
-    | Texp_construct (name, _, args) ->
+    | Texp_construct (name, desc, args) ->
+      let args         = get_constr_args loc desc args in
       let new_args, fv = List.map (unnest_expr let_vars) args |> List.split in
       let fv           = List.concat fv in
 

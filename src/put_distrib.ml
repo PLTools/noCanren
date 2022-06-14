@@ -247,27 +247,33 @@ let revisit_type loc tdecl ~old_ocanren useGT =
   in
 
   (* convert type to fully-abstract one *)
+
+  let abstracting_internal_type typ (n, map, args) =
+    match typ with
+    | [%type: _] -> assert false
+    | {ptyp_desc = Ptyp_var s; _} -> (n, map, typ::args)
+    | arg ->
+        match FoldInfo.param_for_rtyp arg map with
+        | Some {param_name; } -> (n, map, (Typ.var param_name)::args)
+        | None ->
+            let new_name = sprintf "a%d" n in
+            (n+1, FoldInfo.extend new_name arg arg map, (Typ.var new_name)::args) in
+
   let mapa, full_t =
     match tdecl.ptype_kind with
     | Ptype_variant ctors ->
       List.fold_right
         (fun cd (n, acc_map,cs) ->
-            let n,map2,new_args = List.fold_right
-              (fun typ (n, map,args) ->
-                    match typ with
-                    | [%type: _] -> assert false
-                    | {ptyp_desc = Ptyp_var s; _} -> (n, map, typ::args)
-                    | arg ->
-                        match FoldInfo.param_for_rtyp arg map with
-                        | Some {param_name; } -> (n, map, (Typ.var param_name)::args)
-                        | None ->
-                            let new_name = sprintf "a%d" n in
-                            (n+1, FoldInfo.extend new_name arg arg map, (Typ.var new_name)::args)
-              )
-              (match cd.pcd_args with Pcstr_tuple tt -> tt | Pcstr_record _ -> assert false)
-              (n, acc_map,[])
-            in
-            let new_args = Pcstr_tuple new_args in
+          let acc = n, acc_map,[] in
+          match cd.pcd_args with
+          | Pcstr_tuple tt ->
+              let n, map2, new_args = List.fold_right abstracting_internal_type tt acc in
+              let new_args = Pcstr_tuple new_args in
+              (n, map2, { cd with pcd_args = new_args } :: cs)
+          | Pcstr_record lds ->
+            let typs = List.map (fun ldt -> ldt.pld_type) lds in
+            let n, map2, new_args = List.fold_right abstracting_internal_type typs acc in
+            let new_args = Pcstr_record (List.map2 (fun ld t -> { ld with pld_type = t }) lds new_args) in
             (n, map2, { cd with pcd_args = new_args } :: cs)
         )
         ctors

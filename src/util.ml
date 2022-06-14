@@ -293,7 +293,32 @@ let have_unifier =
   helper
 
 let translate_pat pat fresher =
-  let rec helper : type a . a Typedtree.pattern_desc pattern_data -> _ = fun pat ->
+  let translate_constr_name loc constr_loc =
+    match constr_loc.txt with
+    | Lident "::" -> [%expr (%)]
+    | _           -> [%expr [%e lowercase_lident constr_loc.txt |> mknoloc |> Exp.ident]] in
+
+  let rec translate_record_pat fresher fields =
+    let _, (info : Types.label_description), _ = List.hd fields in
+    let count = Array.length info.lbl_all in
+    let rec translate_record_pat fields index =
+      if index == count then [], [], [] else
+      match fields with
+      | (_, (i : Types.label_description), _) :: _xs when i.lbl_pos > index ->
+        let var        = fresher () in
+        let pats, als, vars = translate_record_pat fields (index+1) in
+        create_id var :: pats, als, var :: vars
+      | (_, _i, p) :: xs ->
+        let pat , als,  vars  = helper p in
+        let pats, als', vars' = translate_record_pat xs (index+1) in
+        pat :: pats, als @ als', vars @ vars'
+      | [] ->
+        let var       = fresher () in
+        let pats, als, vars = translate_record_pat [] (index+1) in
+        create_id var :: pats, als, var :: vars
+    in translate_record_pat fields 0
+
+  and helper : type a . a Typedtree.pattern_desc pattern_data -> _ = fun pat ->
     let open Typedtree in
     let loc = pat.pat_loc in
     match pat.pat_desc with
@@ -306,47 +331,68 @@ let translate_pat pat fresher =
     | Tpat_construct (id              ,       _, [], _) -> [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()], [], []
     | Tpat_value x ->
       helper (x :> (Typedtree.value Typedtree.general_pattern))
-    | Tpat_construct ({txt}, _, args, _)                ->
-      let args, als, vars = List.map (fun q -> helper q) args |> split3 in
-      let vars = List.concat vars in
-      let als  = List.concat als  in
-      let constr =
-        match txt with
-        | Lident "::" -> [%expr (%)]
-        | _           -> [%expr [%e lowercase_lident txt |> mknoloc |> Exp.ident]] in
-      create_apply (mark_constr constr) args, als, vars
+    | Tpat_construct (constr_loc, desc, args, t) ->
+      let constr = translate_constr_name loc constr_loc in
+      begin match desc.cstr_inlined with
+      | None ->
+        let args, als, vars = List.map (fun q -> helper q) args |> split3 in
+        let vars = List.concat vars in
+        let als  = List.concat als  in
+
+        create_apply (mark_constr constr) args, als, vars
+        | Some t ->
+          match args with
+          | [a] ->
+            begin match a.pat_desc with
+            | Tpat_any ->
+              begin match t.type_kind with
+              | Type_record (t, _) ->
+                let vars = List.map (fun _ -> fresher ()) t in
+                let args = List.map create_id vars in
+                create_apply (mark_constr constr) args, [], vars
+              | _ -> fail_loc loc "Wildcard schould have record type for inlined argument"
+              end
+            | Tpat_record (fields, _) ->
+              let args, als, vars = translate_record_pat fresher fields in
+              create_apply (mark_constr constr) args, als, vars
+            | _ -> fail_loc loc "Inlined argument of pattern should be record or wildcard"
+            end
+          | _ -> fail_loc loc "Pattern with inlined record should have one argument"
+      end
     | Tpat_tuple l ->
       let args, als, vars = List.map helper l |> split3 in
       let vars = List.concat vars in
       let als  = List.concat als in
       fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [e1; e2]) args, als, vars
     | Tpat_record (fields, _) ->
-      let (_, info, _) = List.hd fields in
-      let count = Array.length info.lbl_all in
-      let rec translate_record_pat fresher fields index =
-        if index == count then [], [], [] else
-        match fields with
-        | (_, (i : Types.label_description), _) :: _xs when i.lbl_pos > index ->
-          let var        = fresher () in
-          let pats, als, vars = translate_record_pat fresher fields (index+1) in
-          create_id var :: pats, als, var :: vars
-        | (_, _i, p) :: xs ->
-          let pat , als,  vars  = helper p in
-          let pats, als', vars' = translate_record_pat fresher xs (index+1) in
-          pat :: pats, als @ als', vars @ vars'
-        | [] ->
-          let var       = fresher () in
-          let pats, als, vars = translate_record_pat fresher [] (index+1) in
-          create_id var :: pats, als, var :: vars in
-      let args, als, vars = translate_record_pat fresher fields 0 in
+      let args, als, vars = translate_record_pat fresher fields in
       let ctor            = ctor_for_record pat.pat_loc pat.pat_type in
-      create_apply ctor args, als, vars
+      create_apply (mark_constr ctor) args, als, vars
     | Tpat_alias (p, v, _) ->
       let pat, als, vars = helper p in
       create_id (name v), (create_id (name v), pat) :: als, name v :: vars
     | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
   in
   helper pat
+
+let get_constr_args loc (desc : Types.constructor_description) args =
+  match desc.cstr_inlined with
+  | None -> args
+  | Some _ ->
+    match args with
+    | [a] ->
+      begin match a.exp_desc with
+      | Texp_record { fields; extended_expression } ->
+        let get_expr f =
+          match f with
+        | _, Overridden (_, e) -> e
+        | _ -> fail_loc loc "Inlined argument of constructor should be record without kept expressions" in
+        if Option.is_none extended_expression then
+          List.map get_expr @@ Array.to_list fields
+        else fail_loc loc "Inlined argument of constructor should be record without extended expression"
+      | _ -> fail_loc loc "Inlined argument of constructor should be record"
+      end
+    | _ -> fail_loc loc "Constructor with inlined record should have one argument"
 
 let rec split_or_pat pat =
   match pat.pat_desc with
