@@ -345,8 +345,12 @@ let main_mapper ~old_ocanren useGT =
     structure = fun self ss ->
       let f si = match si.pstr_desc with
       | Pstr_type (_,tydecls) ->
-        wrap_tydecls si.pstr_loc tydecls
-      | x -> [si]
+        let tds_without_synonims = List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls in
+        begin match tds_without_synonims with
+        | [] -> []
+        | _  -> wrap_tydecls si.pstr_loc tydecls
+      end
+      | _ -> [si]
       in
       List.flatten (List.map f ss)
   }

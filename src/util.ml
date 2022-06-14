@@ -262,7 +262,8 @@ let filter_vars vars1 vars2 =
 let mark_type_declaration td =
     match td.typ_kind with
     | Ttype_variant _
-    | Ttype_record  _ -> { td with typ_attributes = [Attr.mk (mknoloc "put_distrib_here") (Parsetree.PStr [])] }
+    | Ttype_record  _
+    | Ttype_abstract  -> { td with typ_attributes = [Attr.mk (mknoloc "put_distrib_here") (Parsetree.PStr [])] }
     | _               -> fail_loc td.typ_loc "Incrorrect type declaration"
 
 
