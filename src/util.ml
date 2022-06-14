@@ -109,8 +109,15 @@ let get_max_index tast =
 let mangle_construct_name name =
   let low = String.mapi (function 0 -> Char.lowercase_ascii | _ -> fun x -> x ) name in
   match low with
-  | "val" | "if" | "else" | "for" | "do" | "let" | "open" | "not" | "pair" | "conj"
-          | "var" | "snd" | "fst" -> low ^ "_"
+  | "and" | "as" | "assert" | "asr" | "begin" | "class" | "constraint"
+  | "do" | "done" | "downto" | "else" | "end" | "exception" | "external"
+  | "false" | "for" | "fun" | "function" | "functor" | "if" | "in"
+  | "include" | "inherit" | "initializer" | "land" | "lazy" | "let" | "lor"
+  | "lsl" | "lsr" | "lxor" | "match" | "method" | "mod" | "module"
+  | "mutable" | "new" | "nonrec" | "object" | "of" | "open" | "or"
+  | "private" | "rec" | "sig" | "struct" | "then" | "to" | "true"
+  | "try" | "type" | "val" | "virtual" | "when" | "while" | "with"
+  | "not" | "pair" | "conj"| "var" | "snd" | "fst" -> low ^ "_"
   | _ -> low
 
 
