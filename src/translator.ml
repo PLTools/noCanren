@@ -497,17 +497,19 @@ let translate_high tast start_index params =
     | Texp_letop { let_; body }                            -> translate_let_star e.exp_loc let_ body
     | _                                                    -> fail_loc e.exp_loc "Incorrect expression" in
 
-  let translate_structure_item i =
+  let rec translate_structure_item i =
     match i.str_desc with
     | Tstr_value (rec_flag, [bind]) ->
-        Str.value rec_flag [translate_bind bind]
+        [Str.value rec_flag [translate_bind bind]]
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
-      untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }
-    | Tstr_open _ -> untyper.structure_item untyper i
+      [untyper.structure_item untyper { i with str_desc = Tstr_type (rec_flag, new_decls) }]
+    | Tstr_open _ -> [untyper.structure_item untyper i]
+    | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru}} ->
+        List.concat_map translate_structure_item stru.str_items
     | _ -> fail_loc i.str_loc "Incorrect structure item" in
 
-  let translate_structure t = List.map translate_structure_item t.str_items in
+  let translate_structure t = List.concat_map translate_structure_item t.str_items in
 
   translate_structure tast
 
