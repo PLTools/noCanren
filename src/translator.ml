@@ -478,11 +478,17 @@ let translate_high tast start_index params =
         create_apply (create_id @@ bind_name ^ "_o") [body; create_fun var exp_in]
       else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
 
+  and translate_rel_memo e =
+    let result_arg = create_fresh_var_name () in
+    let rel_exp = Untypeast.untype_expression e in
+    let loc = Ppxlib.Location.none in
+    [%expr fun [%p create_logic_var result_arg] -> ([%e create_id result_arg] === !!true) &&& [%e rel_exp]]
+
   and translate_expression e =
     match e.exp_desc with
     | Texp_apply ({exp_desc=Texp_ident(_,{txt=Lident "memo"},_)},[Nolabel, Some arg ]) ->
-        Format.printf "Got memo %s %d\n%!" __FILE__ __LINE__;
-        Untypeast.untype_expression arg
+        (* Format.printf "Got memo %s %d\n%!" __FILE__ __LINE__; *)
+        translate_rel_memo arg
     | Texp_constant _                                      -> translate_construct e
     | Texp_construct _                                     -> translate_construct e
     | Texp_tuple _                                         -> translate_construct e
