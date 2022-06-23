@@ -12,7 +12,6 @@ let () = Printexc.record_backtrace true
 (*****************************************************************************************************************************)
 
 let translate_high tast start_index params =
-
   let lowercase_lident x =
     if params.leave_constuctors
     then x
@@ -481,6 +480,9 @@ let translate_high tast start_index params =
 
   and translate_expression e =
     match e.exp_desc with
+    | Texp_apply ({exp_desc=Texp_ident(_,{txt=Lident "memo"},_)},[Nolabel, Some arg ]) ->
+        Format.printf "Got memo %s %d\n%!" __FILE__ __LINE__;
+        Untypeast.untype_expression arg
     | Texp_constant _                                      -> translate_construct e
     | Texp_construct _                                     -> translate_construct e
     | Texp_tuple _                                         -> translate_construct e
@@ -499,6 +501,7 @@ let translate_high tast start_index params =
 
   let rec translate_structure_item i =
     match i.str_desc with
+    | Tstr_value (_, [ {vb_pat={pat_desc = Tpat_var (_,{txt="memo"})}}]) -> []
     | Tstr_value (rec_flag, [bind]) ->
         [Str.value rec_flag [translate_bind bind]]
     | Tstr_type (rec_flag, decls) ->
