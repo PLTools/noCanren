@@ -229,12 +229,16 @@ let translate_high tast start_index params =
                           ) c' fields
         | Texp_field (e, _, _) -> eval_if_need count e
         | Texp_open (_, e) -> two_or_more_mentions e count
+        | Texp_letop { let_; body }  ->
+          let count = two_or_more_mentions body.c_rhs count in
+          if get_pat_name @@ body.c_lhs == var_name then count
+          else eval_if_need count let_.bop_exp
         | Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
         Texp_setfield (_, _, _, _)|Texp_array _|Texp_sequence (_, _)|
         Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|
         Texp_new (_, _, _)|Texp_instvar (_, _, _)|Texp_setinstvar (_, _, _, _)|
         Texp_override (_, _)|Texp_letmodule (_, _, _, _, _)|Texp_letexception (_, _)|
-        Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|Texp_letop _|
+        Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|
         Texp_extension_constructor (_, _)
         | Texp_ifthenelse (_, _, None)
 
