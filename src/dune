@@ -14,6 +14,7 @@
   Translator
   Translator_unnesting
   Printer_in_spec
+  Untype_more
   noCanren)
  (preprocess
   (pps ppxlib.metaquot ppx_optcomp)))

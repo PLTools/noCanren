@@ -214,15 +214,17 @@ let translate_high tast start_index params =
                                            | _                 -> c
                           ) c' fields
         | Texp_field (e, _, _) -> eval_if_need count e
-        | (Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
+        | Texp_open (_, e) -> two_or_more_mentions e count
+        | Texp_unreachable|Texp_try (_, _)|Texp_variant (_, _)|
         Texp_setfield (_, _, _, _)|Texp_array _|Texp_sequence (_, _)|
         Texp_while (_, _)|Texp_for (_, _, _, _, _, _)|
         Texp_new (_, _, _)|Texp_instvar (_, _, _)|Texp_setinstvar (_, _, _, _)|
         Texp_override (_, _)|Texp_letmodule (_, _, _, _, _)|Texp_letexception (_, _)|
         Texp_assert _|Texp_lazy _|Texp_object (_, _)|Texp_pack _|Texp_letop _|
-        Texp_extension_constructor (_, _)|Texp_open (_, _))
+        Texp_extension_constructor (_, _)
         | Texp_ifthenelse (_, _, None)
-        | _ -> failwith "Not implemented"
+
+        | _ -> Location.raise_errorf "Not implemented expr: %a" Pprintast.expression (Untypeast.untype_expression expr)
 
   in
       two_or_more_mentions expr 0 >= 2 in
@@ -480,14 +482,13 @@ let translate_high tast start_index params =
 
   and translate_rel_memo e =
     let result_arg = create_fresh_var_name () in
-    let rel_exp = Untypeast.untype_expression e in
+    let rel_exp = Untype_more.(skip_bindings.expr skip_bindings) e in
     let loc = Ppxlib.Location.none in
     [%expr fun [%p create_logic_var result_arg] -> ([%e create_id result_arg] === !!true) &&& [%e rel_exp]]
 
   and translate_expression e =
     match e.exp_desc with
     | Texp_apply ({exp_desc=Texp_ident(_,{txt=Lident "memo"},_)},[Nolabel, Some arg ]) ->
-        (* Format.printf "Got memo %s %d\n%!" __FILE__ __LINE__; *)
         translate_rel_memo arg
     | Texp_constant _                                      -> translate_construct e
     | Texp_construct _                                     -> translate_construct e
@@ -507,6 +508,18 @@ let translate_high tast start_index params =
 
   let rec translate_structure_item i =
     match i.str_desc with
+    | Tstr_modtype {mtd_type = Some ({mty_type = Mty_signature sign}); mtd_name} ->
+      let loc = i.str_loc in
+      [ Ast_helper.(Str.modtype ~loc:i.str_loc @@
+          Mtd.mk ~loc mtd_name
+            ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign)
+            )]
+      (* [%str: module type [%p Ast_helper.Pat.ident txt] = sig end ] *)
+    | Tstr_module {mb_name; mb_expr = {mod_desc=Tmod_functor (Named (_, lid, _) as param, {mod_desc=Tmod_structure stru})}} ->
+      [ Ast_helper.(Str.module_ @@ Mb.mk mb_name (Mod.functor_ (Untype_more.untype_functor_param param) @@
+      Mod.structure @@
+       List.concat_map translate_structure_item stru.str_items))]
+    | Tstr_value (_, [ {vb_attributes}]) when has_named_attribute "only_lozovml" vb_attributes   -> []
     | Tstr_value (_, [ {vb_pat={pat_desc = Tpat_var (_,{txt="memo"})}}]) -> []
     | Tstr_value (rec_flag, [bind]) ->
         [Str.value rec_flag [translate_bind bind]]
@@ -516,6 +529,7 @@ let translate_high tast start_index params =
     | Tstr_open _ -> [untyper.structure_item untyper i]
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru}} ->
         List.concat_map translate_structure_item stru.str_items
+    | Tstr_attribute {attr_name={txt="only_ocanren"}; attr_payload = Parsetree.PStr stru} -> stru
     | _ -> fail_loc i.str_loc "Incorrect structure item" in
 
   let translate_structure t = List.concat_map translate_structure_item t.str_items in
