@@ -72,7 +72,16 @@ let translate_high tast start_index params =
     let with_fresh    = List.fold_right create_fresh (List.map fst binds) conj in
     [%expr fun [%p create_logic_var out_var_name] -> [%e with_fresh]]
 
-  and translate_bool_funs is_or =
+  and translate_bool_funs_without_false is_or =
+    let a1  = create_fresh_var_name () in
+    let a2  = create_fresh_var_name () in
+    let q   = create_fresh_var_name () in
+    let loc = Ppxlib.Location.none in
+    let op  = if is_or then [%expr (|||)] else [%expr (&&&)] in
+    [%expr fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
+      [%e op] ([%e create_id a1] !!true) ([%e create_id a2] !!true)]
+
+  and translate_bool_funs_with_false is_or =
     let a1  = create_fresh_var_name () in
     let a2  = create_fresh_var_name () in
     let b   = create_fresh_var_name () in
@@ -86,6 +95,11 @@ let translate_high tast start_index params =
           (conde [
             ([%e create_id b] === [%e fst]) &&& ([%e create_id q] === [%e fst]);
             ([%e create_id b] === [%e snd]) &&& ([%e create_id a2] [%e create_id q])]))]
+
+  and translate_bool_funs expr is_or =
+    if has_named_attribute "rel" expr.exp_attributes
+      then translate_bool_funs_without_false is_or
+      else translate_bool_funs_with_false is_or
 
   and translate_eq_funs is_eq =
     let a1  = create_fresh_var_name () in
@@ -128,10 +142,10 @@ let translate_high tast start_index params =
             ([%e create_id b] === !!false) &&& ([%e translate_expression el] [%e create_id q])
           ]))]
 
-  and translate_ident txt =
+  and translate_ident exp txt =
     match txt with
-    | Lident "&&"  -> translate_bool_funs false
-    | Lident "||"  -> translate_bool_funs true
+    | Lident "&&"  -> translate_bool_funs exp false
+    | Lident "||"  -> translate_bool_funs exp true
     | Lident "not" -> translate_not_fun ()
     | Lident "="   -> translate_eq_funs true
     | Lident "<>"  -> translate_eq_funs false
@@ -410,7 +424,7 @@ let translate_high tast start_index params =
         let lambdas_and_tabled    = List.fold_right create_fun (List.append argument_names5 [res_arg_name_5]) freshing_and_tabled in
         lambdas_and_tabled in
 
-    let new_name = create_pat (get_pat_name bind.vb_pat ^ "_o") in
+    let new_name = create_pat (infix_to_prefix (get_pat_name bind.vb_pat) ^ "_o") in
     let nvb      = Vb.mk new_name tabled_body in
     if is_primary_type bind.vb_expr.exp_type
       then { nvb with pvb_attributes = [Attr.mk (mknoloc "need_CbN") (Parsetree.PStr [])] }
@@ -493,7 +507,7 @@ let translate_high tast start_index params =
     | Texp_constant _                                      -> translate_construct e
     | Texp_construct _                                     -> translate_construct e
     | Texp_tuple _                                         -> translate_construct e
-    | Texp_ident (_, { txt }, _)                           -> translate_ident txt
+    | Texp_ident (_, { txt }, _)                           -> translate_ident e txt
     | Texp_function {cases = [c]} when pat_is_var c.c_lhs  -> translate_abstraciton c
     | Texp_function { cases }                              -> translate_match_without_scrutinee e.exp_loc cases e.exp_type
     | Texp_apply (f, a)                                    -> translate_apply f a e.exp_loc
