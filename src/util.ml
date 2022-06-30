@@ -428,9 +428,22 @@ let is_disj_pats pats =
   in
   helper (List.concat_map split_or_pat pats)
 
+let infix_to_prefix txt =
+  let is_infix_char c =
+    let infix_chars =
+      ['%'; '<'; '#'; '!'; '?'; '~'; '!';
+       '?'; '~'; ':'; '$'; '&'; '*'; '+';
+       '-'; '/'; '='; '>'; '@'; '^'; '|'] in
+    List.exists ((==) c) infix_chars in
+  let char2code c = Printf.sprintf "c%d" (int_of_char c) in
+  let replace c =
+    if is_infix_char c then char2code c else String.make 1 c in
+
+  String.fold_left (fun acc c -> acc ^ replace c) "" txt
+
 let id2id_o = function
-  | Lident s    -> Lident (s ^ "_o")
-  | Ldot (t, s) -> Ldot (t, s ^ "_o")
+  | Lident s    -> Lident (infix_to_prefix s ^ "_o")
+  | Ldot (t, s) -> Ldot (t, infix_to_prefix s ^ "_o")
   | _           -> failwith "id2id_o: undexpected ID"
 
 let normalize_let_name pat =
