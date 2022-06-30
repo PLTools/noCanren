@@ -11,7 +11,7 @@ authors: [
 homepage: "https://github.com/Lozov-Petr/noCanren"
 bug-reports: "https://github.com/Lozov-Petr/noCanren/issues"
 depends: [
-  "dune" {>= "2.8"}
+  "dune" {>= "3.2" & >= "3.2"}
   "ocaml" {>= "4.13"}
   "GT"
   "OCanren" {>= "0.3.0~"}

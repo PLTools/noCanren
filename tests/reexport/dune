@@ -1,24 +1,24 @@
 (env
  (dev
   (flags
-   (:standard -rectypes -warn-error -27-33-8))))
+   (:standard -rectypes -w -27-33 -warn-error -27-33-8))))
 
 (executable
  (name main)
  (modules main)
- (libraries test_reexport))
+ (libraries test_reexport)
+ (preprocess
+  (pps OCanren-ppx.ppx_distrib GT.ppx_all)))
 
 (cram
  (deps ./main.exe))
 
 (library
  (name test_reexport)
- (flags
-  (:standard -dsource))
  (modules Input Output)
  (libraries OCanren)
  (preprocess
-  (pps OCanren-ppx.ppx_fresh GT.ppx_all)))
+  (pps OCanren-ppx.ppx_fresh OCanren-ppx.ppx_distrib GT.ppx_all)))
 
 (rule
  (targets Output.ml)
@@ -31,9 +31,6 @@
   (progn
    (run
     noCanren
-    ;-w
-    ;-8
-    ;-dsource
     -warn-error
     -33
     -rectypes
@@ -41,12 +38,11 @@
     ; switches to typecheck lozovml
     -reexport-path
     Input
+    -distribs
     -useGT
     -I
     %{read-lines:../../config/path-OCanren.cfg}
     %{dep}
     -o
     %{targets})
-   (run rm -f Input.cmi)
-   ; TODO: implement inplace formatting
-   )))
+   (run rm -f Input.cmi))))

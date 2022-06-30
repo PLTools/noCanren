@@ -24,7 +24,8 @@
  (synopsis "Translator from subset of OCaml to OCanren")
  (version 0.3.0)
  (depends
-  dune
+  (dune
+   (>= 3.2))
   (ocaml
    (>= "4.13"))
   GT

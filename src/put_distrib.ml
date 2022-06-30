@@ -5,30 +5,60 @@ open Parsetree
 open Location
 module TypeNameMap = Map.Make (String)
 
-module FoldInfo = struct
+module FoldInfo : sig
+  type t
+
   type item =
     { param_name : string
-    ; rtyp : core_type
-    ; ltyp : core_type
+    ; info : [ `Self | `Concrete of core_type * core_type ]
+    }
+
+  val empty : t
+  val is_empty : t -> bool
+  val param_for_rtyp : core_type -> t -> item option
+  val extend : string -> [ `Self | `Concrete of core_type * core_type ] -> t -> t
+  val map : f:(item -> 'a) -> t -> 'a list
+  val pp : Format.formatter -> t -> unit
+  val pp_item : Format.formatter -> item -> unit
+  val substitute : t -> self:core_type -> core_type list -> core_type list
+end = struct
+  type item =
+    { param_name : string
+    ; info : [ `Self | `Concrete of core_type * core_type ]
     }
 
   exception ItemFound of item
 
   type t = item list
 
+  let pp_item ppf = function
+    | { param_name; info = `Self } -> Format.fprintf ppf "%s: self" param_name
+    | { param_name; info = `Concrete (ltyp, rtyp) } ->
+      let open Format in
+      fprintf
+        ppf
+        "%s: %a -> %a"
+        param_name
+        Pprintast.core_type
+        ltyp
+        Pprintast.core_type
+        rtyp
+  ;;
+
+  let pp ppf xs =
+    let open Format in
+    pp_print_list pp_item ppf xs
+  ;;
+
   let param_for_rtyp typ ts =
-    let typ_repr =
-      Pprintast.core_type Format.str_formatter typ;
-      Format.flush_str_formatter ()
-    in
+    let typ_repr = Format.asprintf "%a" Pprintast.core_type typ in
     try
       List.iter
-        (fun i ->
-          let new_repr =
-            Pprintast.core_type Format.str_formatter i.rtyp;
-            Format.flush_str_formatter ()
-          in
-          if new_repr = typ_repr then raise (ItemFound i))
+        (function
+          | { info = `Self } -> ()
+          | { info = `Concrete (ltyp, rtyp) } as i ->
+            let new_repr = Format.asprintf "%a" Pprintast.core_type rtyp in
+            if new_repr = typ_repr then raise (ItemFound i))
         ts;
       None
     with
@@ -39,10 +69,14 @@ module FoldInfo = struct
   let empty = []
   let is_empty : t -> bool = ( = ) []
 
-  let extend param_name rtyp ltyp ts =
+  let extend param_name info ts =
     (*      printf "extending by `%s`\n%!" param_name;*)
-    { param_name; rtyp; ltyp } :: ts
+    if param_name = "self" && List.exists (fun { param_name } -> param_name = "self") ts
+    then ts
+    else { param_name; info } :: ts
   ;;
+
+  let substitute t ~self args = args
 end
 
 let str_type_ = Ast_helper.Str.type_
@@ -355,18 +389,23 @@ let revisit_type ~params loc tdecl =
     }
   in
   (* convert type to fully-abstract one *)
-  let abstracting_internal_type typ (n, map, args) =
+  let abstracting_internal_type ~selfname typ (n, map, args) =
     match typ with
-    | [%type: _] -> assert false
+    | [%type: _] -> Util.fail_loc typ.ptyp_loc "Wildcards are not supported"
     | { ptyp_desc = Ptyp_var s; _ } -> n, map, typ :: args
+    | { ptyp_desc = Ptyp_constr ({ txt = Lident s }, _) } when s = selfname ->
+      let new_name = "self" in
+      n, FoldInfo.extend new_name `Self map, Typ.var new_name :: args
     | arg ->
       (match FoldInfo.param_for_rtyp arg map with
       | Some { param_name } -> n, map, Typ.var param_name :: args
       | None ->
         let new_name = sprintf "a%d" n in
-        n + 1, FoldInfo.extend new_name arg arg map, Typ.var new_name :: args)
+        ( n + 1
+        , FoldInfo.extend new_name (`Concrete (arg, arg)) map
+        , Typ.var new_name :: args ))
   in
-  let mapa, full_t =
+  let abstr_info =
     let () =
       match tdecl.ptype_manifest with
       | Some _ -> Util.fail_loc tdecl.ptype_loc "No manifest required"
@@ -383,14 +422,20 @@ let revisit_type ~params loc tdecl =
               match cd.pcd_args with
               | Pcstr_tuple tt ->
                 let n, map2, new_args =
-                  List.fold_right abstracting_internal_type tt acc
+                  List.fold_right
+                    (abstracting_internal_type ~selfname:tdecl.ptype_name.txt)
+                    tt
+                    acc
                 in
                 let new_args = Pcstr_tuple new_args in
                 n, map2, { cd with pcd_args = new_args } :: cs
               | Pcstr_record lds ->
                 let typs = List.map (fun ldt -> ldt.pld_type) lds in
                 let n, map2, new_args =
-                  List.fold_right abstracting_internal_type typs acc
+                  List.fold_right
+                    (abstracting_internal_type ~selfname:tdecl.ptype_name.txt)
+                    typs
+                    acc
                 in
                 let new_args =
                   Pcstr_record
@@ -410,13 +455,19 @@ let revisit_type ~params loc tdecl =
               match typ with
               | [%type: _] -> assert false
               | { ptyp_desc = Ptyp_var s; _ } -> n, map, field :: args
+              | { ptyp_desc = Ptyp_constr ({ txt = Lident s }, _) }
+                when s = tdecl.ptype_name.txt ->
+                let new_name = "self" in
+                ( n
+                , FoldInfo.extend new_name `Self map
+                , upd_field (Typ.var new_name) :: args )
               | arg ->
                 (match FoldInfo.param_for_rtyp arg map with
                 | Some { param_name } -> n, map, upd_field (Typ.var param_name) :: args
                 | None ->
                   let new_name = sprintf "a%d" n in
                   ( n + 1
-                  , FoldInfo.extend new_name arg arg map
+                  , FoldInfo.extend new_name (`Concrete (arg, arg)) map
                   , upd_field (Typ.var new_name) :: args )))
             fields
             (0, FoldInfo.empty, [])
@@ -424,61 +475,181 @@ let revisit_type ~params loc tdecl =
         mapa, Ptype_record kind
     in
     let ptype_manifest =
-      match
-        Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
-      with
-      | None -> None
-      | Some lid ->
-        if new_kind = tdecl.ptype_kind
-        then
-          (* Indeed fully abstract *)
+      match params.Util.reexport_path with
+      | [] -> None
+      | _ ->
+        (match
+           Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
+         with
+        | None -> None
+        | Some lid ->
+          if new_kind = tdecl.ptype_kind
+          then
+            (* Indeed fully abstract *)
+            Option.some
+            @@ Ast_helper.Typ.constr
+                 (Location.mknoloc lid)
+                 (List.map fst tdecl.ptype_params)
+          else None)
+    in
+    (*
+    Format.printf "(* mapa = %a *)\n%!" FoldInfo.pp mapa;
+     *)
+    if FoldInfo.is_empty mapa
+    then `AlreadyFull { tdecl with ptype_manifest }
+    else (
+      let make_simple_arg x = x, (Asttypes.NoVariance, Asttypes.NoInjectivity) in
+      let make_to_types xname =
+        let full_t =
+          { tdecl with
+            ptype_manifest
+          ; ptype_kind = new_kind
+          ; ptype_name = Location.mkloc xname tdecl.ptype_name.loc
+          ; ptype_params =
+              tdecl.ptype_params
+              @ FoldInfo.map mapa ~f:(fun fi ->
+                    make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)
+          }
+        in
+        let extra_params =
+          FoldInfo.map mapa ~f:(fun fi -> Ast_helper.Typ.var fi.FoldInfo.param_name)
+        in
+        let spec_typ =
+          Typ.alias
+            (Typ.constr
+               (Location.mknoloc (Longident.Lident full_t.ptype_name.txt))
+               (FoldInfo.substitute
+                  mapa
+                  ~self:[%type: 'self]
+                  (List.map fst tdecl.ptype_params @ extra_params)))
+            "self"
+        in
+        let alias = { tdecl with ptype_manifest = Some spec_typ } in
+        full_t, Str.type_ Recursive [ alias ], spec_typ
+      in
+      `Extra make_to_types)
+  in
+  let add_gt_attribute =
+    if params.Util.useGT
+    then (
+      let attr =
+        Attr.mk
+          (mknoloc "deriving")
+          (PStr [ Str.eval [%expr gt ~options:{ show; fmt; gmap }] ])
+      in
+      fun tdecl -> { tdecl with ptype_attributes = attr :: tdecl.ptype_attributes })
+    else Fun.id
+  in
+  match params.Util.gen_info, abstr_info with
+  | Util.Old_OCanren, _ ->
+    let full_t, extra =
+      match abstr_info with
+      | `AlreadyFull full_t -> full_t, []
+      | `Extra f ->
+        let full_t, extra, _ = f ("g" ^ tdecl.ptype_name.txt) in
+        full_t, [ extra ]
+    in
+    let fmap_for_typ = Old_OCanren.prepare_fmap ~loc full_t params.Util.useGT in
+    List.concat
+      [ [ str_type_ ~loc Recursive [ full_t ] ]
+      ; extra
+      ; Old_OCanren.prepare_distribs ~loc full_t fmap_for_typ
+      ]
+  | Only_Injections, `AlreadyFull full_t ->
+    let full_t =
+      { full_t with ptype_name = Location.mknoloc ("g" ^ tdecl.ptype_name.txt) }
+    in
+    str_type_ ~loc Recursive [ full_t ] :: prepare_distribs_new ~loc full_t
+  | Distribs, `Extra f | Only_Injections, `Extra f ->
+    (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
+    let full_t, extra, spec = f ("g" ^ tdecl.ptype_name.txt) in
+    List.concat
+      [ [ str_type_ ~loc Recursive [ full_t ] ]
+      ; prepare_distribs_new ~loc full_t
+      ; (if params.Util.reexport_path <> []
+        then (
+          (* Going to generate unsafe cast *)
+          let tfrom =
+            Typ.constr
+              (Location.mknoloc
+                 (Longident.unflatten
+                    (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
+                 |> Option.get))
+              (List.map fst tdecl.ptype_params)
+          in
+          (* [%str external cast : [%t tfrom] -> [%t spec] = "%identity"] *)
+          let p_to_ground =
+            Pat.var (Location.mknoloc (sprintf "%s_to_ground" tdecl.ptype_name.txt))
+          in
+          let p_from_ground =
+            Pat.var (Location.mknoloc (sprintf "%s_from_ground" tdecl.ptype_name.txt))
+          in
+          [%str
+            let ([%p p_to_ground] : [%t tfrom] -> [%t spec]) = Obj.magic
+            let ([%p p_from_ground] : [%t spec] -> [%t tfrom]) = Obj.magic])
+        else [])
+      ]
+  | Distribs, `AlreadyFull full_t ->
+    (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
+    let open Ast_helper in
+    let abstract_t =
+      { full_t with ptype_name = Location.mkloc "t" tdecl.ptype_name.loc }
+    in
+    let t2 =
+      { tdecl with
+        ptype_name = Location.mknoloc "ground"
+      ; ptype_kind = Ptype_abstract
+      ; ptype_manifest =
           Option.some
           @@ Ast_helper.Typ.constr
-               (Location.mknoloc lid)
+               (Location.mknoloc (Longident.Lident "t"))
                (List.map fst tdecl.ptype_params)
-        else None
-    in
-    mapa, { tdecl with ptype_manifest; ptype_kind = new_kind }
-  in
-  (* now we need to add some parameters if we collected ones *)
-  let functor_typ, typ_to_add =
-    let make_simple_arg x = x, (Asttypes.NoVariance, Asttypes.NoInjectivity) in
-    let full_t =
-      { full_t with
-        ptype_name = { full_t.ptype_name with txt = "g" ^ full_t.ptype_name.txt }
       }
     in
-    let result_type =
-      if FoldInfo.is_empty mapa
-      then full_t
-      else (
-        let extra_params =
-          FoldInfo.map mapa ~f:(fun fi ->
-              make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)
-        in
-        { full_t with ptype_params = full_t.ptype_params @ extra_params })
+    let make ~mname t1 t2 ~creators =
+      Str.module_
+        (Mb.mk (Location.mknoloc (Some mname))
+        @@ Mod.structure
+             [ Str.extension
+                 ~loc
+                 ( Location.mknoloc "distrib"
+                 , PStr (str_type_ ~loc Nonrecursive [ t1 ] :: t2) )
+             ])
+      :: creators
     in
-    ( result_type
-    , if params.Util.old_ocanren
-      then (
-        let fmap_for_typ = Old_OCanren.prepare_fmap ~loc result_type params.Util.useGT in
-        Old_OCanren.prepare_distribs ~loc result_type fmap_for_typ)
-      else prepare_distribs_new ~loc result_type )
-  in
-  let gt_attribute =
-    if params.Util.useGT
-    then
-      [ Attr.mk
-          (mknoloc "deriving")
-          (PStr [ Str.eval [%expr gt ~options:{ show; gmap }] ])
-      ]
-    else []
-  in
-  let functor_typ =
-    { functor_typ with ptype_attributes = gt_attribute @ functor_typ.ptype_attributes }
-  in
-  [ str_type_ ~loc Recursive [ functor_typ ] ] @ typ_to_add
+    let mname =
+      String.mapi
+        (fun i -> if i = 0 then Char.uppercase_ascii else Fun.id)
+        tdecl.ptype_name.txt
+    in
+    let exposed_creators =
+      match tdecl.ptype_kind with
+      | Ptype_abstract | Ptype_open -> failwith "not supported"
+      | Ptype_variant cds ->
+        List.map
+          (fun { pcd_name } ->
+            let func = lower_lid pcd_name in
+            Str.value Nonrecursive
+            @@ [ Vb.mk
+                   (Pat.var func)
+                   (Exp.ident
+                      (Location.mknoloc (Longident.Ldot (Lident mname, func.txt))))
+               ])
+          cds
+      | Ptype_record _ -> assert false
+    in
+    make
+      (add_gt_attribute abstract_t)
+      [ Ast_helper.Str.type_ Nonrecursive [ t2 ] ]
+      ~mname
+      ~creators:exposed_creators
 ;;
+
+(* [ Ast_helper.Str.extension
+        ~loc
+        ( Location.mknoloc "distrib"
+        , PStr (str_type_ ~loc Recursive [ functor_typ ] :: typ_to_add) )
+    ] *)
 
 let has_to_gen_attr (xs : attributes) =
   try
@@ -513,7 +684,7 @@ let main_mapper params =
             | _ -> wrap_tydecls si.pstr_loc tydecls)
           | _ -> [ si ]
         in
-        List.flatten (List.map f ss))
+        List.concat_map f ss)
   }
 ;;
 

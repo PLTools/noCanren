@@ -4,9 +4,9 @@
   open GT
   open OCanren
   open OCanren.Std
-  type 'a0 gnat =
+  type 'self gnat =
     | O 
-    | S of 'a0 
+    | S of 'self 
   let o () = OCanren.inj O
   let s x0 = OCanren.inj (S (x0))
   let rec add_o a_o b_o q5 =

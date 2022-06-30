@@ -37,6 +37,11 @@ type noCanren_unnesting_params =
   ; use_standart_bool_relations : bool
   }
 
+type gen_info =
+  | Old_OCanren
+  | Only_Injections
+  | Distribs
+
 type noCanren_params =
   { input_name : string
   ; output_name : string option
@@ -51,7 +56,7 @@ type noCanren_params =
   ; high_order_paprams : noCanren_high_params
   ; unnesting_params : noCanren_unnesting_params
   ; useGT : bool
-  ; old_ocanren : bool
+  ; gen_info : gen_info
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
   ; reexport_path : string list
