@@ -13,10 +13,10 @@
  (modules GCW GCW_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets GCW.ml)
@@ -37,10 +37,10 @@
  (modules bottles bottles_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets bottles.ml)
@@ -61,10 +61,10 @@
  (modules bridge bridge_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets bridge.ml)
@@ -85,10 +85,10 @@
  (modules einstein einstein_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets einstein.ml)
@@ -109,10 +109,10 @@
  (modules hanoi hanoi_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets hanoi.ml)
@@ -133,10 +133,10 @@
  (modules hanoi2 hanoi2_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets hanoi2.ml)
@@ -157,10 +157,10 @@
  (modules hm_inferencer hm_inferencer_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets hm_inferencer.ml)
@@ -181,10 +181,10 @@
  (modules scheme_interpreter scheme_interpreter_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets scheme_interpreter.ml)
@@ -205,10 +205,10 @@
  (modules sudoku4x4 sudoku4x4_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets sudoku4x4.ml)
@@ -229,10 +229,10 @@
  (modules unify unify_run)
  (preprocess
   (pps
-    OCanren-ppx.ppx_repr
-    OCanren-ppx.ppx_fresh
-    OCanren-ppx.ppx_distrib
-    GT.ppx_all)))
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
 
 (rule
  (targets unify.ml)
@@ -244,6 +244,7 @@
    sh
    -c
    "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
 (cram
  ;(package noCanren-tests)
  (deps
@@ -256,5 +257,4 @@
   ./hm_inferencer_run.exe
   ./scheme_interpreter_run.exe
   ./sudoku4x4_run.exe
-  ./unify_run.exe
-))
+  ./unify_run.exe))

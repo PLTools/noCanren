@@ -46,6 +46,7 @@ let footer names =
   Stdio.printf " (deps\n";
   Array.iter names ~f:(Stdio.printf "  ./%s_run.exe\n");
   Stdio.printf "))\n"
+;;
 
 let () =
   let path = (Sys.get_argv ()).(1) in
