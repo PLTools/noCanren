@@ -437,3 +437,9 @@ let normalize_let_name pat =
   if get_pat_name pat = source_bind_name then rename_pat pat bind_name
   else pat
 
+let has_named_attribute name attrs =
+  let exception Found in
+  try
+    List.iter (fun {attr_name={txt}} -> if txt = name then raise Found) attrs;
+    false
+  with Found -> true
