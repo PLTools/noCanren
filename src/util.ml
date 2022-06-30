@@ -54,6 +54,7 @@ type noCanren_params =
   ; old_ocanren : bool
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
+  ; reexport_path : string list
   }
 
 (***************************** Util types *********************************)

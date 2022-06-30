@@ -345,7 +345,7 @@ let prepare_distribs_new ~loc tdecl =
                ])
 ;;
 
-let revisit_type loc tdecl ~old_ocanren useGT =
+let revisit_type ~params loc tdecl =
   let tdecl =
     { tdecl with
       ptype_attributes =
@@ -367,46 +367,78 @@ let revisit_type loc tdecl ~old_ocanren useGT =
         n + 1, FoldInfo.extend new_name arg arg map, Typ.var new_name :: args)
   in
   let mapa, full_t =
-    match tdecl.ptype_kind with
-    | Ptype_variant ctors ->
-      List.fold_right
-        (fun cd (n, acc_map, cs) ->
-          let acc = n, acc_map, [] in
-          match cd.pcd_args with
-          | Pcstr_tuple tt ->
-            let n, map2, new_args = List.fold_right abstracting_internal_type tt acc in
-            let new_args = Pcstr_tuple new_args in
-            n, map2, { cd with pcd_args = new_args } :: cs
-          | Pcstr_record lds ->
-            let typs = List.map (fun ldt -> ldt.pld_type) lds in
-            let n, map2, new_args = List.fold_right abstracting_internal_type typs acc in
-            let new_args =
-              Pcstr_record (List.map2 (fun ld t -> { ld with pld_type = t }) lds new_args)
-            in
-            n, map2, { cd with pcd_args = new_args } :: cs)
-        ctors
-        (0, FoldInfo.empty, [])
-      |> fun (_, mapa, cs) -> mapa, { tdecl with ptype_kind = Ptype_variant cs }
-    | Ptype_record fields ->
-      List.fold_right
-        (fun field (n, map, args) ->
-          let typ = field.pld_type in
-          let upd_field typ = { field with pld_type = typ } in
-          match typ with
-          | [%type: _] -> assert false
-          | { ptyp_desc = Ptyp_var s; _ } -> n, map, field :: args
-          | arg ->
-            (match FoldInfo.param_for_rtyp arg map with
-            | Some { param_name } -> n, map, upd_field (Typ.var param_name) :: args
-            | None ->
-              let new_name = sprintf "a%d" n in
-              ( n + 1
-              , FoldInfo.extend new_name arg arg map
-              , upd_field (Typ.var new_name) :: args )))
-        fields
-        (0, FoldInfo.empty, [])
-      |> fun (_, mapa, fields) -> mapa, { tdecl with ptype_kind = Ptype_record fields }
-    | Ptype_abstract | Ptype_open -> Util.fail_loc loc "Not supported"
+    let () =
+      match tdecl.ptype_manifest with
+      | Some _ -> Util.fail_loc tdecl.ptype_loc "No manifest required"
+      | None -> ()
+    in
+    let mapa, new_kind =
+      match tdecl.ptype_kind with
+      | Ptype_abstract | Ptype_open -> Util.fail_loc loc "Not supported"
+      | Ptype_variant ctors ->
+        let _, mapa, kind =
+          List.fold_right
+            (fun cd (n, acc_map, cs) ->
+              let acc = n, acc_map, [] in
+              match cd.pcd_args with
+              | Pcstr_tuple tt ->
+                let n, map2, new_args =
+                  List.fold_right abstracting_internal_type tt acc
+                in
+                let new_args = Pcstr_tuple new_args in
+                n, map2, { cd with pcd_args = new_args } :: cs
+              | Pcstr_record lds ->
+                let typs = List.map (fun ldt -> ldt.pld_type) lds in
+                let n, map2, new_args =
+                  List.fold_right abstracting_internal_type typs acc
+                in
+                let new_args =
+                  Pcstr_record
+                    (List.map2 (fun ld t -> { ld with pld_type = t }) lds new_args)
+                in
+                n, map2, { cd with pcd_args = new_args } :: cs)
+            ctors
+            (0, FoldInfo.empty, [])
+        in
+        mapa, Ptype_variant kind
+      | Ptype_record fields ->
+        let _, mapa, kind =
+          List.fold_right
+            (fun field (n, map, args) ->
+              let typ = field.pld_type in
+              let upd_field typ = { field with pld_type = typ } in
+              match typ with
+              | [%type: _] -> assert false
+              | { ptyp_desc = Ptyp_var s; _ } -> n, map, field :: args
+              | arg ->
+                (match FoldInfo.param_for_rtyp arg map with
+                | Some { param_name } -> n, map, upd_field (Typ.var param_name) :: args
+                | None ->
+                  let new_name = sprintf "a%d" n in
+                  ( n + 1
+                  , FoldInfo.extend new_name arg arg map
+                  , upd_field (Typ.var new_name) :: args )))
+            fields
+            (0, FoldInfo.empty, [])
+        in
+        mapa, Ptype_record kind
+    in
+    let ptype_manifest =
+      match
+        Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
+      with
+      | None -> None
+      | Some lid ->
+        if new_kind = tdecl.ptype_kind
+        then
+          (* Indeed fully abstract *)
+          Option.some
+          @@ Ast_helper.Typ.constr
+               (Location.mknoloc lid)
+               (List.map fst tdecl.ptype_params)
+        else None
+    in
+    mapa, { tdecl with ptype_manifest; ptype_kind = new_kind }
   in
   (* now we need to add some parameters if we collected ones *)
   let functor_typ, typ_to_add =
@@ -427,14 +459,14 @@ let revisit_type loc tdecl ~old_ocanren useGT =
         { full_t with ptype_params = full_t.ptype_params @ extra_params })
     in
     ( result_type
-    , if old_ocanren
+    , if params.Util.old_ocanren
       then (
-        let fmap_for_typ = Old_OCanren.prepare_fmap ~loc result_type useGT in
+        let fmap_for_typ = Old_OCanren.prepare_fmap ~loc result_type params.Util.useGT in
         Old_OCanren.prepare_distribs ~loc result_type fmap_for_typ)
       else prepare_distribs_new ~loc result_type )
   in
   let gt_attribute =
-    if useGT
+    if params.Util.useGT
     then
       [ Attr.mk
           (mknoloc "deriving")
@@ -456,13 +488,13 @@ let has_to_gen_attr (xs : attributes) =
   | Not_found -> false
 ;;
 
-let main_mapper ~old_ocanren useGT =
+let main_mapper params =
   let wrap_tydecls loc ts =
     let f tdecl =
       match tdecl.ptype_kind with
       | (Ptype_variant _ | Ptype_record _)
         when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-        revisit_type loc tdecl ~old_ocanren useGT
+        revisit_type ~params loc tdecl
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
@@ -485,7 +517,7 @@ let main_mapper ~old_ocanren useGT =
   }
 ;;
 
-let process ~old_ocanren useGT =
-  let mapper = main_mapper ~old_ocanren useGT in
+let process params =
+  let mapper = main_mapper params in
   mapper.structure mapper
 ;;

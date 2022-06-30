@@ -84,6 +84,7 @@ let subst_only_util_vars = ref false
 let output_name_for_spec_tree = ref None
 let useGT = ref false
 let old_ocanren = ref false
+let reexport_path = ref []
 let syntax_extenstions = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
@@ -155,9 +156,14 @@ let all_options =
   ; ( "-remove-syntax-extensions"
     , Arg.Unit (fun _ -> syntax_extenstions := false)
     , " Remove suntax extensions ('call_fresh' instead of 'fresh')" )
+  ; ( "-reexport-path"
+    , Arg.String (fun s -> reexport_path := String.split_on_char '.' s)
+    , " Add a module path for reexporting of types" )
   ]
   @ OcamlcOptions.list
 ;;
+
+(* TODO: Kakadu. Why we have multiple refs and we collect them into a record instead of a record with mutable fields??? *)
 
 let mk_noCanren_params () =
   if !unnesting_mode
@@ -201,6 +207,7 @@ let mk_noCanren_params () =
   ; old_ocanren = !old_ocanren
   ; syntax_extenstions = !syntax_extenstions
   ; output_name_for_spec_tree = !output_name_for_spec_tree
+  ; reexport_path = !reexport_path
   }
 ;;
 
