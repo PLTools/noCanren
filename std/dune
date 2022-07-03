@@ -1,0 +1,15 @@
+(library
+ (name Maybe)
+ (modules Maybe)
+ (flags
+  (:standard -rectypes))
+ (libraries GT OCanren)
+ (preprocess
+  (per_module
+   ((pps
+     ppx_expect
+     ppx_inline_test
+     OCanren-ppx.ppx_repr
+     OCanren-ppx.ppx_fresh
+     GT.ppx_all)
+    Maybe))))
