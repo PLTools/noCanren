@@ -56,6 +56,13 @@ type noCanren_params =
   ; output_name_for_spec_tree : string option
   }
 
+(***************************** Util types *********************************)
+
+type binding =
+  | FailureExpr
+  | Alias of Parsetree.expression * Parsetree.expression
+  | Call of Parsetree.expression * Parsetree.expression
+
 (***************************** Constants **********************************)
 
 let fresh_var_prefix = "q"
@@ -292,7 +299,7 @@ let create_conj = function
 ;;
 
 let create_disj = function
-  | [] -> failwith "Conjunction needs one or more arguments"
+  | [] -> failwith "Disjunction needs one or more arguments"
   | [ x ] -> x
   | [ x; y ] ->
     let loc = Ppxlib.Location.none in
@@ -444,6 +451,10 @@ let translate_pat pat fresher =
     | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
     | Tpat_construct ({ txt = Lident "[]" }, _, [], _) ->
       [%expr [%e mark_constr [%expr nil]] ()], [], []
+    | Tpat_construct ({ txt = Lident "Just" }, _, [ arg ], _) -> helper arg
+    | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
+      let v = fresher () in
+      create_id v, [ FailureExpr ], [ v ]
     | Tpat_construct (id, _, [], _) ->
       ( [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()]
       , []
@@ -486,7 +497,7 @@ let translate_pat pat fresher =
       create_apply (mark_constr ctor) args, als, vars
     | Tpat_alias (p, v, _) ->
       let pat, als, vars = helper p in
-      create_id (name v), (create_id (name v), pat) :: als, name v :: vars
+      create_id (name v), Alias (create_id (name v), pat) :: als, name v :: vars
     | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
   in
   helper pat
@@ -528,6 +539,14 @@ let translate_or_pats pat fresher =
   let transl_pats = List.map (fun p -> translate_pat p fresher) @@ split_or_pat pat in
   let vars = uniq @@ List.concat_map (fun (_, _, a) -> a) transl_pats in
   List.map (fun (a, b, _) -> a, b) transl_pats, vars
+;;
+
+let alias2unify alias =
+  let loc = Ppxlib.Location.none in
+  match alias with
+  | FailureExpr -> [%expr failure]
+  | Alias (v, a) -> [%expr [%e v] === [%e a]]
+  | Call (v, a) -> create_apply a [ v ]
 ;;
 
 let is_disj_pats pats =

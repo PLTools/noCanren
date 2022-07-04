@@ -35,20 +35,23 @@ let translate_high tast start_index params =
   let rec unnest_constuct e =
     let loc = Ppxlib.Location.none in
     match e.exp_desc with
-    | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), []
+    | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), [], []
     | Texp_construct ({ txt = Lident s }, _, []) when s = "true" || s = "false" ->
-      create_inj (untyper.expr untyper e), []
+      create_inj (untyper.expr untyper e), [], []
+    | Texp_construct ({ txt = Lident s }, _, []) when s = "Nothing" ->
+      let new_var = create_fresh_var_name () in
+      create_id new_var, [ FailureExpr ], [ new_var ]
+    | Texp_construct ({ txt = Lident s }, _, [ a ]) when s = "Just" -> unnest_constuct a
     | Texp_tuple l ->
-      let new_args, fv = List.map unnest_constuct l |> List.split in
-      let fv = List.concat fv in
+      let new_args, als, vars = List.map unnest_constuct l |> split3 in
       ( fold_right1
           (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [ e1; e2 ])
           new_args
-      , fv )
+      , List.concat als
+      , List.concat vars )
     | Texp_construct (name, desc, args) ->
       let args = get_constr_args loc desc args in
-      let new_args, fv = List.map unnest_constuct args |> List.split in
-      let fv = List.concat fv in
+      let new_args, als, vars = List.map unnest_constuct args |> split3 in
       let new_args =
         match new_args with
         | [] -> [ [%expr ()] ]
@@ -60,23 +63,20 @@ let translate_high tast start_index params =
         | Lident "::" -> Lident "%"
         | txt -> lowercase_lident txt
       in
-      create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args, fv
+      ( create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args
+      , List.concat als
+      , List.concat vars )
     | _ ->
       let fr_var = create_fresh_var_name () in
-      create_id fr_var, [ fr_var, e ]
+      create_id fr_var, [ Call (create_id fr_var, translate_expression e) ], [ fr_var ]
   and translate_construct expr =
     let loc = Ppxlib.Location.none in
-    let constr, binds = unnest_constuct expr in
+    let constr, binds, vars = unnest_constuct expr in
     let out_var_name = create_fresh_var_name () in
     let unify_constr = [%expr [%e create_id out_var_name] === [%e constr]] in
-    let conjs =
-      unify_constr
-      :: List.map
-           (fun (v, e) -> create_apply (translate_expression e) [ create_id v ])
-           binds
-    in
+    let conjs = unify_constr :: List.map alias2unify binds in
     let conj = create_conj conjs in
-    let with_fresh = List.fold_right create_fresh (List.map fst binds) conj in
+    let with_fresh = List.fold_right create_fresh vars conj in
     [%expr fun [%p create_logic_var out_var_name] -> [%e with_fresh]]
   and translate_bool_funs_without_false is_or =
     let a1 = create_fresh_var_name () in
@@ -401,7 +401,7 @@ let translate_high tast start_index params =
        in
        let translate_match_pat (pat, als) =
          let unify = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-         let unifies = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+         let unifies = List.map alias2unify als in
          create_conj (unify :: unifies)
        in
        let translate_case case =
@@ -667,7 +667,6 @@ let translate_high tast start_index params =
                mtd_name
                ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
       ]
-      (* [%str: module type [%p Ast_helper.Pat.ident txt] = sig end ] *)
     | Tstr_module
         { mb_name
         ; mb_expr =
@@ -813,6 +812,11 @@ let fresh_and_conjs_normalizer params =
   let has_heavy_attr e =
     List.exists (fun a -> a.attr_name.txt = "heavy") e.pexp_attributes
   in
+  let is_failure e =
+    match e.pexp_desc with
+    | Pexp_ident { txt = Lident "failure" } -> true
+    | _ -> false
+  in
   let rec split_conjs = function
     | [] -> [], [], []
     | c :: cs ->
@@ -845,7 +849,7 @@ let fresh_and_conjs_normalizer params =
           let conjs1, vars1 = get_conjs_and_vars hd in
           let conjs2, vars2 = get_conjs_and_vars_from_list tl in
           conjs1 @ conjs2, vars1 @ vars2
-        | _ -> fail_loc args.pexp_loc "Bad args in fresh var upper"
+        | _ -> fail_loc args.pexp_loc "get_conjs_and_vars_from_list: arg should be list"
       in
       get_conjs_and_vars_from_list args
     | _ -> [ expr ], []
@@ -853,28 +857,33 @@ let fresh_and_conjs_normalizer params =
   let normalizer sub expr =
     let conjs, vars = get_conjs_and_vars expr in
     let conjs = List.map (Ast_mapper.default_mapper.expr sub) conjs in
-    let conjs =
-      if params.move_unifications
-      then (
-        let unifies, conjs, heavies = split_conjs conjs in
-        unifies @ conjs @ heavies)
-      else conjs
-    in
-    let vars_as_apply = function
-      | x :: xs -> create_apply (create_id x) (List.map create_id xs)
-      | _ -> failwith "Incorrect variable count"
-    in
-    let vars_arg = function
-      | [ v ] -> Exp.tuple [ create_id v ]
-      | _ -> vars_as_apply vars
-    in
-    if List.length vars > 0
+    if List.exists is_failure conjs
     then (
       let loc = Ppxlib.Location.none in
-      if params.syntax_extenstions
-      then create_apply [%expr fresh] (vars_arg vars :: conjs)
-      else List.fold_right create_fresh vars (create_conj conjs))
-    else create_conj conjs
+      [%expr failure])
+    else (
+      let conjs =
+        if params.move_unifications
+        then (
+          let unifies, conjs, heavies = split_conjs conjs in
+          unifies @ conjs @ heavies)
+        else conjs
+      in
+      let vars_as_apply = function
+        | x :: xs -> create_apply (create_id x) (List.map create_id xs)
+        | _ -> failwith "Incorrect variable count"
+      in
+      let vars_arg = function
+        | [ v ] -> Exp.tuple [ create_id v ]
+        | _ -> vars_as_apply vars
+      in
+      if List.length vars > 0
+      then (
+        let loc = Ppxlib.Location.none in
+        if params.syntax_extenstions
+        then create_apply [%expr fresh] (vars_arg vars :: conjs)
+        else List.fold_right create_fresh vars (create_conj conjs))
+      else create_conj conjs)
   in
   { Ast_mapper.default_mapper with expr = normalizer }
 ;;

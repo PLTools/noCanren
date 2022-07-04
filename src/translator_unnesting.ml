@@ -242,7 +242,7 @@ let translate tast start_index params =
         else vars
       in
       let unify = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-      let unifies = List.map (fun (v, p) -> [%expr [%e v] === [%e p]]) als in
+      let unifies = List.map alias2unify als in
       let body =
         create_apply
           (translate_expression (filter_vars let_vars vars) case.c_rhs)
