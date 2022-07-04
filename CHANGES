@@ -1,9 +1,17 @@
 ## 0.3.0 (dev)
 
+### Changed
+
+* `let*` support
+* New switch `-distribs` to generate code suitable for `OCanren-ppx.ppx_distrib`
+* New switch `-rexport-path <path>` to reexport types when it is possible
+* Flatten `include struct ... end` (required for running some of PPX rewriters)
+
+## 0.3.0 (2022-04-28)
+
 ## 0.3.0-alpha1 (2022-02-12)
 
 ### Changed
 
-- Update for OCanren 0.3.0 
+- Update for OCanren 0.3.0
 - Change build system to `dune`
-
