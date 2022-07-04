@@ -86,7 +86,9 @@ let translate_high tast start_index params =
     let op = if is_or then [%expr ( ||| )] else [%expr ( &&& )] in
     [%expr
       fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
-        [%e op] ([%e create_id a1] !!true) ([%e create_id a2] !!true)]
+        [%e create_id q]
+        === !!true
+        &&& [%e op] ([%e create_id a1] !!true) ([%e create_id a2] !!true)]
   and translate_bool_funs_with_false is_or =
     let a1 = create_fresh_var_name () in
     let a2 = create_fresh_var_name () in
@@ -693,7 +695,10 @@ let translate_high tast start_index params =
           untyper
           { i with str_desc = Tstr_type (rec_flag, new_decls) }
       ]
-    | Tstr_open _ -> [ untyper.structure_item untyper i ]
+    | Tstr_open od ->
+      (match od.open_expr.mod_desc with
+      | Tmod_ident (_, { txt = Lident "Maybe" }) -> []
+      | _ -> [ untyper.structure_item untyper i ])
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
       List.concat_map translate_structure_item stru.str_items
     | Tstr_attribute
