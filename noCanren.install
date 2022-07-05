@@ -1,7 +1,17 @@
 lib: [
   "_build/install/default/lib/noCanren/META"
+  "_build/install/default/lib/noCanren/Maybe/Maybe.a" {"Maybe/Maybe.a"}
+  "_build/install/default/lib/noCanren/Maybe/Maybe.cma" {"Maybe/Maybe.cma"}
+  "_build/install/default/lib/noCanren/Maybe/Maybe.cmxa" {"Maybe/Maybe.cmxa"}
+  "_build/install/default/lib/noCanren/Maybe/Maybe.ml" {"Maybe/Maybe.ml"}
+  "_build/install/default/lib/noCanren/Maybe/maybe.cmi" {"Maybe/maybe.cmi"}
+  "_build/install/default/lib/noCanren/Maybe/maybe.cmt" {"Maybe/maybe.cmt"}
+  "_build/install/default/lib/noCanren/Maybe/maybe.cmx" {"Maybe/maybe.cmx"}
   "_build/install/default/lib/noCanren/dune-package"
   "_build/install/default/lib/noCanren/opam"
+]
+libexec: [
+  "_build/install/default/lib/noCanren/Maybe/Maybe.cmxs" {"Maybe/Maybe.cmxs"}
 ]
 bin: [
   "_build/install/default/bin/noCanren"

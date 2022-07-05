@@ -1,6 +1,7 @@
 (library
  (name Maybe)
  (modules Maybe)
+ (public_name noCanren.Maybe)
  (flags
   (:standard -rectypes))
  (libraries GT OCanren)
