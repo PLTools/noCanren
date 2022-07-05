@@ -4,3 +4,5 @@ _build
 regression/output/*
 regression/multifiles/*
 #noCanren.install
+/OCanren        # not putting vendored into git
+

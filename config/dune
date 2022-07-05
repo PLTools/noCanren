@@ -1,3 +1,14 @@
 (executable
  (name gentests)
+ (modules gentests)
  (libraries str stdio base))
+
+(executable
+ (name discover)
+ (modules Discover)
+ (libraries str dune-configurator))
+
+(rule
+ (targets path-GT.cfg path-OCanren.cfg)
+ (action
+  (run ./discover.exe)))

@@ -83,7 +83,8 @@ let leave_constuctors = ref false
 let subst_only_util_vars = ref false
 let output_name_for_spec_tree = ref None
 let useGT = ref false
-let old_ocanren = ref false
+let gen_info = ref Util.Only_Injections
+let reexport_path = ref []
 let syntax_extenstions = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
@@ -149,15 +150,26 @@ let all_options =
     , " Show result of conversion in terminal" )
   ; "-useGT", Arg.Unit (fun _ -> useGT := true), " Use GT in translated code"
   ; ( "-old-ocanren"
-    , Arg.Unit (fun _ -> old_ocanren := true)
+    , Arg.Unit (fun _ -> gen_info := Util.Old_OCanren)
     , " Generate interface for old oCanren (<0.3): FMap1/2/3, etc." )
+  ; ( "-new-ocanren"
+    , Arg.Unit (fun _ -> gen_info := Util.Only_Injections)
+    , " Generate just distribs for new OCanren" )
+  ; ( "-distribs"
+    , Arg.Unit (fun _ -> gen_info := Util.Distribs)
+    , " Generate just distribs for new OCanren" )
   ; "-dtypedtree", Arg.Unit (fun _ -> Clflags.dump_typedtree := true), " Trace typed tree"
   ; ( "-remove-syntax-extensions"
     , Arg.Unit (fun _ -> syntax_extenstions := false)
     , " Remove suntax extensions ('call_fresh' instead of 'fresh')" )
+  ; ( "-reexport-path"
+    , Arg.String (fun s -> reexport_path := String.split_on_char '.' s)
+    , " Add a module path for reexporting of types" )
   ]
   @ OcamlcOptions.list
 ;;
+
+(* TODO: Kakadu. Why we have multiple refs and we collect them into a record instead of a record with mutable fields??? *)
 
 let mk_noCanren_params () =
   if !unnesting_mode
@@ -198,9 +210,10 @@ let mk_noCanren_params () =
   ; high_order_paprams
   ; unnesting_params
   ; useGT = !useGT
-  ; old_ocanren = !old_ocanren
+  ; gen_info = !gen_info
   ; syntax_extenstions = !syntax_extenstions
   ; output_name_for_spec_tree = !output_name_for_spec_tree
+  ; reexport_path = !reexport_path
   }
 ;;
 

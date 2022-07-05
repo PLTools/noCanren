@@ -1135,7 +1135,7 @@ let only_generate tast params =
          (let mapper = fresh_and_conjs_normalizer params in
           mapper.structure mapper)
     |> eval_if_need params.high_order_paprams.use_call_by_need call_by_need_creator
-    |> Put_distrib.process ~old_ocanren:params.old_ocanren params.useGT
+    |> Put_distrib.process params
     |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
     |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
   with
