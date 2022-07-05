@@ -1,6 +1,5 @@
 (library
  (name Maybe)
- (public_name noCanren.Maybe)
  (modules Maybe)
  (public_name noCanren.Maybe)
  (flags
