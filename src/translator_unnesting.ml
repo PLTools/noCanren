@@ -161,18 +161,6 @@ let translate tast start_index params =
       in
       eta_form_for_let let_part new_let_vars expr)
   and translate_rec_let let_vars bind expr =
-    let rec is_func_type (t : Types.type_expr) =
-      match Types.get_desc t with
-      | Tarrow _ -> true
-      | Tlink t' -> is_func_type t'
-      | _ -> false
-    in
-    let rec has_func_arg (t : Types.type_expr) =
-      match Types.get_desc t with
-      | Tarrow (_, f, s, _) -> is_func_type f || has_func_arg s
-      | Tlink t' -> has_func_arg t'
-      | _ -> false
-    in
     let rec get_tabling_rank (typ : Types.type_expr) =
       let loc = Ppxlib.Location.none in
       match Types.get_desc typ with

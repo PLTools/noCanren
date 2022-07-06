@@ -431,18 +431,6 @@ let translate_high tast start_index params =
      else fail_loc loc "Pattern matching contains unified patterns"
   and translate_bind bind =
     let bind = { bind with vb_pat = normalize_let_name bind.vb_pat } in
-    let rec is_func_type (t : Types.type_expr) =
-      match Types.get_desc t with
-      | Tarrow _ -> true
-      | Tlink t' -> is_func_type t'
-      | _ -> false
-    in
-    let rec has_func_arg (t : Types.type_expr) =
-      match Types.get_desc t with
-      | Tarrow (_, f, s, _) -> is_func_type f || has_func_arg s
-      | Tlink t' -> has_func_arg t'
-      | _ -> false
-    in
     let rec get_tabling_rank (typ : Types.type_expr) =
       let loc = Ppxlib.Location.none in
       match Types.get_desc typ with
@@ -532,14 +520,15 @@ let translate_high tast start_index params =
         in
         lambdas_and_tabled)
     in
-    let new_name = create_pat (infix_to_prefix (get_pat_name bind.vb_pat) ^ "_o") in
-    let nvb = Vb.mk new_name tabled_body in
-    if is_primary_type bind.vb_expr.exp_type
-    then
-      { nvb with pvb_attributes = [ Attr.mk (mknoloc "need_CbN") (Parsetree.PStr []) ] }
-    else nvb
+    let new_name = infix_to_prefix (get_pat_name bind.vb_pat) ^ "_o" in
+    let nvb = Vb.mk (create_pat new_name) tabled_body in
+    ( new_name
+    , if is_primary_type bind.vb_expr.exp_type
+      then
+        { nvb with pvb_attributes = [ Attr.mk (mknoloc "need_CbN") (Parsetree.PStr []) ] }
+      else nvb )
   and translate_let flag bind expr =
-    let nvb = translate_bind bind in
+    let nvb = snd @@ translate_bind bind in
     Exp.let_ flag [ nvb ] (translate_expression expr)
   and translate_new_record fields typ loc =
     let fields = Array.to_list fields in
@@ -688,7 +677,17 @@ let translate_high tast start_index params =
     | Tstr_value (_, [ { vb_attributes } ])
       when has_named_attribute "only_lozovml" vb_attributes -> []
     | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) -> []
-    | Tstr_value (rec_flag, [ bind ]) -> [ Str.value rec_flag [ translate_bind bind ] ]
+    | Tstr_value (rec_flag, [ bind ]) ->
+      let name = get_pat_name @@ bind.vb_pat in
+      let tr_name, internal_vb = translate_bind bind in
+      let open Sinonims_synthesis in
+      let interface_vb =
+        [ Vb.mk
+            (create_pat name)
+            (compress create_fresh_var_name tr_name bind.vb_expr.exp_type)
+        ]
+      in
+      [ Str.value rec_flag [ internal_vb ]; Str.value Nonrecursive interface_vb ]
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       [ untyper.structure_item
@@ -1122,6 +1121,7 @@ let eval_if_need flag f = if flag then f else fun x -> x
 
 let only_generate tast params =
   try
+    let _ = Sinonims_synthesis.get_arg_types in
     let start_index = get_max_index tast in
     let reductor = beta_reductor start_index params.subst_only_util_vars in
     (if params.unnesting_mode then translate else translate_high) tast start_index params

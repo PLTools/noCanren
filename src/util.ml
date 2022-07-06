@@ -614,3 +614,17 @@ let has_named_attribute name attrs =
   with
   | Found -> true
 ;;
+
+let rec is_func_type (t : Types.type_expr) =
+  match Types.get_desc t with
+  | Tarrow _ -> true
+  | Tlink t' -> is_func_type t'
+  | _ -> false
+;;
+
+let rec has_func_arg (t : Types.type_expr) =
+  match Types.get_desc t with
+  | Tarrow (_, f, s, _) -> is_func_type f || has_func_arg s
+  | Tlink t' -> has_func_arg t'
+  | _ -> false
+;;
