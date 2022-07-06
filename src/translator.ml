@@ -680,7 +680,7 @@ let translate_high tast start_index params =
     | Tstr_value (rec_flag, [ bind ]) ->
       let name = get_pat_name @@ bind.vb_pat in
       let tr_name, internal_vb = translate_bind bind in
-      let open Sinonims_synthesis in
+      let open Synonyms_synthesis in
       let interface_vb =
         [ Vb.mk
             (create_pat name)
@@ -1121,7 +1121,6 @@ let eval_if_need flag f = if flag then f else fun x -> x
 
 let only_generate tast params =
   try
-    let _ = Sinonims_synthesis.get_arg_types in
     let start_index = get_max_index tast in
     let reductor = beta_reductor start_index params.subst_only_util_vars in
     (if params.unnesting_mode then translate else translate_high) tast start_index params

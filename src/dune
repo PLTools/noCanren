@@ -15,7 +15,7 @@
   Translator_unnesting
   Printer_in_spec
   Untype_more
-  Sinonims_synthesis
+  Synonyms_synthesis
   noCanren)
  (preprocess
   (pps ppxlib.metaquot ppx_optcomp)))
