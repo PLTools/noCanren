@@ -1,10 +1,11 @@
 open Maybe
 
-let x = Just (Just 5), Just Nothing 
+let x _ = return (return 5), return fail
 
-let f x = match x with
-| Just (Just a) -> a
-| Just (Nothing) -> 1
-| Nothing -> 2
+let f x =
+  let* x1 = x in
+  let* x2 = x1 in
+  return x2
+;;
 
-let g x = f Nothing
+let g x = f fail

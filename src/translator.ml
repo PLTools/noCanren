@@ -695,10 +695,7 @@ let translate_high tast start_index params =
           untyper
           { i with str_desc = Tstr_type (rec_flag, new_decls) }
       ]
-    | Tstr_open od ->
-      (match od.open_expr.mod_desc with
-      | Tmod_ident (_, { txt = Lident "Maybe" }) -> []
-      | _ -> [ untyper.structure_item untyper i ])
+    | Tstr_open _ -> [ untyper.structure_item untyper i ]
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
       List.concat_map translate_structure_item stru.str_items
     | Tstr_attribute
