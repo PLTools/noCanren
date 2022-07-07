@@ -26,3 +26,4 @@
       (conde
          [(q9 === (!! false)) &&& (q11 === (!! false));
          fresh (q4 q5) (q9 === (!! true)) (q5 === (!! true)) (x_o q4) (conde [(q4 === q5) &&& (q11 === (!! true)); (q11 === (!! false)) &&& (q4 =/= q5)])])
+  let foo q13 q12 = foo_o ((===) q13) q12
