@@ -16,6 +16,9 @@
   Printer_in_spec
   Untype_more
   Synonyms_synthesis
+  Beta_reductor
+  Normalizer
+  Call_by_need
   noCanren)
  (preprocess
   (pps ppxlib.metaquot ppx_optcomp)))
