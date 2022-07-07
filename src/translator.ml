@@ -36,7 +36,8 @@ let translate_high tast start_index params =
     let loc = Ppxlib.Location.none in
     match e.exp_desc with
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), [], []
-    | Texp_construct ({ txt = Lident s }, _, []) when s = "true" || s = "false" ->
+    | Texp_construct ({ txt = Lident s }, _, [])
+      when s = "true" || s = "false" || s = "()" ->
       create_inj (untyper.expr untyper e), [], []
     | Texp_construct ({ txt = Lident s }, _, []) when s = "Nothing" ->
       let new_var = create_fresh_var_name () in
