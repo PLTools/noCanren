@@ -4,8 +4,10 @@ lib: [
   "_build/install/default/lib/noCanren/Maybe/Maybe.cma" {"Maybe/Maybe.cma"}
   "_build/install/default/lib/noCanren/Maybe/Maybe.cmxa" {"Maybe/Maybe.cmxa"}
   "_build/install/default/lib/noCanren/Maybe/Maybe.ml" {"Maybe/Maybe.ml"}
+  "_build/install/default/lib/noCanren/Maybe/Maybe.mli" {"Maybe/Maybe.mli"}
   "_build/install/default/lib/noCanren/Maybe/maybe.cmi" {"Maybe/maybe.cmi"}
   "_build/install/default/lib/noCanren/Maybe/maybe.cmt" {"Maybe/maybe.cmt"}
+  "_build/install/default/lib/noCanren/Maybe/maybe.cmti" {"Maybe/maybe.cmti"}
   "_build/install/default/lib/noCanren/Maybe/maybe.cmx" {"Maybe/maybe.cmx"}
   "_build/install/default/lib/noCanren/dune-package"
   "_build/install/default/lib/noCanren/opam"
