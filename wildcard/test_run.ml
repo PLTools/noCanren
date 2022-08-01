@@ -20,7 +20,9 @@ let test ?(n = -1) ~show ~reifier (msg, g) =
   let stream = run q g (fun x -> x#reify reifier) in
   let answs = Stream.take ~n stream in
   Printf.printf "Test (%s):\n" msg;
-  L.iteri (fun i a -> Printf.printf "  Answer %.3d: %s\n" (i + 1) @@ show a) answs;
+  (match answs with
+   | [] -> Printf.printf "  No answers\n"
+   | _ -> L.iteri (fun i a -> Printf.printf "  Answer %.3d: %s\n" (i + 1) @@ show a) answs);
   Printf.printf "\n\n"
 ;;
 
@@ -144,5 +146,17 @@ let _ =
     ~n:10
     ~show:show_pair
     ~reifier:reify_pair;
+  sep ()
+;;
+
+let _ =
+  test (REPR (fun q -> matching q !!1)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!2)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!3)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!4)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!5)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!6)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!7)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!8)) ~show:show_bool_list ~reifier:reify_bool_list;
   sep ()
 ;;

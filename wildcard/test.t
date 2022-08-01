@@ -177,3 +177,44 @@
   
   ======================================================================================================
   
+  Test (fun q -> matching q (!! 1)):
+    Answer 001: [_.22; true; false]
+  
+  
+  Test (fun q -> matching q (!! 2)):
+    Answer 001: [_.21; false; true]
+  
+  
+  Test (fun q -> matching q (!! 3)):
+    Answer 001: [true; _.19 [=/= false]; _.20 [=/= false]]
+    Answer 002: [true; _.19 [=/= false; =/= true]; _.20]
+    Answer 003: [true; _.19 [=/= true]; _.20 [=/= true]]
+    Answer 004: [true; _.19; _.20 [=/= false; =/= true]]
+  
+  
+  Test (fun q -> matching q (!! 4)):
+    Answer 001: [false; false; _.18 [=/= true]]
+  
+  
+  Test (fun q -> matching q (!! 5)):
+    Answer 001: [_.16 [=/= false; =/= true]; _.17 [=/= false]; true]
+    Answer 002: [_.16 [=/= true]; _.17 [=/= false]; true]
+  
+  
+  Test (fun q -> matching q (!! 6)):
+    Answer 001: [_.13 [=/= false; =/= true]; _.14 [=/= false]; _.15 [=/= false; =/= true]]
+    Answer 002: [_.13 [=/= false; =/= true]; _.14 [=/= false; =/= true]; _.15 [=/= true]]
+    Answer 003: [_.13 [=/= false; =/= true]; _.14 [=/= true]; _.15 [=/= true]]
+    Answer 004: [_.13 [=/= false; =/= true]; _.14; _.15 [=/= false; =/= true]]
+    Answer 005: [_.13 [=/= true]; _.14 [=/= false]; _.15 [=/= false; =/= true]]
+    Answer 006: [_.13 [=/= true]; _.14 [=/= false; =/= true]; _.15 [=/= true]]
+  
+  
+  Test (fun q -> matching q (!! 7)):
+    Answer 001: _.12 [=/= _.-42 :: _.-42 :: _.-42 :: []; =/= _.-42 :: _.-42 :: true :: []; =/= false :: false :: _.-42 :: []; =/= true :: _.-42 :: _.-42 :: []; =/= _.-42 :: false :: true :: []; =/= _.-42 :: true :: false :: []]
+  
+  
+  Test (fun q -> matching q (!! 8)):
+    No answers
+  ======================================================================================================
+  
