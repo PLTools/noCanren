@@ -22,3 +22,13 @@ let rec eq_lists l1 l2 =
   | x :: xs, y :: ys -> x = y && eq_lists xs ys
   | _ -> false
 ;;
+
+let matching = function
+  | [ _; true; false ] -> 1
+  | [ _; false; true ] -> 2
+  | [ true; _; _ ] -> 3
+  | [ false; false; _ ] -> 4
+  | [ _; _; true ] -> 5
+  | [ _; _; _ ] -> 6
+  | _ -> 7
+;;
