@@ -385,7 +385,8 @@ let translate_high tast start_index params =
           -> Parsetree.expression
     =
     fun (type a) loc translated_scrutinee attrs (cases : a Typedtree.case list) typ ->
-     if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats
+     let is_disj_pats = cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats in
+     if params.use_wildcard || is_disj_pats
      then (
        let high_extra_args = create_fresh_argument_names_by_args typ in
        let result_arg = create_fresh_var_name () in
@@ -401,19 +402,41 @@ let translate_high tast start_index params =
          let unifies = List.map alias2unify als in
          create_conj (unify :: unifies)
        in
-       let translate_case case =
+       let translate_case case prevs =
+         let prevs, wilds =
+           prevs
+           |> List.map (fun p -> translate_or_pats p create_fresh_var_name)
+           |> List.split
+         in
+         let prevs, _ = List.split @@ List.concat prevs in
+         let wilds = List.concat wilds in
+         let diseqs =
+           List.map (fun p -> [%expr [%e create_id scrutinee_var] =/= [%e p]]) prevs
+         in
          let p_with_als, vs = translate_or_pats case.c_lhs create_fresh_var_name in
          let pats = create_disj (List.map translate_match_pat p_with_als) in
+         let pats_with_diseqs = create_conj (pats :: diseqs) in
          let body =
            create_apply (translate_expression case.c_rhs) (List.map create_id extra_args)
          in
          let abst_body = List.fold_right create_fun vs body in
          let subst = List.map create_subst vs in
          let total_body = create_apply abst_body subst in
-         let conj = create_conj [ pats; total_body ] in
-         List.fold_right create_fresh vs conj
+         let conj = create_conj [ pats_with_diseqs; total_body ] in
+         conj |> List.fold_right create_wildcard wilds |> List.fold_right create_fresh vs
        in
-       let new_cases = List.map translate_case cases in
+       let new_cases =
+         if is_disj_pats
+         then List.map (fun c -> translate_case c []) cases
+         else
+           fst
+           @@ List.fold_left
+                (fun (cs, prevs) case ->
+                  ( translate_case case prevs :: cs
+                  , remove_aliases_from_pat case.c_lhs :: prevs ))
+                ([], [])
+                cases
+       in
        let disj = create_disj new_cases in
        let scrutinee = create_apply translated_scrutinee [ create_id scrutinee_var ] in
        let scrutinee = { scrutinee with pexp_attributes = attrs } in
