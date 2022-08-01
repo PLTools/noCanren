@@ -57,6 +57,7 @@ type noCanren_params =
   ; high_order_paprams : noCanren_high_params
   ; unnesting_params : noCanren_unnesting_params
   ; useGT : bool
+  ; use_wildcard : bool
   ; gen_info : gen_info
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
@@ -347,6 +348,11 @@ let create_fun var body =
 let create_fresh var body =
   let loc = Ppxlib.Location.none in
   create_apply [%expr call_fresh] [ create_fun var body ]
+;;
+
+let create_wildcard var body =
+  let loc = Ppxlib.Location.none in
+  create_apply [%expr wc] [ create_fun var body ]
 ;;
 
 let create_inj expr =

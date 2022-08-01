@@ -95,6 +95,7 @@ let gen_info = ref Util.Only_distribs
 let reexport_path = ref None
 let syntax_extenstions = ref true
 let need_std = ref true
+let use_wildcard = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -181,6 +182,9 @@ let all_options =
     , " Add a module path for reexporting of types" )
   ; "-std", Arg.Unit (fun _ -> need_std := true), "Use std libraries (default)"
   ; "-no-std", Arg.Unit (fun _ -> need_std := false), "Do not use std libraries."
+  ; ( "-without-wildcards"
+    , Arg.Unit (fun _ -> use_wildcard := false)
+    , " Don't use relational wirldcards in output program." )
   ]
   @ OcamlcOptions.list
 ;;
@@ -231,6 +235,7 @@ let mk_noCanren_params () =
   ; output_name_for_spec_tree = !output_name_for_spec_tree
   ; reexport_path = !reexport_path
   ; need_std = !need_std
+  ; use_wildcard = !use_wildcard
   }
 ;;
 
