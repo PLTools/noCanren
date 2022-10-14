@@ -380,7 +380,7 @@ let prepare_distribs_new ~loc tdecl =
              ])
 ;;
 
-let revisit_type ~params loc tdecl =
+let revisit_type ~params rec_flg loc tdecl =
   let tdecl =
     { tdecl with
       ptype_attributes =
@@ -641,7 +641,7 @@ let revisit_type ~params loc tdecl =
     in
     make
       (add_gt_attribute abstract_t)
-      [ Ast_helper.Str.type_ Recursive [ t2 ] ]
+      [ Ast_helper.Str.type_ rec_flg [ t2 ] ]
       ~mname
       ~creators:exposed_creators
 ;;
@@ -661,12 +661,12 @@ let has_to_gen_attr (xs : attributes) =
 ;;
 
 let main_mapper params =
-  let wrap_tydecls loc ts =
+  let wrap_tydecls rec_flg loc ts =
     let f tdecl =
       match tdecl.ptype_kind with
       | (Ptype_variant _ | Ptype_record _)
         when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-        revisit_type ~params loc tdecl
+        revisit_type ~params rec_flg loc tdecl
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
@@ -676,13 +676,13 @@ let main_mapper params =
       (fun self ss ->
         let f si =
           match si.pstr_desc with
-          | Pstr_type (_, tydecls) ->
+          | Pstr_type (rec_flg, tydecls) ->
             let tds_without_synonims =
               List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
             in
             (match tds_without_synonims with
              | [] -> []
-             | _ -> wrap_tydecls si.pstr_loc tydecls)
+             | _ -> wrap_tydecls rec_flg si.pstr_loc tydecls)
           | _ -> [ si ]
         in
         List.concat_map f ss)
