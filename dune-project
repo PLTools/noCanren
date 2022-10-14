@@ -33,7 +33,10 @@
   (OCanren-ppx
    (>= "0.3.0~"))
   (odoc :with-doc)
-  (ocamlformat :with-test)
+  (ocamlformat
+   (and
+    (>= "0.23")
+    :with-test))
   ppx_optcomp
   ppxlib
   ;
