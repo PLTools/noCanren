@@ -10,5 +10,8 @@
 
 (rule
  (targets path-GT.cfg path-OCanren.cfg)
+ (deps
+  (package GT)
+  (package OCanren))
  (action
   (run ./discover.exe)))

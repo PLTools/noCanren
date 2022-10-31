@@ -55,10 +55,10 @@ end = struct
     try
       List.iter
         (function
-          | { info = `Self } -> ()
-          | { info = `Concrete (ltyp, rtyp) } as i ->
-            let new_repr = Format.asprintf "%a" Pprintast.core_type rtyp in
-            if new_repr = typ_repr then raise (ItemFound i))
+         | { info = `Self } -> ()
+         | { info = `Concrete (ltyp, rtyp) } as i ->
+           let new_repr = Format.asprintf "%a" Pprintast.core_type rtyp in
+           if new_repr = typ_repr then raise (ItemFound i))
         ts;
       None
     with
@@ -137,57 +137,59 @@ module Old_OCanren = struct
                     ]
                 ]))
     ; (match tdecl.ptype_kind with
-      | Ptype_variant constructors ->
-        Str.value Recursive
-        @@ List.map
-             (fun { pcd_name; pcd_args } ->
-               let names =
-                 let[@warning "-8"] (Pcstr_tuple xs) = pcd_args in
-                 List.mapi (fun n _ -> Printf.sprintf "x__%d" n) xs
-               in
-               let open Exp in
-               let body =
-                 let constr_itself = construct @@ mknoloc (Lident pcd_name.txt) in
-                 match names with
-                 | [] -> constr_itself None
-                 | [ one ] -> constr_itself (Some (ident @@ mknoloc (Lident one)))
-                 | xs ->
-                   (* construct tuple here *)
-                   constr_itself
-                     (Some
-                        (tuple @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
-               in
-               let body =
-                 [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [ nolabel, body ]]]
-               in
-               Vb.mk
-                 ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
-                 (Pat.var @@ lower_lid pcd_name)
-                 (match names with
-                 | [] -> [%expr fun () -> [%e body]]
-                 | names ->
-                   List.fold_right
-                     (fun name acc -> Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc)
-                     names
-                     body))
-             constructors
-      | Ptype_record fields ->
-        fields
-        |> List.map (fun { pld_name } ->
-               let name = pld_name.txt in
-               let lid = mknoloc @@ Longident.Lident name in
-               lid, Exp.ident lid)
-        |> fun b ->
-        [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [ nolabel, Exp.record b None ]]]
-        |> List.fold_right
-             (function
+       | Ptype_variant constructors ->
+         Str.value Recursive
+         @@ List.map
+              (fun { pcd_name; pcd_args } ->
+                let names =
+                  let[@warning "-8"] (Pcstr_tuple xs) = pcd_args in
+                  List.mapi (fun n _ -> Printf.sprintf "x__%d" n) xs
+                in
+                let open Exp in
+                let body =
+                  let constr_itself = construct @@ mknoloc (Lident pcd_name.txt) in
+                  match names with
+                  | [] -> constr_itself None
+                  | [ one ] -> constr_itself (Some (ident @@ mknoloc (Lident one)))
+                  | xs ->
+                    (* construct tuple here *)
+                    constr_itself
+                      (Some
+                         (tuple
+                         @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
+                in
+                let body =
+                  [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [ nolabel, body ]]]
+                in
+                Vb.mk
+                  ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
+                  (Pat.var @@ lower_lid pcd_name)
+                  (match names with
+                   | [] -> [%expr fun () -> [%e body]]
+                   | names ->
+                     List.fold_right
+                       (fun name acc ->
+                         Exp.fun_ nolabel None (Pat.var @@ mknoloc name) acc)
+                       names
+                       body))
+              constructors
+       | Ptype_record fields ->
+         fields
+         |> List.map (fun { pld_name } ->
+              let name = pld_name.txt in
+              let lid = mknoloc @@ Longident.Lident name in
+              lid, Exp.ident lid)
+         |> fun b ->
+         [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [ nolabel, Exp.record b None ]]]
+         |> List.fold_right
+              (function
                | { pld_name } -> Exp.fun_ nolabel None Pat.(var @@ mknoloc pld_name.txt))
-             fields
-        |> Vb.mk
-             ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
-             (Pat.var @@ mknoloc @@ sprintf "ctor_%s" type_name)
-        |> fun vb -> Str.value Nonrecursive [ vb ]
-      | Ptype_abstract | Ptype_open -> Util.fail_loc loc "Not supported")
+              fields
+         |> Vb.mk
+              ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
+              (Pat.var @@ mknoloc @@ sprintf "ctor_%s" type_name)
+         |> fun vb -> Str.value Nonrecursive [ vb ]
+       | Ptype_abstract | Ptype_open -> Util.fail_loc loc "Not supported")
     ]
   ;;
 
@@ -203,10 +205,10 @@ module Old_OCanren = struct
       | Ptype_variant constructors ->
         constructors
         |> List.map (fun { pcd_name } ->
-               Vb.mk
-                 ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
-                 (Pat.var @@ lower_lid pcd_name)
-                 [%expr fun () -> !![%e construct (mknoloc (Lident pcd_name.txt)) None]])
+             Vb.mk
+               ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
+               (Pat.var @@ lower_lid pcd_name)
+               [%expr fun () -> !![%e construct (mknoloc (Lident pcd_name.txt)) None]])
         |> List.map (fun vb -> Str.value Nonrecursive [ vb ]))
   ;;
 
@@ -222,49 +224,49 @@ module Old_OCanren = struct
         let cases =
           constructors
           |> List.map (fun { pcd_name; pcd_args } ->
-                 let argnames = get_param_names pcd_args in
-                 let cname = pcd_name.txt in
-                 let clid = mknoloc @@ Longident.Lident cname in
-                 let make_f_expr name =
-                   Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ name)
+               let argnames = get_param_names pcd_args in
+               let cname = pcd_name.txt in
+               let clid = mknoloc @@ Longident.Lident cname in
+               let make_f_expr name =
+                 Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ name)
+               in
+               let pc_lhs, pc_rhs =
+                 let wrap_one_arg typname new_name =
+                   Exp.(
+                     apply
+                       (make_f_expr typname)
+                       [ nolabel, ident @@ mknoloc @@ Longident.Lident new_name ])
                  in
-                 let pc_lhs, pc_rhs =
-                   let wrap_one_arg typname new_name =
-                     Exp.(
-                       apply
-                         (make_f_expr typname)
-                         [ nolabel, ident @@ mknoloc @@ Longident.Lident new_name ])
-                   in
-                   let get_pat_name i name = sprintf "%s_%d" name i in
-                   match argnames with
-                   | [] -> None, None
-                   | [ s ] ->
-                     Some ([], Ast_helper.Pat.var (mknoloc s)), Some (wrap_one_arg s s)
-                   | ___ ->
-                     ( Some
-                         ( []
-                         , Ast_helper.Pat.(
-                             tuple
-                             @@ List.mapi
-                                  (fun n name -> var (mknoloc @@ get_pat_name n name))
-                                  argnames) )
-                     , Some
-                         (Exp.tuple
-                         @@ List.mapi
-                              (fun n name -> wrap_one_arg name @@ get_pat_name n name)
-                              argnames) )
-                 in
-                 let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in
-                 let pc_rhs = Exp.construct clid pc_rhs in
-                 let pc_guard = None in
-                 { pc_rhs; pc_lhs; pc_guard })
+                 let get_pat_name i name = sprintf "%s_%d" name i in
+                 match argnames with
+                 | [] -> None, None
+                 | [ s ] ->
+                   Some ([], Ast_helper.Pat.var (mknoloc s)), Some (wrap_one_arg s s)
+                 | ___ ->
+                   ( Some
+                       ( []
+                       , Ast_helper.Pat.(
+                           tuple
+                           @@ List.mapi
+                                (fun n name -> var (mknoloc @@ get_pat_name n name))
+                                argnames) )
+                   , Some
+                       (Exp.tuple
+                       @@ List.mapi
+                            (fun n name -> wrap_one_arg name @@ get_pat_name n name)
+                            argnames) )
+               in
+               let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in
+               let pc_rhs = Exp.construct clid pc_rhs in
+               let pc_guard = None in
+               { pc_rhs; pc_lhs; pc_guard })
         in
         [%stri
           let[@service_function] rec fmap =
             [%e
               List.fold_right
                 (function
-                  | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f" ^ name)))
+                 | name -> Exp.fun_ nolabel None Pat.(var @@ mknoloc ("f" ^ name)))
                 param_names
                 (Exp.function_ cases)]
           ;;]
@@ -272,19 +274,19 @@ module Old_OCanren = struct
         let pattern =
           fields
           |> List.map (fun { pld_name } ->
-                 let name = pld_name.txt in
-                 let lid = mknoloc @@ Longident.Lident name in
-                 lid, Pat.var @@ mknoloc name)
+               let name = pld_name.txt in
+               let lid = mknoloc @@ Longident.Lident name in
+               lid, Pat.var @@ mknoloc name)
           |> fun b -> Pat.record b Closed
         in
         let body =
           fields
           |> List.map (fun { pld_type; pld_name } ->
-                 let type_name =
-                   Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ extract_name pld_type)
-                 in
-                 let lid = mknoloc @@ Longident.Lident pld_name.txt in
-                 lid, Exp.apply type_name [ nolabel, Exp.ident lid ])
+               let type_name =
+                 Exp.ident @@ mknoloc @@ Longident.Lident ("f" ^ extract_name pld_type)
+               in
+               let lid = mknoloc @@ Longident.Lident pld_name.txt in
+               lid, Exp.apply type_name [ nolabel, Exp.ident lid ])
           |> fun b -> Exp.record b None |> Exp.fun_ Asttypes.Nolabel None pattern
         in
         [%stri
@@ -338,48 +340,47 @@ let prepare_distribs_new ~loc tdecl =
     let open Longident in
     cs
     |> List.map (fun { pcd_name; pcd_args } ->
-           let construct_expr = construct (mknoloc (Lident pcd_name.txt)) in
-           match pcd_args with
-           | Pcstr_record labs ->
-             for_record
-               (Pat.var (lower_lid pcd_name))
-               (fun r -> construct_expr (Some r))
-               labs
-           | Pcstr_tuple [] ->
-             (* There we need to add extra unit argument *)
-             [%stri
-               let [%p Pat.var (lower_lid pcd_name)] =
-                fun () -> OCanren.inj [%e construct_expr None]
-              ;;]
-           | Pcstr_tuple ts ->
-             let ns = List.mapi (fun n _ -> n) ts in
-             let add_abs =
-               List.fold_right
-                 (fun n acc next ->
-                   [%expr
-                     fun [%p Pat.var @@ mkloc (Printf.sprintf "x%d" n) loc] ->
-                       [%e acc next]])
-                 ns
-                 (fun x -> x)
-             in
-             let add_args =
-               construct_expr
-               @@ Option.some
-               @@ Exp.tuple
-               @@ List.map
-                    (fun x -> Exp.ident (mknoloc (Lident (Printf.sprintf "x%d" x))))
-                    ns
-             in
-             Str.value
-               Nonrecursive
-               [ Vb.mk
-                   ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
-                   (Pat.var @@ lower_lid pcd_name)
-                   (add_abs [%expr OCanren.inj [%e add_args]])
-               ])
+         let construct_expr = construct (mknoloc (Lident pcd_name.txt)) in
+         match pcd_args with
+         | Pcstr_record labs ->
+           for_record
+             (Pat.var (lower_lid pcd_name))
+             (fun r -> construct_expr (Some r))
+             labs
+         | Pcstr_tuple [] ->
+           (* There we need to add extra unit argument *)
+           [%stri
+             let [%p Pat.var (lower_lid pcd_name)] =
+              fun () -> OCanren.inj [%e construct_expr None]
+            ;;]
+         | Pcstr_tuple ts ->
+           let ns = List.mapi (fun n _ -> n) ts in
+           let add_abs =
+             List.fold_right
+               (fun n acc next ->
+                 [%expr
+                   fun [%p Pat.var @@ mkloc (Printf.sprintf "x%d" n) loc] -> [%e acc next]])
+               ns
+               (fun x -> x)
+           in
+           let add_args =
+             construct_expr
+             @@ Option.some
+             @@ Exp.tuple
+             @@ List.map
+                  (fun x -> Exp.ident (mknoloc (Lident (Printf.sprintf "x%d" x))))
+                  ns
+           in
+           Str.value
+             Nonrecursive
+             [ Vb.mk
+                 ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
+                 (Pat.var @@ lower_lid pcd_name)
+                 (add_abs [%expr OCanren.inj [%e add_args]])
+             ])
 ;;
 
-let revisit_type ~params loc tdecl =
+let revisit_type ~params rec_flg loc tdecl =
   let tdecl =
     { tdecl with
       ptype_attributes =
@@ -398,12 +399,12 @@ let revisit_type ~params loc tdecl =
       n, FoldInfo.extend new_name `Self map, Typ.var new_name :: args
     | arg ->
       (match FoldInfo.param_for_rtyp arg map with
-      | Some { param_name } -> n, map, Typ.var param_name :: args
-      | None ->
-        let new_name = sprintf "a%d" n in
-        ( n + 1
-        , FoldInfo.extend new_name (`Concrete (arg, arg)) map
-        , Typ.var new_name :: args ))
+       | Some { param_name } -> n, map, Typ.var param_name :: args
+       | None ->
+         let new_name = sprintf "a%d" n in
+         ( n + 1
+         , FoldInfo.extend new_name (`Concrete (arg, arg)) map
+         , Typ.var new_name :: args ))
   in
   let abstr_info =
     let () =
@@ -463,12 +464,12 @@ let revisit_type ~params loc tdecl =
                 , upd_field (Typ.var new_name) :: args )
               | arg ->
                 (match FoldInfo.param_for_rtyp arg map with
-                | Some { param_name } -> n, map, upd_field (Typ.var param_name) :: args
-                | None ->
-                  let new_name = sprintf "a%d" n in
-                  ( n + 1
-                  , FoldInfo.extend new_name (`Concrete (arg, arg)) map
-                  , upd_field (Typ.var new_name) :: args )))
+                 | Some { param_name } -> n, map, upd_field (Typ.var param_name) :: args
+                 | None ->
+                   let new_name = sprintf "a%d" n in
+                   ( n + 1
+                   , FoldInfo.extend new_name (`Concrete (arg, arg)) map
+                   , upd_field (Typ.var new_name) :: args )))
             fields
             (0, FoldInfo.empty, [])
         in
@@ -481,16 +482,16 @@ let revisit_type ~params loc tdecl =
         (match
            Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
          with
-        | None -> None
-        | Some lid ->
-          if new_kind = tdecl.ptype_kind
-          then
-            (* Indeed fully abstract *)
-            Option.some
-            @@ Ast_helper.Typ.constr
-                 (Location.mknoloc lid)
-                 (List.map fst tdecl.ptype_params)
-          else None)
+         | None -> None
+         | Some lid ->
+           if new_kind = tdecl.ptype_kind
+           then
+             (* Indeed fully abstract *)
+             Option.some
+             @@ Ast_helper.Typ.constr
+                  (Location.mknoloc lid)
+                  (List.map fst tdecl.ptype_params)
+           else None)
     in
     (*
     Format.printf "(* mapa = %a *)\n%!" FoldInfo.pp mapa;
@@ -508,7 +509,7 @@ let revisit_type ~params loc tdecl =
           ; ptype_params =
               tdecl.ptype_params
               @ FoldInfo.map mapa ~f:(fun fi ->
-                    make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)
+                  make_simple_arg @@ Ast_helper.Typ.var fi.FoldInfo.param_name)
           }
         in
         let extra_params =
@@ -640,7 +641,7 @@ let revisit_type ~params loc tdecl =
     in
     make
       (add_gt_attribute abstract_t)
-      [ Ast_helper.Str.type_ Nonrecursive [ t2 ] ]
+      [ Ast_helper.Str.type_ rec_flg [ t2 ] ]
       ~mname
       ~creators:exposed_creators
 ;;
@@ -660,12 +661,12 @@ let has_to_gen_attr (xs : attributes) =
 ;;
 
 let main_mapper params =
-  let wrap_tydecls loc ts =
+  let wrap_tydecls rec_flg loc ts =
     let f tdecl =
       match tdecl.ptype_kind with
       | (Ptype_variant _ | Ptype_record _)
         when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-        revisit_type ~params loc tdecl
+        revisit_type ~params rec_flg loc tdecl
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
@@ -675,13 +676,13 @@ let main_mapper params =
       (fun self ss ->
         let f si =
           match si.pstr_desc with
-          | Pstr_type (_, tydecls) ->
+          | Pstr_type (rec_flg, tydecls) ->
             let tds_without_synonims =
               List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
             in
             (match tds_without_synonims with
-            | [] -> []
-            | _ -> wrap_tydecls si.pstr_loc tydecls)
+             | [] -> []
+             | _ -> wrap_tydecls rec_flg si.pstr_loc tydecls)
           | _ -> [ si ]
         in
         List.concat_map f ss)

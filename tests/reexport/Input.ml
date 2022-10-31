@@ -33,10 +33,10 @@ let rec even_nat n =
   | S Z -> false
 ;;
 
-type id =
+type nonrec id =
   | A
   | B
 
-type rel =
+type nonrec rel =
   | Sub of id * id
   | Descr of id * id
