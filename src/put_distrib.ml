@@ -680,9 +680,7 @@ let main_mapper params =
             let tds_without_synonims =
               List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
             in
-            (match tds_without_synonims with
-             | [] -> []
-             | _ -> wrap_tydecls rec_flg si.pstr_loc tydecls)
+            wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
           | _ -> [ si ]
         in
         List.concat_map f ss)
