@@ -528,9 +528,9 @@ let translate_high tast start_index params =
       then
         { nvb with pvb_attributes = [ Attr.mk (mknoloc "need_CbN") (Parsetree.PStr []) ] }
       else nvb )
-  and translate_let flag bind expr =
-    let nvb = snd @@ translate_bind bind in
-    Exp.let_ flag [ nvb ] (translate_expression expr)
+  and translate_let flag binds expr =
+    let nvbs = List.map (fun b -> snd @@ translate_bind b) binds in
+    Exp.let_ flag nvbs (translate_expression expr)
   and translate_new_record fields typ loc =
     let fields = Array.to_list fields in
     let ctor = ctor_for_record loc typ in
@@ -638,7 +638,7 @@ let translate_high tast start_index params =
     | Texp_apply (f, a) -> translate_apply f a e.exp_loc
     | Texp_match (s, cs, _) -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
     | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
-    | Texp_let (flag, [ bind ], expr) -> translate_let flag bind expr
+    | Texp_let (flag, binds, expr) -> translate_let flag binds expr
     | Texp_record { fields; extended_expression = None } ->
       translate_new_record fields e.exp_type e.exp_loc
     | Texp_record { fields; extended_expression = Some a } ->
@@ -678,17 +678,21 @@ let translate_high tast start_index params =
     | Tstr_value (_, [ { vb_attributes } ])
       when has_named_attribute "only_lozovml" vb_attributes -> []
     | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) -> []
-    | Tstr_value (rec_flag, [ bind ]) ->
-      let name = get_pat_name @@ bind.vb_pat in
-      let tr_name, internal_vb = translate_bind bind in
-      let open Synonyms_synthesis in
-      let interface_vb =
-        [ Vb.mk
-            (create_pat name)
-            (compress create_fresh_var_name tr_name bind.vb_expr.exp_type)
-        ]
+    | Tstr_value (rec_flag, binds) ->
+      let helper bind =
+        let name = get_pat_name @@ bind.vb_pat in
+        let tr_name, internal_vb = translate_bind bind in
+        let open Synonyms_synthesis in
+        let interface_vb =
+          [ Vb.mk
+              (create_pat name)
+              (compress create_fresh_var_name tr_name bind.vb_expr.exp_type)
+          ]
+        in
+        internal_vb, Str.value Nonrecursive interface_vb
       in
-      [ Str.value rec_flag [ internal_vb ]; Str.value Nonrecursive interface_vb ]
+      let new_binds, synonims = List.map helper binds |> List.split in
+      Str.value rec_flag new_binds :: synonims
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       [ untyper.structure_item
