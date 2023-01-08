@@ -14,5 +14,5 @@
       (((q1 === (o ())) &&& (b_o q5)) |||
          (fresh (x) (q1 === (s x))
             (add_o (fun q4 -> x === q4)
-               (fun q3 -> fresh (q2) (q3 === (s q2)) (b_o q2)) q5)))
+               (fun q3 -> fresh (q2) (q3 === (!! (S (q2)))) (b_o q2)) q5)))
   let add q8 q7 q6 = add_o ((===) q8) ((===) q7) q6

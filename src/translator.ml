@@ -11,7 +11,6 @@ let () = Printexc.record_backtrace true
 (*****************************************************************************************************************************)
 
 let translate_high tast start_index params =
-  let lowercase_lident x = if params.leave_constuctors then x else lowercase_lident x in
   let curr_index = ref start_index in
   let create_fresh_var_name () =
     let name = Printf.sprintf "%s%d" fresh_var_prefix !curr_index in
@@ -53,18 +52,17 @@ let translate_high tast start_index params =
     | Texp_construct (name, desc, args) ->
       let args = get_constr_args loc desc args in
       let new_args, als, vars = List.map unnest_constuct args |> split3 in
-      let new_args =
-        match new_args with
-        | [] -> [ [%expr ()] ]
-        | l -> l
-      in
       let new_name =
         match name.txt with
-        | Lident "[]" -> Lident "nil"
-        | Lident "::" -> Lident "%"
-        | txt -> lowercase_lident txt
+        | Lident "[]" -> Lident "List.Nil"
+        | Lident "::" -> Lident "List.Cons"
+        | txt -> txt
       in
-      ( create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args
+      let constr = mknoloc new_name |> Exp.ident |> mark_constr in
+      ( (match new_args with
+         | [] -> constr
+         | _ -> create_apply constr [ Exp.tuple new_args ])
+        |> create_inj
       , List.concat als
       , List.concat vars )
     | _ ->
