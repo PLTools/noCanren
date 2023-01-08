@@ -2,11 +2,11 @@ open Parsetree
 open Format
 
 let print_tree
-    ?(module_name = "program")
-    ?(tree_name = "tree")
-    ?(last_goal = "last_goal")
-    fmt
-    tree
+  ?(module_name = "program")
+  ?(tree_name = "tree")
+  ?(last_goal = "last_goal")
+  fmt
+  tree
   =
   let name_from_pat pat =
     match pat.ppat_desc with

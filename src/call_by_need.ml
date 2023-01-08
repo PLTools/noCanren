@@ -46,9 +46,9 @@ let call_by_need_creator tree =
     match expr.pexp_desc with
     | Pexp_apply (f, args) ->
       (match f.pexp_desc with
-      | Pexp_ident { txt = Lident fst_var } ->
-        fst_var :: List.map (fun (_, e) -> get_name_from_expr e) args
-      | _ -> failwith "Incorrect the first variable in fresh-expression.")
+       | Pexp_ident { txt = Lident fst_var } ->
+         fst_var :: List.map (fun (_, e) -> get_name_from_expr e) args
+       | _ -> failwith "Incorrect the first variable in fresh-expression.")
     | Pexp_tuple [ e ] -> [ get_name_from_expr e ]
     | _ -> failwith "Incorrect list of variables in fresh-expression."
   in
@@ -85,15 +85,15 @@ let call_by_need_creator tree =
     | [] -> failwith @@ Printf.sprintf "Environment has no var \"%s\"." name
     | x :: xs ->
       (match x with
-      | n, _ -> if n = name then x else lookup name xs)
+       | n, _ -> if n = name then x else lookup name xs)
   in
   let rec split_vars env = function
     | [] -> [], []
     | x :: xs ->
       let f, h = split_vars env xs in
       (match lookup x env with
-      | n, First -> n :: f, h
-      | n, High -> f, n :: h)
+       | n, First -> n :: f, h
+       | n, High -> f, n :: h)
   in
   let vb_is_logic vb = has_attr "need_CbN" vb.pvb_attributes in
   let expr_is_logic e = has_attr "need_CbN" e.pexp_attributes in
@@ -101,11 +101,11 @@ let call_by_need_creator tree =
     match e.pexp_desc with
     | Pexp_fun (_, _, _, body) ->
       (match body.pexp_desc with
-      | Pexp_apply (f, [ _; _ ]) ->
-        (match f.pexp_desc with
-        | Pexp_ident { txt = Lident n } -> n = "==="
-        | _ -> false)
-      | _ -> false)
+       | Pexp_apply (f, [ _; _ ]) ->
+         (match f.pexp_desc with
+          | Pexp_ident { txt = Lident n } -> n = "==="
+          | _ -> false)
+       | _ -> false)
     | _ -> false
   in
   let var_is_logic pat = has_attr "logic" pat.ppat_attributes in

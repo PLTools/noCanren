@@ -1,52 +1,59 @@
 open GT
-
 open OCanren
 open OCanren.Std
 open Tester
-
 open Bridge
 
 (*************************************************)
 module Gperson = struct
   [%%distrib
-  type nonrec  t = Bridge.gperson =
+  type nonrec t = Bridge.gperson =
     | A
     | B
     | C
     | D
-  [@@deriving gt ~options:{show; gmap}]
-  type nonrec ground = t
-  ]
+  [@@deriving gt ~options:{ show; gmap }]
+
+  type nonrec ground = t]
 end
+
 module Gstep = struct
   [%%distrib
   type nonrec 'a0 t = 'a0 Bridge.gstep =
-  | One of 'a0
-  | Two of 'a0 * 'a0
-  [@@deriving gt ~options:{show; gmap}]
-  type nonrec ground = Gperson.ground t
-  ]
+    | One of 'a0
+    | Two of 'a0 * 'a0
+  [@@deriving gt ~options:{ show; gmap }]
+
+  type nonrec ground = Gperson.ground t]
 end
+
 let show_person = function
- | A -> "A"
- | B -> "B"
- | C -> "C"
- | D -> "D"
+  | A -> "A"
+  | B -> "B"
+  | C -> "C"
+  | D -> "D"
+;;
 
 let show_step f = function
- | One x     -> f x
- | Two (x,y) -> Printf.sprintf "(%s, %s)" (f x) (f y)
+  | One x -> f x
+  | Two (x, y) -> Printf.sprintf "(%s, %s)" (f x) (f y)
+;;
 
 let myshow x = show List.ground (show_step show_person) x
 
 (*************************************************)
 
-let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ i - 1
+let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ (i - 1)
 
 (** For high order conversion **)
-let getAnswer_o q t r = getAnswer_o ((===) q) t r
+let getAnswer_o q t r = getAnswer_o (( === ) q) t r
 
 let _ =
-  run_r (Std.List.prj_exn Gstep.prj_exn) myshow (1) q qh ("answers", fun q ->
-    getAnswer_o q standartTimes_o (int2nat 17 |> some)
-  )
+  run_r
+    (Std.List.prj_exn Gstep.prj_exn)
+    myshow
+    1
+    q
+    qh
+    ("answers", fun q -> getAnswer_o q standartTimes_o (int2nat 17 |> some))
+;;

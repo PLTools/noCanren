@@ -132,8 +132,8 @@ let mangle_construct_name name =
   let low =
     String.mapi
       (function
-        | 0 -> Char.lowercase_ascii
-        | _ -> fun x -> x)
+       | 0 -> Char.lowercase_ascii
+       | _ -> fun x -> x)
       name
   in
   match low with
@@ -281,8 +281,8 @@ let create_apply f = function
   | args ->
     let args = List.map (fun a -> Nolabel, a) args in
     (match f.pexp_desc with
-    | Pexp_apply (g, args') -> Exp.apply g (args' @ args)
-    | _ -> Exp.apply f args)
+     | Pexp_apply (g, args') -> Exp.apply g (args' @ args)
+     | _ -> Exp.apply f args)
 ;;
 
 let create_apply_to_list f arg_list =
@@ -342,9 +342,9 @@ let ctor_for_record loc typ =
     | Tlink t -> get_id t
     | Tconstr (p, _, _) ->
       (match path2ident p with
-      | Lident i -> Lident ("ctor_g" ^ i)
-      | Ldot (l, r) -> Ldot (l, "ctor_g" ^ r)
-      | Lapply _ -> fail_loc loc "What is 'Lapply'?")
+       | Lident i -> Lident ("ctor_g" ^ i)
+       | Ldot (l, r) -> Ldot (l, "ctor_g" ^ r)
+       | Lapply _ -> fail_loc loc "What is 'Lapply'?")
     | _ -> fail_loc loc "Incorrect type of record"
   in
   get_id typ |> mknoloc |> Exp.ident
@@ -387,10 +387,10 @@ let create_logic_var name =
 
 let have_unifier =
   let rec helper
-      : type a.
-        a Typedtree.pattern_desc pattern_data
-        -> a Typedtree.pattern_desc pattern_data
-        -> bool
+    : type a.
+      a Typedtree.pattern_desc pattern_data
+      -> a Typedtree.pattern_desc pattern_data
+      -> bool
     =
    fun p1 p2 ->
     match p1.pat_desc, p2.pat_desc with
@@ -470,27 +470,29 @@ let translate_pat pat fresher =
     | Tpat_construct (constr_loc, desc, args, t) ->
       let constr = translate_constr_name loc constr_loc in
       (match desc.cstr_inlined with
-      | None ->
-        let args, als, vars = List.map (fun q -> helper q) args |> split3 in
-        let vars = List.concat vars in
-        let als = List.concat als in
-        create_apply (mark_constr constr) args, als, vars
-      | Some t ->
-        (match args with
-        | [ a ] ->
-          (match a.pat_desc with
-          | Tpat_any ->
-            (match t.type_kind with
-            | Type_record (t, _) ->
-              let vars = List.map (fun _ -> fresher ()) t in
-              let args = List.map create_id vars in
-              create_apply (mark_constr constr) args, [], vars
-            | _ -> fail_loc loc "Wildcard schould have record type for inlined argument")
-          | Tpat_record (fields, _) ->
-            let args, als, vars = translate_record_pat fresher fields in
-            create_apply (mark_constr constr) args, als, vars
-          | _ -> fail_loc loc "Inlined argument of pattern should be record or wildcard")
-        | _ -> fail_loc loc "Pattern with inlined record should have one argument"))
+       | None ->
+         let args, als, vars = List.map (fun q -> helper q) args |> split3 in
+         let vars = List.concat vars in
+         let als = List.concat als in
+         create_apply (mark_constr constr) args, als, vars
+       | Some t ->
+         (match args with
+          | [ a ] ->
+            (match a.pat_desc with
+             | Tpat_any ->
+               (match t.type_kind with
+                | Type_record (t, _) ->
+                  let vars = List.map (fun _ -> fresher ()) t in
+                  let args = List.map create_id vars in
+                  create_apply (mark_constr constr) args, [], vars
+                | _ ->
+                  fail_loc loc "Wildcard schould have record type for inlined argument")
+             | Tpat_record (fields, _) ->
+               let args, als, vars = translate_record_pat fresher fields in
+               create_apply (mark_constr constr) args, als, vars
+             | _ ->
+               fail_loc loc "Inlined argument of pattern should be record or wildcard")
+          | _ -> fail_loc loc "Pattern with inlined record should have one argument"))
     | Tpat_tuple l ->
       let args, als, vars = List.map helper l |> split3 in
       let vars = List.concat vars in
@@ -515,25 +517,27 @@ let get_constr_args loc (desc : Types.constructor_description) args =
   | None -> args
   | Some _ ->
     (match args with
-    | [ a ] ->
-      (match a.exp_desc with
-      | Texp_record { fields; extended_expression } ->
-        let get_expr f =
-          match f with
-          | _, Overridden (_, e) -> e
-          | _ ->
+     | [ a ] ->
+       (match a.exp_desc with
+        | Texp_record { fields; extended_expression } ->
+          let get_expr f =
+            match f with
+            | _, Overridden (_, e) -> e
+            | _ ->
+              fail_loc
+                loc
+                "Inlined argument of constructor should be record without kept \
+                 expressions"
+          in
+          if Option.is_none extended_expression
+          then List.map get_expr @@ Array.to_list fields
+          else
             fail_loc
               loc
-              "Inlined argument of constructor should be record without kept expressions"
-        in
-        if Option.is_none extended_expression
-        then List.map get_expr @@ Array.to_list fields
-        else
-          fail_loc
-            loc
-            "Inlined argument of constructor should be record without extended expression"
-      | _ -> fail_loc loc "Inlined argument of constructor should be record")
-    | _ -> fail_loc loc "Constructor with inlined record should have one argument")
+              "Inlined argument of constructor should be record without extended \
+               expression"
+        | _ -> fail_loc loc "Inlined argument of constructor should be record")
+     | _ -> fail_loc loc "Constructor with inlined record should have one argument")
 ;;
 
 let rec split_or_pat pat =

@@ -101,11 +101,11 @@ let translate_high tast start_index params =
     [%expr
       fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
         call_fresh (fun [%p create_pat b] ->
-            [%e create_id a1] [%e create_id b]
-            &&& conde
-                  [ [%e create_id b] === [%e fst] &&& ([%e create_id q] === [%e fst])
-                  ; [%e create_id b] === [%e snd] &&& [%e create_id a2] [%e create_id q]
-                  ])]
+          [%e create_id a1] [%e create_id b]
+          &&& conde
+                [ [%e create_id b] === [%e fst] &&& ([%e create_id q] === [%e fst])
+                ; [%e create_id b] === [%e snd] &&& [%e create_id a2] [%e create_id q]
+                ])]
   and translate_bool_funs expr is_or =
     if has_named_attribute "rel" expr.exp_attributes
     then translate_bool_funs_without_false is_or
@@ -122,17 +122,17 @@ let translate_high tast start_index params =
     [%expr
       fun [%p create_pat a1] [%p create_pat a2] [%p create_logic_var q] ->
         call_fresh (fun [%p create_pat b1] ->
-            call_fresh (fun [%p create_pat b2] ->
-                [%e create_id a1] [%e create_id b1]
-                &&& [%e create_id a2] [%e create_id b2]
-                &&& conde
-                      [ [%e create_id b1]
-                        === [%e create_id b2]
-                        &&& ([%e create_id q] === [%e fst])
-                      ; [%e create_id b1]
-                        =/= [%e create_id b2]
-                        &&& ([%e create_id q] === [%e snd])
-                      ]))]
+          call_fresh (fun [%p create_pat b2] ->
+            [%e create_id a1] [%e create_id b1]
+            &&& [%e create_id a2] [%e create_id b2]
+            &&& conde
+                  [ [%e create_id b1]
+                    === [%e create_id b2]
+                    &&& ([%e create_id q] === [%e fst])
+                  ; [%e create_id b1]
+                    =/= [%e create_id b2]
+                    &&& ([%e create_id q] === [%e snd])
+                  ]))]
   and translate_not_fun () =
     let a = create_fresh_var_name () in
     let b = create_fresh_var_name () in
@@ -141,11 +141,11 @@ let translate_high tast start_index params =
     [%expr
       fun [%p create_pat a] [%p create_logic_var q] ->
         call_fresh (fun [%p create_pat b] ->
-            [%e create_id a] [%e create_id b]
-            &&& conde
-                  [ [%e create_id b] === !!true &&& ([%e create_id q] === !!false)
-                  ; [%e create_id b] === !!false &&& ([%e create_id q] === !!true)
-                  ])]
+          [%e create_id a] [%e create_id b]
+          &&& conde
+                [ [%e create_id b] === !!true &&& ([%e create_id q] === !!false)
+                ; [%e create_id b] === !!false &&& ([%e create_id q] === !!true)
+                ])]
   and translate_if cond th el =
     let b = create_fresh_var_name () in
     let q = create_fresh_var_name () in
@@ -153,15 +153,15 @@ let translate_high tast start_index params =
     [%expr
       fun [%p create_logic_var q] ->
         call_fresh (fun [%p create_pat b] ->
-            [%e translate_expression cond] [%e create_id b]
-            &&& conde
-                  [ [%e create_id b]
-                    === !!true
-                    &&& [%e translate_expression th] [%e create_id q]
-                  ; [%e create_id b]
-                    === !!false
-                    &&& [%e translate_expression el] [%e create_id q]
-                  ])]
+          [%e translate_expression cond] [%e create_id b]
+          &&& conde
+                [ [%e create_id b]
+                  === !!true
+                  &&& [%e translate_expression th] [%e create_id q]
+                ; [%e create_id b]
+                  === !!false
+                  &&& [%e translate_expression el] [%e create_id q]
+                ])]
   and translate_ident exp txt =
     match txt with
     | Lident "&&" -> translate_bool_funs exp false
@@ -225,8 +225,8 @@ let translate_high tast start_index params =
           let args =
             List.map
               (function
-                | _, Some a -> a
-                | _, None -> failwith "Not implemented")
+               | _, Some a -> a
+               | _, None -> failwith "Not implemented")
               args
           in
           List.fold_left eval_if_need count @@ (func :: args)
@@ -353,16 +353,16 @@ let translate_high tast start_index params =
       (translate_expression f)
       (List.map
          (function
-           | _, Some e ->
-             if is_primary_type e.exp_type
-             then mark_fo_arg @@ translate_expression e
-             else translate_expression e
-           | _ -> fail_loc l "Incorrect argument")
+          | _, Some e ->
+            if is_primary_type e.exp_type
+            then mark_fo_arg @@ translate_expression e
+            else translate_expression e
+          | _ -> fail_loc l "Incorrect argument")
          a)
   and translate_match_without_scrutinee
-      loc
-      (cases : 'a Typedtree.case list)
-      (typ : Types.type_expr)
+    loc
+    (cases : 'a Typedtree.case list)
+    (typ : Types.type_expr)
     =
     match Types.get_desc typ with
     | Tarrow (_, _, r, _) ->
@@ -539,8 +539,8 @@ let translate_high tast start_index params =
     let exprs =
       List.map
         (function
-          | _, Overridden (_, expr) -> translate_expression expr
-          | _, Kept _ -> failwith "not implemented")
+         | _, Overridden (_, expr) -> translate_expression expr
+         | _, Kept _ -> failwith "not implemented")
         fields
     in
     let calls = List.map2 (fun e v -> create_apply e [ create_id v ]) exprs vars in
@@ -563,15 +563,15 @@ let translate_high tast start_index params =
     let exprs =
       fields
       |> List.map (function
-             | _, Overridden (_, e) ->
-               Some (translate_expression e, create_fresh_var_name ())
-             | _ -> None)
+           | _, Overridden (_, e) ->
+             Some (translate_expression e, create_fresh_var_name ())
+           | _ -> None)
     in
     let calls =
       exprs
       |> List.filter_map (function
-             | Some (e, v) -> Some (create_apply e [ create_id v ])
-             | None -> None)
+           | Some (e, v) -> Some (create_apply e [ create_id v ])
+           | None -> None)
     in
     let real_vs =
       List.map2
@@ -585,8 +585,8 @@ let translate_high tast start_index params =
     let add_vs =
       exprs
       |> List.filter_map (function
-             | Some (e, v) -> Some v
-             | None -> None)
+           | Some (e, v) -> Some v
+           | None -> None)
     in
     let uni =
       [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id real_vs)]]

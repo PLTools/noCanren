@@ -16,10 +16,10 @@ let fresh_and_conjs_normalizer params =
     | c :: cs ->
       let unifies, conjs, heavies = split_conjs cs in
       (match c.pexp_desc with
-      | Pexp_apply ({ pexp_desc = Pexp_ident { txt = Lident "===" } }, _) ->
-        c :: unifies, conjs, heavies
-      | _ when has_heavy_attr c -> unifies, conjs, c :: heavies
-      | _ -> unifies, c :: conjs, heavies)
+       | Pexp_apply ({ pexp_desc = Pexp_ident { txt = Lident "===" } }, _) ->
+         c :: unifies, conjs, heavies
+       | _ when has_heavy_attr c -> unifies, conjs, c :: heavies
+       | _ -> unifies, c :: conjs, heavies)
   in
   let rec get_conjs_and_vars expr =
     match expr.pexp_desc with

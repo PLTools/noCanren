@@ -1,33 +1,38 @@
-type nat  = O | S of nat
-type term = Var_ of nat | Constr of nat * term list
+type nat =
+  | O
+  | S of nat
+
+type term =
+  | Var_ of nat
+  | Constr of nat * term list
 
 let rec get_term var subst =
   match subst with
-  | x::xs ->
-    match var with
-    | O   -> x
-    | S n -> get_term n xs
-
+  | x :: xs ->
+    (match var with
+     | O -> x
+     | S n -> get_term n xs)
+;;
 
 let rec forall2 f l1 l2 =
   match l1, l2 with
-  | [], []       -> true
-  | x::xs, y::ys -> f x y && forall2 f xs ys
-
+  | [], [] -> true
+  | x :: xs, y :: ys -> f x y && forall2 f xs ys
+;;
 
 let rec check_uni_f subst ft t =
   match ft, t with
   | Constr (n1, a1), Constr (n2, a2) -> n1 = n2 && forall2 (check_uni_f subst) a1 a2
-  | _              , Var_ v          -> ft = get_term v subst
-
+  | _, Var_ v -> ft = get_term v subst
+;;
 
 let rec check_uni subst t1 t2 =
   match t1, t2 with
   | Constr (n1, a1), Constr (n2, a2) -> n1 = n2 && forall2 (check_uni subst) a1 a2
-  | Var_ v         , Constr (n, a)   -> check_uni_f subst (get_term v subst) t2
-  | Constr (n, a)  , Var_ v          -> check_uni_f subst (get_term v subst) t1
-  | Var_ v1        , Var_ v2         -> get_term v1 subst = get_term v2 subst
-
+  | Var_ v, Constr (n, a) -> check_uni_f subst (get_term v subst) t2
+  | Constr (n, a), Var_ v -> check_uni_f subst (get_term v subst) t1
+  | Var_ v1, Var_ v2 -> get_term v1 subst = get_term v2 subst
+;;
 
 (*
 get_term(o   , [X|XS], X).
@@ -59,7 +64,6 @@ check_uni(c(N, A1), c(N, A2), S) :- for_args(A1, A2, S).
     c(cons, [v(s(o)), v(s(s(s(s(o)))))])]),
   S)
  *)
-
 
 (* let eq_nat a b = a = b
 

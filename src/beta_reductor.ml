@@ -71,11 +71,11 @@ let beta_reductor minimal_index only_q =
         | _ -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction"
       in
       (match args with
-      | arg :: args' when need_subst var arg ->
-        beta_reduction (substitute body var arg) args'
-      | _ ->
-        let loc = Ppxlib.Location.none in
-        create_apply [%expr fun [%p pat] -> [%e beta_reduction body []]] args)
+       | arg :: args' when need_subst var arg ->
+         beta_reduction (substitute body var arg) args'
+       | _ ->
+         let loc = Ppxlib.Location.none in
+         create_apply [%expr fun [%p pat] -> [%e beta_reduction body []]] args)
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs =
         List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs
