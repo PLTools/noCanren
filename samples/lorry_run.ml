@@ -6,6 +6,28 @@ open Lorry
 
 (*************************************************)
 
+module Gnat = struct
+  [%%distrib
+  type nonrec 'a t = 'a Lorry.gnat =
+    | O
+    | S of 'a
+  [@@deriving gt ~options:{ show; gmap }]
+
+  type ground = ground t]
+end
+
+module Gstep = struct
+  [%%distrib
+  type nonrec 'a0 t = 'a0 Lorry.gstep =
+    | Left of 'a0
+    | Right of 'a0
+    | Fill
+    | Pour of 'a0
+  [@@deriving gt ~options:{ show; gmap }]
+
+  type nonrec ground = Gnat.ground t]
+end
+
 let show_number num =
   let rec helper = function
     | O -> 0
@@ -31,7 +53,8 @@ let rec of_int i = if i = 0 then o () else s @@ of_int @@ (i - 1)
 let checkAnswer_o a q p r = checkAnswer_o (( === ) a) (( === ) q) (( === ) p) r
 
 let () =
-  run_exn
+  run_r
+    (List.prj_exn Gstep.prj_exn)
     myshow
     1
     q

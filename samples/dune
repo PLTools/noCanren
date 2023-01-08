@@ -222,6 +222,30 @@
    "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
+ (name lorry_run)
+ (flags
+  (:standard -rectypes))
+ (libraries GT OCanren OCanren.tester)
+ (modules lorry lorry_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
+(rule
+ (targets lorry.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input lorry.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
  (name unify_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.unify)
@@ -281,4 +305,5 @@
   ./hm_inferencer_run.exe
   ./scheme_interpreter_run.exe
   ./sudoku4x4_run.exe
+  ./maybe_test_run.exe
   ./unify_run.exe))
