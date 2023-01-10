@@ -155,7 +155,7 @@ let translate_high tast start_index params =
     | Lident "not" -> translate_not_fun ()
     | Lident "=" -> translate_eq_funs true
     | Lident "<>" -> translate_eq_funs false
-    | _ -> id2id_o txt |> mknoloc |> add_translated_module_name_in_ident |> Exp.ident
+    | _ -> txt |> mknoloc |> add_translated_module_name_in_ident |> Exp.ident
   and translate_abstraciton case =
     let rec normalize_abstraction expr acc =
       match expr.exp_desc with
@@ -312,8 +312,7 @@ let translate_high tast start_index params =
       @ [ result_var ]
     in
     let active_vars =
-      List.map (fun p -> get_pat_name p ^ "_o")
-      @@ List.filter (fun p -> need_to_activate p body) real_vars
+      List.map get_pat_name @@ List.filter (fun p -> need_to_activate p body) real_vars
     in
     let fresh_vars = List.map (fun _ -> create_fresh_var_name ()) active_vars in
     let abstr_body = List.fold_right create_fun active_vars body_with_eta_args in
@@ -330,10 +329,7 @@ let translate_high tast start_index params =
     let with_fresh = List.fold_right create_fresh fresh_vars full_conj in
     let first_fun = create_fun result_var with_fresh in
     let with_eta = List.fold_right create_fun (List.map fst eta_vars) first_fun in
-    List.fold_right
-      create_fun
-      (List.map (fun p -> get_pat_name p ^ "_o") real_vars)
-      with_eta
+    List.fold_right create_fun (List.map get_pat_name real_vars) with_eta
   and translate_apply f a l =
     create_apply
       (translate_expression f)
@@ -399,9 +395,7 @@ let translate_high tast start_index params =
          let body =
            create_apply (translate_expression case.c_rhs) (List.map create_id extra_args)
          in
-         let abst_body =
-           List.fold_right create_fun (List.map (fun v -> v ^ "_o") vs) body
-         in
+         let abst_body = List.fold_right create_fun vs body in
          let subst = List.map create_subst vs in
          let total_body = create_apply abst_body subst in
          let conj = create_conj [ pats; total_body ] in
@@ -436,7 +430,7 @@ let translate_high tast start_index params =
       if (not has_tabled_attr) || has_func_arg typ
       then new_body
       else (
-        let name = get_pat_name bind.vb_pat ^ "_o" in
+        let name = get_pat_name bind.vb_pat in
         let unrec_body = create_fun name new_body in
         let recfunc_argument_name = create_fresh_var_name () in
         let recfunc_argument = create_id recfunc_argument_name in
@@ -507,7 +501,7 @@ let translate_high tast start_index params =
         in
         lambdas_and_tabled)
     in
-    let new_name = infix_to_prefix (get_pat_name bind.vb_pat) ^ "_o" in
+    let new_name = get_pat_name bind.vb_pat in
     let nvb = Vb.mk (create_pat new_name) tabled_body in
     ( new_name
     , if is_primary_type bind.vb_expr.exp_type
@@ -597,10 +591,10 @@ let translate_high tast start_index params =
   and translate_let_star loc let_ body =
     if let_.bop_op_name.txt = source_bind_name
     then (
-      let var = (get_pat_name @@ body.c_lhs) ^ "_o" in
+      let var = get_pat_name @@ body.c_lhs in
       let exp_in = translate_expression body.c_rhs in
       let body = translate_expression let_.bop_exp in
-      create_apply (create_id @@ bind_name ^ "_o") [ body; create_fun var exp_in ])
+      create_apply (create_id @@ bind_name) [ body; create_fun var exp_in ])
     else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
   and translate_rel_memo e =
     let result_arg = create_fresh_var_name () in

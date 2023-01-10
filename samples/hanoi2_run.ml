@@ -30,6 +30,6 @@ let _ =
   @@ Stream.take ~n:1
   @@ run
        q
-       (fun q -> eval_o (( === ) q) (( === ) (start 3)) (finish 3))
+       (fun q -> eval (( === ) q) (( === ) (start 3)) (finish 3))
        (fun rr -> rr#reify (Std.List.prj_exn (Std.Pair.prj_exn prj_exn prj_exn)))
 ;;

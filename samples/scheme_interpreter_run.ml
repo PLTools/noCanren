@@ -71,6 +71,6 @@ let run x = run_r term_reify show_lterm x
 (*************************************************)
 
 (** For high order conversion **)
-let eval_o q l r = eval_o (( === ) q) (( === ) l) r
+let eval q l r = eval (( === ) q) (( === ) l) r
 
-let _ = run 1 q qh ("test", fun q -> eval_o q (nil ()) (val_ q))
+let _ = run 1 q qh ("test", fun q -> eval q (nil ()) (val_ q))

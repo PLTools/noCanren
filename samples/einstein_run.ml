@@ -79,7 +79,7 @@ let reify_state () =
 (*************************************************)
 
 (** For high order conversion **)
-let check_state_o q r = check_state_o (( === ) q) r
+let check_state q r = check_state (( === ) q) r
 
 let run_exn eta = run_r (reify_state ()) eta
-let _ = run_exn myshow 1 q qh ("answers", fun q -> check_state_o q !!true)
+let _ = run_exn myshow 1 q qh ("answers", fun q -> check_state q !!true)

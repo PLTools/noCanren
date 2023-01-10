@@ -30,6 +30,6 @@ let gen_pin n =
 let gen n = triple (gen_pin n) (nil ()) (nil ())
 
 (** For high order conversion **)
-let check_o p q r = check_o (( === ) p) (( === ) q) r
+let check p q r = check (( === ) p) (( === ) q) r
 
-let _ = run 1 q qh ("first", fun q -> check_o (gen 3) q !!true)
+let _ = run 1 q qh ("first", fun q -> check (gen 3) q !!true)

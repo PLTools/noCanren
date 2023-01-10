@@ -27,11 +27,11 @@
   open OCanren.Std
   module HO =
     struct
-      let foo_o x_o q11 =
+      let foo x q11 =
         fresh (q9) (q9 === (!! true)) OCanren.success
           (conde
              [(q9 === (!! false)) &&& (q11 === (!! false));
-             fresh (q4 q5) (q9 === (!! true)) (q5 === (!! true)) (x_o q4) (conde [(q4 === q5) &&& (q11 === (!! true)); (q11 === (!! false)) &&& (q4 =/= q5)])])
+             fresh (q4 q5) (q9 === (!! true)) (q5 === (!! true)) (x q4) (conde [(q4 === q5) &&& (q11 === (!! true)); (q11 === (!! false)) &&& (q4 =/= q5)])])
     end
   module FO = struct open HO
-                     let foo q13 q12 = foo_o ((===) q13) q12 end
+                     let foo q13 q12 = foo ((===) q13) q12 end

@@ -50,7 +50,7 @@ let myshow x = show List.ground show_step x
 let rec of_int i = if i = 0 then o () else s @@ of_int @@ (i - 1)
 
 (** For high order conversion **)
-let checkAnswer_o a q p r = checkAnswer_o (( === ) a) (( === ) q) (( === ) p) r
+let checkAnswer a q p r = checkAnswer (( === ) a) (( === ) q) (( === ) p) r
 
 let () =
   run_r
@@ -59,5 +59,5 @@ let () =
     1
     q
     qh
-    ("answers", fun q -> checkAnswer_o q (of_int 8) (of_int 5) (some @@ of_int 22))
+    ("answers", fun q -> checkAnswer q (of_int 8) (of_int 5) (some @@ of_int 22))
 ;;
