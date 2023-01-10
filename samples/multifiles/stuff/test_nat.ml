@@ -1,1 +1,3 @@
-type nat = O | S of nat
+type nat =
+  | O
+  | S of nat
