@@ -1,6 +1,6 @@
 open Maybe
 
-let x _ = return (return 5), return fail
+let x _ = return (return "5"), return fail
 
 let f x =
   let* x1 = x in

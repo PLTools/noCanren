@@ -21,8 +21,9 @@ let max = lift max
 
 module HO = struct
   include OCanren
-  include NatRaw.HO
+  include PeanoRaw.HO
 
+  let from_int i = Std.nat i
   let ( + ) = add
   let ( - ) x y z = call_fresh (fun x' -> add (( === ) z) y x' &&& x x')
   let ( * ) = mul

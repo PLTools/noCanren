@@ -16,9 +16,9 @@
     Maybe))))
 
 (library
- (name Nat)
- (modules Nat NatRaw)
- (public_name noCanren.Nat)
+ (name Peano)
+ (modules Peano PeanoRaw)
+ (public_name noCanren.Peano)
  (flags
   (:standard -rectypes -rectypes -warn-error -33))
  (libraries GT OCanren)
@@ -31,10 +31,10 @@
    GT.ppx_all)))
 
 (rule
- (targets NatRaw.ml)
+ (targets PeanoRaw.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
-  (:input NatRaw.ml2mk.ml))
+  (:input PeanoRaw.ml2mk.ml))
  (action
   (run
    sh

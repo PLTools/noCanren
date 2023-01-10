@@ -33,6 +33,8 @@ let translate_high tast start_index params =
   let rec unnest_constuct e =
     let loc = Ppxlib.Location.none in
     match e.exp_desc with
+    | Texp_constant (Const_int i) ->
+      [%expr from_int [%e Untypeast.untype_expression e]], [], []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), [], []
     | Texp_construct ({ txt = Lident s }, _, [])
       when s = "true" || s = "false" || s = "()" ->
