@@ -397,6 +397,7 @@ let create_constr constr args =
   in
   (match args with
    | [] -> constr
+   | [ _ ] -> create_apply constr args
    | _ -> create_apply constr [ Exp.tuple args ])
   |> create_inj
 ;;
