@@ -52,19 +52,7 @@ let translate_high tast start_index params =
     | Texp_construct (name, desc, args) ->
       let args = get_constr_args loc desc args in
       let new_args, als, vars = List.map unnest_constuct args |> split3 in
-      let new_name =
-        match name.txt with
-        | Lident "[]" -> Lident "List.Nil"
-        | Lident "::" -> Lident "List.Cons"
-        | txt -> txt
-      in
-      let constr = mknoloc new_name |> Exp.ident |> mark_constr in
-      ( (match new_args with
-         | [] -> constr
-         | _ -> create_apply constr [ Exp.tuple new_args ])
-        |> create_inj
-      , List.concat als
-      , List.concat vars )
+      create_constr name new_args, List.concat als, List.concat vars
     | _ ->
       let fr_var = create_fresh_var_name () in
       create_id fr_var, [ Call (create_id fr_var, translate_expression e) ], [ fr_var ]

@@ -385,6 +385,22 @@ let create_logic_var name =
   }
 ;;
 
+let create_constr constr args =
+  let constr =
+    (match constr.txt with
+     | Lident "::" -> Lident "List.Cons"
+     | Lident "[]" -> Lident "List.Nil"
+     | _ -> constr.txt)
+    |> mknoloc
+    |> Exp.ident
+    |> mark_constr
+  in
+  (match args with
+   | [] -> constr
+   | _ -> create_apply constr [ Exp.tuple args ])
+  |> create_inj
+;;
+
 let have_unifier =
   let rec helper
     : type a.
@@ -416,11 +432,6 @@ let have_unifier =
 ;;
 
 let translate_pat pat fresher =
-  let translate_constr_name loc constr_loc =
-    match constr_loc.txt with
-    | Lident "::" -> [%expr ( % )]
-    | _ -> [%expr [%e lowercase_lident constr_loc.txt |> mknoloc |> Exp.ident]]
-  in
   let rec translate_record_pat fresher fields =
     let _, (info : Types.label_description), _ = List.hd fields in
     let count = Array.length info.lbl_all in
@@ -462,19 +473,14 @@ let translate_pat pat fresher =
     | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
       let v = fresher () in
       create_id v, [ FailureExpr ], [ v ]
-    | Tpat_construct (id, _, [], _) ->
-      ( [%expr [%e lowercase_lident id.txt |> mknoloc |> Exp.ident |> mark_constr] ()]
-      , []
-      , [] )
     | Tpat_value x -> helper (x :> Typedtree.value Typedtree.general_pattern)
     | Tpat_construct (constr_loc, desc, args, t) ->
-      let constr = translate_constr_name loc constr_loc in
       (match desc.cstr_inlined with
        | None ->
          let args, als, vars = List.map (fun q -> helper q) args |> split3 in
          let vars = List.concat vars in
          let als = List.concat als in
-         create_apply (mark_constr constr) args, als, vars
+         create_constr constr_loc args, als, vars
        | Some t ->
          (match args with
           | [ a ] ->
@@ -484,12 +490,12 @@ let translate_pat pat fresher =
                 | Type_record (t, _) ->
                   let vars = List.map (fun _ -> fresher ()) t in
                   let args = List.map create_id vars in
-                  create_apply (mark_constr constr) args, [], vars
+                  create_constr constr_loc args, [], vars
                 | _ ->
                   fail_loc loc "Wildcard schould have record type for inlined argument")
              | Tpat_record (fields, _) ->
                let args, als, vars = translate_record_pat fresher fields in
-               create_apply (mark_constr constr) args, als, vars
+               create_constr constr_loc args, als, vars
              | _ ->
                fail_loc loc "Inlined argument of pattern should be record or wildcard")
           | _ -> fail_loc loc "Pattern with inlined record should have one argument"))

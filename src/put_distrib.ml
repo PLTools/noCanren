@@ -608,6 +608,21 @@ let revisit_type ~params rec_flg loc tdecl =
       }
     in
     let make ~mname t1 t2 ~creators =
+      let type_synonim =
+        let open Longident in
+        str_type_
+          ~loc
+          Nonrecursive
+          [ Ast_helper.Type.mk
+              ~params:t1.ptype_params
+              ~kind:t1.ptype_kind
+              ~manifest:
+                (Typ.constr
+                   (Location.mknoloc @@ Ldot (Lident mname, "t"))
+                   (List.map fst t1.ptype_params))
+              (Location.mkloc ("g" ^ mname) tdecl.ptype_name.loc)
+          ]
+      in
       Str.module_
         (Mb.mk (Location.mknoloc (Some mname))
         @@ Mod.structure
@@ -616,6 +631,7 @@ let revisit_type ~params rec_flg loc tdecl =
                  ( Location.mknoloc "distrib"
                  , PStr (str_type_ ~loc Nonrecursive [ t1 ] :: t2) )
              ])
+      :: type_synonim
       :: creators
     in
     let mname =
