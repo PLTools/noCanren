@@ -432,21 +432,36 @@ let have_unifier =
   helper
 ;;
 
+let is_path_to_ocanren path =
+  let rec helper = function
+    | Lident root -> root = "OCanren"
+    | Ldot (next, _) -> helper next
+    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+  in
+  helper path.txt
+;;
+
 let add_translated_module_name_in_ident path =
-  match path.txt with
-  | Lident _ -> path
-  | Ldot (prepath, i) ->
-    { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
-  | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+  if is_path_to_ocanren path
+  then path
+  else (
+    match path.txt with
+    | Lident _ -> path
+    | Ldot (prepath, i) ->
+      { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
+    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported.")
 ;;
 
 let add_translated_module_name_in_module path =
-  let helper = function
-    | Lident i -> Ldot (Lident i, translated_module_name)
-    | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
-    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
-  in
-  { path with txt = helper path.txt }
+  if is_path_to_ocanren path
+  then path
+  else (
+    let helper = function
+      | Lident i -> Ldot (Lident i, translated_module_name)
+      | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
+      | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+    in
+    { path with txt = helper path.txt })
 ;;
 
 let add_translated_module_name_in_open open_ =

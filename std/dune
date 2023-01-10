@@ -14,3 +14,29 @@
      OCanren-ppx.ppx_fresh
      GT.ppx_all)
     Maybe))))
+
+(library
+ (name Nat)
+ (modules Nat NatRaw)
+ (public_name noCanren.Nat)
+ (flags
+  (:standard -rectypes -rectypes -warn-error -33))
+ (libraries GT OCanren)
+ (preprocess
+  (pps
+   ppx_expect
+   ppx_inline_test
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all)))
+
+(rule
+ (targets NatRaw.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input NatRaw.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
