@@ -2,7 +2,7 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Hanoi
+open Hanoi.HO
 
 (*************************************************)
 

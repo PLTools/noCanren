@@ -2,8 +2,8 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Test_nat
-open Test_mul
+open Test_nat.HO
+open Test_mul.HO
 
 module For_gnat = struct
   [%%distrib

@@ -62,8 +62,6 @@ type noCanren_params =
   ; reexport_path : string list
   }
 
-(***************************** Util types *********************************)
-
 type binding =
   | FailureExpr
   | Alias of Parsetree.expression * Parsetree.expression
@@ -82,6 +80,8 @@ let fresh_five_name = "five"
 let fresh_succ_name = "succ"
 let source_bind_name = "let*"
 let bind_name = "let_star_bind"
+let translated_module_name = "HO"
+let synonoms_module_name = "FO"
 let packages = [ "GT"; "OCanren"; "OCanren.Std" ]
 
 (***************************** Fail util **********************************)
@@ -432,6 +432,33 @@ let have_unifier =
   helper
 ;;
 
+let add_translated_module_name_in_ident path =
+  match path.txt with
+  | Lident _ -> path
+  | Ldot (prepath, i) ->
+    { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
+  | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+;;
+
+let add_translated_module_name_in_module path =
+  let helper = function
+    | Lident i -> Ldot (Lident i, translated_module_name)
+    | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
+    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+  in
+  { path with txt = helper path.txt }
+;;
+
+let add_translated_module_name_in_open open_ =
+  let popen_expr = open_.popen_expr in
+  match popen_expr.pmod_desc with
+  | Pmod_ident i ->
+    let pmod_desc = Pmod_ident (add_translated_module_name_in_module i) in
+    let popen_expr = { popen_expr with pmod_desc } in
+    { open_ with popen_expr }
+  | _ -> fail_loc open_.popen_loc "Unexpected open."
+;;
+
 let translate_pat pat fresher =
   let rec translate_record_pat fresher fields =
     let _, (info : Types.label_description), _ = List.hd fields in
@@ -478,10 +505,11 @@ let translate_pat pat fresher =
     | Tpat_construct (constr_loc, desc, args, t) ->
       (match desc.cstr_inlined with
        | None ->
-         let args, als, vars = List.map (fun q -> helper q) args |> split3 in
+         let args, als, vars = List.map helper args |> split3 in
          let vars = List.concat vars in
          let als = List.concat als in
-         create_constr constr_loc args, als, vars
+         let constr = add_translated_module_name_in_ident constr_loc in
+         create_constr constr args, als, vars
        | Some t ->
          (match args with
           | [ a ] ->
@@ -639,4 +667,48 @@ let rec has_func_arg (t : Types.type_expr) =
   | Tarrow (_, f, s, _) -> is_func_type f || has_func_arg s
   | Tlink t' -> has_func_arg t'
   | _ -> false
+;;
+
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
+;;
+
+let eval_if_need flag f = if flag then f else fun x -> x
+
+let add_packages ast =
+  List.map (fun n -> Lident n |> mknoloc |> Mod.ident |> Opn.mk |> Str.open_) packages
+  @ ast
+;;
+
+let attrs_remover =
+  let expr sub expr =
+    Ast_mapper.default_mapper.expr sub { expr with pexp_attributes = [] }
+  in
+  let value_binding sub vb =
+    Ast_mapper.default_mapper.value_binding sub { vb with pvb_attributes = [] }
+  in
+  let pat sub pat = Ast_mapper.default_mapper.pat sub { pat with ppat_attributes = [] } in
+  { Ast_mapper.default_mapper with expr; value_binding; pat }
+;;
+
+let create_external_open name param =
+  let name = mknoloc name |> Mod.ident in
+  let module_ =
+    match param with
+    | None -> name
+    | Some param -> Mod.functor_ param name
+  in
+  Opn.mk module_ |> Str.open_
+;;
+
+let split_translated_and_synonoms translated_and_synonims =
+  let translated, synonims = List.split translated_and_synonims in
+  List.concat translated, List.concat synonims
+;;
+
+let create_external_attribute name value =
+  PStr [ Const.string value |> Exp.constant |> Str.eval ]
+  |> Attr.mk (mknoloc name)
+  |> Str.attribute
 ;;

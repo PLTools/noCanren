@@ -4,7 +4,6 @@ open Ast_helper
 open Ident
 open Parsetree
 open Util
-open Translator_unnesting
 
 let () = Printexc.record_backtrace true
 
@@ -50,6 +49,7 @@ let translate_high tast start_index params =
       , List.concat als
       , List.concat vars )
     | Texp_construct (name, desc, args) ->
+      let name = add_translated_module_name_in_ident name in
       let args = get_constr_args loc desc args in
       let new_args, als, vars = List.map unnest_constuct args |> split3 in
       create_constr name new_args, List.concat als, List.concat vars
@@ -155,7 +155,7 @@ let translate_high tast start_index params =
     | Lident "not" -> translate_not_fun ()
     | Lident "=" -> translate_eq_funs true
     | Lident "<>" -> translate_eq_funs false
-    | _ -> id2id_o txt |> mknoloc |> Exp.ident
+    | _ -> id2id_o txt |> mknoloc |> add_translated_module_name_in_ident |> Exp.ident
   and translate_abstraciton case =
     let rec normalize_abstraction expr acc =
       match expr.exp_desc with
@@ -638,13 +638,14 @@ let translate_high tast start_index params =
     match i.str_desc with
     | Tstr_modtype { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name } ->
       let loc = i.str_loc in
-      [ Ast_helper.(
-          Str.modtype ~loc:i.str_loc
-          @@ Mtd.mk
-               ~loc
-               mtd_name
-               ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
-      ]
+      ( [ Ast_helper.(
+            Str.modtype ~loc:i.str_loc
+            @@ Mtd.mk
+                 ~loc
+                 mtd_name
+                 ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
+        ]
+      , [] )
     | Tstr_module
         { mb_name
         ; mb_expr =
@@ -653,17 +654,24 @@ let translate_high tast start_index params =
                   ((Named (_, lid, _) as param), { mod_desc = Tmod_structure stru })
             }
         } ->
-      [ Ast_helper.(
-          Str.module_
-          @@ Mb.mk
-               mb_name
-               (Mod.functor_ (Untype_more.untype_functor_param param)
-               @@ Mod.structure
-               @@ List.concat_map translate_structure_item stru.str_items))
-      ]
+      let translated, synonims =
+        split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
+      in
+      let name =
+        match mb_name.txt with
+        | Some n -> Lident n
+        | None -> fail_loc mb_name.loc "Modules without names aren't supported"
+      in
+      let param = Untype_more.untype_functor_param param in
+      let mk_module name items =
+        Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
+      in
+      let synonims = create_external_open name (Some param) :: synonims in
+      [ mk_module mb_name translated ], [ mk_module mb_name synonims ]
     | Tstr_value (_, [ { vb_attributes } ])
-      when has_named_attribute "only_lozovml" vb_attributes -> []
-    | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) -> []
+      when has_named_attribute "only_lozovml" vb_attributes -> [], []
+    | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) ->
+      [], []
     | Tstr_value (rec_flag, binds) ->
       let helper bind =
         let name = get_pat_name @@ bind.vb_pat in
@@ -678,71 +686,65 @@ let translate_high tast start_index params =
         internal_vb, Str.value Nonrecursive interface_vb
       in
       let new_binds, synonims = List.map helper binds |> List.split in
-      Str.value rec_flag new_binds :: synonims
+      [ Str.value rec_flag new_binds ], synonims
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
-      [ untyper.structure_item
-          untyper
-          { i with str_desc = Tstr_type (rec_flag, new_decls) }
-      ]
-    | Tstr_open _ -> [ untyper.structure_item untyper i ]
+      ( [ untyper.structure_item
+            untyper
+            { i with str_desc = Tstr_type (rec_flag, new_decls) }
+        ]
+      , [] )
+    | Tstr_open od ->
+      let open_ = untyper.open_declaration untyper od in
+      let open_ = add_translated_module_name_in_open open_ in
+      [ Str.open_ open_ ], []
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
-      List.concat_map translate_structure_item stru.str_items
+      split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
     | Tstr_attribute
         { attr_name = { txt = "only_ocanren" }; attr_payload = Parsetree.PStr stru } ->
-      stru
+      stru, []
     | _ -> fail_loc i.str_loc "Incorrect structure item"
   in
-  let translate_structure t = List.concat_map translate_structure_item t.str_items in
+  let translate_structure t =
+    let mk_module name items =
+      Ast_helper.(Str.module_ @@ Mb.mk name @@ Mod.structure items)
+    in
+    let translated, synonims =
+      split_translated_and_synonoms @@ List.map translate_structure_item t.str_items
+    in
+    let synonims =
+      create_external_open (Lident translated_module_name) None :: synonims
+    in
+    [ mk_module (mknoloc (Some translated_module_name)) translated
+    ; mk_module (mknoloc (Some synonoms_module_name)) synonims
+    ]
+  in
   translate_structure tast
 ;;
 
 (*****************************************************************************************************************************)
 
-let add_packages ast =
-  List.map (fun n -> Lident n |> mknoloc |> Mod.ident |> Opn.mk |> Str.open_) packages
-  @ ast
-;;
-
-(*****************************************************************************************************************************)
-
-let attrs_remover =
-  let expr sub expr =
-    Ast_mapper.default_mapper.expr sub { expr with pexp_attributes = [] }
-  in
-  let value_binding sub vb =
-    Ast_mapper.default_mapper.value_binding sub { vb with pvb_attributes = [] }
-  in
-  let pat sub pat = Ast_mapper.default_mapper.pat sub { pat with ppat_attributes = [] } in
-  { Ast_mapper.default_mapper with expr; value_binding; pat }
-;;
-
-(*****************************************************************************************************************************)
-
-let print_if ppf flag printer arg =
-  if !flag then Format.fprintf ppf "%a@." printer arg;
-  arg
-;;
-
-let eval_if_need flag f = if flag then f else fun x -> x
-
 let only_generate tast params =
   try
     let start_index = get_max_index tast in
     let reductor = Beta_reductor.beta_reductor start_index params.subst_only_util_vars in
-    (if params.unnesting_mode then translate else translate_high) tast start_index params
-    |> add_packages
-    |> eval_if_need params.beta_reduction (reductor.structure reductor)
-    |> eval_if_need
-         params.normalization
-         (let mapper = Normalizer.fresh_and_conjs_normalizer params in
-          mapper.structure mapper)
-    |> eval_if_need
-         params.high_order_paprams.use_call_by_need
-         Call_by_need.call_by_need_creator
-    |> Put_distrib.process params
-    |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
-    |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+    let translated =
+      translate_high tast start_index params
+      |> add_packages
+      |> eval_if_need params.beta_reduction (reductor.structure reductor)
+      |> eval_if_need
+           params.normalization
+           (let mapper = Normalizer.fresh_and_conjs_normalizer params in
+            mapper.structure mapper)
+      |> eval_if_need
+           params.high_order_paprams.use_call_by_need
+           Call_by_need.call_by_need_creator
+      |> Put_distrib.process params
+      |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
+      |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+    in
+    (create_external_attribute "ocaml.warning" "-8" :: Untypeast.untype_structure tast)
+    @ (create_external_attribute "ocaml.warning" "+8" :: translated)
   with
   | TranslatorError e as exc ->
     report_error Format.std_formatter e;

@@ -2,13 +2,13 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Lorry
+open Lorry.HO
 
 (*************************************************)
 
 module Gnat = struct
   [%%distrib
-  type nonrec 'a t = 'a Lorry.gnat =
+  type nonrec 'a t = 'a gnat =
     | O
     | S of 'a
   [@@deriving gt ~options:{ show; gmap }]
@@ -18,7 +18,7 @@ end
 
 module Gstep = struct
   [%%distrib
-  type nonrec 'a0 t = 'a0 Lorry.gstep =
+  type nonrec 'a0 t = 'a0 gstep =
     | Left of 'a0
     | Right of 'a0
     | Fill

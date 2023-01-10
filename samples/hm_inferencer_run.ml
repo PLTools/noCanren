@@ -2,7 +2,7 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Hm_inferencer
+open Hm_inferencer.HO
 
 (*************************************************)
 module For_gnum = struct

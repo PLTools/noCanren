@@ -2,12 +2,12 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Scheme_interpreter
+open Scheme_interpreter.HO
 
 (*************************************************)
 module For_gvariable = struct
   [%%distrib
-  type nonrec 'a0 t = 'a0 Scheme_interpreter.gvariable =
+  type nonrec 'a0 t = 'a0 gvariable =
     | First
     | Next of 'a0
   [@@deriving gt ~options:{ show; gmap }]
@@ -19,7 +19,7 @@ end
    It is possible to rewrite them unifiably, but I'm not sure is it really what is requried *)
 module For_gidentifier = struct
   [%%distrib
-  type nonrec 'a0 t = 'a0 Scheme_interpreter.gidentifier =
+  type nonrec 'a0 t = 'a0 gidentifier =
     | Lambda
     | Quote
     | List
@@ -31,7 +31,7 @@ end
 
 module For_gterm = struct
   [%%distrib
-  type nonrec ('a1, 'a0) t = ('a1, 'a0) Scheme_interpreter.gterm =
+  type nonrec ('a1, 'a0) t = ('a1, 'a0) gterm =
     | Ident of 'a1
     | Seq of 'a0
   [@@deriving gt ~options:{ show; gmap }]

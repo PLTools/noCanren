@@ -2,7 +2,7 @@ module L = List
 open GT
 open OCanren
 open OCanren.Std
-open Hanoi2
+open Hanoi2.HO
 
 (*************************************************)
 

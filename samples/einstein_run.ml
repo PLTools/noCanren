@@ -1,7 +1,7 @@
 open OCanren
 open OCanren.Std
 open Tester
-open Einstein
+open Einstein.HO
 
 (*************************************************)
 

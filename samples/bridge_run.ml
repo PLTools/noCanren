@@ -2,12 +2,12 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Bridge
+open Bridge.HO
 
 (*************************************************)
 module Gperson = struct
   [%%distrib
-  type nonrec t = Bridge.gperson =
+  type nonrec t = gperson =
     | A
     | B
     | C
@@ -19,7 +19,7 @@ end
 
 module Gstep = struct
   [%%distrib
-  type nonrec 'a0 t = 'a0 Bridge.gstep =
+  type nonrec 'a0 t = 'a0 gstep =
     | One of 'a0
     | Two of 'a0 * 'a0
   [@@deriving gt ~options:{ show; gmap }]

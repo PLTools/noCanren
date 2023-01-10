@@ -2,12 +2,12 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Unify
+open Unify.HO
 
 (*************************************************)
 module For_gnat = struct
   [%%distrib
-  type nonrec 'a0 t = 'a0 Unify.gnat =
+  type nonrec 'a0 t = 'a0 gnat =
     | O
     | S of 'a0
   [@@deriving gt ~options:{ show; gmap }]
@@ -17,7 +17,7 @@ end
 
 module For_gterm = struct
   [%%distrib
-  type nonrec ('a1, 'a0) t = ('a1, 'a0) Unify.gterm =
+  type nonrec ('a1, 'a0) t = ('a1, 'a0) gterm =
     | Var_ of 'a1
     | Constr of 'a1 * 'a0
   [@@deriving gt ~options:{ show; gmap }]

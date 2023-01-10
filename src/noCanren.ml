@@ -12,6 +12,12 @@ let print_if ppf flag printer arg =
 
 let ( ++ ) x f = f x
 
+let get_translator tast params =
+  if params.unnesting_mode
+  then Translator_unnesting.only_generate tast params
+  else Translator.only_generate tast params
+;;
+
 let translate ppf params =
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
   Clflags.open_modules := List.append params.opens !Clflags.open_modules;
@@ -28,8 +34,8 @@ let translate ppf params =
       ++ Typemod.type_implementation params.input_name outputprefix modulename env
       ++ print_if ppf Clflags.dump_typedtree Printtyped.implementation_with_coercion
     in
-    let untyped = Translator.only_generate typedtree params in
-    let tree_without_attrs = Translator.(attrs_remover.structure attrs_remover) untyped in
+    let untyped = get_translator typedtree params in
+    let tree_without_attrs = Util.(attrs_remover.structure attrs_remover) untyped in
     let () =
       if !need_print_result || params.output_name == None
       then Pprintast.structure Format.std_formatter tree_without_attrs

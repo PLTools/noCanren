@@ -1,12 +1,12 @@
 open OCanren
 open OCanren.Std
 open Tester
-open Sudoku4x4
+open Sudoku4x4.HO
 
 (*************************************************)
 module Gnum = struct
   [%%distrib
-  type nonrec t = Sudoku4x4.gnum =
+  type nonrec t = gnum =
     | N1
     | N2
     | N3
@@ -18,7 +18,7 @@ end
 
 include struct
   [%%distrib
-  type nonrec 'a t = 'a Sudoku4x4.gsudoku4X4 =
+  type nonrec 'a t = 'a gsudoku4X4 =
     | S4x4 of
         'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
   [@@deriving gt ~options:{ gmap }]

@@ -687,20 +687,23 @@ let main_mapper params =
     in
     List.flatten (List.map f ts)
   in
-  { Ast_mapper.default_mapper with
-    structure =
-      (fun self ss ->
-        let f si =
-          match si.pstr_desc with
-          | Pstr_type (rec_flg, tydecls) ->
-            let tds_without_synonims =
-              List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
-            in
-            wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
-          | _ -> [ si ]
-        in
-        List.concat_map f ss)
-  }
+  let rec mapper =
+    { Ast_mapper.default_mapper with
+      structure =
+        (fun self ss ->
+          let f si =
+            match si.pstr_desc with
+            | Pstr_type (rec_flg, tydecls) ->
+              let tds_without_synonims =
+                List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
+              in
+              wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
+            | _ -> [ default_mapper.structure_item mapper si ]
+          in
+          List.concat_map f ss)
+    }
+  in
+  mapper
 ;;
 
 let process params =
