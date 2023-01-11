@@ -157,6 +157,9 @@ let translate_high tast start_index params =
     | Lident "not" -> translate_not_fun ()
     | Lident "=" -> translate_eq_funs true
     | Lident "<>" -> translate_eq_funs false
+    | Lident "failwith" ->
+      let loc = Ppxlib.Location.none in
+      [%expr fun _ _ -> failure]
     | _ -> txt |> mknoloc |> add_translated_module_name_in_ident |> Exp.ident
   and translate_abstraciton case =
     let rec normalize_abstraction expr acc =

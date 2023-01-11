@@ -22,29 +22,29 @@ let beta_reductor minimal_index only_q =
     in
     index >= minimal_index || arg_is_var
   in
-  let name_from_pat pat =
-    match pat.ppat_desc with
-    | Ppat_var loc -> loc.txt
-    | _ -> fail_loc pat.ppat_loc "Incorrect pattern in beta reduction"
+  let eq_names substituted_var current_pat =
+    match current_pat.ppat_desc with
+    | Ppat_any -> false
+    | Ppat_var loc -> substituted_var = loc.txt
+    | _ -> fail_loc current_pat.ppat_loc "Incorrect pattern in beta reduction"
   in
   let rec substitute' expr var subst =
     match expr.pexp_desc with
     | Pexp_ident { txt = Lident name } -> if name = var then subst else expr
     | Pexp_fun (_, _, pat, body) ->
-      let name = name_from_pat pat in
       let loc = Ppxlib.Location.none in
-      if name = var then expr else [%expr fun [%p pat] -> [%e substitute body var subst]]
+      if eq_names var pat
+      then expr
+      else [%expr fun [%p pat] -> [%e substitute body var subst]]
     | Pexp_apply (func, args) ->
       List.map snd args
       |> List.map (fun a -> substitute a var subst)
       |> create_apply (substitute func var subst)
     | Pexp_let (flag, vbs, expr) ->
       let is_rec = flag = Recursive in
-      let var_in_binds =
-        List.map (fun vb -> name_from_pat vb.pvb_pat) vbs |> List.exists (( = ) var)
-      in
+      let var_in_binds = List.exists (fun vb -> eq_names var vb.pvb_pat) vbs in
       let subst_in_bind bind =
-        if (is_rec && var_in_binds) || ((not is_rec) && var = name_from_pat bind.pvb_pat)
+        if (is_rec && var_in_binds) || ((not is_rec) && eq_names var bind.pvb_pat)
         then bind
         else { bind with pvb_expr = substitute bind.pvb_expr var subst }
       in
@@ -65,17 +65,19 @@ let beta_reductor minimal_index only_q =
       let new_args = List.map (fun a -> beta_reduction a []) old_args in
       List.append new_args args |> beta_reduction func
     | Pexp_fun (_, _, pat, body) ->
-      let var =
-        match pat.ppat_desc with
-        | Ppat_var v -> v.txt
-        | _ -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction"
-      in
-      (match args with
-       | arg :: args' when need_subst var arg ->
-         beta_reduction (substitute body var arg) args'
-       | _ ->
-         let loc = Ppxlib.Location.none in
-         create_apply [%expr fun [%p pat] -> [%e beta_reduction body []]] args)
+      let loc = Ppxlib.Location.none in
+      (match pat.ppat_desc with
+       | Ppat_any ->
+         (match args with
+          | [] -> [%expr fun [%p pat] -> [%e beta_reduction body []]]
+          | _ :: args -> [%expr [%e beta_reduction body args]])
+       | Ppat_var v ->
+         let var = v.txt in
+         (match args with
+          | arg :: args' when need_subst var arg ->
+            beta_reduction (substitute body var arg) args'
+          | _ -> create_apply [%expr fun [%p pat] -> [%e beta_reduction body []]] args)
+       | _ -> fail_loc pat.ppat_loc "Incorrect arg name in beta reduction")
     | Pexp_let (flag, vbs, expr) ->
       let new_vbs =
         List.map (fun v -> { v with pvb_expr = beta_reduction v.pvb_expr [] }) vbs
