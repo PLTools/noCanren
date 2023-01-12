@@ -511,7 +511,7 @@ let translate_pat pat fresher =
     | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
     | Tpat_construct ({ txt = Lident "()" }, _, [], _) -> [%expr !!()], [], []
     | Tpat_construct ({ txt = Lident "[]" }, _, [], _) ->
-      [%expr [%e mark_constr [%expr nil]] ()], [], []
+      create_inj [%expr [%e mark_constr [%expr List.Nil]]], [], []
     | Tpat_construct ({ txt = Lident "Just" }, _, [ arg ], _) -> helper arg
     | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
       let v = fresher () in
