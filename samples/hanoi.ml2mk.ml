@@ -1,64 +1,45 @@
-type nat =
-  | Z
-  | S of nat
-
 type stick =
   | One
   | Two
   | Thr
 
-type 'a triple = Triple of 'a * 'a * 'a
-
-let rec less a b =
-  match b with
-  | S b' ->
-    (match a with
-     | Z -> true
-     | S a' -> less a' b')
+let get name (s1, s2, s3) =
+  match name with
+  | One -> s1
+  | Two -> s2
+  | Thr -> s3
 ;;
 
-let get name state =
-  match state with
-  | Triple (s1, s2, s3) ->
-    (match name with
-     | One -> s1
-     | Two -> s2
-     | Thr -> s3)
+let set name stack (s1, s2, s3) =
+  match name with
+  | One -> stack, s2, s3
+  | Two -> s1, stack, s3
+  | Thr -> s1, s2, stack
 ;;
 
-let set name stack state =
-  match state with
-  | Triple (s1, s2, s3) ->
-    (match name with
-     | One -> Triple (stack, s2, s3)
-     | Two -> Triple (s1, stack, s3)
-     | Thr -> Triple (s1, s2, stack))
+let one_step (fromN, toN) state =
+  match fromN <> toN with
+  | false -> failwith "Ignore branch 1"
+  | true ->
+    (match get fromN state with
+     | [] -> failwith "Ignore branch 2"
+     | x :: xs ->
+       (match get toN state with
+        | [] -> set toN [ x ] (set fromN xs state)
+        | y :: ys as r ->
+          (match Peano.( < ) x y with
+           | false -> failwith "Ignore branch 3"
+           | true -> set toN (x :: r) (set fromN xs state))))
 ;;
 
-let one_step step state =
-  match step with
-  | fromN, toN ->
-    (match fromN <> toN with
-     | true ->
-       (match get fromN state with
-        | x :: xs ->
-          (match get toN state with
-           | [] -> set toN [ x ] (set fromN xs state)
-           | y :: ys as r ->
-             (match less x y with
-              | true -> set toN (x :: r) (set fromN xs state)))))
-;;
-
-let rec check state steps =
-  match steps with
+let rec check state = function
   | [] -> get One state = [] && get Two state = []
   | x :: xs -> check (one_step x state) xs
 ;;
 
-let start_state =
-  Triple ([ Z; S Z; S (S Z); S (S (S Z)); S (S (S (S Z))); S (S (S (S (S Z)))) ], [], [])
-;;
+open Peano
 
+let start_state = [ 0; 1; 2; 3; 4; 5 ], [], []
 let answer = [ One, Thr; One, Two; Thr, Two; One, Thr; Two, One; Two, Thr; One, Thr ]
 
 let answer' =
@@ -79,8 +60,3 @@ let answer' =
   ; Two, Thr
   ]
 ;;
-
-(* let print_bool b = Printf.printf (if b then "yes" else "no")
-
-let _ =
-  print_bool (check start_state answer) *)
