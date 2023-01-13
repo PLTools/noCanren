@@ -82,7 +82,7 @@ let source_bind_name = "let*"
 let bind_name = "let_star_bind"
 let translated_module_name = "HO"
 let synonoms_module_name = "FO"
-let packages = [ "GT"; "OCanren"; "OCanren.Std" ]
+let packages = [ "GT"; "OCanren" ]
 
 (***************************** Fail util **********************************)
 
@@ -388,8 +388,8 @@ let create_logic_var name =
 let create_constr constr args =
   let constr =
     (match constr.txt with
-     | Lident "::" -> Lident "List.Cons"
-     | Lident "[]" -> Lident "List.Nil"
+     | Lident "::" -> Lident "OCanren.Std.List.Cons"
+     | Lident "[]" -> Lident "OCanren.Std.List.Nil"
      | _ -> constr.txt)
     |> mknoloc
     |> Exp.ident
@@ -511,7 +511,7 @@ let translate_pat pat fresher =
     | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
     | Tpat_construct ({ txt = Lident "()" }, _, [], _) -> [%expr !!()], [], []
     | Tpat_construct ({ txt = Lident "[]" }, _, [], _) ->
-      create_inj [%expr [%e mark_constr [%expr List.Nil]]], [], []
+      create_inj [%expr [%e mark_constr [%expr OCanren.Std.List.Nil]]], [], []
     | Tpat_construct ({ txt = Lident "Just" }, _, [ arg ], _) -> helper arg
     | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
       let v = fresher () in
@@ -547,7 +547,9 @@ let translate_pat pat fresher =
       let args, als, vars = List.map helper l |> split3 in
       let vars = List.concat vars in
       let als = List.concat als in
-      ( fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [ e1; e2 ]) args
+      ( fold_right1
+          (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
+          args
       , als
       , vars )
     | Tpat_record (fields, _) ->

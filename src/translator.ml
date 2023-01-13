@@ -46,7 +46,7 @@ let translate_high tast start_index params =
     | Texp_tuple l ->
       let new_args, als, vars = List.map unnest_constuct l |> split3 in
       ( fold_right1
-          (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [ e1; e2 ])
+          (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
           new_args
       , List.concat als
       , List.concat vars )

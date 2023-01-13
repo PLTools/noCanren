@@ -9,7 +9,6 @@
   [@@@ocaml.warning "+8"]
   open GT
   open OCanren
-  open OCanren.Std
   module HO =
     struct
       type 'self gnat =

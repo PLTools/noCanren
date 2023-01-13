@@ -23,14 +23,12 @@ module HO = struct
 
   let from_int i = Std.nat i
   let ( + ) = add
-  let ( - ) x y z = call_fresh (fun x' -> add (( === ) z) y x' &&& x x')
+  let ( - ) x y z = fresh x' (x x') (add (( === ) z) y x')
   let ( * ) = mul
-  let ( / ) x y z = call_fresh (fun x' -> mul (( === ) z) y x' &&& x x')
+  let ( / ) x y z = fresh x' (x x') (mul (( === ) z) y x')
 
-  let modo x y z =
-    call_fresh (fun z' ->
-      ( / ) x y z'
-      &&& call_fresh (fun y' -> ( * ) (( === ) z') y y' &&& ( - ) x (( === ) y') z))
+  let ( mod ) x y z =
+    fresh (z' y') (( / ) x y z') (( * ) (( === ) z') y y' &&& ( - ) x (( === ) y') z)
   ;;
 
   let ( < ) = lt
@@ -40,22 +38,18 @@ module HO = struct
 end
 
 module FO = struct
-  include OCanren
+  open OCanren
 
   let lift op x y z = op (( === ) x) (( === ) y) z
   let ( + ) = lift HO.( + )
   let ( - ) = lift HO.( - )
   let ( * ) = lift HO.( * )
   let ( / ) = lift HO.( / )
-  let modo = lift HO.modo
-  let lt_o = lift HO.lt
-  let le_o = lift HO.le
-  let gt_o = lift HO.gt
-  let ge_o = lift HO.ge
-  let ( < ) = lt_o
-  let ( <= ) = le_o
-  let ( > ) = ge_o
-  let ( >= ) = gt_o
-  let min_o = lift HO.min
-  let max_o = lift HO.max
+  let ( mod ) = lift HO.( mod )
+  let ( < ) = lift HO.lt
+  let ( <= ) = lift HO.le
+  let ( > ) = lift HO.gt
+  let ( >= ) = lift HO.ge
+  let min = lift HO.min
+  let max = lift HO.max
 end
