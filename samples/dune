@@ -294,6 +294,31 @@
    -c
    "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
+(executable
+ (name car_wheels_run)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.hanoi)
+ (libraries GT OCanren OCanren.tester Peano)
+ (modules car_wheels car_wheels_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
+(rule
+ (targets car_wheels.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
+  (:input car_wheels.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -I ../std/.Peano.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
 (cram
  ;(package noCanren-tests)
  (deps
@@ -307,4 +332,7 @@
   ./scheme_interpreter_run.exe
   ./sudoku4x4_run.exe
   ./unify_run.exe
-  ./logic_interpreter_run.exe))
+  ./logic_interpreter_run.exe
+  ./car_wheels_run.exe
+  ;
+  ))
