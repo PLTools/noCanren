@@ -1,8 +1,8 @@
 open Peano
 
-let rec lenght = function
+let rec length = function
   | [] -> 0
-  | _ :: tl -> 1 + lenght tl
+  | _ :: tl -> 1 + length tl
 ;;
 
 let rec append x y =

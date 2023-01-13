@@ -1,4 +1,4 @@
-let lenght = List.length
+let length = List.length
 let append = List.append
 let member = List.mem
 let rev = List.rev
@@ -14,7 +14,7 @@ let all = List.for_all
 module HO = struct
   open ListRaw.HO
 
-  let lenght = lenght
+  let length = length
   let append = append
   let member = member
   let rev = rev
@@ -39,7 +39,7 @@ module FO = struct
     op (fun x y z -> fresh (x0 y0) (x x0) (y y0) (f x0 y0 z)) (( === ) x) (( === ) y) z
   ;;
 
-  let lenght x = lift1 HO.lenght x
+  let length x = lift1 HO.length x
   let append x = lift2 HO.append x
   let member x = lift2 HO.member x
   let rev x = lift1 HO.rev x
