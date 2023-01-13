@@ -4,3 +4,6 @@
   }
   Failure test, all answers {
   }
+  Pair test, all answers {
+  q="ololo1";
+  }

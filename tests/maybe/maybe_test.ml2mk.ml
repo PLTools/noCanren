@@ -9,3 +9,8 @@ let f x =
 ;;
 
 let g x = f fail
+
+let h x =
+  let* a, b = x in
+  return a
+;;

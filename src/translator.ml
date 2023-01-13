@@ -262,7 +262,7 @@ let translate_high tast start_index params =
         | Texp_open (_, e) -> two_or_more_mentions e count
         | Texp_letop { let_; body } ->
           let count = two_or_more_mentions body.c_rhs count in
-          if get_pat_name @@ body.c_lhs == var_name
+          if List.exists (( = ) var_name) @@ get_pat_vars body.c_lhs
           then count
           else eval_if_need count let_.bop_exp
         | Texp_unreachable
@@ -349,14 +349,14 @@ let translate_high tast start_index params =
   and translate_match_without_scrutinee
     loc
     (cases : 'a Typedtree.case list)
-    (typ : Types.type_expr)
+    (typ_desc : Types.type_desc)
     =
-    match Types.get_desc typ with
+    match typ_desc with
     | Tarrow (_, _, r, _) ->
       let new_scrutinee = create_fresh_var_name () in
       let translated_match = translate_match loc (create_id new_scrutinee) [] cases r in
       create_fun new_scrutinee translated_match
-    | Tlink typ -> translate_match_without_scrutinee loc cases typ
+    | Tlink typ -> translate_match_without_scrutinee loc cases typ_desc
     | _ -> fail_loc loc "Incorrect type for 'function'"
   and translate_match_with_scrutinee
         : 'a.
@@ -596,10 +596,13 @@ let translate_high tast start_index params =
   and translate_let_star loc let_ body =
     if let_.bop_op_name.txt = source_bind_name
     then (
-      let var = get_pat_name @@ body.c_lhs in
-      let exp_in = translate_expression body.c_rhs in
+      let fun_typ =
+        Types.Tarrow
+          (Asttypes.Nolabel, body.c_lhs.pat_type, body.c_rhs.exp_type, Types.commu_var ())
+      in
+      let translated_fun = translate_match_without_scrutinee loc [ body ] fun_typ in
       let body = translate_expression let_.bop_exp in
-      create_apply (create_id @@ bind_name) [ body; create_fun var exp_in ])
+      create_apply (create_id @@ bind_name) [ body; translated_fun ])
     else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
   and translate_rel_memo e =
     let result_arg = create_fresh_var_name () in
@@ -619,7 +622,7 @@ let translate_high tast start_index params =
     | Texp_ident (_, { txt }, _) -> translate_ident e txt
     | Texp_function { cases = [ c ] } when pat_is_var c.c_lhs -> translate_abstraciton c
     | Texp_function { cases } ->
-      translate_match_without_scrutinee e.exp_loc cases e.exp_type
+      translate_match_without_scrutinee e.exp_loc cases @@ Types.get_desc e.exp_type
     | Texp_apply (f, a) -> translate_apply f a e.exp_loc
     | Texp_match (s, cs, _) -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
     | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
