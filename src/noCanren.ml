@@ -19,8 +19,7 @@ let get_translator tast params =
 ;;
 
 let translate ppf params =
-  Clflags.include_dirs
-    := List.append (Util.get_std_lib_pathes Sys.executable_name) !Clflags.include_dirs;
+  Clflags.include_dirs := List.append std_lib_pathes !Clflags.include_dirs;
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
   Clflags.open_modules := List.append params.opens !Clflags.open_modules;
   Compmisc.init_path ();
@@ -226,6 +225,7 @@ let mk_noCanren_params () =
 ;;
 
 let () =
+  List.iter (Printf.eprintf "path: %s\n%!") std_lib_pathes;
   Arg.parse all_options (fun path -> input_name := Some path) usage;
   try
     readenv ppf Before_args;
