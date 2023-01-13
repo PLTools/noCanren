@@ -14,7 +14,7 @@
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -rectypes -I ../../std/.List.objs/byte -I ../../std/.Peano.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name list_test_run)

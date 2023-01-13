@@ -65,4 +65,4 @@
   (run
    sh
    -c
-   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` -I ../std/.Peano.objs/byte  %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren`  %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))

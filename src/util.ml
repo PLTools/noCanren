@@ -84,6 +84,10 @@ let translated_module_name = "HO"
 let synonoms_module_name = "FO"
 let packages = [ "GT"; "OCanren" ]
 
+let std_lib_pathes =
+  [ "../std/.List.objs/byte"; "../std/.Maybe.objs/byte"; "../std/.Peano.objs/byte" ]
+;;
+
 (***************************** Fail util **********************************)
 
 type error = NotYetSupported of string
@@ -689,4 +693,9 @@ let create_external_attribute name value =
   PStr [ Const.string value |> Exp.constant |> Str.eval ]
   |> Attr.mk (mknoloc name)
   |> Str.attribute
+;;
+
+let get_std_lib_pathes nocanren_path =
+  let folder = Filename.dirname nocanren_path in
+  List.map (Filename.concat folder) std_lib_pathes
 ;;
