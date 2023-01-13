@@ -1,4 +1,6 @@
-type 'a maybe
+type 'a maybe =
+  | Nothing
+  | Just of 'a
 
 val fail : 'a maybe
 val return : 'a -> 'a maybe
