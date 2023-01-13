@@ -86,6 +86,7 @@ let packages = [ "GT"; "OCanren" ]
 
 let std_lib_pathes =
   [ "../std/.List.objs/byte"; "../std/.Maybe.objs/byte"; "../std/.Peano.objs/byte" ]
+  @ [ "../lib/noCanren/List"; "../lib/noCanren/Maybe"; "../lib/noCanren/Peano" ]
 ;;
 
 (***************************** Fail util **********************************)

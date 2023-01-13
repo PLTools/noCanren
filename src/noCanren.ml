@@ -20,7 +20,7 @@ let get_translator tast params =
 
 let translate ppf params =
   Clflags.include_dirs
-    := List.append (Util.get_std_lib_pathes Sys.argv.(0)) !Clflags.include_dirs;
+    := List.append (Util.get_std_lib_pathes Sys.executable_name) !Clflags.include_dirs;
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
   Clflags.open_modules := List.append params.opens !Clflags.open_modules;
   Compmisc.init_path ();
