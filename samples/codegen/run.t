@@ -11,11 +11,10 @@
   open OCanren
   module HO =
     struct
-      type 'self gnat =
-        | O 
-        | S of 'self 
-      let o () = OCanren.inj O
-      let s x0 = OCanren.inj (S (x0))
+      [%%distrib
+        type nat =
+          | O 
+          | S of nat [@@deriving gt ~options:{ show; fmt; gmap }]]
       let rec add a b q5 =
         fresh (q1) (a q1)
           (((q1 === (!! O)) &&& (b q5)) |||

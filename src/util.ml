@@ -39,7 +39,8 @@ type noCanren_unnesting_params =
 
 type gen_info =
   | Old_OCanren
-  | Only_Injections
+  | Only_injections
+  | Only_distribs
   | Distribs
 
 type noCanren_params =
@@ -82,6 +83,7 @@ let source_bind_name = "let*"
 let bind_name = "let_star_bind"
 let translated_module_name = "HO"
 let synonoms_module_name = "FO"
+let ctor_module_prefix = "For_"
 let packages = [ "GT"; "OCanren" ]
 let std_lib_names = [ "noCanren.List"; "noCanren.Maybe"; "noCanren.Peano" ]
 let std_lib_pathes = List.map Findlib.package_directory std_lib_names

@@ -10,8 +10,6 @@ let print_if ppf flag printer arg =
   arg
 ;;
 
-let ( ++ ) x f = f x
-
 let get_translator tast params =
   if params.unnesting_mode
   then Translator_unnesting.only_generate tast params
@@ -30,10 +28,10 @@ let translate ppf params =
   try
     let { Typedtree.structure = typedtree; _ } =
       Pparse.parse_implementation ~tool_name params.input_name
-      ++ print_if ppf Clflags.dump_parsetree Printast.implementation
-      ++ print_if ppf Clflags.dump_source Pprintast.structure
-      ++ Typemod.type_implementation params.input_name outputprefix modulename env
-      ++ print_if ppf Clflags.dump_typedtree Printtyped.implementation_with_coercion
+      |> print_if ppf Clflags.dump_parsetree Printast.implementation
+      |> print_if ppf Clflags.dump_source Pprintast.structure
+      |> Typemod.type_implementation params.input_name outputprefix modulename env
+      |> print_if ppf Clflags.dump_typedtree Printtyped.implementation_with_coercion
     in
     let untyped = get_translator typedtree params in
     let tree_without_attrs = Util.(attrs_remover.structure attrs_remover) untyped in
@@ -90,7 +88,7 @@ let leave_constuctors = ref false
 let subst_only_util_vars = ref false
 let output_name_for_spec_tree = ref None
 let useGT = ref false
-let gen_info = ref Util.Only_Injections
+let gen_info = ref Util.Only_distribs
 let reexport_path = ref []
 let syntax_extenstions = ref true
 
@@ -160,11 +158,14 @@ let all_options =
     , Arg.Unit (fun _ -> gen_info := Util.Old_OCanren)
     , " Generate interface for old oCanren (<0.3): FMap1/2/3, etc." )
   ; ( "-new-ocanren"
-    , Arg.Unit (fun _ -> gen_info := Util.Only_Injections)
+    , Arg.Unit (fun _ -> gen_info := Util.Only_injections)
     , " Generate just distribs for new OCanren" )
   ; ( "-distribs"
     , Arg.Unit (fun _ -> gen_info := Util.Distribs)
     , " Generate just distribs for new OCanren" )
+  ; ( "-only-distribs"
+    , Arg.Unit (fun _ -> gen_info := Util.Only_distribs)
+    , " Generate only distribs for new OCanren" )
   ; "-dtypedtree", Arg.Unit (fun _ -> Clflags.dump_typedtree := true), " Trace typed tree"
   ; ( "-remove-syntax-extensions"
     , Arg.Unit (fun _ -> syntax_extenstions := false)
@@ -225,7 +226,6 @@ let mk_noCanren_params () =
 ;;
 
 let () =
-  List.iter (Printf.eprintf "path: %s\n%!") std_lib_pathes;
   Arg.parse all_options (fun path -> input_name := Some path) usage;
   try
     readenv ppf Before_args;

@@ -12,6 +12,15 @@ let any = List.exists
 let all = List.for_all
 
 module HO = struct
+  type 'a list = 'a OCanren.Std.List.ground
+  type 'a list_logic = 'a OCanren.Std.List.logic
+  type 'a list_injected = 'a OCanren.Std.List.injected
+
+  let list = OCanren.Std.List.ground
+  let list_logic = OCanren.Std.List.logic
+  let list_prj_exn = OCanren.Std.List.prj_exn
+  let list_reify = OCanren.Std.List.reify
+
   open ListRaw.HO
 
   let length = length

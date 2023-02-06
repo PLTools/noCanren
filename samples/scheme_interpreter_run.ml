@@ -5,43 +5,6 @@ open Tester
 open Scheme_interpreter.HO
 
 (*************************************************)
-module For_gvariable = struct
-  [%%distrib
-  type nonrec 'a0 t = 'a0 gvariable =
-    | First
-    | Next of 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type ground = ground t]
-end
-
-(* TODO: Right now variable are tied-in-the-knot in-place but following two types doesn't.
-   It is possible to rewrite them unifiably, but I'm not sure is it really what is requried *)
-module For_gidentifier = struct
-  [%%distrib
-  type nonrec 'a0 t = 'a0 gidentifier =
-    | Lambda
-    | Quote
-    | List
-    | Var of 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type nonrec 'a ground = 'a t]
-end
-
-module For_gterm = struct
-  [%%distrib
-  type nonrec ('a1, 'a0) t = ('a1, 'a0) gterm =
-    | Ident of 'a1
-    | Seq of 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type nonrec ('a, 'b) ground = ('a, 'b) t]
-end
-
-let var_reify = For_gvariable.reify
-let ident_reify x = For_gidentifier.reify var_reify x
-let rec term_reify x = For_gterm.reify ident_reify (List.reify term_reify) x
 
 let show_var f = function
   | First -> "F"
@@ -73,4 +36,4 @@ let run x = run_r term_reify show_lterm x
 (** For high order conversion **)
 let eval q l r = eval (( === ) q) (( === ) l) r
 
-let _ = run 1 q qh ("test", fun q -> eval q (nil ()) (val_ q))
+let _ = run 1 q qh ("test", fun q -> eval q (nil ()) !!(Val q))

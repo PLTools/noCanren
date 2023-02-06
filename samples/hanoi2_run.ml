@@ -13,7 +13,7 @@ let show_pin = function
 ;;
 
 let show_answer = show List.ground @@ show Pair.ground show_pin show_pin
-let rec toN n = if n = 0 then z () else s (toN (n - 1))
+let rec toN n = if n = 0 then !!Z else !!(S (toN (n - 1)))
 
 let gen_pin n =
   let rec gen_pin m = if m = n then nil () else toN m % gen_pin (m + 1) in

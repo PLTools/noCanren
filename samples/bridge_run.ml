@@ -5,27 +5,6 @@ open Tester
 open Bridge.HO
 
 (*************************************************)
-module Gperson = struct
-  [%%distrib
-  type nonrec t = gperson =
-    | A
-    | B
-    | C
-    | D
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type nonrec ground = t]
-end
-
-module Gstep = struct
-  [%%distrib
-  type nonrec 'a0 t = 'a0 gstep =
-    | One of 'a0
-    | Two of 'a0 * 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type nonrec ground = Gperson.ground t]
-end
 
 let show_person = function
   | A -> "A"
@@ -43,14 +22,14 @@ let myshow x = show List.ground (show_step show_person) x
 
 (*************************************************)
 
-let rec int2nat i = if i = 0 then o () else s @@ int2nat @@ (i - 1)
+let rec int2nat i = if i = 0 then !!O else !!(S (int2nat @@ (i - 1)))
 
 (** For high order conversion **)
 let getAnswer q t r = getAnswer (( === ) q) t r
 
 let _ =
   run_r
-    (Std.List.prj_exn Gstep.prj_exn)
+    (Std.List.prj_exn step_prj_exn)
     myshow
     1
     q

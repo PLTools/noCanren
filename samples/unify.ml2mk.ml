@@ -1,9 +1,11 @@
+open List
+
 type nat =
   | O
   | S of nat
 
 type term =
-  | Var_ of nat
+  | Var of nat
   | Constr of nat * term list
 
 let rec get_term var subst =
@@ -23,15 +25,15 @@ let rec forall2 f l1 l2 =
 let rec check_uni_f subst ft t =
   match ft, t with
   | Constr (n1, a1), Constr (n2, a2) -> n1 = n2 && forall2 (check_uni_f subst) a1 a2
-  | _, Var_ v -> ft = get_term v subst
+  | _, Var v -> ft = get_term v subst
 ;;
 
 let rec check_uni subst t1 t2 =
   match t1, t2 with
   | Constr (n1, a1), Constr (n2, a2) -> n1 = n2 && forall2 (check_uni subst) a1 a2
-  | Var_ v, Constr (n, a) -> check_uni_f subst (get_term v subst) t2
-  | Constr (n, a), Var_ v -> check_uni_f subst (get_term v subst) t1
-  | Var_ v1, Var_ v2 -> get_term v1 subst = get_term v2 subst
+  | Var v, Constr (n, a) -> check_uni_f subst (get_term v subst) t2
+  | Constr (n, a), Var v -> check_uni_f subst (get_term v subst) t1
+  | Var v1, Var v2 -> get_term v1 subst = get_term v2 subst
 ;;
 
 (*
@@ -87,7 +89,7 @@ let rec check_uni_semifree t1 t2 subst =
     begin match eq_nat n1 n2 with
     | true -> all_check_uni_semifree a1 a2 subst
     end
-  | _, Var_ v ->
+  | _, Var v ->
     eq_term (get_term v subst) t1
 
 let rec check_uni t1 t2 subst =
@@ -101,9 +103,9 @@ let rec check_uni t1 t2 subst =
     begin match eq_nat n1 n2 with
     | true -> all_check_uni a1 a2 subst
     end
-  | Var_ v, Constr (n, a) ->
+  | Var v, Constr (n, a) ->
     check_uni_semifree (get_term v subst) t2 subst
-  | Constr (n, a), Var_ v ->
+  | Constr (n, a), Var v ->
     check_uni_semifree (get_term v subst) t1 subst
-  | Var_ v1, Var_ v2 ->
+  | Var v1, Var v2 ->
     eq_term (get_term v1 subst) (get_term v2 subst) *)

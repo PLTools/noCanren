@@ -1,3 +1,5 @@
+open List
+
 type variable =
   | First
   | Next of variable

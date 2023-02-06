@@ -1,3 +1,5 @@
+open List
+
 type num =
   | Z
   | S of num
@@ -18,12 +20,12 @@ type literal =
   | LBool of bool
 
 type 'a lambda =
-  | Var_ of 'a
+  | Var of 'a
   | Lit of literal
   | Tuple2 of 'a lambda * 'a lambda
   | App of 'a lambda * 'a lambda
   | Abst of 'a * 'a lambda
-  | Let_ of 'a * 'a lambda * 'a lambda
+  | Let of 'a * 'a lambda * 'a lambda
 
 (*********************************************************************************)
 
@@ -271,7 +273,7 @@ let ti_literal l =
 let rec ti fv fresher env term =
   let ret s t fv = Tuple (s, t, fv) in
   match term with
-  | Var_ v ->
+  | Var v ->
     (match lookup v env with
      | gt ->
        let pair0 = instantiate fv fresher gt in
@@ -310,7 +312,7 @@ let rec ti fv fresher env term =
             mb_bind subst (fun s3 ->
               let s = compose_subst (compose_subst s1 s2) s3 in
               ret s (apply s3 (TVar fv)) fv''')))
-  | Let_ (v, a, b) ->
+  | Let (v, a, b) ->
     let tuple1 = ti fv fresher env a in
     mb_bind tuple1 (fun tpl1 ->
       match tpl1 with
