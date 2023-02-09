@@ -1,4 +1,4 @@
-module L = List
+module L = Stdlib.List
 open GT
 open OCanren
 open OCanren.Std
