@@ -1,12 +1,4 @@
-type nat =
-  | O
-  | S of nat
-
-let rec add a b =
-  match a with
-  | O -> b
-  | S x -> add x (S b)
-;;
+open Peano
 
 type bottle =
   | Fst
@@ -16,24 +8,6 @@ type stepType =
   | Fill
   | Empty
   | Pour
-
-let rec greater a b =
-  match a with
-  | O -> false
-  | S x ->
-    (match b with
-     | O -> true
-     | S y -> greater x y)
-;;
-
-let rec sub a b =
-  match b with
-  | O -> a
-  | S y ->
-    (match a with
-     | O -> O
-     | S x -> sub x y)
-;;
 
 let anotherBottle = function
   | Fst -> Snd
@@ -58,11 +32,11 @@ let checkStep (f, s) (t, b) capacities =
     | Snd -> f
   in
   match t with
-  | Fill -> lvl1 = O
+  | Fill -> lvl1 = 0
   | Empty -> lvl1 = capacities b
   | Pour ->
     let b' = anotherBottle b in
-    not (lvl1 = O || lvl2 = capacities b')
+    not (lvl1 = 0 || lvl2 = capacities b')
 ;;
 
 let doStep (f, s) (t, b) capacities =
@@ -73,11 +47,11 @@ let doStep (f, s) (t, b) capacities =
   in
   match t with
   | Fill -> createState b (capacities b) lvl2
-  | Empty -> createState b O lvl2
+  | Empty -> createState b 0 lvl2
   | Pour ->
-    let sum = add f s in
+    let sum = f + s in
     let cap2 = capacities (anotherBottle b) in
-    if greater sum cap2 then createState b (sub sum cap2) cap2 else createState b O sum
+    if sum > cap2 then createState b (sum - cap2) cap2 else createState b 0 sum
 ;;
 
 let isFinishState (f, s) reqLvl = f = reqLvl || s = reqLvl
@@ -90,13 +64,13 @@ let checkAnswer answer capacities reqLvl =
       then checkAnswer (doStep state0 x capacities) xs
       else false
   in
-  let startState = O, O in
+  let startState = 0, 0 in
   checkAnswer startState answer
 ;;
 
 (****************************************************************************)
 
 let capacities1 = function
-  | Fst -> S (S (S (S O)))
-  | Snd -> S (S (S (S (S (S (S (S (S O))))))))
+  | Fst -> 4
+  | Snd -> 9
 ;;
