@@ -17,5 +17,5 @@ let _ =
 
 let _ =
   let run n = run_r (List.prj_exn Nat.prj_exn) (GT.show List.ground show_nat) n q qh in
-  run 4 ("fold_left backward", fun q -> mul q (Peano.HO.from_int 10))
+  run 10 ("fold_left backward", fun q -> mul q (Peano.HO.from_int 10))
 ;;

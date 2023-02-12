@@ -1,15 +1,17 @@
 open OCanren.Std.Nat
 
-let rec add n = function
-  | O -> n
-  | S n' -> S (add n n')
+let rec add n m =
+  match n with
+  | O -> m
+  | S n' -> S (add n' m)
 ;;
 
 let ( + ) = add
 
-let rec mul n = function
+let rec mul n m =
+  match n with
   | O -> O
-  | S n' -> add n (mul n n')
+  | S n' -> add m (mul n' m)
 ;;
 
 let ( * ) = mul
