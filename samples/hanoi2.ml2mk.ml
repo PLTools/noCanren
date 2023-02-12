@@ -1,6 +1,4 @@
-type nat =
-  | Z
-  | S of nat
+open Peano
 
 type set =
   { pin1 : nat list
@@ -13,12 +11,6 @@ type pin =
   | B
   | C
 
-let rec less x (S y') =
-  match x with
-  | Z -> true
-  | S x' -> less x' y'
-;;
-
 let extra = function
   | A, B -> C
   | B, A -> C
@@ -26,6 +18,7 @@ let extra = function
   | C, A -> B
   | B, C -> A
   | C, B -> A
+  | A, A | B, B | C, C -> failwith "Incorrect pair of sticks"
 ;;
 
 let select s = function
@@ -48,7 +41,8 @@ let tumrep move s =
      | A, C -> { pin1 = x; pin3 = y; pin2 = z }
      | C, A -> { pin3 = x; pin1 = y; pin2 = z }
      | B, C -> { pin2 = x; pin3 = y; pin1 = z }
-     | C, B -> { pin3 = x; pin2 = y; pin1 = z })
+     | C, B -> { pin3 = x; pin2 = y; pin1 = z }
+     | A, A | B, B | C, C -> failwith "Incorrect pair of sticks")
 ;;
 
 let[@tabled] rec eval p s =
@@ -69,6 +63,8 @@ let[@tabled] rec eval p s =
                (match onB with
                 | [] -> { pin1 = restA; pin2 = [ topA ]; pin3 = onC }
                 | topB :: _ ->
-                  (match less topA topB with
-                   | true -> { pin1 = restA; pin2 = topA :: onB; pin3 = onC })))))
+                  (match topA < topB with
+                   | true -> { pin1 = restA; pin2 = topA :: onB; pin3 = onC }
+                   | false -> failwith "Incorrect step"))
+           | { pin1 = []; _ } -> failwith "Incorrect state")))
 ;;

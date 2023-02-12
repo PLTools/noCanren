@@ -13,14 +13,10 @@ let good_a a =
   | C -> false
 ;;
 
-(* [@@@ocaml.warning "-8"] *)
-
 let good_list xs =
   match xs with
   | Cons (A, Cons (B, Nil)) | Cons (B, Cons (A, Nil)) -> true
 ;;
-
-(* [@@@ocaml.warning "+8"] *)
 
 type nat =
   | Z

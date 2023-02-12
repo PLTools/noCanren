@@ -1,0 +1,32 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -27-33-39))))
+
+(rule
+ (targets maybe_test.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:maybe %{project_root}/std/.Maybe.objs/byte/maybe.cmi)
+  (:input maybe_test.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name maybe_test_run)
+ (flags
+  (:standard -rectypes))
+ (libraries GT OCanren OCanren.tester Maybe)
+ (modules maybe_test maybe_test_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
+(cram
+ (deps ./maybe_test_run.exe))

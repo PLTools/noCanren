@@ -9,301 +9,351 @@
  (name GCW_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.GCW)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules GCW GCW_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets GCW.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input GCW.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name bottles_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.bottles)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules bottles bottles_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets bottles.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input bottles.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name bridge_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.bridge)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules bridge bridge_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets bridge.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input bridge.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name car_wheels_run)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.car_wheels)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
+ (modules car_wheels car_wheels_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   -new-typenames
+   GT.ppx_all)))
+
+(rule
+ (targets car_wheels.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
+  (:input car_wheels.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name einstein_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.einstein)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules einstein einstein_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets einstein.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input einstein.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name hanoi_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.hanoi)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules hanoi hanoi_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets hanoi.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input hanoi.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name hanoi2_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.hanoi2)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules hanoi2 hanoi2_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets hanoi2.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input hanoi2.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name hm_inferencer_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.hm_inferencer)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules hm_inferencer hm_inferencer_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets hm_inferencer.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input hm_inferencer.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name logic_interpreter_run)
+ ;(package noCanren-tests)
+ ;(public_name noCanren-tests.logic_interpreter)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
+ (modules logic_interpreter logic_interpreter_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   -new-typenames
+   GT.ppx_all)))
+
+(rule
+ (targets logic_interpreter.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
+  (:input logic_interpreter.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name scheme_interpreter_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.scheme_interpreter)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules scheme_interpreter scheme_interpreter_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets scheme_interpreter.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input scheme_interpreter.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name sudoku4x4_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.sudoku4x4)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules sudoku4x4 sudoku4x4_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets sudoku4x4.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input sudoku4x4.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
-
-(executable
- (name lorry_run)
- (flags
-  (:standard -rectypes))
- (libraries GT OCanren OCanren.tester)
- (modules lorry lorry_run)
- (preprocess
-  (pps
-   OCanren-ppx.ppx_repr
-   OCanren-ppx.ppx_fresh
-   OCanren-ppx.ppx_distrib
-   GT.ppx_all)))
-
-(rule
- (targets lorry.ml)
- (deps
-  (:exec %{project_root}/src/noCanren.exe)
-  (:input lorry.ml2mk.ml))
- (action
-  (run
-   sh
-   -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name unify_run)
  ;(package noCanren-tests)
  ;(public_name noCanren-tests.unify)
- (libraries GT OCanren OCanren.tester)
+ (libraries GT OCanren OCanren.tester Peano List Maybe)
  (modules unify unify_run)
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
  (targets unify.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
+  %{project_root}/std/.List.objs/byte/list.cmi
+  %{project_root}/std/.Maybe.objs/byte/maybe.cmi
   (:input unify.ml2mk.ml))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
-
-(executable
- (name maybe_test_run)
- (flags
-  (:standard -rectypes))
- (libraries GT OCanren OCanren.tester Maybe)
- (modules maybe_test maybe_test_run)
- (preprocess
-  (pps
-   OCanren-ppx.ppx_repr
-   OCanren-ppx.ppx_fresh
-   OCanren-ppx.ppx_distrib
-   GT.ppx_all)))
-
-(rule
- (targets maybe_test.ml)
- (deps
-  (:exec %{project_root}/src/noCanren.exe)
-  (:input maybe_test.ml2mk.ml))
- (action
-  (run
-   sh
-   -c
-   "%{exec} -w -8 %{input} -I %{project_root}/std -rectypes -open Maybe -I ../std/.Maybe.objs/byte -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
-
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 (cram
  ;(package noCanren-tests)
  (deps
   ./GCW_run.exe
   ./bottles_run.exe
   ./bridge_run.exe
+  ./car_wheels_run.exe
   ./einstein_run.exe
   ./hanoi_run.exe
   ./hanoi2_run.exe
   ./hm_inferencer_run.exe
+  ./logic_interpreter_run.exe
   ./scheme_interpreter_run.exe
   ./sudoku4x4_run.exe
-  ./maybe_test_run.exe
-  ./unify_run.exe))
+  ./unify_run.exe
+  ;
+  ))

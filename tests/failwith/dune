@@ -1,0 +1,29 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -27-33-39))))
+
+(rule
+ (targets failwith_test.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input failwith_test.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name failwith_test_run)
+ (libraries GT OCanren OCanren.tester)
+ (modules failwith_test failwith_test_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
+(cram
+ (deps ./failwith_test_run.exe))

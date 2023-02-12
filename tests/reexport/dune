@@ -1,7 +1,7 @@
 (env
  (_
   (flags
-   (:standard -rectypes -warn-error -27-33-8))))
+   (:standard -rectypes -w -27-33-8))))
 
 (executable
  (name main)
@@ -31,8 +31,8 @@
   (progn
    (run
     noCanren
-    -warn-error
-    -33
+    -w
+    -8
     -rectypes
     -high-order-mode
     ; switches to typecheck lozovml

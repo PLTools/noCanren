@@ -39,7 +39,8 @@ type noCanren_unnesting_params =
 
 type gen_info =
   | Old_OCanren
-  | Only_Injections
+  | Only_injections
+  | Only_distribs
   | Distribs
 
 type noCanren_params =
@@ -62,8 +63,6 @@ type noCanren_params =
   ; reexport_path : string list
   }
 
-(***************************** Util types *********************************)
-
 type binding =
   | FailureExpr
   | Alias of Parsetree.expression * Parsetree.expression
@@ -82,7 +81,12 @@ let fresh_five_name = "five"
 let fresh_succ_name = "succ"
 let source_bind_name = "let*"
 let bind_name = "let_star_bind"
-let packages = [ "GT"; "OCanren"; "OCanren.Std" ]
+let translated_module_name = "HO"
+let synonoms_module_name = "FO"
+let ctor_module_prefix = "For_"
+let packages = [ "GT"; "OCanren" ]
+let std_lib_names = [ "noCanren.List"; "noCanren.Maybe"; "noCanren.Peano" ]
+let std_lib_pathes = List.map Findlib.package_directory std_lib_names
 
 (***************************** Fail util **********************************)
 
@@ -388,8 +392,8 @@ let create_logic_var name =
 let create_constr constr args =
   let constr =
     (match constr.txt with
-     | Lident "::" -> Lident "List.Cons"
-     | Lident "[]" -> Lident "List.Nil"
+     | Lident "::" -> Lident "OCanren.Std.List.Cons"
+     | Lident "[]" -> Lident "OCanren.Std.List.Nil"
      | _ -> constr.txt)
     |> mknoloc
     |> Exp.ident
@@ -432,6 +436,48 @@ let have_unifier =
   helper
 ;;
 
+let is_path_to_ocanren path =
+  let rec helper = function
+    | Lident root -> root = "OCanren"
+    | Ldot (next, _) -> helper next
+    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+  in
+  helper path.txt
+;;
+
+let add_translated_module_name_in_ident path =
+  if is_path_to_ocanren path
+  then path
+  else (
+    match path.txt with
+    | Lident _ -> path
+    | Ldot (prepath, i) ->
+      { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
+    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported.")
+;;
+
+let add_translated_module_name_in_module path =
+  if is_path_to_ocanren path
+  then path
+  else (
+    let helper = function
+      | Lident i -> Ldot (Lident i, translated_module_name)
+      | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
+      | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+    in
+    { path with txt = helper path.txt })
+;;
+
+let add_translated_module_name_in_open open_ =
+  let popen_expr = open_.popen_expr in
+  match popen_expr.pmod_desc with
+  | Pmod_ident i ->
+    let pmod_desc = Pmod_ident (add_translated_module_name_in_module i) in
+    let popen_expr = { popen_expr with pmod_desc } in
+    { open_ with popen_expr }
+  | _ -> fail_loc open_.popen_loc "Unexpected open."
+;;
+
 let translate_pat pat fresher =
   let rec translate_record_pat fresher fields =
     let _, (info : Types.label_description), _ = List.hd fields in
@@ -469,7 +515,7 @@ let translate_pat pat fresher =
     | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
     | Tpat_construct ({ txt = Lident "()" }, _, [], _) -> [%expr !!()], [], []
     | Tpat_construct ({ txt = Lident "[]" }, _, [], _) ->
-      [%expr [%e mark_constr [%expr nil]] ()], [], []
+      create_inj [%expr [%e mark_constr [%expr OCanren.Std.List.Nil]]], [], []
     | Tpat_construct ({ txt = Lident "Just" }, _, [ arg ], _) -> helper arg
     | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
       let v = fresher () in
@@ -478,10 +524,11 @@ let translate_pat pat fresher =
     | Tpat_construct (constr_loc, desc, args, t) ->
       (match desc.cstr_inlined with
        | None ->
-         let args, als, vars = List.map (fun q -> helper q) args |> split3 in
+         let args, als, vars = List.map helper args |> split3 in
          let vars = List.concat vars in
          let als = List.concat als in
-         create_constr constr_loc args, als, vars
+         let constr = add_translated_module_name_in_ident constr_loc in
+         create_constr constr args, als, vars
        | Some t ->
          (match args with
           | [ a ] ->
@@ -504,7 +551,9 @@ let translate_pat pat fresher =
       let args, als, vars = List.map helper l |> split3 in
       let vars = List.concat vars in
       let als = List.concat als in
-      ( fold_right1 (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [ e1; e2 ]) args
+      ( fold_right1
+          (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
+          args
       , als
       , vars )
     | Tpat_record (fields, _) ->
@@ -575,45 +624,6 @@ let is_disj_pats pats =
   helper (List.concat_map split_or_pat pats)
 ;;
 
-let infix_to_prefix txt =
-  let is_infix_char c =
-    let infix_chars =
-      [ '%'
-      ; '<'
-      ; '#'
-      ; '!'
-      ; '?'
-      ; '~'
-      ; '!'
-      ; '?'
-      ; '~'
-      ; ':'
-      ; '$'
-      ; '&'
-      ; '*'
-      ; '+'
-      ; '-'
-      ; '/'
-      ; '='
-      ; '>'
-      ; '@'
-      ; '^'
-      ; '|'
-      ]
-    in
-    List.exists (( == ) c) infix_chars
-  in
-  let char2code c = Printf.sprintf "c%d" (int_of_char c) in
-  let replace c = if is_infix_char c then char2code c else String.make 1 c in
-  String.fold_left (fun acc c -> acc ^ replace c) "" txt
-;;
-
-let id2id_o = function
-  | Lident s -> Lident (infix_to_prefix s ^ "_o")
-  | Ldot (t, s) -> Ldot (t, infix_to_prefix s ^ "_o")
-  | _ -> failwith "id2id_o: undexpected ID"
-;;
-
 let normalize_let_name pat =
   if get_pat_name pat = source_bind_name then rename_pat pat bind_name else pat
 ;;
@@ -639,4 +649,48 @@ let rec has_func_arg (t : Types.type_expr) =
   | Tarrow (_, f, s, _) -> is_func_type f || has_func_arg s
   | Tlink t' -> has_func_arg t'
   | _ -> false
+;;
+
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
+;;
+
+let eval_if_need flag f = if flag then f else fun x -> x
+
+let add_packages ast =
+  List.map (fun n -> Lident n |> mknoloc |> Mod.ident |> Opn.mk |> Str.open_) packages
+  @ ast
+;;
+
+let attrs_remover =
+  let expr sub expr =
+    Ast_mapper.default_mapper.expr sub { expr with pexp_attributes = [] }
+  in
+  let value_binding sub vb =
+    Ast_mapper.default_mapper.value_binding sub { vb with pvb_attributes = [] }
+  in
+  let pat sub pat = Ast_mapper.default_mapper.pat sub { pat with ppat_attributes = [] } in
+  { Ast_mapper.default_mapper with expr; value_binding; pat }
+;;
+
+let create_external_open name param =
+  let name = mknoloc name |> Mod.ident in
+  let module_ =
+    match param with
+    | None -> name
+    | Some param -> Mod.functor_ param name
+  in
+  Opn.mk module_ |> Str.open_
+;;
+
+let split_translated_and_synonoms translated_and_synonims =
+  let translated, synonims = List.split translated_and_synonims in
+  List.concat translated, List.concat synonims
+;;
+
+let create_external_attribute name value =
+  PStr [ Const.string value |> Exp.constant |> Str.eval ]
+  |> Attr.mk (mknoloc name)
+  |> Str.attribute
 ;;

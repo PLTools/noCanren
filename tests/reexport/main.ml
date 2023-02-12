@@ -1,13 +1,10 @@
 open Test_reexport
-open Output
+open Output.HO
 
 let () =
   let open OCanren in
   let answers =
-    run
-      q
-      (fun q -> Output.good_a_o (( === ) q) !!true)
-      (fun rr -> rr#reify OCanren.prj_exn)
+    run q (fun q -> good_a (( === ) q) !!true) (fun rr -> rr#reify OCanren.prj_exn)
     |> Stream.take
   in
   Stdlib.List.iter (fun x -> assert (Input.good_a x)) answers
@@ -20,7 +17,7 @@ let () =
   let answers =
     run
       q
-      (fun q -> Output.good_list_o (( === ) q) !!true)
+      (fun q -> good_list (( === ) q) !!true)
       (fun rr -> rr#reify (Reifier.fix (fun self -> Mylist.prj_exn OCanren.prj_exn self)))
     |> Stream.take
   in
@@ -46,12 +43,12 @@ end
 let () =
   let open OCanren in
   let answers =
-    run q (fun q -> Output.even_nat_o (( === ) q) !!true) (fun rr -> rr#reify Nat.prj_exn)
+    run q (fun q -> even_nat (( === ) q) !!true) (fun rr -> rr#reify Nat.prj_exn)
     |> Stream.take ~n:5
   in
   Stdlib.List.iter
     (fun x ->
       print_endline (GT.show Nat.ground x);
-      assert (Input.even_nat (Output.nat_from_ground x)))
+      assert (Input.even_nat (nat_from_ground x)))
     answers
 ;;

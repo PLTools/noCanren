@@ -4,7 +4,6 @@ open Ast_helper
 open Ident
 open Parsetree
 open Util
-open Translator_unnesting
 
 let () = Printexc.record_backtrace true
 
@@ -34,6 +33,8 @@ let translate_high tast start_index params =
   let rec unnest_constuct e =
     let loc = Ppxlib.Location.none in
     match e.exp_desc with
+    | Texp_constant (Const_int i) ->
+      [%expr from_int [%e Untypeast.untype_expression e]], [], []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), [], []
     | Texp_construct ({ txt = Lident s }, _, [])
       when s = "true" || s = "false" || s = "()" ->
@@ -45,11 +46,12 @@ let translate_high tast start_index params =
     | Texp_tuple l ->
       let new_args, als, vars = List.map unnest_constuct l |> split3 in
       ( fold_right1
-          (fun e1 e2 -> create_apply (mark_constr [%expr pair]) [ e1; e2 ])
+          (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
           new_args
       , List.concat als
       , List.concat vars )
     | Texp_construct (name, desc, args) ->
+      let name = add_translated_module_name_in_ident name in
       let args = get_constr_args loc desc args in
       let new_args, als, vars = List.map unnest_constuct args |> split3 in
       create_constr name new_args, List.concat als, List.concat vars
@@ -155,7 +157,10 @@ let translate_high tast start_index params =
     | Lident "not" -> translate_not_fun ()
     | Lident "=" -> translate_eq_funs true
     | Lident "<>" -> translate_eq_funs false
-    | _ -> id2id_o txt |> mknoloc |> Exp.ident
+    | Lident "failwith" ->
+      let loc = Ppxlib.Location.none in
+      [%expr fun _ _ -> failure]
+    | _ -> txt |> mknoloc |> add_translated_module_name_in_ident |> Exp.ident
   and translate_abstraciton case =
     let rec normalize_abstraction expr acc =
       match expr.exp_desc with
@@ -257,7 +262,7 @@ let translate_high tast start_index params =
         | Texp_open (_, e) -> two_or_more_mentions e count
         | Texp_letop { let_; body } ->
           let count = two_or_more_mentions body.c_rhs count in
-          if get_pat_name @@ body.c_lhs == var_name
+          if List.exists (( = ) var_name) @@ get_pat_vars body.c_lhs
           then count
           else eval_if_need count let_.bop_exp
         | Texp_unreachable
@@ -312,8 +317,7 @@ let translate_high tast start_index params =
       @ [ result_var ]
     in
     let active_vars =
-      List.map (fun p -> get_pat_name p ^ "_o")
-      @@ List.filter (fun p -> need_to_activate p body) real_vars
+      List.map get_pat_name @@ List.filter (fun p -> need_to_activate p body) real_vars
     in
     let fresh_vars = List.map (fun _ -> create_fresh_var_name ()) active_vars in
     let abstr_body = List.fold_right create_fun active_vars body_with_eta_args in
@@ -330,10 +334,7 @@ let translate_high tast start_index params =
     let with_fresh = List.fold_right create_fresh fresh_vars full_conj in
     let first_fun = create_fun result_var with_fresh in
     let with_eta = List.fold_right create_fun (List.map fst eta_vars) first_fun in
-    List.fold_right
-      create_fun
-      (List.map (fun p -> get_pat_name p ^ "_o") real_vars)
-      with_eta
+    List.fold_right create_fun (List.map get_pat_name real_vars) with_eta
   and translate_apply f a l =
     create_apply
       (translate_expression f)
@@ -348,14 +349,14 @@ let translate_high tast start_index params =
   and translate_match_without_scrutinee
     loc
     (cases : 'a Typedtree.case list)
-    (typ : Types.type_expr)
+    (typ_desc : Types.type_desc)
     =
-    match Types.get_desc typ with
+    match typ_desc with
     | Tarrow (_, _, r, _) ->
       let new_scrutinee = create_fresh_var_name () in
       let translated_match = translate_match loc (create_id new_scrutinee) [] cases r in
       create_fun new_scrutinee translated_match
-    | Tlink typ -> translate_match_without_scrutinee loc cases typ
+    | Tlink typ -> translate_match_without_scrutinee loc cases typ_desc
     | _ -> fail_loc loc "Incorrect type for 'function'"
   and translate_match_with_scrutinee
         : 'a.
@@ -399,9 +400,7 @@ let translate_high tast start_index params =
          let body =
            create_apply (translate_expression case.c_rhs) (List.map create_id extra_args)
          in
-         let abst_body =
-           List.fold_right create_fun (List.map (fun v -> v ^ "_o") vs) body
-         in
+         let abst_body = List.fold_right create_fun vs body in
          let subst = List.map create_subst vs in
          let total_body = create_apply abst_body subst in
          let conj = create_conj [ pats; total_body ] in
@@ -436,7 +435,7 @@ let translate_high tast start_index params =
       if (not has_tabled_attr) || has_func_arg typ
       then new_body
       else (
-        let name = get_pat_name bind.vb_pat ^ "_o" in
+        let name = get_pat_name bind.vb_pat in
         let unrec_body = create_fun name new_body in
         let recfunc_argument_name = create_fresh_var_name () in
         let recfunc_argument = create_id recfunc_argument_name in
@@ -507,7 +506,7 @@ let translate_high tast start_index params =
         in
         lambdas_and_tabled)
     in
-    let new_name = infix_to_prefix (get_pat_name bind.vb_pat) ^ "_o" in
+    let new_name = get_pat_name bind.vb_pat in
     let nvb = Vb.mk (create_pat new_name) tabled_body in
     ( new_name
     , if is_primary_type bind.vb_expr.exp_type
@@ -597,10 +596,13 @@ let translate_high tast start_index params =
   and translate_let_star loc let_ body =
     if let_.bop_op_name.txt = source_bind_name
     then (
-      let var = (get_pat_name @@ body.c_lhs) ^ "_o" in
-      let exp_in = translate_expression body.c_rhs in
+      let fun_typ =
+        Types.Tarrow
+          (Asttypes.Nolabel, body.c_lhs.pat_type, body.c_rhs.exp_type, Types.commu_var ())
+      in
+      let translated_fun = translate_match_without_scrutinee loc [ body ] fun_typ in
       let body = translate_expression let_.bop_exp in
-      create_apply (create_id @@ bind_name ^ "_o") [ body; create_fun var exp_in ])
+      create_apply (create_id @@ bind_name) [ body; translated_fun ])
     else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
   and translate_rel_memo e =
     let result_arg = create_fresh_var_name () in
@@ -620,7 +622,7 @@ let translate_high tast start_index params =
     | Texp_ident (_, { txt }, _) -> translate_ident e txt
     | Texp_function { cases = [ c ] } when pat_is_var c.c_lhs -> translate_abstraciton c
     | Texp_function { cases } ->
-      translate_match_without_scrutinee e.exp_loc cases e.exp_type
+      translate_match_without_scrutinee e.exp_loc cases @@ Types.get_desc e.exp_type
     | Texp_apply (f, a) -> translate_apply f a e.exp_loc
     | Texp_match (s, cs, _) -> translate_match_with_scrutinee e.exp_loc s cs e.exp_type
     | Texp_ifthenelse (cond, th, Some el) -> translate_if cond th el
@@ -638,13 +640,14 @@ let translate_high tast start_index params =
     match i.str_desc with
     | Tstr_modtype { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name } ->
       let loc = i.str_loc in
-      [ Ast_helper.(
-          Str.modtype ~loc:i.str_loc
-          @@ Mtd.mk
-               ~loc
-               mtd_name
-               ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
-      ]
+      ( [ Ast_helper.(
+            Str.modtype ~loc:i.str_loc
+            @@ Mtd.mk
+                 ~loc
+                 mtd_name
+                 ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
+        ]
+      , [] )
     | Tstr_module
         { mb_name
         ; mb_expr =
@@ -653,17 +656,24 @@ let translate_high tast start_index params =
                   ((Named (_, lid, _) as param), { mod_desc = Tmod_structure stru })
             }
         } ->
-      [ Ast_helper.(
-          Str.module_
-          @@ Mb.mk
-               mb_name
-               (Mod.functor_ (Untype_more.untype_functor_param param)
-               @@ Mod.structure
-               @@ List.concat_map translate_structure_item stru.str_items))
-      ]
+      let translated, synonims =
+        split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
+      in
+      let name =
+        match mb_name.txt with
+        | Some n -> Lident n
+        | None -> fail_loc mb_name.loc "Modules without names aren't supported"
+      in
+      let param = Untype_more.untype_functor_param param in
+      let mk_module name items =
+        Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
+      in
+      let synonims = create_external_open name (Some param) :: synonims in
+      [ mk_module mb_name translated ], [ mk_module mb_name synonims ]
     | Tstr_value (_, [ { vb_attributes } ])
-      when has_named_attribute "only_lozovml" vb_attributes -> []
-    | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) -> []
+      when has_named_attribute "only_lozovml" vb_attributes -> [], []
+    | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) ->
+      [], []
     | Tstr_value (rec_flag, binds) ->
       let helper bind =
         let name = get_pat_name @@ bind.vb_pat in
@@ -678,71 +688,65 @@ let translate_high tast start_index params =
         internal_vb, Str.value Nonrecursive interface_vb
       in
       let new_binds, synonims = List.map helper binds |> List.split in
-      Str.value rec_flag new_binds :: synonims
+      [ Str.value rec_flag new_binds ], synonims
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
-      [ untyper.structure_item
-          untyper
-          { i with str_desc = Tstr_type (rec_flag, new_decls) }
-      ]
-    | Tstr_open _ -> [ untyper.structure_item untyper i ]
+      ( [ untyper.structure_item
+            untyper
+            { i with str_desc = Tstr_type (rec_flag, new_decls) }
+        ]
+      , [] )
+    | Tstr_open od ->
+      let open_ = untyper.open_declaration untyper od in
+      let open_ = add_translated_module_name_in_open open_ in
+      [ Str.open_ open_ ], []
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
-      List.concat_map translate_structure_item stru.str_items
+      split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
     | Tstr_attribute
         { attr_name = { txt = "only_ocanren" }; attr_payload = Parsetree.PStr stru } ->
-      stru
+      stru, []
     | _ -> fail_loc i.str_loc "Incorrect structure item"
   in
-  let translate_structure t = List.concat_map translate_structure_item t.str_items in
+  let translate_structure t =
+    let mk_module name items =
+      Ast_helper.(Str.module_ @@ Mb.mk name @@ Mod.structure items)
+    in
+    let translated, synonims =
+      split_translated_and_synonoms @@ List.map translate_structure_item t.str_items
+    in
+    let synonims =
+      create_external_open (Lident translated_module_name) None :: synonims
+    in
+    [ mk_module (mknoloc (Some translated_module_name)) translated
+    ; mk_module (mknoloc (Some synonoms_module_name)) synonims
+    ]
+  in
   translate_structure tast
 ;;
 
 (*****************************************************************************************************************************)
 
-let add_packages ast =
-  List.map (fun n -> Lident n |> mknoloc |> Mod.ident |> Opn.mk |> Str.open_) packages
-  @ ast
-;;
-
-(*****************************************************************************************************************************)
-
-let attrs_remover =
-  let expr sub expr =
-    Ast_mapper.default_mapper.expr sub { expr with pexp_attributes = [] }
-  in
-  let value_binding sub vb =
-    Ast_mapper.default_mapper.value_binding sub { vb with pvb_attributes = [] }
-  in
-  let pat sub pat = Ast_mapper.default_mapper.pat sub { pat with ppat_attributes = [] } in
-  { Ast_mapper.default_mapper with expr; value_binding; pat }
-;;
-
-(*****************************************************************************************************************************)
-
-let print_if ppf flag printer arg =
-  if !flag then Format.fprintf ppf "%a@." printer arg;
-  arg
-;;
-
-let eval_if_need flag f = if flag then f else fun x -> x
-
 let only_generate tast params =
   try
     let start_index = get_max_index tast in
     let reductor = Beta_reductor.beta_reductor start_index params.subst_only_util_vars in
-    (if params.unnesting_mode then translate else translate_high) tast start_index params
-    |> add_packages
-    |> eval_if_need params.beta_reduction (reductor.structure reductor)
-    |> eval_if_need
-         params.normalization
-         (let mapper = Normalizer.fresh_and_conjs_normalizer params in
-          mapper.structure mapper)
-    |> eval_if_need
-         params.high_order_paprams.use_call_by_need
-         Call_by_need.call_by_need_creator
-    |> Put_distrib.process params
-    |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
-    |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+    let translated =
+      translate_high tast start_index params
+      |> add_packages
+      |> eval_if_need params.beta_reduction (reductor.structure reductor)
+      |> eval_if_need
+           params.normalization
+           (let mapper = Normalizer.fresh_and_conjs_normalizer params in
+            mapper.structure mapper)
+      |> eval_if_need
+           params.high_order_paprams.use_call_by_need
+           Call_by_need.call_by_need_creator
+      |> Put_distrib.process params
+      |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
+      |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+    in
+    (create_external_attribute "ocaml.warning" "-8" :: Untypeast.untype_structure tast)
+    @ (create_external_attribute "ocaml.warning" "+8" :: translated)
   with
   | TranslatorError e as exc ->
     report_error Format.std_formatter e;

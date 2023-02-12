@@ -2,28 +2,9 @@ open GT
 open OCanren
 open OCanren.Std
 open Tester
-open Unify
+open Unify.HO
 
 (*************************************************)
-module For_gnat = struct
-  [%%distrib
-  type nonrec 'a0 t = 'a0 Unify.gnat =
-    | O
-    | S of 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type ground = ground t]
-end
-
-module For_gterm = struct
-  [%%distrib
-  type nonrec ('a1, 'a0) t = ('a1, 'a0) Unify.gterm =
-    | Var_ of 'a1
-    | Constr of 'a1 * 'a0
-  [@@deriving gt ~options:{ show; gmap }]
-
-  type ground = (For_gnat.ground, ground Std.List.ground) t]
-end
 
 let show_number x =
   let rec nat2int = function
@@ -36,7 +17,7 @@ let show_number x =
 let show_lnumber x =
   let rec nat2int x =
     match x with
-    | Var _ -> 0, Some (show OCanren.logic (fun _ -> "") x)
+    | OCanren.Var _ -> 0, Some (show OCanren.logic (fun _ -> "") x)
     | Value O -> 0, None
     | Value (S n) ->
       let a, s = nat2int n in
@@ -53,7 +34,7 @@ let show_llist f x =
   let rec show_llist x =
     let open List in
     match x with
-    | Var _ -> [], Some (show logic (fun _ -> "") x)
+    | OCanren.Var _ -> [], Some (show logic (fun _ -> "") x)
     | Value Nil -> [], None
     | Value (Cons (x, xs)) ->
       let l, q = show_llist xs in
@@ -67,7 +48,7 @@ let show_llist f x =
 ;;
 
 let rec show_gterm f g = function
-  | Var_ v -> Printf.sprintf "V %s" (f v)
+  | Var v -> Printf.sprintf "V %s" (f v)
   | Constr (n, a) -> Printf.sprintf "C %s %s" (f n) (g a)
 ;;
 
@@ -79,16 +60,16 @@ let rec show_lterm f x =
 
 let my_show x = show List.ground (show_term show_number) x
 let my_lshow x = show_llist (show_lterm show_lnumber) x
-let nat_reifier x = For_gnat.reify x
-let term_reifier x = For_gterm.reify x
+let nat_reifier x = nat_reify x
+let term_reifier x = term_reify x
 let my_reifier = List.reify term_reifier
 let full_run = run_r my_reifier my_lshow
 
 (*************************************************)
 
-let rec int2nat n = if n <= 0 then o () else s (int2nat (n - 1))
-let v n = var_ (int2nat n)
-let c n a = constr (int2nat n) @@ List.list a
+let rec int2nat n = if n <= 0 then !!O else !!(S (int2nat (n - 1)))
+let v n = !!(Var (int2nat n))
+let c n a = !!(Constr (int2nat n, List.list a))
 let t1 = c 0 []
 let t2 = v 0
 let t2' = c 0 [ t2 ]
@@ -136,19 +117,19 @@ let w1, w2 =
 (* append([X | Xs], Ys    , [X | Zs]) *)
 
 (** For high order conversion **)
-let check_uni_o q t1 t2 r = check_uni_o (( === ) q) (( === ) t1) (( === ) t2) r
+let check_uni q t1 t2 r = check_uni (( === ) q) (( === ) t1) (( === ) t2) r
 
 let _ =
-  full_run (-1) q qh ("answers1", fun q -> check_uni_o q t1 t1 !!true);
-  full_run (-1) q qh ("answers2", fun q -> check_uni_o q t2 t2 !!true);
-  full_run (-1) q qh ("answers3", fun q -> check_uni_o q t1 t2 !!true);
-  full_run (-1) q qh ("answers4", fun q -> check_uni_o q t3 t4 !!true);
-  full_run (-1) q qh ("answers5", fun q -> check_uni_o q t3 t5 !!true);
-  full_run (-1) q qh ("answers6", fun q -> check_uni_o q t4 t5 !!true);
-  full_run (-1) q qh ("answers7", fun q -> check_uni_o q x1 x2 !!true);
-  full_run (-1) q qh ("answers8", fun q -> check_uni_o q x1' x2' !!true);
-  full_run (-1) q qh ("answers9", fun q -> check_uni_o q y1 y2 !!true);
-  full_run (-1) q qh ("answers_bad", fun q -> check_uni_o q t2 t2' !!true);
-  full_run (-1) q qh ("answers", fun q -> check_uni_o q w1 w2 !!true);
+  full_run (-1) q qh ("answers1", fun q -> check_uni q t1 t1 !!true);
+  full_run (-1) q qh ("answers2", fun q -> check_uni q t2 t2 !!true);
+  full_run (-1) q qh ("answers3", fun q -> check_uni q t1 t2 !!true);
+  full_run (-1) q qh ("answers4", fun q -> check_uni q t3 t4 !!true);
+  full_run (-1) q qh ("answers5", fun q -> check_uni q t3 t5 !!true);
+  full_run (-1) q qh ("answers6", fun q -> check_uni q t4 t5 !!true);
+  full_run (-1) q qh ("answers7", fun q -> check_uni q x1 x2 !!true);
+  full_run (-1) q qh ("answers8", fun q -> check_uni q x1' x2' !!true);
+  full_run (-1) q qh ("answers9", fun q -> check_uni q y1 y2 !!true);
+  full_run (-1) q qh ("answers_bad", fun q -> check_uni q t2 t2' !!true);
+  full_run (-1) q qh ("answers", fun q -> check_uni q w1 w2 !!true);
   ()
 ;;

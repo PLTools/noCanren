@@ -7,7 +7,7 @@
  (name noCanren)
  (public_name noCanren)
  (package noCanren)
- (libraries compiler-libs.common ppxlib)
+ (libraries compiler-libs.common ppxlib findlib)
  (modules
   Util
   Put_distrib

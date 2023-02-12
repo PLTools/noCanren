@@ -126,7 +126,7 @@ let print_tree
     in
     List.fold_right one_step tree ([], [])
   in
-  let types = Translator.(attrs_remover.structure attrs_remover) types in
+  let types = Util.(attrs_remover.structure attrs_remover) types in
   let buf = Buffer.create 100 in
   let buf_fmt = Format.formatter_of_buffer buf in
   Pprintast.structure buf_fmt types;

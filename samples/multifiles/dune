@@ -26,7 +26,12 @@
  (wrapped false)
  (libraries OCanren)
  (preprocess
-  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx)))
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all
+   OCanren-ppx.ppx_distrib
+   -new-typenames)))
 
 (rule
  (targets test_nat.ml)

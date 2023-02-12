@@ -1,0 +1,31 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -27-33-39))))
+
+(rule
+ (targets list_test.ml)
+ (deps
+  (:list %{project_root}/std/.List.objs/byte/list.cmi)
+  (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input list_test.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name list_test_run)
+ (libraries GT OCanren OCanren.tester Peano List)
+ (modules list_test list_test_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
+(cram
+ (deps ./list_test_run.exe))

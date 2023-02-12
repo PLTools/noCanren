@@ -94,8 +94,8 @@ let translate tast start_index params =
       , args_l
         @ List.map
             (function
-              | _, Some x -> x
-              | _ -> fail_loc expr.exp_loc "Incorrect argument")
+             | _, Some x -> x
+             | _ -> fail_loc expr.exp_loc "Incorrect argument")
             args_r )
     | _ -> expr, []
   and translate_apply let_vars expr =
@@ -355,8 +355,7 @@ let translate tast start_index params =
       else
         [%expr
           call_fresh (fun [%p create_pat cond_var] ->
-              [%e translate_expression let_vars cond] [%e create_id cond_var]
-              &&& [%e body])]
+            [%e translate_expression let_vars cond] [%e create_id cond_var] &&& [%e body])]
     in
     List.fold_right create_fun args with_fresh
   and translate_let_star let_vars loc t let_ body =
@@ -451,4 +450,27 @@ let translate tast start_index params =
     translate_items [] str.str_items
   in
   translate_structure tast
+;;
+
+let only_generate tast params =
+  try
+    let start_index = get_max_index tast in
+    let reductor = Beta_reductor.beta_reductor start_index params.subst_only_util_vars in
+    translate tast start_index params
+    |> add_packages
+    |> eval_if_need params.beta_reduction (reductor.structure reductor)
+    |> eval_if_need
+         params.normalization
+         (let mapper = Normalizer.fresh_and_conjs_normalizer params in
+          mapper.structure mapper)
+    |> eval_if_need
+         params.high_order_paprams.use_call_by_need
+         Call_by_need.call_by_need_creator
+    |> Put_distrib.process params
+    |> print_if Format.std_formatter Clflags.dump_parsetree Printast.implementation
+    |> print_if Format.std_formatter Clflags.dump_source Pprintast.structure
+  with
+  | TranslatorError e as exc ->
+    report_error Format.std_formatter e;
+    raise exc
 ;;

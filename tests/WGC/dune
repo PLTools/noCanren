@@ -1,0 +1,32 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -27-33-39))))
+
+(rule
+ (targets WGC.ml)
+ (deps
+  (:list %{project_root}/std/.List.objs/byte/list.cmi)
+  (:maybe %{project_root}/std/.Maybe.objs/byte/maybe.cmi)
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input WGC.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(executable
+ (name WGC_run)
+ (libraries GT OCanren OCanren.tester Maybe List)
+ (modules WGC WGC_run)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   -new-typenames
+   GT.ppx_all)))
+
+(cram
+ (deps ./WGC_run.exe))

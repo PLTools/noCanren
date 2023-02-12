@@ -1,9 +1,12 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -33))))
+
 (library
  (name Maybe)
  (modules Maybe)
  (public_name noCanren.Maybe)
- (flags
-  (:standard -rectypes))
  (libraries GT OCanren)
  (preprocess
   (per_module
@@ -14,3 +17,52 @@
      OCanren-ppx.ppx_fresh
      GT.ppx_all)
     Maybe))))
+
+(library
+ (name Peano)
+ (modules Peano PeanoRaw)
+ (public_name noCanren.Peano)
+ (libraries GT OCanren)
+ (preprocess
+  (pps
+   ppx_expect
+   ppx_inline_test
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all)))
+
+(rule
+ (targets PeanoRaw.ml)
+ (deps
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input PeanoRaw.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(library
+ (name List)
+ (modules List ListRaw)
+ (public_name noCanren.List)
+ (libraries GT OCanren Peano)
+ (preprocess
+  (pps
+   ppx_expect
+   ppx_inline_test
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all)))
+
+(rule
+ (targets ListRaw.ml)
+ (deps
+  (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input ListRaw.ml2mk.ml))
+ (action
+  (run
+   sh
+   -c
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren`  %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))

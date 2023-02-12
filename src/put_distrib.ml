@@ -109,7 +109,7 @@ module Old_OCanren = struct
     let open Location in
     let open Longident in
     let type_name = tdecl.ptype_name.txt in
-    let module_str = "For_" ^ type_name in
+    let module_str = Util.ctor_module_prefix ^ type_name in
     let gen_module_str = mknoloc module_str in
     let gen_module_opt_str = mknoloc @@ Some module_str in
     let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
@@ -556,12 +556,12 @@ let revisit_type ~params rec_flg loc tdecl =
       ; extra
       ; Old_OCanren.prepare_distribs ~loc full_t fmap_for_typ
       ]
-  | Only_Injections, `AlreadyFull full_t ->
+  | Only_injections, `AlreadyFull full_t ->
     let full_t =
       { full_t with ptype_name = Location.mknoloc ("g" ^ tdecl.ptype_name.txt) }
     in
     str_type_ ~loc Recursive [ full_t ] :: prepare_distribs_new ~loc full_t
-  | Distribs, `Extra f | Only_Injections, `Extra f ->
+  | Distribs, `Extra f | Only_injections, `Extra f ->
     (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
     let full_t, extra, spec = f ("g" ^ tdecl.ptype_name.txt) in
     List.concat
@@ -660,6 +660,7 @@ let revisit_type ~params rec_flg loc tdecl =
       [ Ast_helper.Str.type_ rec_flg [ t2 ] ]
       ~mname
       ~creators:exposed_creators
+  | Only_distribs, _ -> failwith "Unexpected type transtation mode"
 ;;
 
 (* [ Ast_helper.Str.extension
@@ -676,31 +677,71 @@ let has_to_gen_attr (xs : attributes) =
   | Not_found -> false
 ;;
 
+let put_distrib ~params rec_flg loc tdecl =
+  let gt_params =
+    Attr.mk
+      (mknoloc "deriving")
+      (PStr [ Str.eval [%expr gt ~options:{ show; fmt; gmap }] ])
+  in
+  let tdecl =
+    { tdecl with
+      ptype_attributes =
+        gt_params
+        :: List.filter
+             (fun a -> a.attr_name.Location.txt <> "put_distrib_here")
+             tdecl.ptype_attributes
+    }
+  in
+  [ Ast_helper.Str.extension
+      ~loc
+      (Location.mknoloc "distrib", PStr [ str_type_ ~loc Recursive [ tdecl ] ])
+  ]
+;;
+
+let translate_type ~params rec_flg loc tdecl =
+  let open Util in
+  match params.gen_info with
+  | Only_distribs ->
+    (match tdecl.ptype_kind with
+     | Ptype_variant _ -> put_distrib ~params rec_flg loc tdecl
+     | Ptype_record _ ->
+       let params = { params with gen_info = Only_injections } in
+       revisit_type ~params rec_flg loc tdecl
+     | _ -> failwith "Only variant types without manifest are supported")
+  | Old_OCanren | Only_injections | Distribs -> revisit_type ~params rec_flg loc tdecl
+;;
+
 let main_mapper params =
   let wrap_tydecls rec_flg loc ts =
     let f tdecl =
+      let has_gen_attr = has_to_gen_attr tdecl.ptype_attributes in
       match tdecl.ptype_kind with
       | (Ptype_variant _ | Ptype_record _)
-        when tdecl.ptype_manifest = None && has_to_gen_attr tdecl.ptype_attributes ->
-        revisit_type ~params rec_flg loc tdecl
+        when tdecl.ptype_manifest = None && has_gen_attr ->
+        translate_type ~params rec_flg loc tdecl
+      | (Ptype_variant _ | Ptype_record _) when not has_gen_attr ->
+        [ str_type_ ~loc rec_flg [ tdecl ] ]
       | _ -> failwith "Only variant types without manifest are supported"
     in
     List.flatten (List.map f ts)
   in
-  { Ast_mapper.default_mapper with
-    structure =
-      (fun self ss ->
-        let f si =
-          match si.pstr_desc with
-          | Pstr_type (rec_flg, tydecls) ->
-            let tds_without_synonims =
-              List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
-            in
-            wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
-          | _ -> [ si ]
-        in
-        List.concat_map f ss)
-  }
+  let rec mapper =
+    { Ast_mapper.default_mapper with
+      structure =
+        (fun self ss ->
+          let f si =
+            match si.pstr_desc with
+            | Pstr_type (rec_flg, tydecls) ->
+              let tds_without_synonims =
+                List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
+              in
+              wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
+            | _ -> [ default_mapper.structure_item mapper si ]
+          in
+          List.concat_map f ss)
+    }
+  in
+  mapper
 ;;
 
 let process params =
