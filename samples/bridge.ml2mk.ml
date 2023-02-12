@@ -1,6 +1,4 @@
-type peano =
-  | O
-  | S of peano
+open Peano
 
 type person =
   | A
@@ -11,15 +9,6 @@ type person =
 type step =
   | One of person
   | Two of person * person
-
-let rec greater a0 b0 =
-  match a0 with
-  | O -> false
-  | S x ->
-    (match b0 with
-     | O -> true
-     | S y -> greater x y)
-;;
 
 let grForPerson x y =
   match x with
@@ -42,14 +31,6 @@ let grForPerson x y =
      | C -> false
      | D -> true)
   | D -> false
-;;
-
-let max a0 b0 = if greater a0 b0 then a0 else b0
-
-let rec add a0 b0 =
-  match a0 with
-  | O -> b0
-  | S x -> add x (S b0)
 ;;
 
 let checkPerson (l, a0, b0, c0, d0) = function
@@ -91,19 +72,16 @@ let getAnswer answer times =
     match answer with
     | x :: xs ->
       if checkStep state x
-      then (
-        match getAnswer xs (step state x) [@heavy] with
-        | None -> None
-        | Some t1 -> Some (add (getTime x times) t1))
-      else None
-    | [] -> if state = finish then Some O else None
+      then getTime x times + getAnswer xs (step state x)
+      else failwith "Incorrect step"
+    | [] -> if state = finish then 0 else failwith "Result isn't finish state."
   in
   getAnswer answer start
 ;;
 
 let standartTimes = function
-  | A -> S O
-  | B -> S (S O)
-  | C -> S (S (S (S (S O))))
-  | D -> S (S (S (S (S (S (S (S (S (S O)))))))))
+  | A -> 1
+  | B -> 2
+  | C -> 5
+  | D -> 10
 ;;
