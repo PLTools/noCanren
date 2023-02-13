@@ -346,8 +346,8 @@ let ctor_for_record loc typ =
     | Tlink t -> get_id t
     | Tconstr (p, _, _) ->
       (match path2ident p with
-       | Lident i -> Lident ("ctor_g" ^ i)
-       | Ldot (l, r) -> Ldot (l, "ctor_g" ^ r)
+       | Lident i -> Lident ("ctor_" ^ i)
+       | Ldot (l, r) -> Ldot (l, "ctor_" ^ r)
        | Lapply _ -> fail_loc loc "What is 'Lapply'?")
     | _ -> fail_loc loc "Incorrect type of record"
   in

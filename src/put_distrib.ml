@@ -698,15 +698,33 @@ let put_distrib ~params rec_flg loc tdecl =
   ]
 ;;
 
+let mk_record_constr ~loc type_name fields =
+  fields
+  |> List.map (fun { pld_name } ->
+       let name = pld_name.txt in
+       let lid = mknoloc @@ Longident.Lident name in
+       lid, Exp.ident lid)
+  |> fun b ->
+  [%expr inj [%e Exp.record b None]]
+  |> List.fold_right
+       (function
+        | { pld_name } -> Exp.fun_ Nolabel None Pat.(var @@ mknoloc pld_name.txt))
+       fields
+  |> Vb.mk
+       ~attrs:[ Attr.mk (mknoloc "service_function") (Parsetree.PStr []) ]
+       (Pat.var @@ mknoloc @@ sprintf "ctor_%s" type_name)
+  |> fun vb -> Str.value Nonrecursive [ vb ]
+;;
+
 let translate_type ~params rec_flg loc tdecl =
   let open Util in
   match params.gen_info with
   | Only_distribs ->
     (match tdecl.ptype_kind with
      | Ptype_variant _ -> put_distrib ~params rec_flg loc tdecl
-     | Ptype_record _ ->
-       let params = { params with gen_info = Only_injections } in
-       revisit_type ~params rec_flg loc tdecl
+     | Ptype_record fields ->
+       put_distrib ~params rec_flg loc tdecl
+       @ [ mk_record_constr ~loc tdecl.ptype_name.txt fields ]
      | _ -> failwith "Only variant types without manifest are supported")
   | Old_OCanren | Only_injections | Distribs -> revisit_type ~params rec_flg loc tdecl
 ;;

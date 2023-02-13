@@ -1,4 +1,5 @@
 open Peano
+open List
 
 type set =
   { pin1 : nat list

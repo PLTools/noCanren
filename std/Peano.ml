@@ -21,6 +21,14 @@ module HO = struct
   include OCanren
   include PeanoRaw.HO
 
+  type nat = OCanren.Std.Nat.ground
+  type nat_logic = OCanren.Std.Nat.logic
+  type nat_injected = OCanren.Std.Nat.injected
+
+  let nat = OCanren.Std.Nat.ground
+  let nat_logic = OCanren.Std.Nat.logic
+  let nat_prj_exn = OCanren.Std.Nat.prj_exn
+  let nat_reify = OCanren.Std.Nat.reify
   let from_int i = Std.nat i
   let ( + ) = add
   let ( - ) x y z = fresh x' (x x') (add (( === ) z) y x')

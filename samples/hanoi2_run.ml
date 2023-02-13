@@ -14,8 +14,8 @@ let gen_pin n =
   gen_pin 0
 ;;
 
-let start n = ctor_gset (gen_pin n) (nil ()) (nil ())
-let finish n = ctor_gset (nil ()) (nil ()) (gen_pin n)
+let start n = ctor_set (gen_pin n) (nil ()) (nil ())
+let finish n = ctor_set (nil ()) (nil ()) (gen_pin n)
 
 let _ =
   Printf.printf "%s\n"
