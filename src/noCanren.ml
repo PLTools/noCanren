@@ -89,7 +89,7 @@ let subst_only_util_vars = ref false
 let output_name_for_spec_tree = ref None
 let useGT = ref false
 let gen_info = ref Util.Only_distribs
-let reexport_path = ref []
+let reexport_path = ref None
 let syntax_extenstions = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
@@ -171,7 +171,9 @@ let all_options =
     , Arg.Unit (fun _ -> syntax_extenstions := false)
     , " Remove suntax extensions ('call_fresh' instead of 'fresh')" )
   ; ( "-reexport-path"
-    , Arg.String (fun s -> reexport_path := String.split_on_char '.' s)
+    , Arg.String
+        (fun s ->
+          reexport_path := if s = "" then Some [] else Some (String.split_on_char '.' s))
     , " Add a module path for reexporting of types" )
   ]
   @ OcamlcOptions.list

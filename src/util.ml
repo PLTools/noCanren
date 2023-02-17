@@ -60,7 +60,7 @@ type noCanren_params =
   ; gen_info : gen_info
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
-  ; reexport_path : string list
+  ; reexport_path : string list option
   }
 
 type binding =

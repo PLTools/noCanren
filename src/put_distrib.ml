@@ -477,11 +477,9 @@ let revisit_type ~params rec_flg loc tdecl =
     in
     let ptype_manifest =
       match params.Util.reexport_path with
-      | [] -> None
-      | _ ->
-        (match
-           Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
-         with
+      | None -> None
+      | Some prefix ->
+        (match Longident.unflatten (prefix @ [ tdecl.ptype_name.txt ]) with
          | None -> None
          | Some lid ->
            if new_kind = tdecl.ptype_kind
@@ -567,28 +565,26 @@ let revisit_type ~params rec_flg loc tdecl =
     List.concat
       [ [ str_type_ ~loc Recursive [ full_t ] ]
       ; prepare_distribs_new ~loc full_t
-      ; (if params.Util.reexport_path <> []
-        then (
-          (* Going to generate unsafe cast *)
-          let tfrom =
-            Typ.constr
-              (Location.mknoloc
-                 (Longident.unflatten
-                    (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
-                 |> Option.get))
-              (List.map fst tdecl.ptype_params)
-          in
-          (* [%str external cast : [%t tfrom] -> [%t spec] = "%identity"] *)
-          let p_to_ground =
-            Pat.var (Location.mknoloc (sprintf "%s_to_ground" tdecl.ptype_name.txt))
-          in
-          let p_from_ground =
-            Pat.var (Location.mknoloc (sprintf "%s_from_ground" tdecl.ptype_name.txt))
-          in
-          [%str
-            let ([%p p_to_ground] : [%t tfrom] -> [%t spec]) = Obj.magic
-            let ([%p p_from_ground] : [%t spec] -> [%t tfrom]) = Obj.magic])
-        else [])
+      ; (match params.Util.reexport_path with
+         | None -> []
+         | Some prefix ->
+           (* Going to generate unsafe cast *)
+           let tfrom =
+             Typ.constr
+               (Location.mknoloc
+                  (Longident.unflatten (prefix @ [ tdecl.ptype_name.txt ]) |> Option.get))
+               (List.map fst tdecl.ptype_params)
+           in
+           (* [%str external cast : [%t tfrom] -> [%t spec] = "%identity"] *)
+           let p_to_ground =
+             Pat.var (Location.mknoloc (sprintf "%s_to_ground" tdecl.ptype_name.txt))
+           in
+           let p_from_ground =
+             Pat.var (Location.mknoloc (sprintf "%s_from_ground" tdecl.ptype_name.txt))
+           in
+           [%str
+             let ([%p p_to_ground] : [%t tfrom] -> [%t spec]) = Obj.magic
+             let ([%p p_from_ground] : [%t spec] -> [%t tfrom]) = Obj.magic])
       ]
   | Distribs, `AlreadyFull full_t ->
     (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
