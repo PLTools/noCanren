@@ -668,7 +668,7 @@ let translate_high tast start_index params =
       let mk_module name items =
         Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
       in
-      let synonims = create_external_open name (Some param) :: synonims in
+      let synonims = create_external_open ~loc:i.str_loc name (Some param) :: synonims in
       [ mk_module mb_name translated ], [ mk_module mb_name synonims ]
     | Tstr_value (_, [ { vb_attributes } ])
       when has_named_attribute "only_lozovml" vb_attributes -> [], []
@@ -715,7 +715,8 @@ let translate_high tast start_index params =
       split_translated_and_synonoms @@ List.map translate_structure_item t.str_items
     in
     let synonims =
-      create_external_open (Lident translated_module_name) None :: synonims
+      create_external_open ~loc:Location.none (Lident translated_module_name) None
+      :: synonims
     in
     [ mk_module (mknoloc (Some translated_module_name)) translated
     ; mk_module (mknoloc (Some synonoms_module_name)) synonims

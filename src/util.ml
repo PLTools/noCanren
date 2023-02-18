@@ -681,12 +681,15 @@ let attrs_remover =
   { Ast_mapper.default_mapper with expr; value_binding; pat }
 ;;
 
-let create_external_open name param =
+let create_external_open ~loc name param =
   let name = mknoloc name |> Mod.ident in
   let module_ =
     match param with
     | None -> name
-    | Some param -> Mod.functor_ param name
+    | Some (Named ({ txt = Some param }, _)) ->
+      let param = mknoloc @@ Lident param |> Mod.ident in
+      Mod.apply name param
+    | _ -> fail_loc loc "Functor with unexpected argument"
   in
   Opn.mk module_ |> Str.open_
 ;;
