@@ -606,7 +606,7 @@ let translate_high tast start_index params =
     else fail_loc loc "Unexpected let operation (only 'let*' is supported)"
   and translate_rel_memo e =
     let result_arg = create_fresh_var_name () in
-    let rel_exp = Untype_more.(skip_bindings.expr skip_bindings) e in
+    let rel_exp = mark_memo_expr @@ Untype_more.(skip_bindings.expr skip_bindings) e in
     let loc = Ppxlib.Location.none in
     [%expr
       fun [%p create_logic_var result_arg] ->

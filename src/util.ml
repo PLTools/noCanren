@@ -372,6 +372,13 @@ let mark_constr expr =
   }
 ;;
 
+let mark_memo_expr expr =
+  { expr with
+    pexp_attributes =
+      Attr.mk (mknoloc "memo_expr") (Parsetree.PStr []) :: expr.pexp_attributes
+  }
+;;
+
 let mark_fo_arg expr =
   { expr with
     pexp_attributes =
