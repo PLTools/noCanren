@@ -607,7 +607,7 @@ let revisit_type ~params rec_flg loc tdecl =
       }
     in
     let make ~mname t1 t2 ~creators =
-      let type_synonim =
+      let type_synonym =
         let open Longident in
         str_type_
           ~loc
@@ -630,7 +630,7 @@ let revisit_type ~params rec_flg loc tdecl =
                  ( Location.mknoloc "distrib"
                  , PStr (str_type_ ~loc Nonrecursive [ t1 ] :: t2) )
              ])
-      :: type_synonim
+      :: type_synonym
       :: creators
     in
     let mname =
@@ -749,10 +749,10 @@ let main_mapper params =
           let f si =
             match si.pstr_desc with
             | Pstr_type (rec_flg, tydecls) ->
-              let tds_without_synonims =
+              let tds_without_synonyms =
                 List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
               in
-              wrap_tydecls rec_flg si.pstr_loc tds_without_synonims
+              wrap_tydecls rec_flg si.pstr_loc tds_without_synonyms
             | _ -> [ default_mapper.structure_item mapper si ]
           in
           List.concat_map f ss)

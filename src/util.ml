@@ -68,6 +68,12 @@ type binding =
   | Alias of Parsetree.expression * Parsetree.expression
   | Call of Parsetree.expression * Parsetree.expression
 
+type translated_structure_item =
+  { translated : structure_item list
+  ; synonyms : structure_item list
+  ; ocaml_code : structure_item list
+  }
+
 (***************************** Constants **********************************)
 
 let fresh_var_prefix = "q"
@@ -694,9 +700,15 @@ let create_external_open ~loc name param =
   Opn.mk module_ |> Str.open_
 ;;
 
-let split_translated_and_synonoms translated_and_synonims =
-  let translated, synonims, ocaml_code = split3 translated_and_synonims in
-  List.concat translated, List.concat synonims, List.concat ocaml_code
+let split_translated_structure_item tsi =
+  List.fold_right
+    (fun t acc ->
+      { translated = t.translated @ acc.translated
+      ; synonyms = t.synonyms @ acc.synonyms
+      ; ocaml_code = t.ocaml_code @ acc.ocaml_code
+      })
+    tsi
+    { translated = []; synonyms = []; ocaml_code = [] }
 ;;
 
 let create_external_attribute name value =

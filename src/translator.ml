@@ -640,15 +640,17 @@ let translate_high tast start_index params =
     match i.str_desc with
     | Tstr_modtype { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name } ->
       let loc = i.str_loc in
-      ( [ Ast_helper.(
-            Str.modtype ~loc:i.str_loc
-            @@ Mtd.mk
-                 ~loc
-                 mtd_name
-                 ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
-        ]
-      , []
-      , [] )
+      { translated =
+          [ Ast_helper.(
+              Str.modtype ~loc:i.str_loc
+              @@ Mtd.mk
+                   ~loc
+                   mtd_name
+                   ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
+          ]
+      ; synonyms = []
+      ; ocaml_code = []
+      }
     | Tstr_module
         { mb_name
         ; mb_expr =
@@ -657,8 +659,9 @@ let translate_high tast start_index params =
                   ((Named (_, lid, _) as param), { mod_desc = Tmod_structure stru })
             }
         } ->
-      let translated, synonims, ocaml_code =
-        split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
+      let { translated; synonyms; ocaml_code } =
+        split_translated_structure_item
+        @@ List.map translate_structure_item stru.str_items
       in
       let name =
         match mb_name.txt with
@@ -669,12 +672,16 @@ let translate_high tast start_index params =
       let mk_module name items =
         Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
       in
-      let synonims = create_external_open ~loc:i.str_loc name (Some param) :: synonims in
-      [ mk_module mb_name translated ], [ mk_module mb_name synonims ], []
+      let synonims = create_external_open ~loc:i.str_loc name (Some param) :: synonyms in
+      { translated = [ mk_module mb_name translated ]
+      ; synonyms = [ mk_module mb_name synonims ]
+      ; ocaml_code = []
+      }
     | Tstr_value (_, [ { vb_attributes } ])
-      when has_named_attribute "only_lozovml" vb_attributes -> [], [], []
+      when has_named_attribute "only_lozovml" vb_attributes ->
+      { translated = []; synonyms = []; ocaml_code = [] }
     | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) ->
-      [], [], []
+      { translated = []; synonyms = []; ocaml_code = [] }
     | Tstr_value (rec_flag, binds) ->
       let helper bind =
         let name = get_pat_name @@ bind.vb_pat in
@@ -688,39 +695,41 @@ let translate_high tast start_index params =
         in
         internal_vb, Str.value Nonrecursive interface_vb
       in
-      let new_binds, synonims = List.map helper binds |> List.split in
-      [ Str.value rec_flag new_binds ], synonims, []
+      let new_binds, synonyms = List.map helper binds |> List.split in
+      { translated = [ Str.value rec_flag new_binds ]; synonyms; ocaml_code = [] }
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
-      ( [ untyper.structure_item
-            untyper
-            { i with str_desc = Tstr_type (rec_flag, new_decls) }
-        ]
-      , []
-      , [] )
+      { translated =
+          [ untyper.structure_item
+              untyper
+              { i with str_desc = Tstr_type (rec_flag, new_decls) }
+          ]
+      ; synonyms = []
+      ; ocaml_code = []
+      }
     | Tstr_open od ->
       let open_ = untyper.open_declaration untyper od in
       let open_ = add_translated_module_name_in_open open_ in
-      [ Str.open_ open_ ], [], []
+      { translated = [ Str.open_ open_ ]; synonyms = []; ocaml_code = [] }
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
-      split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
+      split_translated_structure_item @@ List.map translate_structure_item stru.str_items
     | Tstr_attribute
         { attr_name = { txt = "only_ocanren" }; attr_payload = Parsetree.PStr stru } ->
-      stru, [], []
+      { translated = stru; synonyms = []; ocaml_code = [] }
     | Tstr_attribute { attr_name = { txt = "ocaml" }; attr_payload = Parsetree.PStr stru }
-      -> [], [], stru
+      -> { translated = []; synonyms = []; ocaml_code = stru }
     | _ -> fail_loc i.str_loc "Incorrect structure item"
   in
   let translate_structure t =
     let mk_module name items =
       Ast_helper.(Str.module_ @@ Mb.mk name @@ Mod.structure items)
     in
-    let translated, synonims, ocaml_code =
-      split_translated_and_synonoms @@ List.map translate_structure_item t.str_items
+    let { translated; synonyms; ocaml_code } =
+      split_translated_structure_item @@ List.map translate_structure_item t.str_items
     in
     let synonims =
       create_external_open ~loc:Location.none (Lident translated_module_name) None
-      :: synonims
+      :: synonyms
     in
     [ mk_module (mknoloc (Some translated_module_name)) translated
     ; mk_module (mknoloc (Some synonoms_module_name)) synonims
