@@ -695,8 +695,8 @@ let create_external_open ~loc name param =
 ;;
 
 let split_translated_and_synonoms translated_and_synonims =
-  let translated, synonims = List.split translated_and_synonims in
-  List.concat translated, List.concat synonims
+  let translated, synonims, ocaml_code = split3 translated_and_synonims in
+  List.concat translated, List.concat synonims, List.concat ocaml_code
 ;;
 
 let create_external_attribute name value =
