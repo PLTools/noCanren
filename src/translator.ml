@@ -647,6 +647,7 @@ let translate_high tast start_index params =
                  mtd_name
                  ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
         ]
+      , []
       , [] )
     | Tstr_module
         { mb_name
@@ -656,7 +657,7 @@ let translate_high tast start_index params =
                   ((Named (_, lid, _) as param), { mod_desc = Tmod_structure stru })
             }
         } ->
-      let translated, synonims =
+      let translated, synonims, ocaml_code =
         split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
       in
       let name =
@@ -669,11 +670,11 @@ let translate_high tast start_index params =
         Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
       in
       let synonims = create_external_open ~loc:i.str_loc name (Some param) :: synonims in
-      [ mk_module mb_name translated ], [ mk_module mb_name synonims ]
+      [ mk_module mb_name translated ], [ mk_module mb_name synonims ], []
     | Tstr_value (_, [ { vb_attributes } ])
-      when has_named_attribute "only_lozovml" vb_attributes -> [], []
+      when has_named_attribute "only_lozovml" vb_attributes -> [], [], []
     | Tstr_value (_, [ { vb_pat = { pat_desc = Tpat_var (_, { txt = "memo" }) } } ]) ->
-      [], []
+      [], [], []
     | Tstr_value (rec_flag, binds) ->
       let helper bind =
         let name = get_pat_name @@ bind.vb_pat in
@@ -688,30 +689,33 @@ let translate_high tast start_index params =
         internal_vb, Str.value Nonrecursive interface_vb
       in
       let new_binds, synonims = List.map helper binds |> List.split in
-      [ Str.value rec_flag new_binds ], synonims
+      [ Str.value rec_flag new_binds ], synonims, []
     | Tstr_type (rec_flag, decls) ->
       let new_decls = List.map mark_type_declaration decls in
       ( [ untyper.structure_item
             untyper
             { i with str_desc = Tstr_type (rec_flag, new_decls) }
         ]
+      , []
       , [] )
     | Tstr_open od ->
       let open_ = untyper.open_declaration untyper od in
       let open_ = add_translated_module_name_in_open open_ in
-      [ Str.open_ open_ ], []
+      [ Str.open_ open_ ], [], []
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
       split_translated_and_synonoms @@ List.map translate_structure_item stru.str_items
     | Tstr_attribute
         { attr_name = { txt = "only_ocanren" }; attr_payload = Parsetree.PStr stru } ->
-      stru, []
+      stru, [], []
+    | Tstr_attribute { attr_name = { txt = "ocaml" }; attr_payload = Parsetree.PStr stru }
+      -> [], [], stru
     | _ -> fail_loc i.str_loc "Incorrect structure item"
   in
   let translate_structure t =
     let mk_module name items =
       Ast_helper.(Str.module_ @@ Mb.mk name @@ Mod.structure items)
     in
-    let translated, synonims =
+    let translated, synonims, ocaml_code =
       split_translated_and_synonoms @@ List.map translate_structure_item t.str_items
     in
     let synonims =
@@ -721,6 +725,7 @@ let translate_high tast start_index params =
     [ mk_module (mknoloc (Some translated_module_name)) translated
     ; mk_module (mknoloc (Some synonoms_module_name)) synonims
     ]
+    @ ocaml_code
   in
   translate_structure tast
 ;;
