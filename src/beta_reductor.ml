@@ -29,31 +29,34 @@ let beta_reductor minimal_index only_q =
     | _ -> fail_loc current_pat.ppat_loc "Incorrect pattern in beta reduction"
   in
   let rec substitute' expr var subst =
-    match expr.pexp_desc with
-    | Pexp_ident { txt = Lident name } -> if name = var then subst else expr
-    | Pexp_fun (_, _, pat, body) ->
-      let loc = Ppxlib.Location.none in
-      if eq_names var pat
-      then expr
-      else [%expr fun [%p pat] -> [%e substitute body var subst]]
-    | Pexp_apply (func, args) ->
-      List.map snd args
-      |> List.map (fun a -> substitute a var subst)
-      |> create_apply (substitute func var subst)
-    | Pexp_let (flag, vbs, expr) ->
-      let is_rec = flag = Recursive in
-      let var_in_binds = List.exists (fun vb -> eq_names var vb.pvb_pat) vbs in
-      let subst_in_bind bind =
-        if (is_rec && var_in_binds) || ((not is_rec) && eq_names var bind.pvb_pat)
-        then bind
-        else { bind with pvb_expr = substitute bind.pvb_expr var subst }
-      in
-      let new_vbs = List.map subst_in_bind vbs in
-      Exp.let_ flag new_vbs (if var_in_binds then expr else substitute expr var subst)
-    | Pexp_construct (name, Some expr) ->
-      Some (substitute expr var subst) |> Exp.construct name
-    | Pexp_tuple exprs -> List.map (fun e -> substitute e var subst) exprs |> Exp.tuple
-    | _ -> expr
+    if has_named_attribute "memo_expr" expr.pexp_attributes
+    then expr
+    else (
+      match expr.pexp_desc with
+      | Pexp_ident { txt = Lident name } -> if name = var then subst else expr
+      | Pexp_fun (_, _, pat, body) ->
+        let loc = Ppxlib.Location.none in
+        if eq_names var pat
+        then expr
+        else [%expr fun [%p pat] -> [%e substitute body var subst]]
+      | Pexp_apply (func, args) ->
+        List.map snd args
+        |> List.map (fun a -> substitute a var subst)
+        |> create_apply (substitute func var subst)
+      | Pexp_let (flag, vbs, expr) ->
+        let is_rec = flag = Recursive in
+        let var_in_binds = List.exists (fun vb -> eq_names var vb.pvb_pat) vbs in
+        let subst_in_bind bind =
+          if (is_rec && var_in_binds) || ((not is_rec) && eq_names var bind.pvb_pat)
+          then bind
+          else { bind with pvb_expr = substitute bind.pvb_expr var subst }
+        in
+        let new_vbs = List.map subst_in_bind vbs in
+        Exp.let_ flag new_vbs (if var_in_binds then expr else substitute expr var subst)
+      | Pexp_construct (name, Some expr) ->
+        Some (substitute expr var subst) |> Exp.construct name
+      | Pexp_tuple exprs -> List.map (fun e -> substitute e var subst) exprs |> Exp.tuple
+      | _ -> expr)
   and substitute expr var subst =
     let res = substitute' expr var subst in
     { res with pexp_attributes = expr.pexp_attributes }

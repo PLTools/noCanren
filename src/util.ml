@@ -60,7 +60,7 @@ type noCanren_params =
   ; gen_info : gen_info
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
-  ; reexport_path : string list
+  ; reexport_path : string list option
   }
 
 type binding =
@@ -372,6 +372,13 @@ let mark_constr expr =
   }
 ;;
 
+let mark_memo_expr expr =
+  { expr with
+    pexp_attributes =
+      Attr.mk (mknoloc "memo_expr") (Parsetree.PStr []) :: expr.pexp_attributes
+  }
+;;
+
 let mark_fo_arg expr =
   { expr with
     pexp_attributes =
@@ -674,12 +681,15 @@ let attrs_remover =
   { Ast_mapper.default_mapper with expr; value_binding; pat }
 ;;
 
-let create_external_open name param =
+let create_external_open ~loc name param =
   let name = mknoloc name |> Mod.ident in
   let module_ =
     match param with
     | None -> name
-    | Some param -> Mod.functor_ param name
+    | Some (Named ({ txt = Some param }, _)) ->
+      let param = mknoloc @@ Lident param |> Mod.ident in
+      Mod.apply name param
+    | _ -> fail_loc loc "Functor with unexpected argument"
   in
   Opn.mk module_ |> Str.open_
 ;;

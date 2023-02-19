@@ -105,11 +105,10 @@ module Old_OCanren = struct
 
   let nolabel = Asttypes.Nolabel
 
-  let prepare_distribs_for_FAT ~loc tdecl fmap_decl =
+  let prepare_distribs_for_FAT ~loc ~type_name tdecl fmap_decl =
     let open Location in
     let open Longident in
-    let type_name = tdecl.ptype_name.txt in
-    let module_str = Util.ctor_module_prefix ^ type_name in
+    let module_str = Util.ctor_module_prefix ^ tdecl.ptype_name.txt in
     let gen_module_str = mknoloc module_str in
     let gen_module_opt_str = mknoloc @@ Some module_str in
     let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
@@ -193,12 +192,12 @@ module Old_OCanren = struct
     ]
   ;;
 
-  let prepare_distribs ~loc tdecl fmap_decl =
+  let prepare_distribs ~loc ~type_name tdecl fmap_decl =
     let open Location in
     let open Longident in
     let open Exp in
     if List.length tdecl.ptype_params > 0
-    then prepare_distribs_for_FAT ~loc tdecl fmap_decl
+    then prepare_distribs_for_FAT ~loc ~type_name tdecl fmap_decl
     else (
       match tdecl.ptype_kind with
       | Ptype_abstract | Ptype_open | Ptype_record _ -> Util.fail_loc loc "Not supported"
@@ -301,7 +300,7 @@ module Old_OCanren = struct
   ;;
 end
 
-let prepare_distribs_new ~loc tdecl =
+let prepare_distribs_new ~loc ~type_name tdecl =
   let for_record pat_name add_constr labs =
     let open Longident in
     let r =
@@ -330,8 +329,7 @@ let prepare_distribs_new ~loc tdecl =
     Util.fail_loc loc "Not supported %s %d" __FILE__ __LINE__
   | Ptype_record labs ->
     [ for_record
-        (Pat.var
-           (mkloc (Printf.sprintf "ctor_%s" tdecl.ptype_name.txt) tdecl.ptype_name.loc))
+        (Pat.var (mkloc (Printf.sprintf "ctor_%s" type_name) tdecl.ptype_name.loc))
         (fun r -> r)
         labs
     ]
@@ -477,11 +475,9 @@ let revisit_type ~params rec_flg loc tdecl =
     in
     let ptype_manifest =
       match params.Util.reexport_path with
-      | [] -> None
-      | _ ->
-        (match
-           Longident.unflatten (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
-         with
+      | None -> None
+      | Some prefix ->
+        (match Longident.unflatten (prefix @ [ tdecl.ptype_name.txt ]) with
          | None -> None
          | Some lid ->
            if new_kind = tdecl.ptype_kind
@@ -554,41 +550,44 @@ let revisit_type ~params rec_flg loc tdecl =
     List.concat
       [ [ str_type_ ~loc Recursive [ full_t ] ]
       ; extra
-      ; Old_OCanren.prepare_distribs ~loc full_t fmap_for_typ
+      ; Old_OCanren.prepare_distribs
+          ~loc
+          ~type_name:tdecl.ptype_name.txt
+          full_t
+          fmap_for_typ
       ]
   | Only_injections, `AlreadyFull full_t ->
     let full_t =
       { full_t with ptype_name = Location.mknoloc ("g" ^ tdecl.ptype_name.txt) }
     in
-    str_type_ ~loc Recursive [ full_t ] :: prepare_distribs_new ~loc full_t
+    str_type_ ~loc Recursive [ full_t ]
+    :: prepare_distribs_new ~loc ~type_name:tdecl.ptype_name.txt full_t
   | Distribs, `Extra f | Only_injections, `Extra f ->
     (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
     let full_t, extra, spec = f ("g" ^ tdecl.ptype_name.txt) in
     List.concat
       [ [ str_type_ ~loc Recursive [ full_t ] ]
-      ; prepare_distribs_new ~loc full_t
-      ; (if params.Util.reexport_path <> []
-        then (
-          (* Going to generate unsafe cast *)
-          let tfrom =
-            Typ.constr
-              (Location.mknoloc
-                 (Longident.unflatten
-                    (params.Util.reexport_path @ [ tdecl.ptype_name.txt ])
-                 |> Option.get))
-              (List.map fst tdecl.ptype_params)
-          in
-          (* [%str external cast : [%t tfrom] -> [%t spec] = "%identity"] *)
-          let p_to_ground =
-            Pat.var (Location.mknoloc (sprintf "%s_to_ground" tdecl.ptype_name.txt))
-          in
-          let p_from_ground =
-            Pat.var (Location.mknoloc (sprintf "%s_from_ground" tdecl.ptype_name.txt))
-          in
-          [%str
-            let ([%p p_to_ground] : [%t tfrom] -> [%t spec]) = Obj.magic
-            let ([%p p_from_ground] : [%t spec] -> [%t tfrom]) = Obj.magic])
-        else [])
+      ; prepare_distribs_new ~loc ~type_name:tdecl.ptype_name.txt full_t
+      ; (match params.Util.reexport_path with
+         | None -> []
+         | Some prefix ->
+           (* Going to generate unsafe cast *)
+           let tfrom =
+             Typ.constr
+               (Location.mknoloc
+                  (Longident.unflatten (prefix @ [ tdecl.ptype_name.txt ]) |> Option.get))
+               (List.map fst tdecl.ptype_params)
+           in
+           (* [%str external cast : [%t tfrom] -> [%t spec] = "%identity"] *)
+           let p_to_ground =
+             Pat.var (Location.mknoloc (sprintf "%s_to_ground" tdecl.ptype_name.txt))
+           in
+           let p_from_ground =
+             Pat.var (Location.mknoloc (sprintf "%s_from_ground" tdecl.ptype_name.txt))
+           in
+           [%str
+             let ([%p p_to_ground] : [%t tfrom] -> [%t spec]) = Obj.magic
+             let ([%p p_from_ground] : [%t spec] -> [%t tfrom]) = Obj.magic])
       ]
   | Distribs, `AlreadyFull full_t ->
     (* Format.printf "(* %s %d *)\n%!" __FILE__ __LINE__; *)
