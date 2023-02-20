@@ -693,7 +693,7 @@ let put_distrib ~params rec_flg loc tdecl =
   in
   [ Ast_helper.Str.extension
       ~loc
-      (Location.mknoloc "distrib", PStr [ str_type_ ~loc Recursive [ tdecl ] ])
+      (Location.mknoloc "ocanren", PStr [ str_type_ ~loc Recursive [ tdecl ] ])
   ]
 ;;
 

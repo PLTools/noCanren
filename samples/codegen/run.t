@@ -11,7 +11,7 @@
   open OCanren
   module HO =
     struct
-      [%%distrib
+      [%%ocanren
         type nat =
           | O 
           | S of nat [@@deriving gt ~options:{ show; fmt; gmap }]]
