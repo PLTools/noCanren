@@ -28,7 +28,8 @@
  (targets PeanoRaw.ml)
  (deps
   (:exec %{project_root}/src/noCanren.exe)
-  (:input PeanoRaw.ml2mk.ml))
+  (:input PeanoRaw.ml2mk.ml)
+  (package OCanren))
  (action
   (run
    sh
@@ -46,9 +47,10 @@
 (rule
  (targets ListRaw.ml)
  (deps
-  (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
+  %{project_root}/std/.Peano.objs/byte/peano.cmi
   (:exec %{project_root}/src/noCanren.exe)
-  (:input ListRaw.ml2mk.ml))
+  (:input ListRaw.ml2mk.ml)
+  (package OCanren))
  (action
   (run
    sh
