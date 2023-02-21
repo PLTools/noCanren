@@ -9,14 +9,12 @@
  (public_name noCanren.Maybe)
  (libraries GT OCanren)
  (preprocess
-  (per_module
-   ((pps
-     ppx_expect
-     ppx_inline_test
-     OCanren-ppx.ppx_repr
-     OCanren-ppx.ppx_fresh
-     GT.ppx_all)
-    Maybe))))
+  (pps
+   ppx_expect
+   ppx_inline_test
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all)))
 
 (library
  (name Peano)
@@ -24,12 +22,7 @@
  (public_name noCanren.Peano)
  (libraries GT OCanren)
  (preprocess
-  (pps
-   ppx_expect
-   ppx_inline_test
-   OCanren-ppx.ppx_repr
-   OCanren-ppx.ppx_fresh
-   GT.ppx_all)))
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx_all)))
 
 (rule
  (targets PeanoRaw.ml)
@@ -40,7 +33,7 @@
   (run
    sh
    -c
-   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` %{input} -o %{targets}")))
 
 (library
  (name List)
@@ -48,12 +41,7 @@
  (public_name noCanren.List)
  (libraries GT OCanren Peano)
  (preprocess
-  (pps
-   ppx_expect
-   ppx_inline_test
-   OCanren-ppx.ppx_repr
-   OCanren-ppx.ppx_fresh
-   GT.ppx_all)))
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx_all)))
 
 (rule
  (targets ListRaw.ml)
@@ -65,4 +53,4 @@
   (run
    sh
    -c
-   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren`  %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -w -8 -rectypes -I `ocamlfind -query OCanren` %{input} -o %{targets}")))
