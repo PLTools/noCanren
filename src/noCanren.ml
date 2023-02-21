@@ -17,7 +17,10 @@ let get_translator tast params =
 ;;
 
 let translate ppf params =
-  Clflags.include_dirs := List.append std_lib_pathes !Clflags.include_dirs;
+  Clflags.include_dirs
+    := if params.need_std
+       then List.append (get_std_lib_pathes ()) !Clflags.include_dirs
+       else !Clflags.include_dirs;
   Clflags.include_dirs := List.append params.include_dirs !Clflags.include_dirs;
   Clflags.open_modules := List.append params.opens !Clflags.open_modules;
   Compmisc.init_path ();
@@ -91,6 +94,7 @@ let useGT = ref false
 let gen_info = ref Util.Only_distribs
 let reexport_path = ref None
 let syntax_extenstions = ref true
+let need_std = ref true
 
 module OcamlcOptions = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
@@ -175,6 +179,8 @@ let all_options =
         (fun s ->
           reexport_path := if s = "" then Some [] else Some (String.split_on_char '.' s))
     , " Add a module path for reexporting of types" )
+  ; "-std", Arg.Unit (fun _ -> need_std := true), "Use std libraries (default)"
+  ; "-no-std", Arg.Unit (fun _ -> need_std := false), "Do not use std libraries."
   ]
   @ OcamlcOptions.list
 ;;
@@ -224,6 +230,7 @@ let mk_noCanren_params () =
   ; syntax_extenstions = !syntax_extenstions
   ; output_name_for_spec_tree = !output_name_for_spec_tree
   ; reexport_path = !reexport_path
+  ; need_std = !need_std
   }
 ;;
 

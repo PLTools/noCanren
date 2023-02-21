@@ -13,6 +13,7 @@ bug-reports: "https://github.com/Lozov-Petr/noCanren/issues"
 depends: [
   "dune" {>= "3.2"}
   "ocaml" {>= "4.13"}
+  "ocamlfind"
   "GT"
   "OCanren" {>= "0.3.0~"}
   "OCanren-ppx" {>= "0.3.0~"}
