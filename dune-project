@@ -27,6 +27,7 @@
   dune
   (ocaml
    (>= "4.13"))
+  ocamlfind
   GT
   (OCanren
    (>= "0.3.0~"))

@@ -61,6 +61,7 @@ type noCanren_params =
   ; syntax_extenstions : bool
   ; output_name_for_spec_tree : string option
   ; reexport_path : string list option
+  ; need_std : bool
   }
 
 type binding =
@@ -92,7 +93,20 @@ let synonoms_module_name = "FO"
 let ctor_module_prefix = "For_"
 let packages = [ "GT"; "OCanren" ]
 let std_lib_names = [ "noCanren.List"; "noCanren.Maybe"; "noCanren.Peano" ]
-let std_lib_pathes = List.map Findlib.package_directory std_lib_names
+
+let get_std_lib_pathes () =
+  List.filter_map
+    (fun name ->
+      let open Findlib in
+      try Some (package_directory name) with
+      | No_such_package (lib_name, reason) ->
+        Printf.eprintf
+          "No such std package '%s'%s\n"
+          lib_name
+          (if reason <> "" then Printf.sprintf ", reason: %s" reason else ".");
+        None)
+    std_lib_names
+;;
 
 (***************************** Fail util **********************************)
 
