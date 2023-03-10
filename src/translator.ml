@@ -731,10 +731,10 @@ let translate_high tast start_index params =
       create_external_open ~loc:Location.none (Lident translated_module_name) None
       :: synonyms
     in
-    [ mk_module (mknoloc (Some translated_module_name)) translated
-    ; mk_module (mknoloc (Some synonoms_module_name)) synonims
-    ]
-    @ ocaml_code
+    { translated = [ mk_module (mknoloc (Some translated_module_name)) translated ]
+    ; synonyms = [ mk_module (mknoloc (Some synonoms_module_name)) synonims ]
+    ; ocaml_code
+    }
   in
   translate_structure tast
 ;;
@@ -745,8 +745,9 @@ let only_generate tast params =
   try
     let start_index = get_max_index tast in
     let reductor = Beta_reductor.beta_reductor start_index params.subst_only_util_vars in
+    let { translated; synonyms; ocaml_code } = translate_high tast start_index params in
     let translated =
-      translate_high tast start_index params
+      translated
       |> add_packages
       |> eval_if_need params.beta_reduction (reductor.structure reductor)
       |> eval_if_need
@@ -762,6 +763,8 @@ let only_generate tast params =
     in
     (create_external_attribute "ocaml.warning" "-8" :: Untypeast.untype_structure tast)
     @ (create_external_attribute "ocaml.warning" "+8" :: translated)
+    @ synonyms
+    @ ocaml_code
   with
   | TranslatorError e as exc ->
     report_error Format.std_formatter e;

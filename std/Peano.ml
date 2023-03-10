@@ -31,7 +31,7 @@ module HO = struct
   let nat_reify = OCanren.Std.Nat.reify
   let from_int i = Std.nat i
   let ( + ) = add
-  let ( - ) x y z = fresh x' (x x') (add (( === ) z) y x')
+  let ( - ) = sub
   let ( * ) = mul
   let ( / ) x y z = fresh x' (x x') (mul (( === ) z) y x')
 
