@@ -30,7 +30,7 @@ type set = (nat, nat, nat, nat)
    Performs a given move for a given set if possible
 *)
 
-let ( - ) a b = if a > b then a - b else 0
+let ( - ) a b = if a >= b then a - b else 0
 
 let step (capA, capB, a, b) = function
   | FillA -> capA, capB, capA, b
