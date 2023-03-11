@@ -9,12 +9,13 @@
   (:list %{project_root}/std/.List.objs/byte/list.cmi)
   (:maybe %{project_root}/std/.Maybe.objs/byte/maybe.cmi)
   (:exec %{project_root}/src/noCanren.exe)
-  (:input waterPuzzle.ml2mk.ml))
+  (:input waterPuzzle.ml2mk.ml)
+  (:pp5 %{project_root}/pp5+gt+plugins+ocanren+logger+dump.exe))
  (action
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} -pp %{pp5} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name waterPuzzle)

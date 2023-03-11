@@ -1,6 +1,8 @@
 (* Natural numbers in Peano encoding *)
 open Peano
 
+let ( - ) a b = if a >= b then a - b else 0
+
 (* A possible moves:
    --- pour A to B
    --- pour B to A
@@ -30,8 +32,6 @@ type set = (nat, nat, nat, nat)
    Performs a given move for a given set if possible
 *)
 
-let ( - ) a b = if a >= b then a - b else 0
-
 let step (capA, capB, a, b) = function
   | FillA -> capA, capB, capA, b
   | FillB -> capA, capB, a, capB
@@ -56,19 +56,15 @@ let rec eval set = function
 open GT
 open OCanren
 open OCanren.Std
-open HO
+open HO;;
 
 (*************************************************)
 
-type set = Nat.ground * Nat.ground * Nat.ground * Nat.ground
-[@@deriving gt ~options:{ show }]
+@type set = Nat.ground * Nat.ground * Nat.ground * Nat.ground with show;;
 
-type lset = Nat.logic * Nat.logic * Nat.logic * Nat.logic
-[@@deriving gt ~options:{ show }]
+@type lset = Nat.logic * Nat.logic * Nat.logic * Nat.logic with  show;;
 
-type answer = move OCanren.Std.List.ground [@@deriving gt ~options:{ show }]
-
-let set a b c d = pair a @@ pair b @@ pair c d
+@type answer = move OCanren.Std.List.ground with show
 
 let _ =
   Printf.printf "%s\n"
@@ -77,10 +73,9 @@ let _ =
   @@ Stream.take ~n:1
   @@ run
        q
-       (fun q ->
-         fresh
-           (a b c d)
-           (c === nat 1 ||| (d === nat 1))
-           (FO.eval (set (nat 5) (nat 3) (nat 0) (nat 0)) q (set a b c d)))
+       (fun q -> ocanren {
+         fresh a, b, c, d in
+           FO.eval (5, 3, 0, 0) q (a, b, c, d) &
+           {a == 1 | d == 1}})
        (fun rr -> rr#reify (Std.List.prj_exn prj_exn))
 ;;]

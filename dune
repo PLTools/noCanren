@@ -2,3 +2,35 @@
  (dev
   (flags
    (:standard -warn-error -24-32-34 -w -32-34))))
+
+(rule
+ (targets pp5+gt+plugins+ocanren+logger+o.exe)
+ (deps
+  (package OCanren))
+ (action
+  (run
+   mkcamlp5.opt
+   -package
+   camlp5,camlp5.pa_o
+   -package
+   OCanren.syntax,GT.syntax,GT.syntax.all
+   pr_o.cmx
+   -o
+   %{targets}
+   -)))
+
+(rule
+ (targets pp5+gt+plugins+ocanren+logger+dump.exe)
+ (deps
+  (package OCanren))
+ (action
+  (run
+   mkcamlp5.opt
+   -package
+   camlp5,camlp5.pa_o
+   -package
+   OCanren.syntax,GT.syntax,GT.syntax.all
+   pr_dump.cmx
+   -o
+   %{targets}
+   -)))
