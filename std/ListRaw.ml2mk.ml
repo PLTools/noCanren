@@ -63,3 +63,8 @@ let rec all f = function
   | [] -> true
   | hd :: tl -> f hd && all f tl
 ;;
+
+let rec find_opt p = function
+  | [] -> None
+  | x :: xs -> if p x then Some x else find_opt p xs
+;;

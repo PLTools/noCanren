@@ -10,6 +10,7 @@ let fold_left = List.fold_left
 let fold_right = List.fold_right
 let any = List.exists
 let all = List.for_all
+let find_opt = List.find_opt
 
 module HO = struct
   type 'a list = 'a OCanren.Std.List.ground
@@ -35,6 +36,7 @@ module HO = struct
   let fold_right = fold_right
   let any = any
   let all = all
+  let find_opt = find_opt
 end
 
 module FO = struct
@@ -60,4 +62,5 @@ module FO = struct
   let fold_right x = lift_ho_2 HO.fold_right x
   let any x = lift_ho_1 HO.any x
   let all x = lift_ho_1 HO.all x
+  let find_opt x = lift_ho_1 HO.find_opt x
 end
