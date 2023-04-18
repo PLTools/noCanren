@@ -69,7 +69,7 @@ let full_run = run_r my_reifier my_lshow
 
 let rec int2nat n = if n <= 0 then !!O else !!(S (int2nat (n - 1)))
 let v n = !!(Var (int2nat n))
-let c n a = !!(Constr (int2nat n, List.list a))
+let c n a = !!(Constr (int2nat n, Std.list Fun.id a))
 let t1 = c 0 []
 let t2 = v 0
 let t2' = c 0 [ t2 ]
