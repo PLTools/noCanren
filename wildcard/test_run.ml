@@ -150,13 +150,60 @@ let _ =
 ;;
 
 let _ =
-  test (REPR (fun q -> matching q !!1)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!2)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!3)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!4)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!5)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!6)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!7)) ~show:show_bool_list ~reifier:reify_bool_list;
-  test (REPR (fun q -> matching q !!8)) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"1")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"2")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"3")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"4")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"5")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"6")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"7")) ~show:show_bool_list ~reifier:reify_bool_list;
+  test (REPR (fun q -> matching q !!"8")) ~show:show_bool_list ~reifier:reify_bool_list;
+  sep ()
+;;
+
+let matching_grounded x y =
+  let is_bool x = conde [ x === !!true; x === !!false ] in
+  fresh
+    (a b c)
+    (x === Std.list Fun.id [ a; b; c ])
+    (is_bool a)
+    (is_bool b)
+    (is_bool c)
+    (matching x y)
+;;
+
+let _ =
+  test
+    (REPR (fun q -> matching_grounded q !!"1"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"2"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"3"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"4"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"5"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"6"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"7"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
+  test
+    (REPR (fun q -> matching_grounded q !!"8"))
+    ~show:show_bool_list
+    ~reifier:reify_bool_list;
   sep ()
 ;;

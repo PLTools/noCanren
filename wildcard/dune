@@ -1,12 +1,14 @@
 (env
  (_
   (flags
-   (:standard -rectypes -w -33))))
+   (:standard -rectypes -w -27-33))))
 
 (executable
  (name test_run)
  (libraries GT OCanren OCanren.tester)
  (modules test test_run)
+ (flags
+  (:standard -w -11))
  (preprocess
   (pps
    OCanren-ppx.ppx_repr
@@ -23,7 +25,7 @@
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} %{input} -w -11 -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (executable
  (name bottles_run)
@@ -36,6 +38,7 @@
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (rule
@@ -47,7 +50,7 @@
   (run
    sh
    -c
-   "%{exec} -w -8 %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+   "%{exec} %{input} -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
 
 (cram
  (deps ./test_run.exe ./bottles_run.exe))
