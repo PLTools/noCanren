@@ -21,8 +21,8 @@ module HO = struct
   include OCanren
   include PeanoRaw.HO
 
-  type nat = OCanren.Std.Nat.ground
-  type nat_logic = OCanren.Std.Nat.logic
+  type nat = OCanren.Std.Nat.ground [@@deriving gt ~options:{ show; fmt; gmap }]
+  type nat_logic = OCanren.Std.Nat.logic [@@deriving gt ~options:{ show; fmt; gmap }]
   type nat_injected = OCanren.Std.Nat.injected
 
   let nat = OCanren.Std.Nat.ground

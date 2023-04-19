@@ -19,8 +19,11 @@ let nth = List.nth
 let nth_opt = List.nth_opt
 
 module HO = struct
-  type 'a list = 'a OCanren.Std.List.ground
+  type 'a list = 'a OCanren.Std.List.ground [@@deriving gt ~options:{ show; fmt; gmap }]
+
   type 'a list_logic = 'a OCanren.Std.List.logic
+  [@@deriving gt ~options:{ show; fmt; gmap }]
+
   type 'a list_injected = 'a OCanren.Std.List.injected
 
   let list = OCanren.Std.List.ground
