@@ -752,3 +752,44 @@ let create_external_attribute name value =
   |> Attr.mk (mknoloc name)
   |> Str.attribute
 ;;
+
+let rec remove_aliases_from_pat
+  : type a. a Typedtree.pattern_desc pattern_data -> a Typedtree.pattern_desc pattern_data
+  =
+ fun pat ->
+  let open Typedtree in
+  let mk pat_desc = { pat with pat_desc } in
+  match pat.pat_desc with
+  | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_value _ -> pat
+  | Tpat_tuple l ->
+    let l = List.map remove_aliases_from_pat l in
+    mk @@ Tpat_tuple l
+  | Tpat_construct (a, b, l, c) ->
+    let l = List.map remove_aliases_from_pat l in
+    mk @@ Tpat_construct (a, b, l, c)
+  | Tpat_alias (pat, _, _) -> remove_aliases_from_pat pat
+  | Tpat_record (l, a) ->
+    let l = List.map (fun (a, b, p) -> a, b, remove_aliases_from_pat p) l in
+    mk @@ Tpat_record (l, a)
+  | Tpat_or (p1, p2, x) ->
+    mk @@ Tpat_or (remove_aliases_from_pat p1, remove_aliases_from_pat p2, x)
+  | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
+;;
+
+let rec translate_type (t : core_type) =
+  let mk n = Lident n |> mknoloc in
+  let add_goal t = Typ.arrow Nolabel t @@ Typ.constr (mk "OCanren.goal") [] in
+  let translate_type_constr name =
+    match name.txt with
+    | Lident n ->
+      (match n with
+       | "unit" | "int" -> mk @@ n ^ " OCanren.ilogic"
+       | _ -> mk @@ n ^ "_injected")
+    | _ -> fail_loc name.loc "Only type constructors without dots are supported"
+  in
+  match t.ptyp_desc with
+  | Ptyp_var v -> add_goal @@ Typ.constr (Lident "OCanren.ilogic" |> mknoloc) [ t ]
+  | Ptyp_constr (c, args) -> add_goal @@ Typ.constr (translate_type_constr c) []
+  | Ptyp_arrow (label, t1, t2) -> Typ.arrow label (translate_type t1) (translate_type t2)
+  | _ -> fail_loc t.ptyp_loc "Unexpected type."
+;;

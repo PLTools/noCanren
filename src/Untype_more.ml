@@ -59,6 +59,7 @@ let untype_module_type mt =
   match mt.mty_desc with
   | Tmty_ident (_, { txt = Lident ident; loc }) ->
     Ast_helper.Mty.ident (Location.mkloc (Lident ident) loc)
+  | Tmty_signature s -> Ast_helper.Mty.signature @@ untype_signature s
   | _ -> assert false
 ;;
 

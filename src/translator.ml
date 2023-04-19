@@ -643,29 +643,59 @@ let translate_high tast start_index params =
     | Texp_letop { let_; body } -> translate_let_star e.exp_loc let_ body
     | _ -> fail_loc e.exp_loc "Incorrect expression"
   in
+  let translate_sign ~loc sign =
+    let open Parsetree in
+    let translated_sign =
+      List.map
+        (fun sign_item ->
+          match sign_item.psig_desc with
+          | Psig_value vd ->
+            { sign_item with
+              psig_desc = Psig_value { vd with pval_type = translate_type vd.pval_type }
+            }
+          | _ -> fail_loc loc "Only values in signatures are supported")
+        sign
+    in
+    [ Sig.module_
+      @@ Md.mk (mknoloc @@ Some translated_module_name)
+      @@ Mty.signature translated_sign
+    ]
+  in
   let rec translate_structure_item i =
+    let loc = i.str_loc in
     match i.str_desc with
     | Tstr_modtype { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name } ->
-      let loc = i.str_loc in
       { translated =
           [ Ast_helper.(
-              Str.modtype ~loc:i.str_loc
+              Str.modtype ~loc
               @@ Mtd.mk
                    ~loc
                    mtd_name
-                   ~typ:(Mty.signature @@ Untype_more.untype_types_sign sign))
+                   ~typ:
+                     (Mty.signature
+                      @@ translate_sign ~loc
+                      @@ Untype_more.untype_types_sign sign))
           ]
       ; synonyms = []
       ; ocaml_code = []
       }
-    | Tstr_module
-        { mb_name
-        ; mb_expr =
-            { mod_desc =
-                Tmod_functor
-                  ((Named (_, lid, _) as param), { mod_desc = Tmod_structure stru })
-            }
-        } ->
+    | Tstr_module { mb_name; mb_expr = { mod_desc; _ } } ->
+      let param, stru =
+        match mod_desc with
+        | Tmod_functor ((Named _ as param), { mod_desc = Tmod_structure stru }) ->
+          Some (Untype_more.untype_functor_param param), stru
+        | Tmod_structure stru -> None, stru
+        | _ -> fail_loc loc "Unexpected kind of module"
+      in
+      let translated_param =
+        Option.map
+          (function
+           | Unit -> Unit
+           | Named (n, ({ pmty_desc = Pmty_signature sign } as mt)) ->
+             Named (n, { mt with pmty_desc = Pmty_signature (translate_sign ~loc sign) })
+           | _ -> fail_loc loc "")
+          param
+      in
       let { translated; synonyms; ocaml_code } =
         split_translated_structure_item
         @@ List.map translate_structure_item stru.str_items
@@ -675,11 +705,14 @@ let translate_high tast start_index params =
         | Some n -> Lident n
         | None -> fail_loc mb_name.loc "Modules without names aren't supported"
       in
-      let param = Untype_more.untype_functor_param param in
       let mk_module name items =
-        Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
+        match translated_param with
+        | Some param ->
+          Ast_helper.(
+            Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
+        | None -> Ast_helper.(Str.module_ @@ Mb.mk name @@ Mod.structure items)
       in
-      let synonyms = create_external_open ~loc:i.str_loc name (Some param) :: synonyms in
+      let synonyms = create_external_open ~loc name param :: synonyms in
       { translated = [ mk_module mb_name translated ]
       ; synonyms = [ mk_module mb_name synonyms ]
       ; ocaml_code = []
@@ -726,7 +759,7 @@ let translate_high tast start_index params =
       { translated = stru; synonyms = []; ocaml_code = [] }
     | Tstr_attribute { attr_name = { txt = "ocaml" }; attr_payload = Parsetree.PStr stru }
       -> { translated = []; synonyms = []; ocaml_code = stru }
-    | _ -> fail_loc i.str_loc "Incorrect structure item"
+    | _ -> fail_loc loc "Incorrect structure item"
   in
   let translate_structure t =
     let mk_module name items =
