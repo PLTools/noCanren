@@ -429,7 +429,8 @@ let translate_high tast start_index params =
          if is_disj_pats
          then List.map (fun c -> translate_case c []) cases
          else
-           fst
+           List.rev
+           @@ fst
            @@ List.fold_left
                 (fun (cs, prevs) case ->
                   ( translate_case case prevs :: cs
