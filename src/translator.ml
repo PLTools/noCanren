@@ -679,9 +679,9 @@ let translate_high tast start_index params =
       let mk_module name items =
         Ast_helper.(Str.module_ @@ Mb.mk name (Mod.functor_ param @@ Mod.structure items))
       in
-      let synonims = create_external_open ~loc:i.str_loc name (Some param) :: synonyms in
+      let synonyms = create_external_open ~loc:i.str_loc name (Some param) :: synonyms in
       { translated = [ mk_module mb_name translated ]
-      ; synonyms = [ mk_module mb_name synonims ]
+      ; synonyms = [ mk_module mb_name synonyms ]
       ; ocaml_code = []
       }
     | Tstr_value (_, [ { vb_attributes } ])
@@ -717,7 +717,8 @@ let translate_high tast start_index params =
     | Tstr_open od ->
       let open_ = untyper.open_declaration untyper od in
       let open_ = add_translated_module_name_in_open open_ in
-      { translated = [ Str.open_ open_ ]; synonyms = []; ocaml_code = [] }
+      let open_ = Str.open_ open_ in
+      { translated = [ open_ ]; synonyms = [ open_ ]; ocaml_code = [] }
     | Tstr_include { incl_mod = { mod_desc = Tmod_structure stru } } ->
       split_translated_structure_item @@ List.map translate_structure_item stru.str_items
     | Tstr_attribute
@@ -734,12 +735,20 @@ let translate_high tast start_index params =
     let { translated; synonyms; ocaml_code } =
       split_translated_structure_item @@ List.map translate_structure_item t.str_items
     in
-    let synonims =
-      create_external_open ~loc:Location.none (Lident translated_module_name) None
-      :: synonyms
+    let opens, rest_synonyms =
+      List.partition
+        (fun si ->
+          match si.pstr_desc with
+          | Pstr_open _ -> true
+          | _ -> false)
+        synonyms
     in
+    let open_main_module =
+      create_external_open ~loc:Location.none (Lident translated_module_name) None
+    in
+    let synonyms = opens @ (open_main_module :: rest_synonyms) in
     { translated = [ mk_module (mknoloc (Some translated_module_name)) translated ]
-    ; synonyms = [ mk_module (mknoloc (Some synonoms_module_name)) synonims ]
+    ; synonyms = [ mk_module (mknoloc (Some synonoms_module_name)) synonyms ]
     ; ocaml_code
     }
   in
