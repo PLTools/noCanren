@@ -283,13 +283,13 @@ let rec is_primary_type (t : Types.type_expr) =
 
 let pat_is_var p =
   match p.pat_desc with
-  | Tpat_var (_, _) -> true
+  | Tpat_alias ({ pat_desc = Tpat_any }, _, _) | Tpat_var _ -> true
   | _ -> false
 ;;
 
 let get_pat_name p =
   match p.pat_desc with
-  | Tpat_var (n, _) -> name n
+  | Tpat_alias ({ pat_desc = Tpat_any }, n, _) | Tpat_var (n, _) -> name n
   | _ -> fail_loc p.pat_loc "Incorrect pattern"
 ;;
 
@@ -433,6 +433,10 @@ let create_constr constr args =
   |> create_inj
 ;;
 
+let create_record bindings =
+  Exp.record (List.map (fun (name, expr) -> Lident name |> mknoloc, expr) bindings) None
+;;
+
 let have_unifier =
   let rec helper
     : type a.
@@ -559,20 +563,32 @@ let translate_pat pat fresher =
        | Some t ->
          (match args with
           | [ a ] ->
-            (match a.pat_desc with
-             | Tpat_any ->
-               (match t.type_kind with
-                | Type_record (t, _) ->
-                  let vars = List.map (fun _ -> fresher ()) t in
-                  let args = List.map create_id vars in
-                  create_constr constr_loc args, [], vars
+            let record_arg, als, vars =
+              let label_names =
+                match t.type_kind with
+                | Type_record (tds, _) ->
+                  List.map (fun td -> Types.(Ident.name td.ld_id)) tds
                 | _ ->
-                  fail_loc loc "Wildcard schould have record type for inlined argument")
-             | Tpat_record (fields, _) ->
-               let args, als, vars = translate_record_pat fresher fields in
-               create_constr constr_loc args, als, vars
-             | _ ->
-               fail_loc loc "Inlined argument of pattern should be record or wildcard")
+                  fail_loc loc "Wildcard schould have record type for inlined argument"
+              in
+              match a.pat_desc with
+              | Tpat_any ->
+                let names_and_vars =
+                  List.map (fun name -> name, fresher ()) label_names
+                in
+                let vars = List.map snd names_and_vars in
+                let bindings =
+                  List.map (fun (name, var) -> name, create_id var) names_and_vars
+                in
+                create_record bindings, [], vars
+              | Tpat_record (fields, _) ->
+                let args, als, vars = translate_record_pat fresher fields in
+                let bindings = List.map2 (fun name arg -> name, arg) label_names args in
+                create_record bindings, als, vars
+              | _ ->
+                fail_loc loc "Inlined argument of pattern should be record or wildcard"
+            in
+            create_constr constr_loc [ record_arg ], als, vars
           | _ -> fail_loc loc "Pattern with inlined record should have one argument"))
     | Tpat_tuple l ->
       let args, als, vars = List.map helper l |> split3 in
@@ -597,15 +613,19 @@ let translate_pat pat fresher =
 
 let get_constr_args loc (desc : Types.constructor_description) args =
   match desc.cstr_inlined with
-  | None -> args
+  | None -> `Constr_args args
   | Some _ ->
     (match args with
      | [ a ] ->
        (match a.exp_desc with
         | Texp_record { fields; extended_expression } ->
-          let get_expr f =
+          let get_binding f =
             match f with
-            | _, Overridden (_, e) -> e
+            | _, Overridden ({ txt = Lident l }, e) -> l, e
+            | _, Overridden _ ->
+              fail_loc
+                loc
+                "Only record fields without dots are supported for inlined records"
             | _ ->
               fail_loc
                 loc
@@ -613,7 +633,9 @@ let get_constr_args loc (desc : Types.constructor_description) args =
                  expressions"
           in
           if Option.is_none extended_expression
-          then List.map get_expr @@ Array.to_list fields
+          then (
+            let bindings = List.map get_binding @@ Array.to_list fields in
+            `Inlined_record_fields bindings)
           else
             fail_loc
               loc

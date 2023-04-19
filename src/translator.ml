@@ -52,9 +52,16 @@ let translate_high tast start_index params =
       , List.concat vars )
     | Texp_construct (name, desc, args) ->
       let name = add_translated_module_name_in_ident name in
-      let args = get_constr_args loc desc args in
-      let new_args, als, vars = List.map unnest_constuct args |> split3 in
-      create_constr name new_args, List.concat als, List.concat vars
+      (match get_constr_args loc desc args with
+       | `Constr_args args ->
+         let new_args, als, vars = List.map unnest_constuct args |> split3 in
+         create_constr name new_args, List.concat als, List.concat vars
+       | `Inlined_record_fields fields ->
+         let new_args, als, vars =
+           List.map (fun (_, expr) -> unnest_constuct expr) fields |> split3
+         in
+         let bindings = List.map2 (fun (l, _) e -> l, e) fields new_args in
+         create_constr name [ create_record bindings ], List.concat als, List.concat vars)
     | _ ->
       let fr_var = create_fresh_var_name () in
       create_id fr_var, [ Call (create_id fr_var, translate_expression e) ], [ fr_var ]
@@ -295,11 +302,11 @@ let translate_high tast start_index params =
     let need_to_activate p e =
       is_primary_type p.pat_type
       && (is_active_arg p
-         || (params.high_order_paprams.activate_tactic <> Off
-            && two_or_more_mentions
-                 params.high_order_paprams.activate_tactic
-                 (get_pat_name p)
-                 e))
+          || (params.high_order_paprams.activate_tactic <> Off
+              && two_or_more_mentions
+                   params.high_order_paprams.activate_tactic
+                   (get_pat_name p)
+                   e))
     in
     let create_simple_arg var =
       let fresh_n = create_fresh_var_name () in
