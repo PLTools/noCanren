@@ -47,7 +47,7 @@ let beta_reductor minimal_index only_q =
         let is_rec = flag = Recursive in
         let var_in_binds = List.exists (fun vb -> eq_names var vb.pvb_pat) vbs in
         let subst_in_bind bind =
-          if (is_rec && var_in_binds) || ((not is_rec) && eq_names var bind.pvb_pat)
+          if is_rec && var_in_binds
           then bind
           else { bind with pvb_expr = substitute bind.pvb_expr var subst }
         in
