@@ -56,3 +56,11 @@
    sh
    -c
    "%{exec} -w -8 -rectypes -no-std -I `ocamlfind -query OCanren` -I .Peano.objs/byte %{input} -o %{targets}")))
+
+(library
+ (name Option)
+ (modules Option)
+ (public_name noCanren.Option)
+ (libraries GT OCanren)
+ (preprocess
+  (pps OCanren-ppx.ppx_repr OCanren-ppx.ppx_fresh GT.ppx_all)))
