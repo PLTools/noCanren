@@ -113,28 +113,28 @@ module Old_OCanren = struct
     let gen_module_opt_str = mknoloc @@ Some module_str in
     let distrib_lid = mknoloc Longident.(Ldot (Lident gen_module_str.txt, "distrib")) in
     [ (Str.module_
-      @@ Mb.mk gen_module_opt_str
-      @@ Mod.(
-           apply
-             (ident
-                (mknoloc
-                @@ Lident
-                     (let n = List.length tdecl.ptype_params in
-                      if n = 1 then "Fmap" else sprintf "Fmap%d" n)))
-           @@ structure
-                [ fmap_decl
-                ; str_type_
-                    Recursive
-                    ~loc
-                    [ Type.mk
-                        ~params:tdecl.ptype_params
-                        ~kind:Ptype_abstract
-                        ~manifest:
-                          (Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt)
-                          @@ List.map fst tdecl.ptype_params)
-                        (mknoloc "t")
-                    ]
-                ]))
+       @@ Mb.mk gen_module_opt_str
+       @@ Mod.(
+            apply
+              (ident
+                 (mknoloc
+                  @@ Lident
+                       (let n = List.length tdecl.ptype_params in
+                        if n = 1 then "Fmap" else sprintf "Fmap%d" n)))
+            @@ structure
+                 [ fmap_decl
+                 ; str_type_
+                     Recursive
+                     ~loc
+                     [ Type.mk
+                         ~params:tdecl.ptype_params
+                         ~kind:Ptype_abstract
+                         ~manifest:
+                           (Typ.constr (mknoloc @@ Lident tdecl.ptype_name.txt)
+                            @@ List.map fst tdecl.ptype_params)
+                         (mknoloc "t")
+                     ]
+                 ]))
     ; (match tdecl.ptype_kind with
        | Ptype_variant constructors ->
          Str.value Recursive
@@ -155,7 +155,7 @@ module Old_OCanren = struct
                     constr_itself
                       (Some
                          (tuple
-                         @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
+                          @@ List.map (fun name -> ident @@ mknoloc (Lident name)) xs))
                 in
                 let body =
                   [%expr inj [%e Exp.apply (Exp.ident distrib_lid) [ nolabel, body ]]]
@@ -251,9 +251,9 @@ module Old_OCanren = struct
                                 argnames) )
                    , Some
                        (Exp.tuple
-                       @@ List.mapi
-                            (fun n name -> wrap_one_arg name @@ get_pat_name n name)
-                            argnames) )
+                        @@ List.mapi
+                             (fun n name -> wrap_one_arg name @@ get_pat_name n name)
+                             argnames) )
                in
                let pc_lhs = Ast_helper.Pat.construct clid pc_lhs in
                let pc_rhs = Exp.construct clid pc_rhs in
@@ -624,12 +624,12 @@ let revisit_type ~params rec_flg loc tdecl =
       in
       Str.module_
         (Mb.mk (Location.mknoloc (Some mname))
-        @@ Mod.structure
-             [ Str.extension
-                 ~loc
-                 ( Location.mknoloc "distrib"
-                 , PStr (str_type_ ~loc Nonrecursive [ t1 ] :: t2) )
-             ])
+         @@ Mod.structure
+              [ Str.extension
+                  ~loc
+                  ( Location.mknoloc "distrib"
+                  , PStr (str_type_ ~loc Nonrecursive [ t1 ] :: t2) )
+              ])
       :: type_synonym
       :: creators
     in
@@ -720,7 +720,7 @@ let translate_type ~params rec_flg loc tdecl =
   match params.gen_info with
   | Only_distribs ->
     (match tdecl.ptype_kind with
-     | Ptype_variant _ -> put_distrib ~params rec_flg loc tdecl
+     | Ptype_abstract | Ptype_variant _ -> put_distrib ~params rec_flg loc tdecl
      | Ptype_record fields ->
        put_distrib ~params rec_flg loc tdecl
        @ [ mk_record_constr ~loc tdecl.ptype_name.txt fields ]
@@ -731,14 +731,18 @@ let translate_type ~params rec_flg loc tdecl =
 let main_mapper params =
   let wrap_tydecls rec_flg loc ts =
     let f tdecl =
-      let has_gen_attr = has_to_gen_attr tdecl.ptype_attributes in
-      match tdecl.ptype_kind with
-      | (Ptype_variant _ | Ptype_record _)
-        when tdecl.ptype_manifest = None && has_gen_attr ->
-        translate_type ~params rec_flg loc tdecl
-      | (Ptype_variant _ | Ptype_record _) when not has_gen_attr ->
-        [ str_type_ ~loc rec_flg [ tdecl ] ]
-      | _ -> failwith "Only variant types without manifest are supported"
+      if has_to_gen_attr tdecl.ptype_attributes
+      then (
+        let is_supported =
+          match tdecl.ptype_kind with
+          | Ptype_variant _ | Ptype_record _ -> tdecl.ptype_manifest = None
+          | Ptype_abstract -> true
+          | _ -> false
+        in
+        if is_supported
+        then translate_type ~params rec_flg loc tdecl
+        else failwith "Only variant types without manifest are supported")
+      else [ str_type_ ~loc rec_flg [ tdecl ] ]
     in
     List.flatten (List.map f ts)
   in
@@ -748,11 +752,7 @@ let main_mapper params =
         (fun self ss ->
           let f si =
             match si.pstr_desc with
-            | Pstr_type (rec_flg, tydecls) ->
-              let tds_without_synonyms =
-                List.filter (fun td -> td.ptype_kind <> Ptype_abstract) tydecls
-              in
-              wrap_tydecls rec_flg si.pstr_loc tds_without_synonyms
+            | Pstr_type (rec_flg, tydecls) -> wrap_tydecls rec_flg si.pstr_loc tydecls
             | _ -> [ default_mapper.structure_item mapper si ]
           in
           List.concat_map f ss)
