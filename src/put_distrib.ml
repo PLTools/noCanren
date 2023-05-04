@@ -676,24 +676,27 @@ let has_to_gen_attr (xs : attributes) =
   | Not_found -> false
 ;;
 
-let put_distrib ~params rec_flg loc tdecl =
+let put_distrib ~params rec_flg loc tdecls =
   let gt_params =
     Attr.mk
       (mknoloc "deriving")
       (PStr [ Str.eval [%expr gt ~options:{ show; fmt; gmap }] ])
   in
-  let tdecl =
-    { tdecl with
-      ptype_attributes =
-        gt_params
-        :: List.filter
-             (fun a -> a.attr_name.Location.txt <> "put_distrib_here")
-             tdecl.ptype_attributes
-    }
+  let tdecls =
+    List.map
+      (fun tdecl ->
+        { tdecl with
+          ptype_attributes =
+            gt_params
+            :: List.filter
+                 (fun a -> a.attr_name.Location.txt <> "put_distrib_here")
+                 tdecl.ptype_attributes
+        })
+      tdecls
   in
   [ Ast_helper.Str.extension
       ~loc
-      (Location.mknoloc "distrib", PStr [ str_type_ ~loc Recursive [ tdecl ] ])
+      (Location.mknoloc "distrib", PStr [ str_type_ ~loc Recursive tdecls ])
   ]
 ;;
 
@@ -715,36 +718,50 @@ let mk_record_constr ~loc type_name fields =
   |> fun vb -> Str.value Nonrecursive [ vb ]
 ;;
 
-let translate_type ~params rec_flg loc tdecl =
+let translate_type ~params rec_flg loc tdecls =
   let open Util in
+  let is_supported =
+    List.for_all
+      (fun tdecl ->
+        match tdecl.ptype_kind with
+        | Ptype_abstract | Ptype_variant _ | Ptype_record _ -> true
+        | _ -> false)
+      tdecls
+  in
   match params.gen_info with
-  | Only_distribs ->
-    (match tdecl.ptype_kind with
-     | Ptype_abstract | Ptype_variant _ -> put_distrib ~params rec_flg loc tdecl
-     | Ptype_record fields ->
-       put_distrib ~params rec_flg loc tdecl
-       @ [ mk_record_constr ~loc tdecl.ptype_name.txt fields ]
-     | _ -> failwith "Only variant types without manifest are supported")
-  | Old_OCanren | Only_injections | Distribs -> revisit_type ~params rec_flg loc tdecl
+  | Only_distribs when is_supported ->
+    let ctors_for_records =
+      List.filter_map
+        (fun tdecl ->
+          match tdecl.ptype_kind with
+          | Ptype_record fields ->
+            Some (mk_record_constr ~loc tdecl.ptype_name.txt fields)
+          | _ -> None)
+        tdecls
+    in
+    put_distrib ~params rec_flg loc tdecls @ ctors_for_records
+  | Old_OCanren | Only_injections | Distribs ->
+    List.concat_map (revisit_type ~params rec_flg loc) tdecls
+  | _ -> failwith "Only variant types without manifest are supported"
 ;;
 
 let main_mapper params =
-  let wrap_tydecls rec_flg loc ts =
-    let f tdecl =
-      if has_to_gen_attr tdecl.ptype_attributes
-      then (
-        let is_supported =
-          match tdecl.ptype_kind with
-          | Ptype_variant _ | Ptype_record _ -> tdecl.ptype_manifest = None
-          | Ptype_abstract -> true
-          | _ -> false
-        in
-        if is_supported
-        then translate_type ~params rec_flg loc tdecl
-        else failwith "Only variant types without manifest are supported")
-      else [ str_type_ ~loc rec_flg [ tdecl ] ]
-    in
-    List.flatten (List.map f ts)
+  let wrap_tydecls rec_flg loc type_decls =
+    if List.for_all (fun tdecl -> has_to_gen_attr tdecl.ptype_attributes) type_decls
+    then (
+      let is_supported =
+        List.for_all
+          (fun tdecl ->
+            match tdecl.ptype_kind with
+            | Ptype_variant _ | Ptype_record _ -> tdecl.ptype_manifest = None
+            | Ptype_abstract -> true
+            | _ -> false)
+          type_decls
+      in
+      if is_supported
+      then translate_type ~params rec_flg loc type_decls
+      else failwith "Only variant types without manifest are supported")
+    else [ str_type_ ~loc rec_flg type_decls ]
   in
   let rec mapper =
     { Ast_mapper.default_mapper with
