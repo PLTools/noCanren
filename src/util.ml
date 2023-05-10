@@ -783,7 +783,7 @@ let rec translate_type (t : core_type) =
     match name.txt with
     | Lident n ->
       (match n with
-       | "unit" | "int" -> mk @@ n ^ " OCanren.ilogic"
+       | "unit" | "int" | "bool" -> mk @@ n ^ " OCanren.ilogic"
        | _ -> mk @@ n ^ "_injected")
     | _ -> fail_loc name.loc "Only type constructors without dots are supported"
   in

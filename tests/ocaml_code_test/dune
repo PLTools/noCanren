@@ -26,6 +26,7 @@
    OCanren-ppx.ppx_repr
    OCanren-ppx.ppx_fresh
    OCanren-ppx.ppx_distrib
+   -new-typenames
    GT.ppx_all)))
 
 (cram

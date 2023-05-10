@@ -643,28 +643,35 @@ let translate_high tast start_index params =
     | Texp_letop { let_; body } -> translate_let_star e.exp_loc let_ body
     | _ -> fail_loc e.exp_loc "Incorrect expression"
   in
-  let translate_sign ~loc sign =
+  let translate_sign ~loc attributes sign =
     let open Parsetree in
-    let translated_sign =
-      List.map
-        (fun sign_item ->
-          match sign_item.psig_desc with
-          | Psig_value vd ->
-            { sign_item with
-              psig_desc = Psig_value { vd with pval_type = translate_type vd.pval_type }
-            }
-          | _ -> fail_loc loc "Only values in signatures are supported")
-        sign
-    in
-    [ Sig.module_
-      @@ Md.mk (mknoloc @@ Some translated_module_name)
-      @@ Mty.signature translated_sign
-    ]
+    if has_named_attribute "same_in_ocanren" attributes
+    then sign
+    else (
+      let translated_sign =
+        List.map
+          (fun sign_item ->
+            match sign_item.psig_desc with
+            | Psig_value vd ->
+              { sign_item with
+                psig_desc = Psig_value { vd with pval_type = translate_type vd.pval_type }
+              }
+            | Psig_type (_, tdecls)
+              when List.for_all (fun tdecl -> tdecl.ptype_kind = Ptype_abstract) tdecls ->
+              sign_item
+            | _ -> fail_loc loc "Only values and abstract in signatures are supported")
+          sign
+      in
+      [ Sig.module_
+        @@ Md.mk (mknoloc @@ Some translated_module_name)
+        @@ Mty.signature translated_sign
+      ])
   in
   let rec translate_structure_item i =
     let loc = i.str_loc in
     match i.str_desc with
-    | Tstr_modtype { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name } ->
+    | Tstr_modtype
+        { mtd_type = Some { mty_type = Mty_signature sign }; mtd_name; mtd_attributes } ->
       { translated =
           [ Ast_helper.(
               Str.modtype ~loc
@@ -673,7 +680,7 @@ let translate_high tast start_index params =
                    mtd_name
                    ~typ:
                      (Mty.signature
-                      @@ translate_sign ~loc
+                      @@ translate_sign ~loc mtd_attributes
                       @@ Untype_more.untype_types_sign sign))
           ]
       ; synonyms = []
@@ -691,9 +698,14 @@ let translate_high tast start_index params =
         Option.map
           (function
            | Unit -> Unit
-           | Named (n, ({ pmty_desc = Pmty_signature sign } as mt)) ->
-             Named (n, { mt with pmty_desc = Pmty_signature (translate_sign ~loc sign) })
-           | _ -> fail_loc loc "")
+           | Named (n, ({ pmty_desc = Pmty_signature sign; pmty_attributes } as mt)) ->
+             Named
+               ( n
+               , { mt with
+                   pmty_desc = Pmty_signature (translate_sign ~loc pmty_attributes sign)
+                 } )
+           | Named (name, { pmty_desc = Pmty_ident _ }) as ident -> ident
+           | _ -> fail_loc loc "Unexpected module parameter")
           param
       in
       let { translated; synonyms; ocaml_code } =

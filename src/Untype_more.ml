@@ -23,17 +23,17 @@ let untype_types_sign =
       Sig.type_
         Nonrecursive
         (List.map (fun f -> f (Location.mknoloc (Ident.name id))) (untype_tdecl tdecl))
-    | _ -> assert false
+    | _ -> failwith "Unexpected signature"
   and untype_tdecl decl =
-    let manifest =
-      match decl.type_manifest with
-      | None -> assert false
-      | Some t -> untype_type t
-    in
     let params =
       List.map
         (fun t -> untype_type t, (Asttypes.NoVariance, Asttypes.NoInjectivity))
         decl.type_params
+    in
+    let manifest =
+      match decl.type_manifest with
+      | None -> assert false
+      | Some t -> untype_type t
     in
     [ Type.mk ~manifest ~params ]
   and lident_of_path = function
