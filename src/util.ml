@@ -787,9 +787,17 @@ let rec translate_type (t : core_type) =
        | _ -> mk @@ n ^ "_injected")
     | _ -> fail_loc name.loc "Only type constructors without dots are supported"
   in
+  let rec translate_arg arg =
+    match arg.ptyp_desc with
+    | Ptyp_var v -> Typ.constr (Lident "OCanren.ilogic" |> mknoloc) [ t ]
+    | Ptyp_constr (c, args) ->
+      Typ.constr (translate_type_constr c) @@ List.map translate_arg args
+    | _ -> fail_loc t.ptyp_loc "Unexpected type."
+  in
   match t.ptyp_desc with
   | Ptyp_var v -> add_goal @@ Typ.constr (Lident "OCanren.ilogic" |> mknoloc) [ t ]
-  | Ptyp_constr (c, args) -> add_goal @@ Typ.constr (translate_type_constr c) []
+  | Ptyp_constr (c, args) ->
+    add_goal @@ Typ.constr (translate_type_constr c) @@ List.map translate_arg args
   | Ptyp_arrow (label, t1, t2) -> Typ.arrow label (translate_type t1) (translate_type t2)
   | _ -> fail_loc t.ptyp_loc "Unexpected type."
 ;;
