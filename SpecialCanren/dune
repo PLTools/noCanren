@@ -1,0 +1,4 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -w -27))))
