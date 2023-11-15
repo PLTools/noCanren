@@ -44,18 +44,7 @@ let translate tast start_index params =
       in
       let new_args, fv = List.map (unnest_expr let_vars) args |> List.split in
       let fv = List.concat fv in
-      let new_args =
-        match new_args with
-        | [] -> [ [%expr ()] ]
-        | l -> l
-      in
-      let new_name =
-        match name.txt with
-        | Lident "[]" -> Lident "nil"
-        | Lident "::" -> Lident "%"
-        | txt -> lowercase_lident txt
-      in
-      create_apply (mknoloc new_name |> Exp.ident |> mark_constr) new_args, fv
+      create_constr name new_args, fv
     | _ when is_primary_type expr.exp_type ->
       let fr_var = create_fresh_var_name () in
       create_id fr_var, [ fr_var, expr ]
