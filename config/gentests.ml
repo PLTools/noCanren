@@ -72,7 +72,7 @@ let footer names =
 
 let () =
   let path = (Sys.get_argv ()).(1) in
-  let files = Caml.Sys.readdir path in
+  let files = Stdlib.Sys.readdir path in
   let tail = "_run.ml" in
   let taillen = String.length tail in
   let names =
