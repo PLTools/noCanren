@@ -30,11 +30,11 @@ let translate_high tast start_index params =
     | Tlink typ -> create_fresh_argument_names_by_args typ
     | _ -> []
   in
-  let rec unnest_constuct e =
+  let rec unnest_construct e =
     let loc = Ppxlib.Location.none in
     match e.exp_desc with
     | Texp_constant (Const_int i) ->
-      [%expr from_int [%e Untypeast.untype_expression e]], [], []
+      [%expr Peano.HO.from_int [%e Untypeast.untype_expression e]], [], []
     | Texp_constant c -> create_inj (Exp.constant (Untypeast.constant c)), [], []
     | Texp_construct ({ txt = Lident s }, _, [])
       when s = "true" || s = "false" || s = "()" ->
@@ -42,9 +42,9 @@ let translate_high tast start_index params =
     | Texp_construct ({ txt = Lident s }, _, []) when s = "Nothing" ->
       let new_var = create_fresh_var_name () in
       create_id new_var, [ FailureExpr ], [ new_var ]
-    | Texp_construct ({ txt = Lident s }, _, [ a ]) when s = "Just" -> unnest_constuct a
+    | Texp_construct ({ txt = Lident s }, _, [ a ]) when s = "Just" -> unnest_construct a
     | Texp_tuple l ->
-      let new_args, als, vars = List.map unnest_constuct l |> split3 in
+      let new_args, als, vars = List.map unnest_construct l |> split3 in
       ( fold_right1
           (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
           new_args
@@ -54,11 +54,11 @@ let translate_high tast start_index params =
       let name = add_translated_module_name_in_ident name in
       (match get_constr_args loc desc args with
        | `Constr_args args ->
-         let new_args, als, vars = List.map unnest_constuct args |> split3 in
+         let new_args, als, vars = List.map unnest_construct args |> split3 in
          create_constr name new_args, List.concat als, List.concat vars
        | `Inlined_record_fields fields ->
          let new_args, als, vars =
-           List.map (fun (_, expr) -> unnest_constuct expr) fields |> split3
+           List.map (fun (_, expr) -> unnest_construct expr) fields |> split3
          in
          let bindings = List.map2 (fun (l, _) e -> l, e) fields new_args in
          create_constr name [ create_record bindings ], List.concat als, List.concat vars)
@@ -67,7 +67,7 @@ let translate_high tast start_index params =
       create_id fr_var, [ Call (create_id fr_var, translate_expression e) ], [ fr_var ]
   and translate_construct expr =
     let loc = Ppxlib.Location.none in
-    let constr, binds, vars = unnest_constuct expr in
+    let constr, binds, vars = unnest_construct expr in
     let out_var_name = create_fresh_var_name () in
     let unify_constr = [%expr [%e create_id out_var_name] === [%e constr]] in
     let conjs = unify_constr :: List.map alias2unify binds in
@@ -189,7 +189,7 @@ let translate_high tast start_index params =
       let rec two_or_more_mentions expr count =
         let eval_if_need c e = if c <= 1 then two_or_more_mentions e c else c in
         let rec get_pat_vars : type a. a Typedtree.general_pattern -> _ =
-         fun p ->
+          fun p ->
           match p.pat_desc with
           | Tpat_any | Tpat_constant _ -> []
           | Tpat_var (n, _) -> [ name n ]
@@ -223,8 +223,8 @@ let translate_high tast start_index params =
           let args =
             List.map
               (function
-               | _, Some a -> a
-               | _, None -> failwith "Not implemented")
+                | _, Some a -> a
+                | _, None -> failwith "Not implemented")
               args
           in
           List.fold_left eval_if_need count @@ (func :: args)
@@ -347,11 +347,11 @@ let translate_high tast start_index params =
       (translate_expression f)
       (List.map
          (function
-          | _, Some e ->
-            if is_primary_type e.exp_type
-            then mark_fo_arg @@ translate_expression e
-            else translate_expression e
-          | _ -> fail_loc l "Incorrect argument")
+           | _, Some e ->
+             if is_primary_type e.exp_type
+             then mark_fo_arg @@ translate_expression e
+             else translate_expression e
+           | _ -> fail_loc l "Incorrect argument")
          a)
   and translate_match_without_scrutinee
     loc
@@ -366,62 +366,62 @@ let translate_high tast start_index params =
     | Tlink typ -> translate_match_without_scrutinee loc cases typ_desc
     | _ -> fail_loc loc "Incorrect type for 'function'"
   and translate_match_with_scrutinee
-        : 'a.
-          loc
-          -> Typedtree.expression
-          -> 'a Typedtree.case list
-          -> Types.type_expr
-          -> Parsetree.expression
+    : 'a.
+    loc
+    -> Typedtree.expression
+    -> 'a Typedtree.case list
+    -> Types.type_expr
+    -> Parsetree.expression
     =
     fun (type a) loc s (cases : a Typedtree.case list) typ ->
-     translate_match loc (translate_expression s) s.exp_attributes cases typ
+    translate_match loc (translate_expression s) s.exp_attributes cases typ
   and translate_match
-        : 'a.
-          loc
-          -> Parsetree.expression
-          -> attributes
-          -> 'a Typedtree.case list
-          -> Types.type_expr
-          -> Parsetree.expression
+    : 'a.
+    loc
+    -> Parsetree.expression
+    -> attributes
+    -> 'a Typedtree.case list
+    -> Types.type_expr
+    -> Parsetree.expression
     =
     fun (type a) loc translated_scrutinee attrs (cases : a Typedtree.case list) typ ->
-     if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats
-     then (
-       let high_extra_args = create_fresh_argument_names_by_args typ in
-       let result_arg = create_fresh_var_name () in
-       let extra_args = high_extra_args @ [ result_arg ] in
-       let scrutinee_var = create_fresh_var_name () in
-       let create_subst v =
-         let abs_v = create_fresh_var_name () in
-         let unify = [%expr [%e create_id v] === [%e create_id abs_v]] in
-         create_fun abs_v unify
-       in
-       let translate_match_pat (pat, als) =
-         let unify = [%expr [%e create_id scrutinee_var] === [%e pat]] in
-         let unifies = List.map alias2unify als in
-         create_conj (unify :: unifies)
-       in
-       let translate_case case =
-         let p_with_als, vs = translate_or_pats case.c_lhs create_fresh_var_name in
-         let pats = create_disj (List.map translate_match_pat p_with_als) in
-         let body =
-           create_apply (translate_expression case.c_rhs) (List.map create_id extra_args)
-         in
-         let abst_body = List.fold_right create_fun vs body in
-         let subst = List.map create_subst vs in
-         let total_body = create_apply abst_body subst in
-         let conj = create_conj [ pats; total_body ] in
-         List.fold_right create_fresh vs conj
-       in
-       let new_cases = List.map translate_case cases in
-       let disj = create_disj new_cases in
-       let scrutinee = create_apply translated_scrutinee [ create_id scrutinee_var ] in
-       let scrutinee = { scrutinee with pexp_attributes = attrs } in
-       let conj = create_conj [ scrutinee; disj ] in
-       let fresh = create_fresh scrutinee_var conj in
-       let with_res = [%expr fun [%p create_logic_var result_arg] -> [%e fresh]] in
-       List.fold_right create_fun high_extra_args with_res)
-     else fail_loc loc "Pattern matching contains unified patterns"
+    if cases |> List.map (fun c -> c.c_lhs) |> is_disj_pats
+    then (
+      let high_extra_args = create_fresh_argument_names_by_args typ in
+      let result_arg = create_fresh_var_name () in
+      let extra_args = high_extra_args @ [ result_arg ] in
+      let scrutinee_var = create_fresh_var_name () in
+      let create_subst v =
+        let abs_v = create_fresh_var_name () in
+        let unify = [%expr [%e create_id v] === [%e create_id abs_v]] in
+        create_fun abs_v unify
+      in
+      let translate_match_pat (pat, als) =
+        let unify = [%expr [%e create_id scrutinee_var] === [%e pat]] in
+        let unifies = List.map alias2unify als in
+        create_conj (unify :: unifies)
+      in
+      let translate_case case =
+        let p_with_als, vs = translate_or_pats case.c_lhs create_fresh_var_name in
+        let pats = create_disj (List.map translate_match_pat p_with_als) in
+        let body =
+          create_apply (translate_expression case.c_rhs) (List.map create_id extra_args)
+        in
+        let abst_body = List.fold_right create_fun vs body in
+        let subst = List.map create_subst vs in
+        let total_body = create_apply abst_body subst in
+        let conj = create_conj [ pats; total_body ] in
+        List.fold_right create_fresh vs conj
+      in
+      let new_cases = List.map translate_case cases in
+      let disj = create_disj new_cases in
+      let scrutinee = create_apply translated_scrutinee [ create_id scrutinee_var ] in
+      let scrutinee = { scrutinee with pexp_attributes = attrs } in
+      let conj = create_conj [ scrutinee; disj ] in
+      let fresh = create_fresh scrutinee_var conj in
+      let with_res = [%expr fun [%p create_logic_var result_arg] -> [%e fresh]] in
+      List.fold_right create_fun high_extra_args with_res)
+    else fail_loc loc "Pattern matching contains unified patterns"
   and translate_bind bind =
     let bind = { bind with vb_pat = normalize_let_name bind.vb_pat } in
     let rec get_tabling_rank (typ : Types.type_expr) =
@@ -531,8 +531,8 @@ let translate_high tast start_index params =
     let exprs =
       List.map
         (function
-         | _, Overridden (_, expr) -> translate_expression expr
-         | _, Kept _ -> failwith "not implemented")
+          | _, Overridden (_, expr) -> translate_expression expr
+          | _, Kept _ -> failwith "not implemented")
         fields
     in
     let calls = List.map2 (fun e v -> create_apply e [ create_id v ]) exprs vars in
@@ -555,15 +555,14 @@ let translate_high tast start_index params =
     let exprs =
       fields
       |> List.map (function
-           | _, Overridden (_, e) ->
-             Some (translate_expression e, create_fresh_var_name ())
-           | _ -> None)
+        | _, Overridden (_, e) -> Some (translate_expression e, create_fresh_var_name ())
+        | _ -> None)
     in
     let calls =
       exprs
       |> List.filter_map (function
-           | Some (e, v) -> Some (create_apply e [ create_id v ])
-           | None -> None)
+        | Some (e, v) -> Some (create_apply e [ create_id v ])
+        | None -> None)
     in
     let real_vs =
       List.map2
@@ -577,8 +576,8 @@ let translate_high tast start_index params =
     let add_vs =
       exprs
       |> List.filter_map (function
-           | Some (e, v) -> Some v
-           | None -> None)
+        | Some (e, v) -> Some v
+        | None -> None)
     in
     let uni =
       [%expr [%e create_id mvar] === [%e create_apply ctor (List.map create_id real_vs)]]
@@ -697,15 +696,15 @@ let translate_high tast start_index params =
       let translated_param =
         Option.map
           (function
-           | Unit -> Unit
-           | Named (n, ({ pmty_desc = Pmty_signature sign; pmty_attributes } as mt)) ->
-             Named
-               ( n
-               , { mt with
-                   pmty_desc = Pmty_signature (translate_sign ~loc pmty_attributes sign)
-                 } )
-           | Named (name, { pmty_desc = Pmty_ident _ }) as ident -> ident
-           | _ -> fail_loc loc "Unexpected module parameter")
+            | Unit -> Unit
+            | Named (n, ({ pmty_desc = Pmty_signature sign; pmty_attributes } as mt)) ->
+              Named
+                ( n
+                , { mt with
+                    pmty_desc = Pmty_signature (translate_sign ~loc pmty_attributes sign)
+                  } )
+            | Named (name, { pmty_desc = Pmty_ident _ }) as ident -> ident
+            | _ -> fail_loc loc "Unexpected module parameter")
           param
       in
       let { translated; synonyms; ocaml_code } =

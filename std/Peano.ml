@@ -18,8 +18,8 @@ let min = lift min
 let max = lift max
 
 module HO = struct
-  include OCanren
-  include PeanoRaw.HO
+  open OCanren
+  open PeanoRaw.HO
 
   type nat = OCanren.Std.Nat.ground [@@deriving gt ~options:{ show; fmt; gmap }]
   type nat_logic = OCanren.Std.Nat.logic [@@deriving gt ~options:{ show; fmt; gmap }]
@@ -43,6 +43,8 @@ module HO = struct
   let ( <= ) = le
   let ( > ) = gt
   let ( >= ) = ge
+  let min = min
+  let max = max
 end
 
 module FO = struct
@@ -54,10 +56,10 @@ module FO = struct
   let ( * ) = lift HO.( * )
   let ( / ) = lift HO.( / )
   let ( mod ) = lift HO.( mod )
-  let ( < ) = lift HO.lt
-  let ( <= ) = lift HO.le
-  let ( > ) = lift HO.gt
-  let ( >= ) = lift HO.ge
+  let ( < ) = lift HO.( < )
+  let ( <= ) = lift HO.( <= )
+  let ( > ) = lift HO.( > )
+  let ( >= ) = lift HO.( >= )
   let min = lift HO.min
   let max = lift HO.max
 end
