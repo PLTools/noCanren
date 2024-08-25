@@ -11,10 +11,9 @@
   (run
    mkcamlp5.opt
    -package
-   camlp5,camlp5.pa_o
-   -package
    OCanren.syntax,GT.syntax,GT.syntax.all
-   pr_o.cmx
+   -package
+   camlp5,camlp5.pa_o,camlp5.pr_o
    -o
    %{targets}
    -)))
@@ -27,10 +26,9 @@
   (run
    mkcamlp5.opt
    -package
-   camlp5,camlp5.pa_o
+   camlp5,camlp5.pa_o,camlp5.pr_dump
    -package
    OCanren.syntax,GT.syntax,GT.syntax.all
-   pr_dump.cmx
    -o
    %{targets}
    -)))

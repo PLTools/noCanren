@@ -1,7 +1,7 @@
 (executable
  (name gentests)
  (modules gentests)
- (libraries str stdio base))
+ (libraries str))
 
 (executable
  (name discover)

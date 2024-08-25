@@ -1,5 +1,3 @@
-open Base
-
 let header =
   {|; THIS FILE IS GENERATED AUTOMATICALLY
 
@@ -63,31 +61,33 @@ let wrap =
 ;;
 
 let footer names =
-  Stdio.printf "(cram\n";
-  Stdio.printf " ;(package noCanren-tests)\n";
-  Stdio.printf " (deps\n";
-  Array.iter names ~f:(Stdio.printf "  ./%s_run.exe\n");
-  Stdio.printf "  ;\n  ))\n"
+  Printf.printf "(cram\n";
+  Printf.printf " ;(package noCanren-tests)\n";
+  Printf.printf " (deps\n";
+  ListLabels.iter names ~f:(Printf.printf "  ./%s_run.exe\n");
+  Printf.printf "  ;\n  ))\n";
+  flush stdout
 ;;
 
 let () =
-  let path = (Sys.get_argv ()).(1) in
-  let files = Caml.Sys.readdir path in
+  let path = Sys.argv.(1) in
+  let files = Stdlib.Sys.readdir path |> Array.to_list in
   let tail = "_run.ml" in
   let taillen = String.length tail in
   let names =
-    Array.filter_map files ~f:(fun s ->
+    ListLabels.filter_map files ~f:(fun s ->
       if String.length s > taillen && (String.equal tail @@ Str.last_chars s taillen)
       then (
-        let name = String.chop_suffix_exn s ~suffix:tail in
+        let name = String.sub s 0 (String.length s - taillen) in
         match name with
         | "lorry" -> None
         | _ -> Some name)
       else None)
-    |> Array.sorted_copy ~compare:String.compare
+    |> List.sort String.compare
   in
   (* Array.iter names ~f:Stdio.print_endline; *)
-  Stdio.printf "%s\n%!" header;
-  Array.iter names ~f:(fun name -> Stdio.printf "%s%!" (wrap name));
-  footer names
+  Printf.printf "%s\n%!" header;
+  ListLabels.iter names ~f:(fun name -> Printf.printf "%s%!" (wrap name));
+  footer names;
+  flush stdout
 ;;
