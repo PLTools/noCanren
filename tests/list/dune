@@ -10,11 +10,28 @@
   (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
   (:exec %{project_root}/src/noCanren.exe)
   (:input list_test.ml2mk.ml))
+ (mode
+  (promote (until-clean)))
  (action
   (run
    sh
    -c
    "%{exec} -w -8 %{input} -rectypes -o %{targets} | ocamlformat --enable-outside-detected-project --impl -")))
+
+(rule
+ (targets list_test_unnesting.ml)
+ (deps
+  (:list %{project_root}/std/.List.objs/byte/list.cmi)
+  (:peano %{project_root}/std/.Peano.objs/byte/peano.cmi)
+  (:exec %{project_root}/src/noCanren.exe)
+  (:input unnesting.ml2mk.ml))
+ (mode
+  (promote (until-clean)))
+ (action
+  (run
+   sh
+   -c
+   "%{exec}  -unnesting-mode   -without-activate-tactics -w -8 %{input} -rectypes -o %{targets} ")))
 
 (executable
  (name list_test_run)
@@ -27,5 +44,18 @@
    OCanren-ppx.ppx_distrib
    GT.ppx_all)))
 
+(executable
+ (name list_test_run2)
+ (libraries GT OCanren OCanren.tester Peano List)
+ (modules list_test_run2 list_test_unnesting)
+ (flags
+  (:standard -open OCanren.Std))
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_repr
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_distrib
+   GT.ppx_all)))
+
 (cram
- (deps ./list_test_run.exe))
+ (deps ./list_test_run.exe ./list_test_run2.exe))

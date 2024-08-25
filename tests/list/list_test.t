@@ -1,3 +1,4 @@
+  $ ./list_test_run2.exe
   $ ./list_test_run.exe
   lenght, all answers {
   q=5;
