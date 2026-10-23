@@ -66,8 +66,8 @@ type noCanren_params =
 
 type binding =
   | FailureExpr
-  | Alias of Parsetree.expression * Parsetree.expression
-  | Call of Parsetree.expression * Parsetree.expression
+  | Alias of Ppxlib.expression * Ppxlib.expression
+  | Call of Ppxlib.expression * Ppxlib.expression
 
 type translated_structure_item =
   { translated : structure_item list
@@ -156,8 +156,8 @@ let mangle_construct_name name =
   let low =
     String.mapi
       (function
-       | 0 -> Char.lowercase_ascii
-       | _ -> fun x -> x)
+        | 0 -> Char.lowercase_ascii
+        | _ -> fun x -> x)
       name
   in
   match low with
@@ -226,19 +226,26 @@ let mangle_construct_name name =
   | _ -> low
 ;;
 
+[%%if ocaml_version >= (5, 5, 0)]
+
 let rec longident_eq a b =
   match a, b with
   | Lident x, Lident y -> x = y
-  | Ldot (a, x), Ldot (b, y) -> x = y && longident_eq a b
-  | Lapply (a1, a2), Lapply (b1, b2) -> longident_eq a1 b1 && longident_eq a2 b2
+  | Ldot (a, x), Ldot (b, y) -> x = y && longident_eq a.txt b.txt
+  | Lapply (a1, a2), Lapply (b1, b2) ->
+    longident_eq a1.txt b1.txt && longident_eq a2.txt b2.txt
   | _ -> false
 ;;
 
 let rec lowercase_lident = function
   | Lident s -> Lident (mangle_construct_name s)
-  | Lapply (l, r) -> Lapply (lowercase_lident l, lowercase_lident r)
-  | Ldot (t, s) -> Ldot (t, mangle_construct_name s)
+  | Lapply (l, r) ->
+    Lapply
+      ({ l with txt = lowercase_lident l.txt }, { r with txt = lowercase_lident r.txt })
+  | Ldot (t, s) -> Ldot (t, { s with txt = mangle_construct_name s.txt })
 ;;
+
+[%%endif]
 
 let rec fold_right1 f = function
   | [ h ] -> h
@@ -271,8 +278,13 @@ let rec uniq = function
 (********************** Translator util funcions ****************************)
 
 let untyper = Untypeast.default_mapper
-let create_id s = Lident s |> mknoloc |> Exp.ident
-let create_pat s = mknoloc s |> Pat.var
+
+let create_id s =
+  let open Ppxlib.Ast_builder.Default in
+  Ppxlib.Lident s |> mknoloc |> pexp_ident ~loc:Ppxlib.Location.none
+;;
+
+let create_pat s = mknoloc s |> Ppxlib.Ast_builder.Default.ppat_var ~loc:Location.none
 
 let rec is_primary_type (t : Types.type_expr) =
   match Types.get_desc t with
@@ -282,10 +294,16 @@ let rec is_primary_type (t : Types.type_expr) =
 ;;
 
 let pat_is_var p =
-  match p.pat_desc with
-  | Tpat_alias ({ pat_desc = Tpat_any }, _, _) | Tpat_var _ -> true
-  | _ -> false
+  let open Tast_pattern in
+  parse
+    (tpat_var drop ||| tpat_alias tpat_any drop drop)
+    Location.none
+    ~on_error:(fun _ -> false)
+    p
+    true
 ;;
+
+[%%if ocaml_version < (5, 0, 0)]
 
 let get_pat_name p =
   match p.pat_desc with
@@ -300,16 +318,40 @@ let rename_pat p new_name =
   | _ -> fail_loc p.pat_loc "Incorrect renamed pattern"
 ;;
 
-let create_apply f = function
-  | [] -> f
+[%%else]
+
+let get_pat_name p =
+  let open Tast_pattern in
+  parse
+    (tpat_id __ ||| tpat_alias tpat_any __ drop)
+    Location.none
+    ~on_error:(fun _ -> fail_loc p.pat_loc "Incorrect pattern")
+    p
+    (fun n -> Ident.name n)
+;;
+
+let rename_pat p new_name =
+  match p.pat_desc with
+  | Tpat_var (n, d, uid) ->
+    (* TODO(Kakadu): I'm not sure that UID should not change *)
+    { p with pat_desc = Tpat_var (create_local new_name, { d with txt = new_name }, uid) }
+  | _ -> fail_loc p.pat_loc "Incorrect renamed pattern"
+;;
+
+[%%endif]
+
+let create_apply f : Ppxlib.expression list -> _ = function
+  | [] -> (f : Ppxlib.expression)
   | args ->
-    let args = List.map (fun a -> Nolabel, a) args in
-    (match f.pexp_desc with
-     | Pexp_apply (g, args') -> Exp.apply g (args' @ args)
-     | _ -> Exp.apply f args)
+    let open Ppxlib.Ast_builder.Default in
+    let args = List.map (fun a -> Ppxlib.Nolabel, a) args in
+    (match f.Ppxlib.pexp_desc with
+     | Ppxlib.Pexp_apply (g, args') -> pexp_apply ~loc:f.Ppxlib.pexp_loc g (args' @ args)
+     | _ -> pexp_apply ~loc:f.Ppxlib.pexp_loc f args)
 ;;
 
 let create_apply_to_list f arg_list =
+  let open Ppxlib in
   let loc = f.pexp_loc in
   let new_arg =
     List.fold_right (fun x acc -> [%expr [%e x] :: [%e acc]]) arg_list [%expr []]
@@ -340,6 +382,7 @@ let create_disj = function
 ;;
 
 let create_fun var body =
+  let open Ppxlib in
   let loc = Ppxlib.Location.none in
   [%expr fun [%p create_pat var] -> [%e body]]
 ;;
@@ -353,6 +396,8 @@ let create_inj expr =
   let loc = Ppxlib.Location.none in
   [%expr !![%e expr]]
 ;;
+
+[%%if ocaml_version < (5, 0, 0)]
 
 let rec path2ident = function
   | Path.Pident i -> Lident (name i)
@@ -374,6 +419,31 @@ let ctor_for_record loc typ =
   get_id typ |> mknoloc |> Exp.ident
 ;;
 
+[%%else]
+
+let rec path2ident : _ -> Ppxlib.Longident.t = function
+  | Path.Pident i -> Ppxlib.Lident (name i)
+  | Path.Pdot (l, r) -> Ppxlib.Ldot (path2ident l, r)
+  | Path.Papply (l, r) -> Ppxlib.Lapply (path2ident l, path2ident r)
+  | Path.Pextra_ty _ -> failwith "Not implemented"
+;;
+
+let ctor_for_record loc typ =
+  let rec get_id (typ : Types.type_expr) : Ppxlib.Longident.t =
+    match Types.get_desc typ with
+    | Tlink t -> get_id t
+    | Tconstr (p, _, _) ->
+      (match path2ident p with
+       | Ppxlib.Lident i -> Ppxlib.Lident ("ctor_" ^ i)
+       | Ldot (l, r) -> Ppxlib.Ldot (l, "ctor_" ^ r)
+       | Lapply _ -> fail_loc loc "What is 'Lapply'?")
+    | _ -> fail_loc loc "Incorrect type of record"
+  in
+  get_id typ |> mknoloc |> Ppxlib.Ast_builder.Default.pexp_ident ~loc
+;;
+
+[%%endif]
+
 let filter_vars vars1 vars2 = List.filter (fun v -> List.for_all (( <> ) v) vars2) vars1
 
 let mark_type_declaration td =
@@ -386,56 +456,24 @@ let mark_type_declaration td =
 ;;
 
 let mark_constr expr =
+  let _ : Ppxlib.expression = expr in
+  let open Ppxlib.Ast_builder.Default in
   { expr with
-    pexp_attributes =
-      Attr.mk (mknoloc "it_was_constr") (Parsetree.PStr []) :: expr.pexp_attributes
-  }
-;;
-
-let mark_memo_expr expr =
-  { expr with
-    pexp_attributes =
-      Attr.mk (mknoloc "memo_expr") (Parsetree.PStr []) :: expr.pexp_attributes
-  }
-;;
-
-let mark_fo_arg expr =
-  { expr with
-    pexp_attributes =
-      Attr.mk (mknoloc "need_CbN") (Parsetree.PStr []) :: expr.pexp_attributes
+    Ppxlib.pexp_attributes =
+      attribute
+        ~loc:Location.none
+        ~name:(mknoloc "it_was_constr")
+        ~payload:(Ppxlib.PStr [])
+      :: expr.pexp_attributes
   }
 ;;
 
 let is_active_arg pat =
+  let open Typedtree in
   List.exists (fun a -> a.attr_name.txt = "active") pat.pat_attributes
 ;;
 
-let create_logic_var name =
-  { (create_pat name) with
-    ppat_attributes = [ Attr.mk (mknoloc "logic") (Parsetree.PStr []) ]
-  }
-;;
-
-let create_constr constr args =
-  let constr =
-    (match constr.txt with
-     | Lident "::" -> Lident "OCanren.Std.List.Cons"
-     | Lident "[]" -> Lident "OCanren.Std.List.Nil"
-     | _ -> constr.txt)
-    |> mknoloc
-    |> Exp.ident
-    |> mark_constr
-  in
-  (match args with
-   | [] -> constr
-   | [ _ ] -> create_apply constr args
-   | _ -> create_apply constr [ Exp.tuple args ])
-  |> create_inj
-;;
-
-let create_record bindings =
-  Exp.record (List.map (fun (name, expr) -> Lident name |> mknoloc, expr) bindings) None
-;;
+[%%if ocaml_version < (5, 0, 0)]
 
 let have_unifier =
   let rec helper
@@ -444,16 +482,50 @@ let have_unifier =
       -> a Typedtree.pattern_desc pattern_data
       -> bool
     =
-   fun p1 p2 ->
+    fun p1 p2 ->
+    Tast_pattern.parse ~on_error:(fun _ ->
+      match p1.pat_desc, p2.pat_desc with
+      | Tpat_any, _ | _, Tpat_any | Tpat_var _, _ | _, Tpat_var _ -> true
+      | Tpat_or (a, b, _), _ -> helper a p2 || helper b p2
+      | _, Tpat_or (a, b, _) -> helper p1 a || helper p1 a
+      | Tpat_alias (p1, _, _), _ -> helper p1 p2
+      | _, Tpat_alias (p2, _, _) -> helper p1 p2
+      | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
+      | Tpat_tuple t1, Tpat_tuple t2 ->
+        List.length t1 = List.length t2 && List.for_all2 helper t1 t2
+      | Tpat_construct (_, cd1, a1, _), Tpat_construct (_, cd2, a2, _) ->
+        cd1.cstr_name = cd2.cstr_name
+        && List.length a1 = List.length a2
+        && List.for_all2 helper a1 a2
+      | Tpat_value v1, Tpat_value v2 ->
+        helper
+          (v1 :> Typedtree.value Typedtree.general_pattern)
+          (v2 :> Typedtree.value Typedtree.general_pattern)
+      | Tpat_exception _, _ | _, Tpat_exception _ | _ -> false)
+  in
+  helper
+;;
+
+[%%else]
+
+let have_unifier =
+  let rec helper
+    : type a.
+      a Typedtree.pattern_desc pattern_data
+      -> a Typedtree.pattern_desc pattern_data
+      -> bool
+    =
+    fun p1 p2 ->
     match p1.pat_desc, p2.pat_desc with
     | Tpat_any, _ | _, Tpat_any | Tpat_var _, _ | _, Tpat_var _ -> true
     | Tpat_or (a, b, _), _ -> helper a p2 || helper b p2
     | _, Tpat_or (a, b, _) -> helper p1 a || helper p1 a
-    | Tpat_alias (p1, _, _), _ -> helper p1 p2
-    | _, Tpat_alias (p2, _, _) -> helper p1 p2
+    | Tpat_alias (p1, _, _, _, _), _ -> helper p1 p2
+    | _, Tpat_alias (p2, _, _, _, _) -> helper p1 p2
     | Tpat_constant c1, Tpat_constant c2 -> c1 = c2
     | Tpat_tuple t1, Tpat_tuple t2 ->
-      List.length t1 = List.length t2 && List.for_all2 helper t1 t2
+      List.length t1 = List.length t2
+      && List.for_all2 helper (List.map snd t1) (List.map snd t2)
     | Tpat_construct (_, cd1, a1, _), Tpat_construct (_, cd2, a2, _) ->
       cd1.cstr_name = cd2.cstr_name
       && List.length a1 = List.length a2
@@ -467,63 +539,128 @@ let have_unifier =
   helper
 ;;
 
-let is_path_to_ocanren path =
-  let rec helper = function
-    | Lident root -> root = "OCanren"
-    | Ldot (next, _) -> helper next
-    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
-  in
-  helper path.txt
-;;
+[%%endif]
 
-let add_translated_module_name_in_ident path =
-  if is_path_to_ocanren path
-  then path
-  else (
-    match path.txt with
-    | Lident _ -> path
-    | Ldot (prepath, i) ->
-      { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
-    | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported.")
-;;
+include struct
+  open Ppxlib
 
-let add_translated_module_name_in_module path =
-  if is_path_to_ocanren path
-  then path
-  else (
-    let helper = function
-      | Lident i -> Ldot (Lident i, translated_module_name)
-      | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
+  let mark_memo_expr expr =
+    let open Ppxlib.Ast_builder.Default in
+    { expr with
+      pexp_attributes =
+        attribute ~loc:Location.none ~name:(mknoloc "memo_expr") ~payload:(PStr [])
+        :: expr.pexp_attributes
+    }
+  ;;
+
+  let mark_fo_arg expr =
+    let open Ppxlib.Ast_builder.Default in
+    { expr with
+      pexp_attributes =
+        attribute ~loc:Location.none ~name:(mknoloc "need_CbN") ~payload:(PStr [])
+        :: expr.pexp_attributes
+    }
+  ;;
+
+  let create_logic_var name =
+    let open Ppxlib.Ast_builder.Default in
+    { (create_pat name) with
+      ppat_attributes =
+        [ attribute ~loc:Location.none ~name:(mknoloc "logic") ~payload:(Ppxlib.PStr []) ]
+    }
+  ;;
+
+  let create_constr constr args =
+    let open Ppxlib.Ast_builder.Default in
+    let constr =
+      (match constr.txt with
+       | Ppxlib.Lident "::" -> Ppxlib.Lident "OCanren.Std.List.Cons"
+       | Lident "[]" -> Ppxlib.Lident "OCanren.Std.List.Nil"
+       | _ -> constr.txt)
+      |> mknoloc
+      |> pexp_ident ~loc:Location.none
+      |> mark_constr
+    in
+    (match args with
+     | [] -> constr
+     | [ _ ] -> create_apply constr args
+     | _ -> create_apply constr [ pexp_tuple ~loc:Location.none args ])
+    |> create_inj
+  ;;
+
+  let create_record bindings =
+    let open Ppxlib.Ast_builder.Default in
+    pexp_record
+      (List.map (fun (name, expr) -> Lident name |> mknoloc, expr) bindings)
+      None
+  ;;
+
+  let is_path_to_ocanren path =
+    let rec helper = function
+      | Lident root -> root = "OCanren"
+      | Ldot (next, _) -> helper next
       | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
     in
-    { path with txt = helper path.txt })
+    helper path.txt
+  ;;
+
+  let add_translated_module_name_in_ident path =
+    if is_path_to_ocanren path
+    then path
+    else (
+      match path.txt with
+      | Lident _ -> path
+      | Ldot (prepath, i) ->
+        { path with txt = Ldot (Ldot (prepath, translated_module_name), i) }
+      | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported.")
+  ;;
+
+  let add_translated_module_name_in_module path =
+    if is_path_to_ocanren path
+    then path
+    else (
+      let helper = function
+        | Lident i -> Ldot (Lident i, translated_module_name)
+        | Ldot (prepath, i) -> Ldot (Ldot (prepath, i), translated_module_name)
+        | Lapply _ -> fail_loc path.loc "'Laplay' is unsupported."
+      in
+      { path with txt = helper path.txt })
+  ;;
+
+  let add_translated_module_name_in_open open_ =
+    let popen_expr = open_.popen_expr in
+    match popen_expr.pmod_desc with
+    | Pmod_ident i ->
+      let pmod_desc = Pmod_ident (add_translated_module_name_in_module i) in
+      let popen_expr = { popen_expr with pmod_desc } in
+      { open_ with popen_expr }
+    | _ -> fail_loc open_.popen_loc "Unexpected open."
+  ;;
+end
+
+let hack_longident : Longident.t with_loc -> Astlib.Longident.t with_loc =
+  fun from ->
+  match from.txt with
+  | Longident.Lident l -> { from with txt = Ppxlib.Longident.Lident l }
+  | _ -> assert false
 ;;
 
-let add_translated_module_name_in_open open_ =
-  let popen_expr = open_.popen_expr in
-  match popen_expr.pmod_desc with
-  | Pmod_ident i ->
-    let pmod_desc = Pmod_ident (add_translated_module_name_in_module i) in
-    let popen_expr = { popen_expr with pmod_desc } in
-    { open_ with popen_expr }
-  | _ -> fail_loc open_.popen_loc "Unexpected open."
-;;
-
-let translate_pat pat fresher =
-  let rec translate_record_pat fresher fields =
-    let _, (info : Types.label_description), _ = List.hd fields in
+include (
+struct
+  let translate_record_pat helper fresher fields =
+    let _, (info : Tast_pattern.label_description), _ = List.hd fields in
     let count = Array.length info.lbl_all in
     let rec translate_record_pat fields index =
       if index == count
       then [], [], []
       else (
         match fields with
-        | (_, (i : Types.label_description), _) :: _xs when i.lbl_pos > index ->
+        | (_, (i : Tast_pattern.label_description), _) :: _xs when i.lbl_pos > index ->
           let var = fresher () in
           let pats, als, vars = translate_record_pat fields (index + 1) in
           create_id var :: pats, als, var :: vars
         | (_, _i, p) :: xs ->
-          let pat, als, vars = helper p in
+          let pat, als, vars = helper fresher p in
           let pats, als', vars' = translate_record_pat xs (index + 1) in
           pat :: pats, als @ als', vars @ vars'
         | [] ->
@@ -532,8 +669,13 @@ let translate_pat pat fresher =
           create_id var :: pats, als, var :: vars)
     in
     translate_record_pat fields 0
-  and helper : type a. a Typedtree.pattern_desc pattern_data -> _ =
-   fun pat ->
+  ;;
+
+  (* TODO(Kakadu): Ideally we want to aboid copy paste here, but GADT ... *)
+  [%%if ocaml_version < (5, 0, 0)]
+
+  let rec helper : type a. a Typedtree.pattern_desc pattern_data -> _ =
+    fun pat fresher ->
     let open Typedtree in
     let loc = pat.pat_loc in
     match pat.pat_desc with
@@ -541,7 +683,10 @@ let translate_pat pat fresher =
       let var = fresher () in
       create_id var, [], [ var ]
     | Tpat_var (v, _) -> create_id (name v), [], [ name v ]
-    | Tpat_constant c -> Untypeast.constant c |> Exp.constant |> create_inj, [], []
+    | Tpat_constant c ->
+      ( Untypeast.constant c |> Ppxlib.Ast_builder.Default.pexp_constant |> create_inj
+      , []
+      , [] )
     | Tpat_construct ({ txt = Lident "true" }, _, [], _) -> [%expr !!true], [], []
     | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
     | Tpat_construct ({ txt = Lident "()" }, _, [], _) -> [%expr !!()], [], []
@@ -558,7 +703,7 @@ let translate_pat pat fresher =
          let args, als, vars = List.map helper args |> split3 in
          let vars = List.concat vars in
          let als = List.concat als in
-         let constr = add_translated_module_name_in_ident constr_loc in
+         let constr = add_translated_module_name_in_ident (hack_longident constr_loc) in
          create_constr constr args, als, vars
        | Some t ->
          (match args with
@@ -580,15 +725,15 @@ let translate_pat pat fresher =
                 let bindings =
                   List.map (fun (name, var) -> name, create_id var) names_and_vars
                 in
-                create_record bindings, [], vars
+                create_record ~loc:Location.none bindings, [], vars
               | Tpat_record (fields, _) ->
                 let args, als, vars = translate_record_pat fresher fields in
                 let bindings = List.map2 (fun name arg -> name, arg) label_names args in
-                create_record bindings, als, vars
+                create_record ~loc:Location.none bindings, als, vars
               | _ ->
                 fail_loc loc "Inlined argument of pattern should be record or wildcard"
             in
-            create_constr constr_loc [ record_arg ], als, vars
+            create_constr (hack_longident constr_loc) [ record_arg ], als, vars
           | _ -> fail_loc loc "Pattern with inlined record should have one argument"))
     | Tpat_tuple l ->
       let args, als, vars = List.map helper l |> split3 in
@@ -607,11 +752,112 @@ let translate_pat pat fresher =
       let pat, als, vars = helper p in
       create_id (name v), Alias (create_id (name v), pat) :: als, name v :: vars
     | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
-  in
-  helper pat
-;;
+  ;;
 
-let get_constr_args loc (desc : Types.constructor_description) args =
+  [%%else]
+
+  let ppat_alias = Ppxlib.Ast_builder.Default.ppat_alias
+
+  let hack_constant : Parsetree.constant -> Ppxlib.constant = function
+    | _ -> assert false
+  ;;
+
+  let rec helper
+    : type a. _ -> a Typedtree.pattern_desc pattern_data -> Ppxlib.expression * _ * _
+    =
+    fun fresher pat ->
+    let open Typedtree in
+    let loc = pat.pat_loc in
+    match pat.pat_desc with
+    | Tpat_any ->
+      let var = fresher () in
+      create_id var, [], [ var ]
+    | Tpat_var (v, _, _) -> create_id (name v), [], [ name v ]
+    | Tpat_constant c ->
+      ( hack_constant (My_untype.constant c)
+        |> Ppxlib.Ast_builder.Default.pexp_constant ~loc
+        |> create_inj
+      , []
+      , [] )
+    | Tpat_construct ({ txt = Lident "true" }, _, [], _) -> [%expr !!true], [], []
+    | Tpat_construct ({ txt = Lident "false" }, _, [], _) -> [%expr !!false], [], []
+    | Tpat_construct ({ txt = Lident "()" }, _, [], _) -> [%expr !!()], [], []
+    | Tpat_construct ({ txt = Lident "[]" }, _, [], _) ->
+      create_inj [%expr [%e mark_constr [%expr OCanren.Std.List.Nil]]], [], []
+    | Tpat_construct ({ txt = Lident "Just" }, _, [ arg ], _) -> helper fresher arg
+    | Tpat_construct ({ txt = Lident "Nothing" }, _, [], _) ->
+      let v = fresher () in
+      create_id v, [ FailureExpr ], [ v ]
+    | Tpat_value x -> helper fresher (x :> Typedtree.value Typedtree.general_pattern)
+    | Tpat_construct (constr_loc, desc, args, t) ->
+      (match desc.cstr_inlined with
+       | None ->
+         let args, als, vars = List.map (helper fresher) args |> split3 in
+         let vars = List.concat vars in
+         let als = List.concat als in
+         let constr = add_translated_module_name_in_ident (hack_longident constr_loc) in
+         create_constr constr args, als, vars
+       | Some t ->
+         (match args with
+          | [ a ] ->
+            let record_arg, als, vars =
+              let label_names =
+                match t.type_kind with
+                | Type_record (tds, _) ->
+                  List.map (fun td -> Types.(Ident.name td.ld_id)) tds
+                | _ ->
+                  fail_loc loc "Wildcard schould have record type for inlined argument"
+              in
+              match a.pat_desc with
+              | Tpat_any ->
+                let names_and_vars =
+                  List.map (fun name -> name, fresher ()) label_names
+                in
+                let vars = List.map snd names_and_vars in
+                let bindings =
+                  List.map (fun (name, var) -> name, create_id var) names_and_vars
+                in
+                create_record ~loc:Location.none bindings, [], vars
+              | Tpat_record (fields, _) ->
+                let args, als, vars = translate_record_pat helper fresher fields in
+                let bindings = List.map2 (fun name arg -> name, arg) label_names args in
+                create_record ~loc:Location.none bindings, als, vars
+              | _ ->
+                fail_loc loc "Inlined argument of pattern should be record or wildcard"
+            in
+            create_constr (hack_longident constr_loc) [ record_arg ], als, vars
+          | _ -> fail_loc loc "Pattern with inlined record should have one argument"))
+    | Tpat_tuple l ->
+      let args, als, vars = List.map (fun (_, x) -> helper fresher x) l |> split3 in
+      let vars = List.concat vars in
+      let als = List.concat als in
+      ( fold_right1
+          (fun e1 e2 -> create_apply (mark_constr [%expr Std.pair]) [ e1; e2 ])
+          args
+      , als
+      , vars )
+    | Tpat_record (fields, _) ->
+      let args, als, vars = translate_record_pat helper fresher fields in
+      let ctor = ctor_for_record pat.pat_loc pat.pat_type in
+      create_apply (mark_constr ctor) args, als, vars
+    | Tpat_alias (p, v, _, _, _) ->
+      let pat, als, vars = helper fresher p in
+      create_id (name v), Alias (create_id (name v), pat) :: als, name v :: vars
+    | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
+  ;;
+
+  [%%endif]
+
+  let translate_pat pat fresher = helper fresher pat
+end :
+sig
+  val translate_pat
+    :  _ Typedtree.pattern_desc pattern_data
+    -> (unit -> label)
+    -> Ppxlib.expression * binding list * label list
+end)
+
+let get_constr_args loc (desc : Tast_pattern.constructor_description) args =
   match desc.cstr_inlined with
   | None -> `Constr_args args
   | Some _ ->
@@ -753,10 +999,12 @@ let create_external_attribute name value =
   |> Str.attribute
 ;;
 
+[%%if ocaml_version < (5, 0, 0)]
+
 let rec remove_aliases_from_pat
   : type a. a Typedtree.pattern_desc pattern_data -> a Typedtree.pattern_desc pattern_data
   =
- fun pat ->
+  fun pat ->
   let open Typedtree in
   let mk pat_desc = { pat with pat_desc } in
   match pat.pat_desc with
@@ -775,6 +1023,33 @@ let rec remove_aliases_from_pat
     mk @@ Tpat_or (remove_aliases_from_pat p1, remove_aliases_from_pat p2, x)
   | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
 ;;
+
+[%%else]
+
+let rec remove_aliases_from_pat
+  : type a. a Typedtree.pattern_desc pattern_data -> a Typedtree.pattern_desc pattern_data
+  =
+  fun pat ->
+  let open Typedtree in
+  let mk pat_desc = { pat with pat_desc } in
+  match pat.pat_desc with
+  | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_value _ -> pat
+  | Tpat_tuple l ->
+    let l = List.map (fun (l, p) -> l, remove_aliases_from_pat p) l in
+    mk @@ Tpat_tuple l
+  | Tpat_construct (a, b, l, c) ->
+    let l = List.map remove_aliases_from_pat l in
+    mk @@ Tpat_construct (a, b, l, c)
+  | Tpat_alias (pat, _, _, _, _) -> remove_aliases_from_pat pat
+  | Tpat_record (l, a) ->
+    let l = List.map (fun (a, b, p) -> a, b, remove_aliases_from_pat p) l in
+    mk @@ Tpat_record (l, a)
+  | Tpat_or (p1, p2, x) ->
+    mk @@ Tpat_or (remove_aliases_from_pat p1, remove_aliases_from_pat p2, x)
+  | _ -> fail_loc pat.pat_loc "Incorrect pattern in pattern matching"
+;;
+
+[%%endif]
 
 let rec translate_type (t : core_type) =
   let mk n = Lident n |> mknoloc in
