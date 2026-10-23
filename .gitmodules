@@ -1,0 +1,10 @@
+[submodule "zanuda"]
+	path = zanuda
+	url = https://github.com/Kakadu/zanuda.git
+
+[submodule "OCanren"]
+	path = OCanren
+	url = https://github.com/Kakadu/OCanren.git
+	branch = ocaml55
+
+
