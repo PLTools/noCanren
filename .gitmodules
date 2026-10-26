@@ -1,6 +1,7 @@
 [submodule "zanuda"]
 	path = zanuda
 	url = https://github.com/Kakadu/zanuda.git
+	branch = nocanren55
 
 [submodule "OCanren"]
 	path = OCanren
