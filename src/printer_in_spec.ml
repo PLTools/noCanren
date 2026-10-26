@@ -2,27 +2,43 @@ open Parsetree
 open Format
 
 let print_tree
-  ?(module_name = "program")
-  ?(tree_name = "tree")
-  ?(last_goal = "last_goal")
-  fmt
-  tree
+      ?(module_name = "program")
+      ?(tree_name = "tree")
+      ?(last_goal = "last_goal")
+      fmt
+      tree
   =
   let name_from_pat pat =
-    match pat.ppat_desc with
-    | Ppat_var loc -> loc.txt
+    match pat.Ppxlib.ppat_desc with
+    | Ppxlib.Ppat_var loc -> loc.txt
     | _ -> failwith "Incorrect pattern in tree printer"
   in
   let rec has_attr attr = function
     | x :: xs -> x.attr_name.Location.txt = attr || has_attr attr xs
     | [] -> false
   in
-  let rec get_args_and_body expr =
-    match expr.pexp_desc with
+  let get_args_and_body expr =
+    Ppxlib.Ast_pattern.(parse (pexp_function __ drop (pfunction_body __)))
+      Location.none
+      expr
+      ~on_error:(fun _ -> [], expr)
+      (fun params body ->
+        let _ : Ppxlib.function_param list = params in
+        let _ : Ppxlib.expression = body in
+        let new_params =
+          List.map
+            (fun x ->
+              match x.Ppxlib.pparam_desc with
+              | Pparam_val (_, _, p) -> name_from_pat p
+              | _ -> failwith "Not implemnted")
+            params
+        in
+        new_params, body)
+    (* match expr.pexp_desc with
     | Pexp_fun (_, _, pat, body) ->
       let vars, body' = get_args_and_body body in
       name_from_pat pat :: vars, body'
-    | _ -> [], expr
+    | _ -> [], expr *)
   in
   let rec print_list need_nl sep f fmt = function
     | [ x ] -> f fmt x
